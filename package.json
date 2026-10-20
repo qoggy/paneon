@@ -1,0 +1,65 @@
+{
+  "name": "paneon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Code-first interactive interfaces for coding agents.",
+  "license": "MIT",
+  "author": "qoggy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qoggy/paneon.git"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "bin": {
+    "paneon": "dist/cli/index.js"
+  },
+  "files": [
+    "dist/cli/",
+    "dist/web/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:cli": "node src/cli/index.ts",
+    "build": "npm run typecheck && npm run build:cli && npm run build:web",
+    "build:cli": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist/cli', { recursive: true, force: true });\" && tsc -p tsconfig.cli.json",
+    "build:web": "vite build",
+    "prepack": "npm run build",
+    "test": "npm run build:cli && node --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@tailwindcss/vite": "^4",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6",
+    "eslint": "^10",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "tailwindcss": "^4",
+    "typescript": "~6",
+    "typescript-eslint": "^8",
+    "vite": "^8"
+  }
+}
