@@ -48,7 +48,8 @@
     "test:versions": "node tests/acceptance-versions.mjs",
     "test:browser:production": "node tests/browser/production-runtime.mjs",
     "test:browser:host": "node tests/browser/host-lifecycle.mjs",
-    "test:browser:tabs": "node tests/browser/multiple-tabs.mjs"
+    "test:browser:tabs": "node tests/browser/multiple-tabs.mjs",
+    "test:browser:mermaid": "node tests/browser/mermaid.mjs"
   },
   "dependencies": {
     "@fastify/websocket": "^11.3.4",
@@ -65,6 +66,7 @@
     "fastify": "^5.12.7",
     "github-markdown-css": "5.9.0",
     "lucide-react": "1.60.0",
+    "mermaid": "12.2.0",
     "radix-ui": "1.8.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

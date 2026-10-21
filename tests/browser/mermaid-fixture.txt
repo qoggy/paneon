@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { definePanel, z } from 'paneon/sdk';
+import { Button, Markdown, Mermaid, Page, Section, Stack, Textarea } from 'paneon/ui';
+
+const flow = 'flowchart LR\n  Start --> Finish';
+const sequence = 'sequenceDiagram\n  Human->>Agent: Question\n  Agent-->>Human: Answer';
+const document = [
+  '# Markdown diagrams',
+  '',
+  '```mermaid',
+  'flowchart TD',
+  '  MarkdownStart --> MarkdownEnd',
+  '```',
+  '',
+  '```mermaid',
+  'sequenceDiagram',
+  '  Browser->>Human: Explanation',
+  '```',
+  '',
+  '- Nested list diagram',
+  '',
+  '  ```mermaid',
+  '  flowchart LR',
+  '    ListStart --> ListEnd',
+  '  ```',
+  '',
+  '> Quoted diagram',
+  '>',
+  '> ```mermaid',
+  '> sequenceDiagram',
+  '>   QuoteStart->>QuoteEnd: Message',
+  '> ```',
+  '',
+  'Inline `mermaid` stays code.',
+  '',
+  '```typescript',
+  'const text = "ordinary code";',
+  '```',
+  '',
+  '<script>window.__markdownExecuted = true</script>',
+].join('\n');
+
+function Panel() {
+  const [code, setCode] = useState(flow);
+  const [shown, setShown] = useState(true);
+  const [race, setRace] = useState(0);
+  const [updatedMarkdown, setUpdatedMarkdown] = useState(false);
+  return (
+    <Page title="Mermaid acceptance">
+      <Section title="Standalone diagrams">
+        <div data-testid="standalone-flow"><Mermaid code={flow} /></div>
+        <div data-testid="standalone-sequence"><Mermaid code={sequence} /></div>
+      </Section>
+      <Section title="Markdown">
+        <Button onClick={() => setUpdatedMarkdown((value) => !value)}>Update Markdown</Button>
+        <div data-testid="markdown-diagrams">
+          <Markdown>{updatedMarkdown ? document.replaceAll('MarkdownStart', 'MarkdownUpdated') : document}</Markdown>
+        </div>
+      </Section>
+      <Section title="Editable diagram">
+        <Textarea aria-label="Diagram source" value={code} onChange={(event) => setCode(event.target.value)} />
+        <Stack direction="row" wrap>
+          <Button onClick={() => setCode('flowchart LR\n  Broken --> [')}>Invalid diagram</Button>
+          <Button onClick={() => setCode('flowchart LR\n  Recovered --> Ready')}>Recover diagram</Button>
+        </Stack>
+        <div data-testid="editable"><Mermaid code={code} /></div>
+      </Section>
+      <Section title="Render lifecycle">
+        <Stack direction="row" wrap>
+          <Button onClick={() => setShown((value) => !value)}>{shown ? 'Unmount diagram' : 'Mount diagram'}</Button>
+          <Button onClick={() => setRace((value) => value + 1)}>Update lifecycle diagram</Button>
+        </Stack>
+        <p>Lifecycle revision {race}</p>
+        <div data-testid="toggled">{shown && <Mermaid code={`flowchart LR\n  Revision${race} --> Current`} />}</div>
+      </Section>
+    </Page>
+  );
+}
+export default definePanel({id:'mermaid-acceptance',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});

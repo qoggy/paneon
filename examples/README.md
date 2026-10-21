@@ -16,6 +16,21 @@ node dist/cli/index.js panel run examples/components-panel.tsx --cwd "$PWD" --pa
 These examples declare exactly the current development version, `0.0.0`. Check
 and update the range deliberately when reusing them with another version.
 
+## Mermaid diagrams
+
+```sh
+node dist/cli/index.js panel run examples/mermaid-panel.tsx --cwd "$PWD" --params '{}' --open --json
+```
+
+The example combines `<Mermaid code={source} />` and Markdown fenced blocks
+marked `mermaid`. Edit the source or choose a preset to update the diagram;
+try invalid source, then select a valid preset to recover. Multiple diagrams
+render independently. Other code blocks and inline code remain text.
+
+Both entry points use the bundled official Mermaid library and its default
+appearance, without a CDN or a separate theme. This example needs no external
+service or `serverAction`.
+
 ## Simulated CLI integration
 
 ```sh

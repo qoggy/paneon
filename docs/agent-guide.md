@@ -297,10 +297,10 @@ radius, or control height. `Page`, `Section`, and `Stack` only supply layout.
 | `Popover` | `PopoverTrigger`, `PopoverContent`, `PopoverAnchor` |
 | `Switch` | Controlled/uncontrolled boolean control |
 | `CodeBlock` | `code: string`, optional `language` |
-| `Markdown` | Markdown string as children |
+| `Markdown` | Markdown string as children, including fenced Mermaid diagrams |
+| `Mermaid` | `code: string`, optional `className` |
 
-This is the complete 29-main-component scope; companion exports are not counted
-as extra main components. Slider is not included.
+Companion exports belong to their main component families. Slider is not included.
 
 For basic layout, use `<Page title="..."><Stack>...</Stack></Page>`, add
 `<Section title="...">` for a region, and use
@@ -325,6 +325,43 @@ Markdown uses `react-markdown` + `remark-gfm` and the community-maintained
 tables, strikethrough, read-only task lists, and automatic links. Raw HTML parsing
 is disabled by default. It is a read-only renderer, not an editor or annotation
 system. Host styles are loaded separately inside the iframe.
+
+### Mermaid diagrams
+
+Use `Mermaid` for a standalone diagram, or a `mermaid` fenced block inside
+`Markdown`. Both entry points use the official Mermaid library, bundled locally,
+and keep its default appearance. Do not load Mermaid from a CDN or add a separate
+rendering service.
+
+```tsx
+import { Markdown, Mermaid } from 'paneon/ui';
+
+<Mermaid code={'flowchart LR\n  Question --> Explanation'} />;
+
+<Markdown>{`## Review flow
+
+\`\`\`mermaid
+sequenceDiagram
+  Human->>Agent: Ask a question
+  Agent-->>Human: Explain the options
+\`\`\`
+`}</Markdown>;
+```
+
+The `code` prop is ordinary React state: changing it renders the new source.
+Multiple diagrams can appear in the same document, including lists and quotes.
+While rendering, the component shows a loading state; invalid source displays an
+error in that diagram and can be corrected without reloading the page. Other
+Markdown code blocks, inline code, and GFM content retain their existing behavior.
+Raw HTML parsing stays disabled. The optional `className` is for container layout,
+not a separate diagram theme API.
+
+[The Mermaid example](../examples/mermaid-panel.tsx) provides editable source,
+flowchart and sequence presets, Markdown diagrams, and error recovery:
+
+```sh
+paneon panel run examples/mermaid-panel.tsx --cwd "$PWD" --params '{}' --open --json
+```
 
 ## Deliver events to the agent
 
@@ -434,6 +471,7 @@ npm run test:browser:credentials
 npm run test:browser:queries
 npm run test:browser:production
 npm run test:browser:host
+npm run test:browser:mermaid
 ```
 
 Run independent installation and browser checks from a real `npm pack` artifact:

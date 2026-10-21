@@ -12,5 +12,14 @@ github-markdown-css is a community project that reproduces GitHub Markdown style
 
 Bundle rendering dependencies and styles with the product and load them inside the panel iframe. Treat Markdown as content, not executable JSX, scripts, or commands; do not enable raw HTML parsing by default. This requirement does not add editing, annotations, or document storage.
 
+Render fenced code blocks marked `mermaid` through the same `Mermaid` component
+exported from `paneon/ui` (`code: string`, optional `className`). Use the official
+Mermaid library bundled locally, retaining the installed version's default
+appearance and strict security setting. Do not introduce a custom theme, CDN,
+remote rendering service, or raw HTML parsing. Multiple diagrams and source
+updates are supported; a syntax failure is local to that diagram and can recover
+when corrected. Ordinary fenced code and inline code retain their current
+behavior. See `examples/mermaid-panel.tsx` for both entry points.
+
 **Why:** Agents need a simple way to display readable explanations and documents without writing typography CSS.
 **How to apply:** Export the component from paneon/ui and provide a usage example. Keep the standard community presentation rather than inventing another visual system.

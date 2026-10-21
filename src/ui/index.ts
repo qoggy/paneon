@@ -26,3 +26,4 @@ export * from './separator';
 export * from './layout';
 export * from './code-block';
 export * from './markdown';
+export * from './mermaid';

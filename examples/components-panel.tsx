@@ -66,6 +66,7 @@ import {
   Input,
   Label,
   Markdown,
+  Mermaid,
   Page,
   Pagination,
   PaginationContent,
@@ -403,6 +404,9 @@ function ComponentsPanel() {
               </PaginationItem>
             </PaginationContent>
           </Pagination>
+        </Section>
+        <Section title="Mermaid diagrams">
+          <Mermaid code={'flowchart LR\n  Question --> Diagram\n  Diagram --> Understanding'} />
         </Section>
         <Section title="Read-only content">
           <CodeBlock
