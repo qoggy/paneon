@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Code-first interactive interfaces for coding agents.",
+  "description": "Code-first interactive interfaces for agents.",
   "license": "MIT",
   "author": "qoggy",
   "repository": {
@@ -17,49 +17,100 @@
     "paneon": "dist/cli/index.js"
   },
   "files": [
-    "dist/cli/",
-    "dist/web/",
+    "dist/",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "examples/",
+    "docs/agent-guide.md",
+    "src/ui/UPSTREAM-LICENSE.md",
+    "src/ui/upstream.json"
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:cli": "node src/cli/index.ts",
-    "build": "npm run typecheck && npm run build:cli && npm run build:web",
-    "build:cli": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist/cli', { recursive: true, force: true });\" && tsc -p tsconfig.cli.json",
+    "build": "npm run typecheck && npm run build:cli && npm run build:ui && npm run build:web",
+    "build:cli": "tsc -p tsconfig.cli.json",
     "build:web": "vite build",
     "prepack": "npm run build",
-    "test": "npm run build:cli && node --test tests/*.test.ts",
-    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json",
+    "test": "npm run build:cli && npm run build:ui && node --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.examples.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "build:ui": "vite build --config vite.ui.config.ts && tsc -p tsconfig.ui.json",
+    "test:browser:ui": "node tests/browser/ui.mjs",
+    "test:acceptance": "node tests/acceptance.mjs",
+    "test:pack": "node tests/acceptance-pack.mjs",
+    "test:browser:credentials": "node tests/browser/credentials.mjs",
+    "test:browser:queries": "node tests/browser/query-lifecycle.mjs",
+    "test:versions": "node tests/acceptance-versions.mjs",
+    "test:browser:production": "node tests/browser/production-runtime.mjs",
+    "test:browser:host": "node tests/browser/host-lifecycle.mjs",
+    "test:browser:tabs": "node tests/browser/multiple-tabs.mjs"
   },
   "dependencies": {
+    "@fastify/websocket": "^11.3.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6",
+    "better-sqlite3": "^13.0.3",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
     "commander": "^14.0.0",
+    "esbuild": "^0.28.2",
+    "fastify": "^5.12.7",
+    "github-markdown-css": "5.9.0",
+    "lucide-react": "1.60.0",
+    "radix-ui": "1.8.1",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "semver": "^7.8.5",
+    "shiki": "4.5.0",
+    "tailwind-merge": "3.7.0",
+    "tailwindcss": "^4.3.3",
+    "tw-animate-css": "1.4.0",
+    "typescript": "~6",
+    "vite": "^8",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10",
-    "@tailwindcss/vite": "^4",
-    "@types/node": "^24",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/semver": "^7.8.0",
+    "@types/ws": "^8.18.2",
     "eslint": "^10",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17",
+    "playwright": "^1.64.1",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "tailwindcss": "^4",
-    "typescript": "~6",
     "typescript-eslint": "^8",
-    "vite": "^8"
+    "ws": "^8.22.0"
+  },
+  "exports": {
+    ".": "./dist/sdk/index.js",
+    "./sdk": {
+      "types": "./dist/sdk/index.d.ts",
+      "browser": "./dist/sdk/client.js",
+      "default": "./dist/sdk/index.js"
+    },
+    "./sdk/client": {
+      "types": "./dist/sdk/client.d.ts",
+      "default": "./dist/sdk/client.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "default": "./dist/ui/index.js"
+    },
+    "./ui/theme.css": "./dist/ui/theme.css"
   }
 }

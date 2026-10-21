@@ -1,0 +1,46 @@
+{
+  "transport": "WebSocket",
+  "date": "2026-10-21",
+  "method": "Browser Use via cua_repl against an isolated real runtime and watched TSX fixture",
+  "chrome": {
+    "sameProfile": true,
+    "tabs": 10,
+    "allInitiallyRendered": true,
+    "tenthTabActionCompleted": true,
+    "automaticSourceUpdate": "Not verified: Browser Use reported a paused document response; frame navigation was blocked in the automation session. Reloading a tab displayed the updated source."
+  },
+  "inAppBrowser": {
+    "tabs": 10,
+    "allInitiallyRendered": true,
+    "automaticallyUpdatedTabs": 10,
+    "reconnectedTabs": 10,
+    "lastTabReloaded": true
+  },
+  "backendObserved": {
+    "connectionsWithAllTabs": 10,
+    "connectionsAfterClosingOne": 9,
+    "connectionsAfterClosingAll": 0,
+    "mutationCallsBeforeUpdate": 1,
+    "mutationCallsAfterUpdateReconnectAndReload": 1
+  },
+  "tests": {
+    "sequentialCommand": "node --test --test-concurrency=1 tests/*.test.ts",
+    "passed": 44,
+    "failed": 0,
+    "skipped": 0,
+    "initialParallelRun": {
+      "passed": 42,
+      "failed": 2,
+      "reason": "Two wall-clock assertions exceeded 5s: CLI --version startup and CLI 200ms event wait. Both passed in an isolated focused rerun; all 44 passed sequentially. No timing bounds were relaxed."
+    }
+  },
+  "browserRegressionScript": "npm run test:browser:tabs (added; this round used cua_repl to exercise the browser checks rather than executing the Playwright runner)",
+  "liveRuntime": {
+    "restarted": true,
+    "port": 54738,
+    "existingHttpPanelRestored": true,
+    "existingGhPanelRestored": true,
+    "githubRowsRendered": true,
+    "httpDemoBackend": "127.0.0.1:43180 ECONNREFUSED; independent demo backend was not started"
+  }
+}

@@ -1,0 +1,19 @@
+import {useState} from 'react';
+import * as U from '../../src/ui/index';
+export default function Variants() {
+ const [tab,setTab]=useState('one'); const [text,setText]=useState(''); const [open,setOpen]=useState(false); const [popover,setPopover]=useState(false); const [menu,setMenu]=useState(false);
+ return <U.Page title="Behavior variants">
+ <U.Tabs value={tab} onValueChange={setTab}><U.TabsList><U.TabsTrigger value="one">Controlled one</U.TabsTrigger><U.TabsTrigger value="two">Controlled two</U.TabsTrigger></U.TabsList><U.TabsContent value="one">Controlled first panel</U.TabsContent><U.TabsContent value="two">Controlled second panel</U.TabsContent></U.Tabs>
+ <U.Checkbox aria-label="Uncontrolled checkbox" defaultChecked/><U.Switch aria-label="Uncontrolled switch" defaultChecked/>
+ <U.Textarea aria-label="Controlled textarea" value={text} onChange={e=>setText(e.target.value)}/><output aria-label="Textarea value">{text}</output>
+ <U.Accordion type="single" collapsible><U.AccordionItem value="one"><U.AccordionTrigger>Single first</U.AccordionTrigger><U.AccordionContent>Single first content</U.AccordionContent></U.AccordionItem><U.AccordionItem value="two"><U.AccordionTrigger>Single second</U.AccordionTrigger><U.AccordionContent>Single second content</U.AccordionContent></U.AccordionItem><U.AccordionItem value="disabled" disabled><U.AccordionTrigger>Disabled accordion</U.AccordionTrigger><U.AccordionContent>Never opened</U.AccordionContent></U.AccordionItem></U.Accordion>
+ <U.Collapsible open={open} onOpenChange={setOpen}><U.CollapsibleTrigger asChild><U.Button>Controlled disclosure</U.Button></U.CollapsibleTrigger><U.CollapsibleContent>Controlled disclosure content</U.CollapsibleContent></U.Collapsible>
+ <U.Popover open={popover} onOpenChange={setPopover}><U.PopoverTrigger asChild><U.Button>Controlled popover</U.Button></U.PopoverTrigger><U.PopoverContent>Controlled popover content</U.PopoverContent></U.Popover>
+ <U.DropdownMenu open={menu} onOpenChange={setMenu}><U.DropdownMenuTrigger asChild><U.Button>Controlled menu</U.Button></U.DropdownMenuTrigger><U.DropdownMenuContent><U.DropdownMenuItem>Controlled menu item</U.DropdownMenuItem></U.DropdownMenuContent></U.DropdownMenu>
+ <U.Pagination aria-label="Single page"><U.PaginationContent><U.PaginationItem><U.PaginationLink href="#" isActive onClick={e=>e.preventDefault()}>Only page</U.PaginationLink></U.PaginationItem></U.PaginationContent></U.Pagination><section aria-label="Empty pagination">No results</section>
+ <U.CodeBlock code={'<script>window.executed=true</script>\n  whitespace preserved'} language="unknown-language"/>
+ {['javascript','js','typescript','ts','jsx','tsx','json','bash','sh','yaml','yml','diff'].map(language=><U.CodeBlock key={language} code={language==='json'?'{"value": 1}':language==='yaml'||language==='yml'?'value: 1':language==='diff'?'+ added\n- removed':'const value = 1'} language={language}/>)}
+ <U.CodeBlock code={'x'.repeat(500)} />
+ <U.Markdown>{'<script>window.executed=true</script>\n\n<img src="https://invalid.example/test" onerror="window.executed=true"/>\n\n**Safe content**'}</U.Markdown>
+ </U.Page>;
+}

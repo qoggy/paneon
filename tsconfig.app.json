@@ -16,6 +16,13 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/cli"]
+  "include": [
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/web/**/*",
+    "src/ui/**/*",
+    "src/sdk/**/*",
+    "src/shared/types.ts"
+  ],
+  "exclude": ["src/cli", "src/runtime", "src/compiler"]
 }

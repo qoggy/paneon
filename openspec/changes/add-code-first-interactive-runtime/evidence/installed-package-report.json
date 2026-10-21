@@ -1,0 +1,12 @@
+{
+  "label": "installed-package",
+  "evidence": [
+    "CLI example: real iframe click, application-owned execFile, result, history, event redelivery and explicit ack",
+    "HTTP example: author fetch mutation, query refresh, explicit event and failed-backend feedback",
+    "Pure function, custom SVG interaction, multiline Chinese event, actual frontend and Node action source update",
+    "Explicit no-watch retained through manual reload, empty and single-page table states",
+    "Independent CLI processes, service restart, existing instance URL recovery, saved event and ack position recovery"
+  ],
+  "artifacts": "/var/folders/01/7961y03s2xbdldhx3v2vfcmr0000gp/T/paneon-evidence-LPHHzX",
+  "tables": ["consumers", "events", "panels", "schema_meta", "sqlite_sequence"]
+}

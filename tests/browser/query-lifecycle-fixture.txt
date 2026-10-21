@@ -1,0 +1,35 @@
+import {definePanel,serverAction,useQuery,z} from 'paneon/sdk';
+import {useEffect,useRef,useState} from 'react';
+import {appendFileSync,existsSync,readFileSync,writeFileSync} from 'node:fs';
+import {Button,Page,Stack} from 'paneon/ui';
+export const slowQuery=serverAction({kind:'query',input:z.object({milliseconds:z.number()}),handler:async(_ctx,input)=>{
+ const callId=crypto.randomUUID();
+ appendFileSync('query.jsonl',JSON.stringify({type:'start',callId,time:Date.now()})+'\n');
+ await new Promise(resolve=>setTimeout(resolve,input.milliseconds));
+ appendFileSync('query.jsonl',JSON.stringify({type:'end',callId,time:Date.now()})+'\n');
+ return {callId};
+}});
+export const mutate=serverAction({input:z.object({}),handler:()=>{
+ const previous=existsSync('mutation-count.txt')?Number(readFileSync('mutation-count.txt','utf8')):0;
+ writeFileSync('mutation-count.txt',String(previous+1));
+ return {count:previous+1};
+}});
+function QuerySubscription(){
+ const query=useQuery(slowQuery,{milliseconds:300},{refreshMs:75});
+ return <Stack><Button onClick={()=>void query.refetch()}>Refetch query</Button><output aria-label="Query state">{query.loading?'Loading':query.error?.message??query.data?.callId??'Waiting'}</output></Stack>;
+}
+function CanvasExample(){
+ const canvas=useRef<HTMLCanvasElement>(null);
+ useEffect(()=>{const context=canvas.current?.getContext('2d');if(context){context.fillStyle='#123456';context.fillRect(8,8,16,16);}},[]);
+ return <canvas ref={canvas} role="img" aria-label="Canvas rectangle" width={48} height={48}>Canvas rectangle example</canvas>;
+}
+function Panel(){
+ const[mounted,setMounted]=useState(true);const[result,setResult]=useState('');
+ return <Page title="Query lifecycle test"><Stack><CanvasExample/>
+ <Button onClick={()=>setMounted(value=>!value)}>{mounted?'Unmount query':'Mount query'}</Button>
+ {mounted?<QuerySubscription/>:<p>Query subscription unmounted</p>}
+ <Button onClick={async()=>{try{setResult(JSON.stringify(await mutate({})));}catch(cause){const error=cause as Error&{code?:string};setResult(`${error.code}|${error.message}`);}}}>Perform mutation once</Button>
+ <output aria-label="Mutation result">{result}</output>
+ </Stack></Page>;
+}
+export default definePanel({id:'query-lifecycle',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});

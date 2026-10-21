@@ -20,18 +20,42 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/cli/**'],
+    ignores: ['src/cli/**', 'src/compiler/**', 'src/runtime/**', 'src/shared/**', 'src/sdk/**'],
     extends: [reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['src/cli/**/*.ts', 'tests/**/*.ts', 'vite.config.ts'],
+    files: [
+      'src/cli/**/*.ts',
+      'src/compiler/**/*.ts',
+      'src/runtime/**/*.ts',
+      'src/shared/**/*.ts',
+      'tests/**/*.ts',
+      'vite*.config.ts',
+    ],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['src/sdk/client.ts'],
+    extends: [reactHooks.configs.flat.recommended],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ['src/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        { allowExportNames: ['buttonVariants', 'badgeVariants', 'tabsListVariants'] },
+      ],
+    },
   },
   prettierRecommended,
 ]);

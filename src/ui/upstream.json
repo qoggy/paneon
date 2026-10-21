@@ -1,0 +1,184 @@
+{
+  "retrievedAt": "2026-10-20",
+  "style": "new-york-v4",
+  "baseColor": "neutral",
+  "items": [
+    {
+      "name": "button",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
+      "sha256": "4b8d7d848742727973c1b088af8d15f0b628272a1316f2d2fa344e73ddff9e9c",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "input",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/input.json",
+      "sha256": "b1fffa12ba72ce30a291749012b47235eda110648b8106725ced22b5b31c8f1b",
+      "dependencies": ["cn"],
+      "registryDependencies": []
+    },
+    {
+      "name": "label",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/label.json",
+      "sha256": "b03d6bc91da205758df87c5403d74bae4d742f1f4ac5ae0b94ad7a29ab6350ea",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "field",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/field.json",
+      "sha256": "5524eca8a5aca35b2f02dac696144053ea8d3d02f722676942e4e92bb08efeb2",
+      "dependencies": ["cn"],
+      "registryDependencies": ["label", "separator"]
+    },
+    {
+      "name": "card",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/card.json",
+      "sha256": "c7ebaa49ba2a0613838558f3892c5007523c2dc26d6b36a244145d454a796106",
+      "dependencies": ["cn"],
+      "registryDependencies": []
+    },
+    {
+      "name": "radio-group",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json",
+      "sha256": "299fa36d5c5df3aefa40a59d8d3f92a1ccc9feae6b5187135851d9846348f1af",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "checkbox",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/checkbox.json",
+      "sha256": "567b649e4cd68c05bfdc58ca00fa04aee38bca291cd6f16ed7776ec06ba3d6bd",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "textarea",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/textarea.json",
+      "sha256": "2367d3964326b19ca2355f872d08153c86932abd4b103b5fd02039a3f2cb8ae5",
+      "dependencies": ["cn"],
+      "registryDependencies": []
+    },
+    {
+      "name": "select",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/select.json",
+      "sha256": "ca3189ea8101a04f144b6d0f0e7330841639bfa5f4d57e7cca0894d39b30817b",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "badge",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+      "sha256": "0f988b37cf1c56e7ecc83b1dcf24c9af4e73ce4341da5caf2c9d9b07a551319b",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "alert",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/alert.json",
+      "sha256": "413c97869ec0e53efa4a37f590833bcf4a7a57255f5a2e909c6bb5bac7b4570d",
+      "dependencies": ["cn"],
+      "registryDependencies": []
+    },
+    {
+      "name": "spinner",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/spinner.json",
+      "sha256": "9516791ff6443cb5dee344f4f61df812c6b1fa455b86eb2febd10acc66c0c178",
+      "dependencies": ["cn", "class-variance-authority"],
+      "registryDependencies": []
+    },
+    {
+      "name": "table",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/table.json",
+      "sha256": "35a45f90ee92883533c4c1029212d38bd263694e90ea54fbfaf66a099f7d3cc4",
+      "dependencies": ["cn"],
+      "registryDependencies": []
+    },
+    {
+      "name": "pagination",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/pagination.json",
+      "sha256": "e70ae7251fdb0f3c4c7473b158a15b35fa0a84ce999ce3aea66e6d6d3d409750",
+      "dependencies": ["cn"],
+      "registryDependencies": ["button"]
+    },
+    {
+      "name": "tabs",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/tabs.json",
+      "sha256": "49320e6dcf56570753bb14ed3f5d66acf07d12e183c0e9024466995b25be5b1d",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "dialog",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/dialog.json",
+      "sha256": "0115e3a57aa55a978c5fed0d77f7e98edd694215aae3e569def3fff722ba9f26",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "alert-dialog",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json",
+      "sha256": "03c0d4de131a9b049e9080724666045c8785074af7e07040a0a0f922a810e7c2",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": ["button"]
+    },
+    {
+      "name": "accordion",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/accordion.json",
+      "sha256": "93254d43d27259998b10c7bb5261f85bdc44509d46309a5c10a1e5d126a8d279",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "collapsible",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/collapsible.json",
+      "sha256": "fdc6666e9c728d7e731b0e4d67e11db81020aff47408c259549fc1aefcc8e3e7",
+      "dependencies": ["radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "tooltip",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
+      "sha256": "1b7b452b34beab05b22bd653963abd1c88ebd8e9ebcc89dcaebf4ac4938c929e",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "dropdown-menu",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/dropdown-menu.json",
+      "sha256": "235b1231cf71d94225eccd6c19117e7fa7b09cf256d23a199d63aee53265fd52",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "popover",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/popover.json",
+      "sha256": "78793171b536e0c335ad51b1313619e533566b514d3503ef60c94dc9d3ccfbef",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "switch",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/switch.json",
+      "sha256": "cc526c3a4827be315be746355a988e22dacc99d663ed31924fd30c2507cdc005",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    },
+    {
+      "name": "separator",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/separator.json",
+      "sha256": "4242a9fe839cae9083acff1280b7cccfda10e97bbc83283aed12d2d12bebdc6a",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
+    }
+  ],
+  "theme": {
+    "url": "https://ui.shadcn.com/r/colors/neutral.json",
+    "sha256": "58f847c9413f0c0e326f4796702a40c31a6d115e2b73b07edc288e7ef949af7f"
+  },
+  "tailwind": {
+    "package": "shadcn@4.22.1",
+    "path": "dist/tailwind.css",
+    "sha256": "4c371f7a1ff5d219ae2f7ff28bd256b4346fd546fe46fbae22092e57db2f0fae"
+  }
+}

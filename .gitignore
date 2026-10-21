@@ -48,3 +48,6 @@ Thumbs.db
 
 # Paneon runtime data
 .paneon/
+
+# Demo release example state
+.paneon-demo-release.json

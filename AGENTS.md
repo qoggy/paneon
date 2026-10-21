@@ -11,7 +11,7 @@ npm ci                       # Install dependencies
 npm run dev                  # Start the React development server
 npm run dev:cli -- --help     # Show CLI help
 npm run build                # Type-check and build the CLI and web interface
-npm test                     # Build the CLI and run automated tests
+npm test                     # Build the CLI/UI and run automated tests
 npm run lint                 # Run ESLint
 npm run format               # Format files with Prettier
 npm run format:check         # Check formatting

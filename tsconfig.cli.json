@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
-    "rootDir": "src/cli",
-    "outDir": "dist/cli",
-    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "jsx": "react-jsx",
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "strict": true,
@@ -16,5 +17,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/cli/**/*.ts"]
+  "include": [
+    "src/cli/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/sdk/**/*.ts",
+    "src/compiler/**/*.ts",
+    "src/runtime/**/*.ts"
+  ]
 }
