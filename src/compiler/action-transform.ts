@@ -253,6 +253,7 @@ export function createGraph(
   const selected = new Map<string, Set<ts.Statement>>();
   const selectedImports = new Map<string, Set<string>>();
   const roots = new Map<string, Set<string>>();
+  const selectedExports = new Map<ts.ExportDeclaration, Set<string>>();
   const actions: Graph['actions'] = [];
   const load = (file: string) => {
     let m = modules.get(file);
@@ -262,13 +263,6 @@ export function createGraph(
       selected.set(file, new Set());
       selectedImports.set(file, new Set());
       roots.set(file, new Set());
-      for (const [name, a] of m.actions)
-        actions.push({
-          id: `${relative(dirname(entry), file).replaceAll('\\', '/')}#${name}`,
-          name,
-          file,
-          kind: a.kind,
-        });
     }
     return m;
   };
@@ -324,28 +318,155 @@ export function createGraph(
     const declaration = m.names.get(name);
     if (declaration) select(file, declaration);
   }
-  function include(file: string, exported: string) {
+  const isRuntimeDeclaration = (s: ts.Statement) =>
+    ts.isVariableStatement(s) || ts.isFunctionDeclaration(s) || ts.isClassDeclaration(s);
+  const hasModifier = (s: ts.Statement, kind: ts.SyntaxKind) =>
+    ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((m) => m.kind === kind);
+  function exportedNames(file: string, visiting = new Set<string>()): Set<string> {
+    if (visiting.has(file)) return new Set();
+    const branch = new Set(visiting).add(file);
     const m = load(file);
+    const names = new Set<string>();
+    for (const s of m.source.statements) {
+      if (ts.isExportAssignment(s) || hasModifier(s, ts.SyntaxKind.DefaultKeyword))
+        names.add('default');
+      else if (isRuntimeDeclaration(s) && hasModifier(s, ts.SyntaxKind.ExportKeyword)) {
+        for (const [name, declaration] of m.names) if (declaration === s) names.add(name);
+      } else if (ts.isExportDeclaration(s) && !s.isTypeOnly) {
+        if (s.exportClause && ts.isNamedExports(s.exportClause)) {
+          for (const e of s.exportClause.elements) if (!e.isTypeOnly) names.add(e.name.text);
+        } else if (s.exportClause) names.add(s.exportClause.name.text);
+        else if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
+          const path = localPath(file, s.moduleSpecifier.text);
+          if (path)
+            for (const name of exportedNames(path, branch)) if (name !== 'default') names.add(name);
+        }
+      }
+    }
+    return names;
+  }
+  function hasExternalStar(file: string, visiting = new Set<string>()): boolean {
+    if (visiting.has(file)) return false;
+    const branch = new Set(visiting).add(file);
+    return load(file).source.statements.some((s) => {
+      if (
+        !ts.isExportDeclaration(s) ||
+        s.isTypeOnly ||
+        s.exportClause ||
+        !s.moduleSpecifier ||
+        !ts.isStringLiteral(s.moduleSpecifier)
+      )
+        return false;
+      const path = localPath(file, s.moduleSpecifier.text);
+      return !path || hasExternalStar(path, branch);
+    });
+  }
+  function directExport(m: SourceModule, name: string) {
+    if (name === 'default')
+      return m.source.statements.find(
+        (s) =>
+          ts.isExportAssignment(s) ||
+          (isRuntimeDeclaration(s) && hasModifier(s, ts.SyntaxKind.DefaultKeyword)),
+      );
+    const declaration = m.names.get(name);
+    return declaration &&
+      isRuntimeDeclaration(declaration) &&
+      hasModifier(declaration, ts.SyntaxKind.ExportKeyword) &&
+      !hasModifier(declaration, ts.SyntaxKind.DefaultKeyword)
+      ? declaration
+      : undefined;
+  }
+  function retainExport(file: string, statement: ts.ExportDeclaration, name: string) {
+    const names = selectedExports.get(statement) ?? new Set<string>();
+    names.add(name);
+    selectedExports.set(statement, names);
+    selected.get(file)?.add(statement);
+    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const specifier = statement.moduleSpecifier.text;
+      if (
+        side === 'client' &&
+        (specifier.startsWith('node:') || builtinModules.includes(specifier))
+      )
+        throw new PaneonError('BUILD_FAILED', 'Browser code cannot import Node modules.', {
+          entryPath: file,
+          dependency: specifier,
+        });
+    }
+  }
+  function include(file: string, exported: string, forwarding = new Set<string>()) {
+    const m = load(file);
+    const branch = new Set(forwarding).add(file);
     const done = roots.get(file)!;
     if (done.has(exported)) return;
     done.add(exported);
-    if (exported === 'default') {
-      const d = m.source.statements.find(ts.isExportAssignment);
-      if (d) select(file, d);
-    } else if (exported === '*') {
-      for (const n of m.names.keys()) reference(file, n);
+    if (exported === '*') {
+      for (const name of exportedNames(file)) include(file, name);
+      // External namespaces have no locally inspectable export list.
+      for (const s of m.source.statements)
+        if (
+          ts.isExportDeclaration(s) &&
+          !s.isTypeOnly &&
+          !s.exportClause &&
+          s.moduleSpecifier &&
+          ts.isStringLiteral(s.moduleSpecifier)
+        ) {
+          const path = localPath(file, s.moduleSpecifier.text);
+          if (path && !hasExternalStar(path, branch)) continue;
+          retainExport(file, s, '*');
+          if (path) include(path, '*', branch);
+        }
     } else {
-      const n = m.names.get(exported);
-      if (n) select(file, n);
-      else
-        for (const s of m.source.statements)
-          if (ts.isExportDeclaration(s)) {
-            select(file, s);
+      const direct = directExport(m, exported);
+      if (direct) select(file, direct);
+      else {
+        let matched = false;
+        for (const s of m.source.statements) {
+          if (!ts.isExportDeclaration(s) || s.isTypeOnly || !s.exportClause) continue;
+          if (ts.isNamedExports(s.exportClause)) {
+            const binding = s.exportClause.elements.find(
+              (e) => !e.isTypeOnly && e.name.text === exported,
+            );
+            if (!binding) continue;
+            matched = true;
+            retainExport(file, s, exported);
+            const name = binding.propertyName?.text ?? binding.name.text;
             if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-              const p = localPath(file, s.moduleSpecifier.text);
-              if (p) include(p, exported);
+              const path = localPath(file, s.moduleSpecifier.text);
+              if (path) include(path, name, branch);
+            } else reference(file, name);
+          } else if (s.exportClause.name.text === exported) {
+            matched = true;
+            retainExport(file, s, exported);
+            if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
+              const path = localPath(file, s.moduleSpecifier.text);
+              if (path) include(path, '*', branch);
             }
           }
+        }
+        // Explicit exports take precedence. Named output for star edges cannot
+        // accidentally expose another declaration removed from its dependency.
+        if (!matched && exported !== 'default')
+          for (const s of m.source.statements) {
+            if (
+              !ts.isExportDeclaration(s) ||
+              s.isTypeOnly ||
+              s.exportClause ||
+              !s.moduleSpecifier ||
+              !ts.isStringLiteral(s.moduleSpecifier)
+            )
+              continue;
+            const path = localPath(file, s.moduleSpecifier.text);
+            if (
+              path &&
+              !exportedNames(path, branch).has(exported) &&
+              !hasExternalStar(path, branch)
+            )
+              continue;
+            retainExport(file, s, exported);
+            if (path) include(path, exported, branch);
+            break;
+          }
+      }
     }
     for (const s of m.source.statements)
       if (ts.isImportDeclaration(s) && !s.importClause) {
@@ -360,31 +481,78 @@ export function createGraph(
       }
   }
   include(entry, 'default');
-  // Gather all statically declared actions reachable from the panel's source imports.
+  // Imported actions may be reached through aliases or barrels. Unrelated
+  // re-export branches must not become action roots.
   const discovered = new Set<string>();
-  function discover(file: string) {
-    if (discovered.has(file)) return;
-    discovered.add(file);
+  const actionModules = new Set<string>();
+  function discover(file: string, exported: string, forwarding = new Set<string>()) {
+    const key = `${file}\0${exported}`;
+    if (discovered.has(key)) return;
+    discovered.add(key);
     const m = load(file);
+    const branch = new Set(forwarding).add(file);
+    if (!actionModules.has(file)) {
+      actionModules.add(file);
+      for (const [name, action] of m.actions)
+        actions.push({
+          id: `${relative(dirname(entry), file).replaceAll('\\', '/')}#${name}`,
+          name,
+          file,
+          kind: action.kind,
+        });
+    }
     for (const a of m.actions.values()) if (side === 'server') select(file, a.statement);
-    for (const s of m.source.statements)
-      if (
-        ts.isImportDeclaration(s) &&
-        ts.isStringLiteral(s.moduleSpecifier) &&
-        !isTypeOnlyImport(s)
-      ) {
-        const p = localPath(file, s.moduleSpecifier.text);
-        if (p) {
-          load(p);
-          discover(p);
-        }
+    for (const imported of m.imports.values()) {
+      const path = localPath(file, imported.specifier);
+      if (path) discover(path, imported.imported);
+    }
+    if (directExport(m, exported)) return;
+    let matched = false;
+    for (const s of m.source.statements) {
+      if (!ts.isExportDeclaration(s) || s.isTypeOnly || !s.exportClause) continue;
+      const names = ts.isNamedExports(s.exportClause)
+        ? s.exportClause.elements
+            .filter((e) => !e.isTypeOnly && (exported === '*' || e.name.text === exported))
+            .map((e) => e.propertyName?.text ?? e.name.text)
+        : exported === '*' || s.exportClause.name.text === exported
+          ? ['*']
+          : [];
+      if (names.length) matched = true;
+      if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
+        const path = localPath(file, s.moduleSpecifier.text);
+        if (path) for (const name of names) discover(path, name, branch);
       }
+    }
+    if ((matched && exported !== '*') || exported === 'default') return;
+    for (const s of m.source.statements) {
+      if (
+        !ts.isExportDeclaration(s) ||
+        s.isTypeOnly ||
+        s.exportClause ||
+        !s.moduleSpecifier ||
+        !ts.isStringLiteral(s.moduleSpecifier)
+      )
+        continue;
+      const path = localPath(file, s.moduleSpecifier.text);
+      if (
+        path &&
+        (exported === '*' ||
+          exportedNames(path, branch).has(exported) ||
+          hasExternalStar(path, branch))
+      ) {
+        discover(path, exported, branch);
+        if (exported !== '*') break;
+      }
+    }
   }
-  discover(entry);
+  discover(entry, 'default');
   const sources = new Map<string, string>();
   for (const [file, m] of modules) {
     const lines: string[] = [];
-    if (side === 'client' && m.actions.size)
+    if (
+      side === 'client' &&
+      [...m.actions.values()].some((a) => selected.get(file)?.has(a.statement))
+    )
       lines.push('import {createActionProxy as __paneonProxy} from "paneon/sdk/client";');
     for (const statement of m.source.statements) {
       if (ts.isImportDeclaration(statement) && statement.importClause) {
@@ -400,6 +568,52 @@ export function createGraph(
         if (def || named)
           lines.push(
             `import ${[def, named].filter(Boolean).join(', ')} from ${statement.moduleSpecifier.getText(m.source)};`,
+          );
+      } else if (ts.isExportDeclaration(statement)) {
+        const names = selectedExports.get(statement);
+        if (!names) continue;
+        const clause = statement.exportClause;
+        if (clause && ts.isNamedExports(clause)) {
+          const elements = clause.elements.filter((e) => !e.isTypeOnly && names.has(e.name.text));
+          lines.push(
+            printer.printNode(
+              ts.EmitHint.Unspecified,
+              ts.factory.updateExportDeclaration(
+                statement,
+                statement.modifiers,
+                false,
+                ts.factory.updateNamedExports(clause, elements),
+                statement.moduleSpecifier,
+                statement.attributes,
+              ),
+              m.source,
+            ),
+          );
+        } else if (clause || names.has('*')) lines.push(statement.getText(m.source));
+        else
+          lines.push(
+            printer.printNode(
+              ts.EmitHint.Unspecified,
+              ts.factory.updateExportDeclaration(
+                statement,
+                statement.modifiers,
+                false,
+                ts.factory.createNamedExports(
+                  [...names].map((name) =>
+                    ts.factory.createExportSpecifier(
+                      false,
+                      undefined,
+                      /^[A-Za-z_$][\w$]*$/.test(name)
+                        ? ts.factory.createIdentifier(name)
+                        : ts.factory.createStringLiteral(name),
+                    ),
+                  ),
+                ),
+                statement.moduleSpecifier,
+                statement.attributes,
+              ),
+              m.source,
+            ),
           );
       } else if (selected.get(file)!.has(statement)) {
         const action = [...m.actions].find(([, a]) => a.statement === statement);

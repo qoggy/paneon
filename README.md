@@ -52,9 +52,9 @@ service. Neither command deletes the source or saved interaction events.
 - [HTTP integration](examples/http-panel.tsx): a local HTTP counter service.
 - [GitHub PR browser](examples/gh-panel.tsx): real `gh` reads and agent review requests.
 
-See [example setup](examples/README.md) and the [agent authoring guide](docs/agent-guide.md)
-for SDK usage, all commands and components, event consumption, and temporary
-credential input.
+Agent usage instructions, API references, and reusable panels live in the
+[Paneon skill](skills/paneon/SKILL.md). See the [example directory](examples/README.md)
+for the purpose and setup of the repository examples.
 
 ## Install a local package
 
@@ -62,7 +62,30 @@ credential input.
 npm pack
 npm install -g /absolute/path/to/paneon-0.0.0.tgz
 paneon --help
+paneon init
 ```
+
+Run `paneon init` to install the bundled, matching skill for your agents. The
+terminal flow selects agents, Project (default) or Global scope, and Symlink
+(recommended) or Copy when different agent directories are involved. Universal
+agents share `.agents/skills`; a shared directory is copied once without asking
+for an installation method. Review target paths and `overwrites:` before confirming.
+Existing Paneon skill directories are replaced completely, including local edits;
+correct links are retained. Other skills are left untouched.
+
+From a local build, use `node dist/cli/index.js init`. For scripts:
+
+```sh
+paneon init --agent codex claude-code --project --yes --json
+paneon init --agent claude-code --global --copy --yes --json
+```
+
+`--agent` uses the IDs listed in `paneon init --help`. Without explicit agents,
+`--yes` chooses Universal and detected targets. JSON and non-terminal invocations
+require `--yes` and never show prompts. Installation records stay in
+`~/.paneon/skill-installations.json`; no project metadata directory is created.
+After upgrading the CLI, rerun `paneon init` to synchronize its bundled skill.
+A unified `paneon update` command is not implemented yet.
 
 After upgrading Paneon, explicitly stop an older server before running panels
 with the new CLI. Panels declare a compatible package range with
@@ -79,8 +102,8 @@ npm run lint
 npm run format:check
 ```
 
-See the [agent guide](docs/agent-guide.md#repeatable-acceptance) for real-browser and
-independent-package checks. These use isolated temporary operating-system homes.
+Real-browser and independent-package checks live in `tests/browser/` and
+`tests/acceptance*.mjs`. These use isolated temporary operating-system homes.
 Paneon's own runtime directory is fixed to `~/.paneon`.
 
 ## License

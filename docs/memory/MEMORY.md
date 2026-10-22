@@ -12,7 +12,9 @@
 - [CLI output and debugging](cli-output-and-debugging.md) — English CLI text; moderate results omit repeated inputs while preserving useful information; --debug stays on stderr
 - [CLI command groups](cli-command-groups.md) — Panel/server groups, reusable instance URLs, and explicit --wait-ms millisecond units
 - [Default UI styling](ui-default-styling.md) — Initial iteration uses shadcn default themes and component styles; layout helpers only fill necessary layout gaps
-- [Reusable panel examples](ui-reusable-examples.md) — Provide copyable TSX compositions and a real gh CLI repository/PR integration example
+- [Reusable panel examples](ui-reusable-examples.md) — Provide one-off explanatory TSX with public source references and a read-only gh PR example
+- [Product skill assets](agent-skill-assets.md) — The product skill is the sole agent usage guide and contains standard panels and scene examples; the CLI runs ordinary TSX
+- [Shared selection and comments](ui-selection-feedback.md) — Contextual comment UI with unchanged annotation data; supplied standard pages support explicit corrections while custom pages retain workflow control
 - [Markdown rendering](ui-markdown-rendering.md) — Read-only Markdown uses react-markdown + remark-gfm and github-markdown-css light styling
 - [Source updates](tech-source-updates.md) — Reuse Vite/React update mechanisms without custom old-worker or in-flight-call preservation
 - [Runtime home](tech-runtime-home.md) — PANEON_HOME is an internal constant fixed to ~/.paneon, without a user-facing override

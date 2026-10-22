@@ -21,5 +21,7 @@ updates are supported; a syntax failure is local to that diagram and can recover
 when corrected. Ordinary fenced code and inline code retain their current
 behavior. See `examples/mermaid-panel.tsx` for both entry points.
 
+`Markdown` exposes optional `components` and `rehypePlugins` extension points for trusted TSX authors. Overrides compose with built-in renderers so source-mapping adapters retain GFM, GitHub styles and default Mermaid handling without directly importing rendering dependencies from a copied skill. Keep raw HTML disabled by default.
+
 **Why:** Agents need a simple way to display readable explanations and documents without writing typography CSS.
 **How to apply:** Export the component from paneon/ui and provide a usage example. Keep the standard community presentation rather than inventing another visual system.

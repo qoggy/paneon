@@ -1,0 +1,48 @@
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+export async function startExplanationsFixture() {
+  const { startServer } = await import(
+    process.env.PANEON_TEST_RUNTIME_ENTRY ??
+      new URL('../../dist/runtime/server.js', import.meta.url).href
+  );
+  const root = await mkdtemp(join(tmpdir(), 'paneon-explanations-'));
+  let service;
+  try {
+    const skill = join(root, 'copied-skill/paneon');
+    await cp(
+      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
+      skill,
+      { recursive: true },
+    );
+    service = await startServer(join(root, '.paneon'));
+    const panels = {};
+    for (const name of ['concurrency', 'sentinel-leap-array'])
+      panels[name] = await service.runtime.run(
+        join(skill, `assets/examples/${name}/panel.tsx`),
+        root,
+        {},
+        false,
+      );
+    return {
+      root,
+      skill,
+      service,
+      panels,
+      url: (name) =>
+        `http://127.0.0.1:${service.descriptor.port}/panels/${panels[name].instanceId}`,
+      events: async (name) =>
+        (await service.runtime.events(panels[name].instanceId, 'explanation-browser', 100, 0))
+          .events,
+      async stop() {
+        await service.stop();
+        await rm(root, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    await service?.stop();
+    await rm(root, { recursive: true, force: true });
+    throw error;
+  }
+}

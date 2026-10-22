@@ -1,0 +1,31 @@
+import { useState } from 'react';
+import { definePanel, z } from 'paneon/sdk';
+import { Button, FeedbackProvider, FeedbackSurface, FeedbackToolbar } from 'paneon/ui';
+import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
+import { createDiffModel } from './shared/diff-model.ts';
+import { diffTargetText } from './shared/diff-schema.ts';
+import type { GitRef } from './shared/diff-schema.ts';
+
+const original = Array.from({ length: 90 }, (_, i) => `const line${i + 1} = "original ${i + 1}";\r\n`).join('');
+const modified = original.replace('original 10', 'changed 10').replace('original 45', 'changed 45').replace('original 80', 'changed 80');
+function Panel() {
+  const [kind, setKind] = useState('changed');
+  const model = createDiffModel(original, kind === 'same' ? original : modified);
+  return <FeedbackProvider<GitRef> onSubmit={async () => {}} adapter={{
+    resolve: (target) => ({status: 'ready', text: diffTargetText(model, target)}),
+    targetRanges: (target) => diffTargetRanges(model, target),
+    locate: (target) => locateDiffTarget(model, target),
+  }}>
+    <FeedbackSurface />
+    <div className="flex flex-wrap items-center gap-2 p-2">
+      <Button onClick={() => setKind('changed')}>Changed source</Button>
+      <Button onClick={() => setKind('same')}>Same source</Button>
+      <Button onClick={() => setKind('binary')}>Binary source</Button>
+      <FeedbackToolbar />
+    </div>
+    <div data-toolbar-viewport className="h-[32rem] min-w-0 overflow-y-auto border">
+      <DiffView sourceId={kind} oldPath="file.ts" newPath="file.ts" oldText={original} newText={kind === 'same' ? original : modified} fileOnly={kind === 'binary'} />
+    </div>
+  </FeedbackProvider>;
+}
+export default definePanel({id:'diff-toolbar-acceptance',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});

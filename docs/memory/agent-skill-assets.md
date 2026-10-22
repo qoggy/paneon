@@ -1,0 +1,22 @@
+---
+name: agent-skill-assets
+description: Distribute ready-to-run standard panels and reusable scene examples as Paneon skill resources
+type: tech
+---
+
+# Product skill assets
+
+Standard panels and reusable scene examples belong to the user-facing Paneon skill. The CLI remains a generic TSX runtime; agents can supply data to a shipped panel without generating its implementation, or copy an example to customize behavior. All instructions for agents using Paneon belong inside this skill: SKILL.md is the entry, and references contain CLI/API, authoring, feedback, and page contracts loaded on demand. Do not maintain a separate agent guide under docs/ or another parallel source of usage instructions. README remains a human-facing overview and links to the skill.
+
+The browser home requires no special standard-panel catalog or launch area. Running a shipped source creates an ordinary instance managed by the existing list and commands. Repository .agents/skills contains development tooling; the product skill has its own resource directory.
+
+Maintain one canonical product skill source and ship its complete resources with the CLI package, following the same release version rather than an independent skill release sequence. The CLI is the single installation entry and is responsible for installing its bundled, matching skill; do not require users to independently locate and install or manually copy the skill. CLI installation or upgrade does not imply agent discovery or automatic updates to an existing skill copy. Keep requires.paneon compatibility checks. The skill contains choose/form, table, Markdown review, multi-repository Git review, the read-only GitHub PR example, and the concurrency/Sentinel examples. The skill-only guide migration, PR integration, and CLI skill installation through paneon init are implemented and accepted; the active change records their verification. Agent installation guidance belongs inside the product skill.
+
+The adopted initial installer interaction follows the researched Vercel Skills flow and English prompts: fixed-selected Universal agents share one directory; select agents before scope, default to Project with optional Global; copy directly and skip the method prompt when all targets share one directory, otherwise recommend Symlink with a Copy alternative; list overwrite targets before one confirmation. Avoid speculative backup, merge or content-conflict workflows. Paneon installs only its own bundled skill rather than a remote skill catalog. paneon init supports the interactive flow and explicit agent/scope/method options, --yes, --json and --debug.
+
+Installation and update metadata, if persisted, must stay inside the fixed ~/.paneon home. Do not add Paneon metadata files under user project directories; shipped skill resources still belong in the selected agent skill directories. paneon init records successful installations in ~/.paneon/skill-installations.json with schemaVersion: 1, physical project roots, scope, selected targets and installation method. Ordinary skill directories are completely replaced; correctly targeted links are retained. The update command remains unimplemented.
+
+The agreed future update policy is: paneon update upgrades the CLI and synchronizes every registered Paneon skill installation; --project limits skill synchronization to the current cwd project, and --global limits it to user-level installations. Default updates are independent of cwd. Reuse registered targets and methods; replace ordinary skill directories completely, overwriting local modifications and removing obsolete files, while preserving correctly targeted links. Skip and report missing project directories without recreating projects. CLI being current does not skip skill synchronization. This update command remains outside the current implementation iteration.
+
+**Why:** Common interactions should reuse maintained code while preserving the existing code-first interface and agent portability.
+**How to apply:** Follow openspec/changes/add-paneon-skill-panels/design.md for scope and tasks.md for remaining resources. --params-file is implemented as a creation-time JSON snapshot; do not describe it as parameter-file watching. Document the available paneon init installer separately from the agreed future update policy; do not describe paneon update as implemented. A future update command is not part of the current implementation.

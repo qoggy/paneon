@@ -3,6 +3,11 @@ import { readFileSync, mkdirSync, rmSync, writeFileSync, statSync, existsSync } 
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PANEON_HOME, PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
+import {
+  HTTP_BODY_LIMIT_BYTES,
+  requestBodyBytes,
+  bodyTooLargeDiagnostic,
+} from '../shared/limits.js';
 import { PROTOCOL_VERSION, PaneonError } from '../shared/types.js';
 import type { RuntimeDescriptor, JsonValue } from '../shared/types.js';
 function readDescriptor(): RuntimeDescriptor | null {
@@ -159,6 +164,11 @@ export async function call(
     allowVersionMismatch?: boolean;
   } = {},
 ) {
+  const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+  if (body !== undefined && requestBodyBytes(body) > HTTP_BODY_LIMIT_BYTES) {
+    const detail = bodyTooLargeDiagnostic();
+    throw new PaneonError(detail.code, detail.message, detail.details);
+  }
   const runtime = options.start
     ? await ensureRuntime()
     : await discover(options.allowVersionMismatch);
@@ -171,7 +181,7 @@ export async function call(
         Authorization: `Bearer ${runtime.controlToken}`,
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(body !== undefined ? { body } : {}),
     });
   } catch {
     throw new PaneonError(

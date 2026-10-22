@@ -40,3 +40,11 @@ export type PanelDefinition<I = unknown> = {
 export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<I> {
   return definition;
 }
+export { feedbackSchema } from './feedback.js';
+export type {
+  Feedback,
+  FeedbackTarget,
+  FeedbackAnnotation,
+  FeedbackTextRange,
+  JsonValue,
+} from './feedback.js';

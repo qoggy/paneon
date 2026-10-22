@@ -1,0 +1,244 @@
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { mkdir, writeFile, rename, rm } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { chromium } from 'playwright';
+import { startGitReviewFixture } from './git-review-fixture.mjs';
+import { commentTools } from './git-review-comment-tools.mjs';
+
+const f = await startGitReviewFixture();
+const execute = promisify(execFile);
+let browser;
+let page;
+const prefix = 'marketplaces/x-one-cowork/plugins/paw-nextjs/skills';
+const modified = `${prefix}/alpha/same.ts`;
+const deleted = `${prefix}/deleted.ts`;
+const added = `${prefix}/beta/same.ts`;
+const renamed = `${prefix}/重命名 new\nname.ts`;
+const special = ' 特殊目录 /文件\n🙂.ts ';
+const long = `${'long-directory-'.repeat(14)}/leaf.ts`;
+try {
+  const repository = join(f.root, 'file-tree-repo');
+  await mkdir(repository);
+  const git = async (...args) => (await execute('git', ['-C', repository, ...args])).stdout.trim();
+  const put = async (path, text) => {
+    await mkdir(dirname(join(repository, path)), { recursive: true });
+    await writeFile(join(repository, path), text);
+  };
+  await git('init', '-q', '-b', 'main');
+  await git('config', 'user.name', 'File tree reviewer');
+  await git('config', 'user.email', 'tree@example.test');
+  await git('config', 'core.quotepath', 'false');
+  for (const path of [modified, deleted, 'old 原名.ts', 'root.ts', special, long])
+    await put(path, `// ${JSON.stringify(path)}\nexport const value = 1;\n`);
+  await git('add', '.');
+  await git('commit', '-qm', 'Create tree baseline');
+  const base = await git('rev-parse', 'HEAD');
+  for (const path of [modified, 'root.ts', special, long])
+    await put(path, `// ${JSON.stringify(path)}\nexport const value = 2;\n`);
+  await put(added, 'export const added = true;\n');
+  await rm(join(repository, deleted));
+  await rename(join(repository, 'old 原名.ts'), join(repository, renamed));
+  await git('add', '.');
+  await git('commit', '-qm', 'Change files across the tree');
+  const tip = await git('rev-parse', 'HEAD');
+  await git('branch', 'tree-tip');
+  await git('reset', '--soft', base);
+  await put(modified, '// staged and unstaged stay separate\nexport const value = 3;\n');
+  await put('untracked/新文件.ts', 'export const untracked = true;\n');
+  const params = {
+    title: 'Compact file tree acceptance',
+    repositories: [{ id: 'tree', path: repository }],
+    initialView: { repositoryId: 'tree', type: 'changes', file: modified },
+  };
+  const panel = await f.run(params);
+  browser = await chromium.launch({
+    headless: true,
+    channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
+  });
+  page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(f.url(panel));
+  const frame = page.frameLocator('iframe');
+  const button = (name) => frame.getByRole('button', { name, exact: true });
+  const files = frame.locator('[data-file-id]');
+  const group = (area) => frame.locator(`[data-file-group="${area}"]`);
+  const directory = (area, path) =>
+    group(area)
+      .locator('[data-file-directory]')
+      .and(frame.locator(`[data-file-directory=${JSON.stringify(path)}]`));
+  await frame.getByRole('heading', { name: params.title, exact: true }).waitFor();
+  await button(`已暂存 · M ${modified}`).waitFor();
+  assert.equal(await files.count(), 9, 'Each index/worktree snapshot keeps its own leaf');
+  assert.equal(await group('staged').locator('[data-file-id]').count(), 7);
+  assert.equal(await group('unstaged').locator('[data-file-id]').count(), 1);
+  assert.equal(await group('untracked').locator('[data-file-id]').count(), 1);
+  const stagedRoot = directory('staged', prefix);
+  await stagedRoot.waitFor();
+  assert.ok((await stagedRoot.textContent()).includes(`${prefix}4`));
+  assert.equal(
+    await group('staged')
+      .locator(`[data-file-directory=${JSON.stringify(`${prefix}/alpha`)}]`)
+      .count(),
+    1,
+  );
+  assert.equal(await button('已暂存 · M root.ts').textContent(), 'root.tsM');
+  const staged = button(`已暂存 · M ${modified}`);
+  const unstaged = button(`未暂存 · M ${modified}`);
+  assert.notEqual(
+    await staged.getAttribute('data-file-id'),
+    await unstaged.getAttribute('data-file-id'),
+  );
+  assert.equal(await staged.getAttribute('aria-pressed'), 'true');
+  for (const [name, color, status] of [
+    [`已暂存 · M ${modified}`, 'text-blue', 'M'],
+    [`已暂存 · A ${added}`, 'text-green', 'A'],
+    [`已暂存 · D ${deleted}`, 'text-muted-foreground', 'D'],
+    [`已暂存 · R100 ${renamed}`, 'text-blue', 'R100'],
+    ['未跟踪 · ? untracked/新文件.ts', 'text-green', '?'],
+  ]) {
+    const leaf = button(name);
+    assert.ok((await leaf.getAttribute('class')).includes(color));
+    assert.equal(await leaf.getAttribute('data-file-status'), status);
+    assert.ok((await leaf.textContent()).endsWith(status));
+  }
+  const colors = await Promise.all(
+    [staged, button(`已暂存 · A ${added}`), button(`已暂存 · D ${deleted}`)].map((el) =>
+      el.evaluate((node) => getComputedStyle(node).color),
+    ),
+  );
+  assert.equal(new Set(colors).size, 3, 'Actual rendered colors differ');
+  assert.ok(
+    (await button(`已暂存 · R100 ${renamed}`).getAttribute('title')).includes(
+      `old 原名.ts → ${renamed}`,
+    ),
+  );
+  await button(`已暂存 · D ${deleted}`).click();
+  await frame
+    .locator('[data-code-side="old"][data-line="2"]')
+    .filter({ hasText: 'value = 1' })
+    .waitFor();
+  assert.equal(await button(`已暂存 · D ${deleted}`).isEnabled(), true);
+  await stagedRoot.click();
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'false');
+  assert.equal(await staged.count(), 0);
+  assert.equal(await frame.getByRole('textbox', { name: '搜索文件', exact: true }).count(), 0);
+  await stagedRoot.click();
+  await staged.waitFor();
+  await button(`已暂存 · R100 ${renamed}`).click();
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
+  await button(`已暂存 · M ${special}`).click();
+  assert.equal(
+    await button(`已暂存 · M ${special}`).getAttribute('title'),
+    `已暂存 · M ${special}`,
+  );
+  await staged.click();
+  const comments = commentTools(frame, page);
+  await button('选择对象').click();
+  await button('选择新侧第 2 行').click();
+  await comments.write('目录树切换保留评论');
+  await comments.save();
+  assert.equal(await comments.count(), 1);
+  await unstaged.click();
+  await frame
+    .locator('[data-code-side="new"][data-line="2"]')
+    .filter({ hasText: 'value = 3' })
+    .waitFor();
+  await stagedRoot.click();
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'false');
+  await comments.locate(1);
+  await staged.waitFor();
+  assert.equal(await staged.getAttribute('aria-pressed'), 'true');
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
+  assert.equal(await comments.count(), 1);
+  assert.equal(await comments.text(1), '目录树切换保留评论');
+  // Locating the same source again must reveal it even when selection did not change.
+  await stagedRoot.click();
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'false');
+  await comments.locate(1);
+  await staged.waitFor({ timeout: 3000 });
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
+  await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await button(`已暂存 · M ${long}`).click();
+  const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
+  const geometry = await content.evaluate(() => {
+    const list = document.querySelector('[data-file-scroll]');
+    const tree = document.querySelector('[data-file-tree]');
+    return {
+      viewport: innerWidth,
+      document: document.documentElement.scrollWidth,
+      list: list.getBoundingClientRect().toJSON(),
+      tree: tree.getBoundingClientRect().toJSON(),
+      listClient: list.clientWidth,
+      listScroll: list.scrollWidth,
+      leaves: [...tree.querySelectorAll('[data-file-id]')].map((el) => ({
+        width: el.getBoundingClientRect().width,
+        scroll: el.scrollWidth,
+        client: el.clientWidth,
+      })),
+    };
+  });
+  assert.ok(geometry.document <= geometry.viewport + 1, JSON.stringify(geometry));
+  assert.ok(geometry.list.right <= geometry.viewport + 1, JSON.stringify(geometry));
+  assert.ok(geometry.tree.width <= geometry.list.width, JSON.stringify(geometry));
+  assert.ok(geometry.listScroll <= geometry.listClient + 1, JSON.stringify(geometry));
+  assert.ok(
+    geometry.leaves.every((leaf) => leaf.scroll <= leaf.client + 1),
+    JSON.stringify(geometry),
+  );
+  await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-mobile.png', fullPage: true });
+  // Folding a different directory must preserve the user's scroll position.
+  const unrelated = directory('untracked', 'untracked');
+  await unrelated.scrollIntoViewIfNeeded();
+  const scrollBefore = await frame.locator('[data-file-scroll]').evaluate((el) => el.scrollTop);
+  assert.ok(scrollBefore > 100);
+  await unrelated.click();
+  await content.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const scrollAfter = await frame.locator('[data-file-scroll]').evaluate((el) => ({
+    top: el.scrollTop,
+    max: el.scrollHeight - el.clientHeight,
+  }));
+  assert.ok(
+    scrollAfter.top >= Math.min(scrollBefore, scrollAfter.max) - 1,
+    `Folding an unrelated folder stole scroll: ${JSON.stringify({ scrollBefore, scrollAfter })}`,
+  );
+  // Same component in history and compare; these views have no working-area groups.
+  for (const initialView of [
+    { repositoryId: 'tree', type: 'history', commit: tip },
+    { repositoryId: 'tree', type: 'compare', base, head: tip, mode: 'commits' },
+  ]) {
+    const view = await f.run({ ...params, initialView });
+    await page.goto(f.url(view));
+    await frame.locator(`[data-file-directory=${JSON.stringify(prefix)}]`).waitFor();
+    assert.equal(await files.count(), 7);
+    assert.equal(await frame.locator('[data-file-group="staged"]').count(), 0);
+    await button(`D ${deleted}`).click();
+    await frame
+      .locator('[data-code-side="old"][data-line="2"]')
+      .filter({ hasText: 'value = 1' })
+      .waitFor();
+  }
+  assert.deepEqual(errors, []);
+  assert.equal((await f.events(panel)).length, 0);
+  console.log(
+    JSON.stringify({
+      status: 'passed',
+      geometry,
+      screenshots: [
+        '/private/tmp/paneon-git-file-tree-desktop.png',
+        '/private/tmp/paneon-git-file-tree-mobile.png',
+      ],
+    }),
+  );
+} catch (error) {
+  await page?.screenshot({ path: '/private/tmp/paneon-git-file-tree-failure.png', fullPage: true });
+  throw error;
+} finally {
+  await browser?.close();
+  await f.stop();
+}

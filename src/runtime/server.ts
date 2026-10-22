@@ -17,6 +17,7 @@ import { PACKAGE_ROOT, PACKAGE_VERSION, PANEON_HOME } from '../shared/paths.js';
 import { PROTOCOL_VERSION, PaneonError, diagnostic, jsonValue } from '../shared/types.js';
 import type { RuntimeDescriptor } from '../shared/types.js';
 import { Runtime } from './lifecycle.js';
+import { HTTP_BODY_LIMIT_BYTES, bodyTooLargeDiagnostic } from '../shared/limits.js';
 const mime: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -34,7 +35,7 @@ export async function startServer(home = PANEON_HOME): Promise<{
 }> {
   const runtime = new Runtime(home);
   await runtime.restore();
-  const app = Fastify({ logger: false, bodyLimit: 131072 });
+  const app = Fastify({ logger: false, bodyLimit: HTTP_BODY_LIMIT_BYTES });
   await app.register(websocket, { options: { maxPayload: 1024 } });
   let origin = '';
   const descriptor: RuntimeDescriptor = {
@@ -77,6 +78,10 @@ export async function startServer(home = PANEON_HOME): Promise<{
       throw new PaneonError('INVALID_ORIGIN', 'A same-origin Origin header is required.');
   });
   app.setErrorHandler((error, _request, reply) => {
+    if ((error as { code?: string }).code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      reply.status(413).send({ ok: false, error: bodyTooLargeDiagnostic() });
+      return;
+    }
     const detail = diagnostic(error);
     reply.status(error instanceof PaneonError ? 400 : 500).send({ ok: false, error: detail });
   });

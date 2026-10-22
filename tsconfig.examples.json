@@ -7,6 +7,11 @@
       "paneon/ui": ["./src/ui/index.ts"]
     }
   },
-  "include": ["examples/**/*.ts", "examples/**/*.tsx"],
+  "include": [
+    "examples/**/*.ts",
+    "examples/**/*.tsx",
+    "skills/paneon/assets/**/*.ts",
+    "skills/paneon/assets/**/*.tsx"
+  ],
   "exclude": []
 }

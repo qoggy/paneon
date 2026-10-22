@@ -4,8 +4,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
-import { createElement, type ComponentType } from 'react';
+import { createElement, type ComponentType, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type ReactMarkdown from 'react-markdown';
+import type { Root } from 'hast';
+type MarkdownProps = { children: string; className?: string } & Pick<
+  ComponentProps<typeof ReactMarkdown>,
+  'components' | 'rehypePlugins'
+>;
 
 const output = mkdtempSync(join(import.meta.dirname, '.mermaid-test-'));
 after(() => rmSync(output, { recursive: true, force: true }));
@@ -22,7 +28,7 @@ const { Mermaid } = (await import(pathToFileURL(join(output, 'mermaid.js')).href
   Mermaid: ComponentType<{ code: string; className?: string }>;
 };
 const { Markdown } = (await import(pathToFileURL(join(output, 'markdown.js')).href)) as {
-  Markdown: ComponentType<{ children: string; className?: string }>;
+  Markdown: ComponentType<MarkdownProps>;
 };
 
 void test('Mermaid is safe to import and render without browser globals', () => {
@@ -83,4 +89,30 @@ void test('Markdown keeps ordinary code, inline code, GFM, and raw HTML disabled
   assert.match(html, /disabled=""/);
   assert.doesNotMatch(html, /<script>/);
   assert.doesNotMatch(html, /data-slot="mermaid"/);
+});
+
+void test('Markdown source adapters compose with built-in GFM and Mermaid rendering', () => {
+  const html = renderToStaticMarkup(
+    createElement(Markdown, {
+      children:
+        'A paragraph.\n\n| Name | Value |\n| --- | --- |\n| Test | 1 |\n\n```mermaid\nflowchart LR\n A --> B\n```',
+      components: {
+        p: ({ children }) => createElement('p', { 'data-adapter': 'paragraph' }, children),
+      },
+      rehypePlugins: [
+        () => (tree: Root) => {
+          tree.children.unshift({
+            type: 'element',
+            tagName: 'span',
+            properties: { 'data-source-marker': 'mapped' },
+            children: [],
+          });
+        },
+      ],
+    }),
+  );
+  assert.match(html, /data-adapter="paragraph"/);
+  assert.match(html, /data-source-marker="mapped"/);
+  assert.match(html, /<table>/);
+  assert.equal((html.match(/data-slot="mermaid"/g) ?? []).length, 1);
 });

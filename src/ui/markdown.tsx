@@ -1,6 +1,6 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Children, isValidElement } from 'react';
+import { Children, isValidElement, type ComponentProps } from 'react';
 import { Mermaid } from './mermaid';
 import { cn } from './utils';
 
@@ -17,10 +17,26 @@ const components: Components = {
   },
 };
 
-export function Markdown({ children, className }: { children: string; className?: string }) {
+export type MarkdownProps = {
+  children: string;
+  className?: string;
+  components?: Components;
+  rehypePlugins?: ComponentProps<typeof ReactMarkdown>['rehypePlugins'];
+};
+
+export function Markdown({
+  children,
+  className,
+  components: overrides,
+  rehypePlugins,
+}: MarkdownProps) {
   return (
     <div className={cn('markdown-body min-w-0 overflow-x-auto', className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={{ ...components, ...overrides }}
+      >
         {children}
       </ReactMarkdown>
     </div>

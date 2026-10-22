@@ -1,3 +1,8 @@
+import {
+  HTTP_BODY_LIMIT_BYTES,
+  requestBodyBytes,
+  bodyTooLargeDiagnostic,
+} from '../shared/limits.ts';
 export type Diagnostic = { code: string; message: string };
 export type PanelSummary = {
   instanceId: string;
@@ -36,6 +41,10 @@ export class ApiError extends Error {
   }
 }
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  if (typeof options?.body === 'string' && requestBodyBytes(options.body) > HTTP_BODY_LIMIT_BYTES) {
+    const detail = bodyTooLargeDiagnostic();
+    throw new ApiError(detail.code, detail.message);
+  }
   let response: Response;
   try {
     const headers = new Headers(options?.headers);

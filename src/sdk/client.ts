@@ -135,3 +135,12 @@ export function useQuery<I, O>(
   const refetch = useCallback(() => trigger.current(), []);
   return { ...state, refetch };
 }
+
+export { feedbackSchema } from './feedback.js';
+export type {
+  Feedback,
+  FeedbackTarget,
+  FeedbackAnnotation,
+  FeedbackTextRange,
+  JsonValue,
+} from './feedback.js';

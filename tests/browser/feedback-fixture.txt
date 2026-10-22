@@ -1,0 +1,300 @@
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { definePanel, agent, feedbackSchema, z } from 'paneon/sdk';
+import type { FeedbackTarget as Target, Feedback } from 'paneon/sdk';
+import {
+  Button,
+  Card,
+  FeedbackProvider,
+  FeedbackTarget,
+  FeedbackText,
+  FeedbackControls,
+  Input,
+  Page,
+  useFeedback,
+} from 'paneon/ui';
+import type { FeedbackAdapter } from 'paneon/ui';
+
+type Ref = { kind: string; id: string };
+const original = '重复中文👨‍👩‍👧‍👦é😀，重复中文。';
+const mappedSource = '前**重复**与重复尾';
+const bridgeSource = 'first\n第二行 😀\nthird';
+const bridgeLine = '第二行 😀\n';
+function Registered({ shown }: { shown: boolean }) {
+  const feedback = useFeedback<Ref>();
+  const first = useRef<HTMLSpanElement>(null);
+  const second = useRef<HTMLElement>(null);
+  const third = useRef<HTMLSpanElement>(null);
+  const registerText = feedback.registerText;
+  useLayoutEffect(() => {
+    if (!shown) return;
+    const a = first.current!.firstChild as Text;
+    const b = second.current!.firstChild as Text;
+    const c = third.current!.firstChild as Text;
+    return registerText({
+      ref: { kind: 'mapped', id: 'one' },
+      source: mappedSource,
+      segments: [
+        { node: a, sourceOffsets: [0, 1] },
+        { node: b, sourceOffsets: [3, 4, 5] },
+        { node: c, sourceOffsets: [7, 8, 9, 10, 11] },
+      ],
+    });
+  }, [shown, registerText]);
+  return shown ? (
+    <p data-testid="mapped">
+      <span ref={first}>前</span>
+      <strong ref={second}>重复</strong>
+      <span ref={third}>与重复尾</span>
+    </p>
+  ) : null;
+}
+function Discontinuous() {
+  const { registerText } = useFeedback<Ref>();
+  const first = useRef<HTMLSpanElement>(null);
+  const second = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const ref = { kind: 'discontinuous', id: 'one' };
+    const one = registerText({
+      ref,
+      source: '甲隐藏乙',
+      segments: [{ node: first.current!.firstChild as Text, sourceOffsets: [0, 1] }],
+    });
+    const two = registerText({
+      ref,
+      source: '甲隐藏乙',
+      segments: [{ node: second.current!.firstChild as Text, sourceOffsets: [3, 4] }],
+    });
+    return () => {
+      one();
+      two();
+    };
+  }, [registerText]);
+  return (
+    <p data-testid="discontinuous">
+      <span ref={first}>甲</span>
+      <span ref={second}>乙</span>
+    </p>
+  );
+}
+function SplitGrapheme() {
+  const { registerText } = useFeedback<Ref>();
+  const first = useRef<HTMLSpanElement>(null);
+  const second = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(
+    () =>
+      registerText({
+        ref: { kind: 'split', id: 'one' },
+        source: 'é',
+        segments: [
+          { node: first.current!.firstChild as Text, sourceOffsets: [0, 1] },
+          { node: second.current!.firstChild as Text, sourceOffsets: [1, 2] },
+        ],
+      }),
+    [registerText],
+  );
+  return (
+    <p data-testid="split">
+      <span ref={first}>e</span>
+      <span ref={second}>́</span>
+    </p>
+  );
+}
+function Contents({
+  snapshot,
+  adapterMode,
+  setAdapterMode,
+}: {
+  snapshot: string;
+  adapterMode: string;
+  setAdapterMode: (mode: string) => void;
+}) {
+  const feedback = useFeedback<Ref>();
+  const [clicks, setClicks] = useState(0);
+  const [linkClicks, setLinkClicks] = useState(0);
+  const [shown, setShown] = useState(true);
+  const [mappedShown, setMappedShown] = useState(true);
+  const [bridgeShown, setBridgeShown] = useState(true);
+  const [changed, setChanged] = useState(false);
+  const [shifted, setShifted] = useState(false);
+  const [hookError, setHookError] = useState('');
+  return (
+    <>
+      <FeedbackControls />
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => { const target = feedback.value.annotations[0]?.targets[0]; if (target) void feedback.locate(target).catch(() => {}); }}>Locate first</Button>
+        <Button onClick={() => { const target = feedback.value.annotations[0]?.targets[1]; if (target) void feedback.locate(target).catch(() => {}); }}>Locate second target</Button>
+        <Button onClick={() => { const target = feedback.value.annotations.find(entry => entry.targets.some(target => target.text?.quote === '👨‍👩‍👧‍👦'))?.targets[0]; if (target) void feedback.locate(target).catch(() => {}); }}>Locate family</Button>
+      </div>
+      <FeedbackTarget target={{ kind: 'card', id: 'outer' }} asChild>
+        <Card data-testid="outer">
+          <p>Outer card</p>
+          <FeedbackTarget target={{ kind: 'card', id: 'a' }} asChild>
+            <Card data-testid="card-a">Card A</Card>
+          </FeedbackTarget>
+          <Button onClick={() => setClicks(clicks + 1)}>Ordinary button {clicks}</Button>
+          <a href="#ordinary" onClick={() => setLinkClicks(linkClicks + 1)}>
+            Ordinary link {linkClicks}
+          </a>
+          <Input aria-label="Ordinary input" />
+        </Card>
+      </FeedbackTarget>
+      {shown && (
+        <FeedbackTarget target={{ id: 'b', kind: 'card' }} asChild>
+          <Card data-testid="card-b">Card B</Card>
+        </FeedbackTarget>
+      )}
+      <Button onClick={() => setShown(!shown)}>Toggle B</Button>
+      <table>
+        <tbody>
+          <FeedbackTarget target={{ kind: 'row', id: 'one' }} asChild>
+            <tr data-testid="row">
+              <td>Valid table row</td>
+            </tr>
+          </FeedbackTarget>
+        </tbody>
+      </table>
+      <Button onClick={() => setShifted(!shifted)}>Toggle layout gap</Button>
+      {shifted && <div style={{height:120}} />}
+      <FeedbackTarget target={{ kind: 'paragraph', id: 'wrapper' }} asChild>
+        <p data-testid="plain">
+          <FeedbackText
+            target={{ kind: 'text', id: 'one' }}
+            text={changed ? original.replace('。', '！') : original}
+          />
+        </p>
+      </FeedbackTarget>
+      <Button onClick={() => setChanged(!changed)}>Change source</Button>
+      <div data-testid="nested-scroll" style={{ maxHeight: 140, overflow: 'auto' }}>
+        <div style={{ height: 120 }} />
+        <p data-testid="nested-text"><FeedbackText target={{kind:'nested', id:'one'}} text="嵌套滚动容器中的评论位置，重复重复，中文😀。" /></p>
+        <div style={{ height: 220 }} />
+      </div>
+      {bridgeShown && <p data-testid="bridge"><FeedbackText target={{kind:'bridge-source',id:'one'}} text={bridgeSource} className="whitespace-pre" /></p>}
+      <Button onClick={() => feedback.toggleTarget({ref:{kind:'bridge-lines',id:'one'},text:{start:0,end:bridgeLine.length,quote:bridgeLine}})}>Select bridge interval</Button>
+      <Button onClick={() => setBridgeShown(!bridgeShown)}>Toggle bridge</Button>
+      <Registered shown={mappedShown} />
+      <Discontinuous />
+      <SplitGrapheme />
+      <Button onClick={() => setMappedShown(!mappedShown)}>Toggle mapped</Button>
+      <Button onClick={() => setAdapterMode(adapterMode === 'ready' ? 'missing' : 'ready')}>
+        Adapter {adapterMode}
+      </Button>
+      <Button
+        onClick={() => {
+          feedback.editAnnotation(null);
+          feedback.createAnnotation([{ ref: { kind: 'remote', id: 'slow' } }]);
+        }}
+      >
+        Add remote slow
+      </Button>
+      <Button
+        onClick={() => {
+          feedback.editAnnotation(null);
+          feedback.createAnnotation([{ ref: { kind: 'remote', id: 'fast' } }]);
+        }}
+      >
+        Add remote fast
+      </Button>
+      <Button
+        onClick={() => {
+          void feedback.locate({ ref: { kind: 'remote', id: 'slow' } }).catch(() => {});
+          void feedback.locate({ ref: { kind: 'remote', id: 'fast' } }).catch(() => {});
+        }}
+      >
+        Locate race
+      </Button>
+      <Button
+        onClick={() => {
+          void feedback.submit().catch(() => {});
+          void feedback.submit().catch(() => {});
+          try {
+            feedback.setComment('MUST NOT CHANGE');
+          } catch (error) {
+            setHookError((error as Error).message);
+          }
+        }}
+      >
+        Submit twice and mutate
+      </Button>
+      <Button onClick={() => { const entry = feedback.value.annotations.at(-1); if (entry) feedback.removeAnnotation(entry.id); }}>Remove last</Button>
+      <Button
+        onClick={() => {
+          feedback.editAnnotation(null);
+          feedback.createAnnotation([
+            {
+              ref: { kind: 'text', id: 'one' },
+              text: { start: 5, end: 6, quote: original.slice(5, 6) },
+            },
+          ]);
+        }}
+      >
+        Add invalid grapheme
+      </Button>
+      <output data-testid="hook-error">{hookError}</output>
+      <output hidden data-testid="snapshot">{snapshot}</output>
+      <output hidden data-testid="draft">{JSON.stringify(feedback.value)}</output>
+      <output hidden data-testid="active">{feedback.activeAnnotationId}</output>
+      <div aria-hidden="true" style={{ height: '50vh' }} />
+
+    </>
+  );
+}
+function Panel() {
+  const [snapshot, setSnapshot] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const [fail, setFail] = useState(true);
+  const [adapt, setAdapt] = useState(false);
+  const [adapterMode, setAdapterMode] = useState('ready');
+  const [located, setLocated] = useState('');
+  const adapter = useMemo<FeedbackAdapter<Ref>>(
+    () => ({
+      async resolve(target) {
+        if (target.ref.id === 'slow') await new Promise((resolve) => setTimeout(resolve, 120));
+        if (adapterMode !== 'ready') return { status: 'missing', message: 'Snapshot unavailable' };
+        return { status: 'ready', text: target.ref.kind === 'mapped' ? mappedSource : target.ref.kind === 'bridge-lines' ? bridgeLine : original };
+      },
+      targetRanges(target) {
+        if (target.ref.kind !== 'bridge-lines' || target.ref.id !== 'one') return [];
+        const node = document.querySelector('[data-testid="bridge"] [data-feedback-text]')?.firstChild;
+        if (!node || !target.text || bridgeLine.slice(target.text.start,target.text.end) !== target.text.quote) return [];
+        const range = document.createRange();
+        range.setStart(node, 6 + target.text.start);
+        range.setEnd(node, 6 + target.text.end);
+        return [range];
+      },
+      async locate(target) {
+        await Promise.resolve();
+        setLocated(target.ref.id);
+      },
+    }),
+    [adapterMode],
+  );
+  async function submit(value: Feedback<Ref>) {
+    if (!Object.isFrozen(value) || !Object.isFrozen(value.annotations))
+      throw new Error('Snapshot must be frozen');
+    setAttempts((count) => count + 1);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    if (fail) throw new Error('Deliberate submission failure');
+    const receipt = await agent.emit('feedback-submitted', value);
+    setSnapshot(JSON.stringify(value));
+    setLocated(`event:${receipt.id}`);
+  }
+  return (
+    <Page title="Feedback acceptance">
+      <Button onClick={() => setFail(!fail)}>Failure {fail ? 'on' : 'off'}</Button>
+      <Button onClick={() => setAdapt(!adapt)}>Adapter enabled {adapt ? 'yes' : 'no'}</Button>
+      <output data-testid="attempts">{attempts}</output>
+      <output data-testid="located">{located}</output>
+      <FeedbackProvider<Ref> onSubmit={submit} adapter={adapt ? adapter : undefined}>
+        <Contents snapshot={snapshot} adapterMode={adapterMode} setAdapterMode={setAdapterMode} />
+      </FeedbackProvider>
+    </Page>
+  );
+}
+export default definePanel({
+  id: 'feedback-acceptance',
+  requires: { paneon: '0.0.0' },
+  input: z.object({}),
+  events: { 'feedback-submitted': feedbackSchema(z.object({ kind: z.string(), id: z.string() })) },
+  render: Panel,
+});

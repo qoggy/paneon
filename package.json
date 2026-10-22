@@ -22,14 +22,15 @@
     "CHANGELOG.md",
     "LICENSE",
     "examples/",
-    "docs/agent-guide.md",
+    "skills/paneon/",
     "src/ui/UPSTREAM-LICENSE.md",
-    "src/ui/upstream.json"
+    "src/ui/upstream.json",
+    "src/cli/skill-install/UPSTREAM-LICENSE.md"
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:cli": "node src/cli/index.ts",
-    "build": "npm run typecheck && npm run build:cli && npm run build:ui && npm run build:web",
+    "build": "npm run build:cli && npm run build:ui && npm run typecheck && npm run build:web",
     "build:cli": "tsc -p tsconfig.cli.json",
     "build:web": "vite build",
     "prepack": "npm run build",
@@ -52,6 +53,7 @@
     "test:browser:mermaid": "node tests/browser/mermaid.mjs"
   },
   "dependencies": {
+    "@clack/prompts": "1.8.1",
     "@fastify/websocket": "^11.3.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.19.2",

@@ -8,6 +8,7 @@ import { watchPanel } from '../compiler/index.js';
 import { CompilerProcess } from '../compiler/process.js';
 import type { CompiledPanel } from '../compiler/index.js';
 import { PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
+import { EVENT_PAYLOAD_LIMIT_CHARACTERS, EVENT_TYPE_LIMIT_CHARACTERS } from '../shared/limits.js';
 import { PaneonError, diagnostic, jsonValue } from '../shared/types.js';
 import type { StoredPanel, JsonValue, Manifest } from '../shared/types.js';
 import { Store } from './store.js';
@@ -385,8 +386,16 @@ export class Runtime extends EventEmitter {
     return live.execution.request('invoke', { actionId, input });
   }
   async append(id: string, revision: string, type: string, payload: unknown) {
-    if (typeof type !== 'string' || type.length > 128 || JSON.stringify(payload)?.length > 65536)
-      throw new PaneonError('INVALID_EVENT', 'The event exceeds the allowed limits.');
+    if (typeof type !== 'string' || type.length > EVENT_TYPE_LIMIT_CHARACTERS)
+      throw new PaneonError(
+        'INVALID_EVENT',
+        `The event type must be a string of at most ${EVENT_TYPE_LIMIT_CHARACTERS} UTF-16 code units.`,
+      );
+    if (JSON.stringify(payload)?.length > EVENT_PAYLOAD_LIMIT_CHARACTERS)
+      throw new PaneonError(
+        'INVALID_EVENT',
+        `The serialized event payload exceeds the ${EVENT_PAYLOAD_LIMIT_CHARACTERS}-character UTF-16 limit.`,
+      );
     const live = this.active(id, revision);
     this.credentials.check(payload);
     const parsed = await live.execution.request('validate-event', { type, payload });

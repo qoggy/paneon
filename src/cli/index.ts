@@ -59,18 +59,49 @@ function integer(value: string | undefined, min: number, max: number, fallback?:
     invalid(`Expected an integer between ${min} and ${max}.`);
   return n;
 }
+const init = program
+  .command('init')
+  .description('Install the bundled Paneon skill for your agents')
+  .option('--agent <agents...>', 'Agent IDs to install to (see init --help)')
+  .option('--project', 'Install to the current project (default)')
+  .option('--global', 'Install to your user-level agent directories')
+  .option('--copy', 'Copy to all selected agents instead of using symlinks')
+  .option('--yes', 'Skip prompts and install using supplied options and defaults')
+  .addHelpText(
+    'after',
+    '\nAgents: codex, cursor, claude-code, opencode, gemini-cli, github-copilot, cline, windsurf, qwen-code, kiro-cli, roo\n\nExamples:\n  paneon init\n  paneon init --agent codex claude-code --project --yes --json\n  paneon init --agent claude-code --global --copy --yes --json',
+  );
+execute(init, async () => {
+  const path = import.meta.url.endsWith('.ts')
+    ? new URL('../../dist/cli/init.js', import.meta.url).href
+    : './init.js';
+  const { runInit } = (await import(path)) as typeof import('./init.js');
+  return runInit(init.optsWithGlobals());
+});
 const run = panel
   .command('run <entry.tsx>')
   .description('Create a new panel instance and print its browser URL')
   .requiredOption('--cwd <directory>', 'Working directory for local panel functions')
-  .requiredOption('--params <json>', 'Panel input matching its schema')
+  .option('--params <json>', 'Panel input matching its schema (choose one input source)')
+  .option(
+    '--params-file <path>',
+    'Read panel input from a UTF-8 JSON file (choose one input source)',
+  )
   .addOption(new Option('--watch', 'Automatically reload source changes (default)'))
   .addOption(new Option('--no-watch', 'Disable automatic source reload'))
   .option('--open', 'Open the panel in the system browser');
 execute(run, async () => {
   if (process.argv.includes('--watch') && process.argv.includes('--no-watch'))
     invalid('--watch and --no-watch cannot be used together.');
-  const options = run.opts<{ cwd: string; params: string; watch?: boolean; open?: boolean }>();
+  const options = run.opts<{
+    cwd: string;
+    params?: string;
+    paramsFile?: string;
+    watch?: boolean;
+    open?: boolean;
+  }>();
+  if ((options.params !== undefined) === (options.paramsFile !== undefined))
+    invalid('Provide exactly one of --params or --params-file.');
   const entryPath = resolve(run.args[0]);
   const cwd = resolve(options.cwd);
   try {
@@ -79,11 +110,21 @@ execute(run, async () => {
   } catch {
     invalid('The entry and cwd must exist and be accessible.');
   }
+  let input = options.params ?? '';
+  if (options.paramsFile !== undefined) {
+    try {
+      input = readFileSync(resolve(options.paramsFile), 'utf8');
+    } catch {
+      invalid('--params-file must name a readable UTF-8 JSON file.');
+    }
+  }
   let params: unknown;
   try {
-    params = JSON.parse(options.params);
+    params = JSON.parse(input);
   } catch {
-    invalid('--params must be valid JSON.');
+    invalid(
+      `${options.paramsFile !== undefined ? '--params-file' : '--params'} must contain valid JSON.`,
+    );
   }
   const result = await (
     await client()

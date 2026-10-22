@@ -27,3 +27,22 @@ export * from './layout';
 export * from './code-block';
 export * from './markdown';
 export * from './mermaid';
+export { FeedbackProvider } from './feedback-provider';
+export {
+  FeedbackTarget,
+  FeedbackText,
+  FeedbackControls,
+  FeedbackSurface,
+  FeedbackSubmitButton,
+  FeedbackToolbar,
+} from './feedback';
+export { useFeedback } from './feedback-context';
+export type {
+  TargetResolution,
+  FeedbackAdapter,
+  FeedbackProviderProps,
+  FeedbackTargetProps,
+  FeedbackTextProps,
+  TextRegistration,
+  FeedbackController,
+} from './feedback-types';
