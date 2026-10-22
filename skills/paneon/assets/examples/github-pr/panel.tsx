@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
 import type { FeedbackTarget as Target } from 'paneon/sdk';
@@ -99,6 +100,7 @@ export const checkReviewRequest = serverAction({
 type Tab = 'overview' | 'files' | 'checks';
 type ListQuery = { state: 'open' | 'closed' | 'merged' | 'all'; search: string; limit: number };
 function GithubPR() {
+  const { t, language, message } = useLocale();
   const params = usePanelInput<GitHubPRParams>();
   const [sessionId] = useState(() => crypto.randomUUID()),
     session = { repository: params.repository, sessionId };
@@ -109,7 +111,7 @@ function GithubPR() {
     [listError, setListError] = useState('');
   const [detail, setDetail] = useState<PRDetail>(),
     [detailLoading, setDetailLoading] = useState(false),
-    [detailError, setDetailError] = useState('');
+    [detailError, setDetailError] = useState<string | { number: number; error: string }>('');
   const [tab, setTab] = useState<Tab>('overview'),
     [comparison, setComparison] = useState<PRComparison>(),
     [checks, setChecks] = useState<PRChecks>();
@@ -117,11 +119,11 @@ function GithubPR() {
     [old, setOld] = useState<PRSnapshot>(),
     [locateTarget, setLocateTarget] = useState<Target<PRRef>>();
   const [tabLoading, setTabLoading] = useState(false),
-    [tabError, setTabError] = useState(''),
+    [tabError, setTabError] = useState<string | { filename: string; error: string }>(''),
     [fileFilter, setFileFilter] = useState('');
   const [requestLoading, setRequestLoading] = useState(false),
-    [requestMessage, setRequestMessage] = useState(''),
-    [saved, setSaved] = useState('');
+    [requestMessage, setRequestMessage] = useState<{ id?: number; error?: string }>(),
+    [saved, setSaved] = useState<number>();
   const snapshots = useRef(new Map<string, PRSnapshot>()),
     details = useRef(new Map<string, PRDetail>());
   const comparisons = useRef(new Map<string, PRComparison>()),
@@ -174,9 +176,7 @@ function GithubPR() {
       setFileFilter('');
     } catch (error) {
       if (serial === detailSerial.current)
-        setDetailError(
-          `无法打开 PR #${number}：${error instanceof Error ? error.message : String(error)}`,
-        );
+        setDetailError({ number, error: error instanceof Error ? error.message : String(error) });
     } finally {
       if (serial === detailSerial.current) setDetailLoading(false);
     }
@@ -199,9 +199,7 @@ function GithubPR() {
       setSelected(result.data);
     } catch (error) {
       if (serial === tabSerial.current)
-        setTabError(
-          `文件 ${filename} 未能完整读取：${error instanceof Error ? error.message : String(error)}`,
-        );
+        setTabError({ filename, error: error instanceof Error ? error.message : String(error) });
     } finally {
       if (serial === tabSerial.current) setTabLoading(false);
     }
@@ -272,16 +270,14 @@ function GithubPR() {
   async function requestReview() {
     if (!shown || requestLoading) return;
     setRequestLoading(true);
-    setRequestMessage('');
+    setRequestMessage(undefined);
     try {
       const result = await checkReviewRequest({ ...session, detailId: shown.id });
       if (!result.ok) throw new Error(result.message);
       const receipt = await agent.emit('review-requested', result.data);
-      setRequestMessage(
-        `已保存整份 PR 审阅请求，事件 ${receipt.id}。草稿意见未发送；需要 AI 正在等待或之后恢复会话读取。`,
-      );
+      setRequestMessage({ id: receipt.id });
     } catch (error) {
-      setRequestMessage(`请求未保存：${error instanceof Error ? error.message : String(error)}`);
+      setRequestMessage({ error: error instanceof Error ? error.message : String(error) });
     } finally {
       setRequestLoading(false);
     }
@@ -289,11 +285,11 @@ function GithubPR() {
   return (
     <FeedbackProvider<PRRef>
       onSubmit={async (feedback) => {
-        setSaved('');
+        setSaved(undefined);
         const result = await checkFeedback({ ...session, feedback });
         if (!result.ok) throw new Error(result.message);
         const receipt = await agent.emit('pr-feedback-submitted', result.data);
-        setSaved(`已保存当前完整意见，事件 ${receipt.id}。意见仅交给当前 AI，未发布到 GitHub。`);
+        setSaved(receipt.id);
       }}
       adapter={{
         resolve(target) {
@@ -353,16 +349,16 @@ function GithubPR() {
     >
       <Page
         title={`GitHub PR · ${params.repository}`}
-        description="真实 gh 只读查询；审阅请求和意见仅交给当前 AI。"
+        description={t('真实 gh 只读查询；审阅请求和意见仅交给当前 AI。')}
       >
         <FeedbackSurface />
         <FeedbackToolbar />
         <div className="grid gap-4 md:grid-cols-[minmax(14rem,1fr)_minmax(0,3fr)]">
           <aside className="space-y-3">
             <label>
-              状态{' '}
+              {t('状态')}{' '}
               <select
-                aria-label="PR 状态"
+                aria-label={t('PR 状态')}
                 value={query.state}
                 onChange={(event) =>
                   void loadList({
@@ -374,16 +370,16 @@ function GithubPR() {
               >
                 {(['open', 'closed', 'merged', 'all'] as const).map((state) => (
                   <option key={state} value={state}>
-                    {state}
+                    {t(state)}
                   </option>
                 ))}
               </select>
             </label>
             <Input
-              aria-label="搜索 PR"
+              aria-label={t('搜索 PR')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索 PR"
+              placeholder={t('搜索 PR')}
             />
             <div className="flex flex-wrap gap-2">
               <Button
@@ -391,25 +387,25 @@ function GithubPR() {
                 disabled={listLoading}
                 onClick={() => void loadList({ ...query, search, limit: 30 })}
               >
-                搜索
+                {t('搜索')}
               </Button>
               <Button variant="outline" disabled={listLoading} onClick={() => void loadList(query)}>
-                刷新列表
+                {t('刷新列表')}
               </Button>
             </div>
-            {listLoading && <p role="status">读取 PR 列表…</p>}
+            {listLoading && <p role="status">{t('读取 PR 列表…')}</p>}
             {listError && (
               <Alert variant="destructive">
-                <AlertTitle>列表查询失败</AlertTitle>
+                <AlertTitle>{t('列表查询失败')}</AlertTitle>
                 <AlertDescription>{listError}</AlertDescription>
               </Alert>
             )}
             <p className="text-sm text-muted-foreground">
-              已加载 {list?.items.length ?? 0} 条；gh 最大获取量 {query.limit}
-              ，不代表完整仓库或固定分页快照。
+              {t('已加载')} {list?.items.length ?? 0} {t('条；gh 最大获取量')} {query.limit}
+              {t('，不代表完整仓库或固定分页快照。')}
             </p>
-            {list?.items.length === 0 && <p>该查询没有 PR。</p>}
-            <div className="max-h-96 space-y-2 overflow-y-auto" aria-label="PR 列表">
+            {list?.items.length === 0 && <p>{t('该查询没有 PR。')}</p>}
+            <div className="max-h-96 space-y-2 overflow-y-auto" aria-label={t('PR 列表')}>
               {list?.items.map((pr) => (
                 <div key={pr.number} className="rounded-md border p-2">
                   <Button
@@ -420,9 +416,13 @@ function GithubPR() {
                     #{pr.number} {pr.title}
                   </Button>
                   <p className="text-xs text-muted-foreground">
-                    {pr.author?.login ?? 'deleted user'} · {pr.headRefName} → {pr.baseRefName} ·{' '}
-                    {pr.isDraft ? 'Draft · ' : ''}
-                    {pr.state} · {pr.updatedAt}
+                    {pr.author?.login ?? t('deleted user')} · {pr.headRefName} → {pr.baseRefName} ·{' '}
+                    {pr.isDraft ? `${t('Draft')} · ` : ''}
+                    {pr.state} ·{' '}
+                    {new Intl.DateTimeFormat(language, {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    }).format(new Date(pr.updatedAt))}
                   </p>
                 </div>
               ))}
@@ -433,27 +433,31 @@ function GithubPR() {
                 disabled={listLoading}
                 onClick={() => void loadList({ ...query, limit: query.limit + 30 })}
               >
-                加载更多（增加 30）
+                {t('加载更多（增加 30）')}
               </Button>
             )}
           </aside>
           <main className="min-w-0 space-y-4">
-            {detailLoading && <p role="status">读取 PR 详情…</p>}
+            {detailLoading && <p role="status">{t('读取 PR 详情…')}</p>}
             {detailError && (
               <Alert variant="destructive">
-                <AlertTitle>详情查询失败</AlertTitle>
-                <AlertDescription>{detailError}</AlertDescription>
+                <AlertTitle>{t('详情查询失败')}</AlertTitle>
+                <AlertDescription>
+                  {typeof detailError === 'string'
+                    ? detailError
+                    : t('Unable to open PR #{number}: {error}', detailError)}
+                </AlertDescription>
               </Alert>
             )}
             {!shown && !detailLoading && (
-              <p>从列表选择 PR，或通过 initialPullRequest 指定初始编号。</p>
+              <p>{t('从列表选择 PR，或通过 initialPullRequest 指定初始编号。')}</p>
             )}
             {old && (
               <Alert>
-                <AlertTitle>回看保留快照</AlertTitle>
+                <AlertTitle>{t('回看保留快照')}</AlertTitle>
                 <AlertDescription>
                   PR #{old.source.number} · {old.source.kind} · head {old.source.headCommit}
-                  。刷新后仍指向原始内容。
+                  {t('。刷新后仍指向原始内容。')}
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -461,7 +465,7 @@ function GithubPR() {
                       setTab(current.current.tab);
                     }}
                   >
-                    返回当前 PR
+                    {t('返回当前 PR')}
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -480,24 +484,30 @@ function GithubPR() {
                     </h2>
                     <p>
                       {shown.headRefName} → {shown.baseRefName} ·{' '}
-                      {shown.author?.login ?? 'deleted user'}
+                      {shown.author?.login ?? t('deleted user')}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Badge>{shown.state}</Badge>
-                      {shown.isDraft && <Badge variant="secondary">Draft</Badge>}
-                      <Badge variant="outline">Review: {shown.reviewDecision || 'none'}</Badge>
+                      {shown.isDraft && <Badge variant="secondary">{t('Draft')}</Badge>}
                       <Badge variant="outline">
-                        Merge: {shown.mergeable} / {shown.mergeStateStatus}
+                        {t('Review:')} {shown.reviewDecision || 'none'}
+                      </Badge>
+                      <Badge variant="outline">
+                        {t('Merge:')} {shown.mergeable} / {shown.mergeStateStatus}
                       </Badge>
                     </div>
                     <p className="text-xs break-all text-muted-foreground">
-                      Base {shown.baseRefOid}
+                      {t('Base')} {shown.baseRefOid}
                       <br />
-                      Head {shown.headRefOid}
+                      {t('Head')} {shown.headRefOid}
                       <br />
-                      更新于 {shown.updatedAt}
+                      {t('更新于')}{' '}
+                      {new Intl.DateTimeFormat(language, {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(shown.updatedAt))}
                     </p>
-                    <span className="text-sm text-muted-foreground">（可选择整份 PR）</span>
+                    <span className="text-sm text-muted-foreground">{t('（可选择整份 PR）')}</span>
                   </div>
                 </FeedbackTarget>
                 <div className="flex flex-wrap gap-2">
@@ -507,20 +517,29 @@ function GithubPR() {
                     rel="noreferrer"
                     className="underline"
                   >
-                    在 GitHub 打开 PR
+                    {t('在 GitHub 打开 PR')}
                   </a>
                   <Button
                     variant="outline"
                     disabled={detailLoading}
                     onClick={() => void open(shown.number)}
                   >
-                    刷新 PR
+                    {t('刷新 PR')}
                   </Button>
                   <Button disabled={requestLoading} onClick={() => void requestReview()}>
-                    {requestLoading ? '保存请求中…' : '请 AI 审阅此 PR'}
+                    {requestLoading ? t('保存请求中…') : t('请 AI 审阅此 PR')}
                   </Button>
                 </div>
-                {requestMessage && <p role="status">{requestMessage}</p>}
+                {requestMessage && (
+                  <p role="status">
+                    {requestMessage.id !== undefined
+                      ? t(
+                          'Saved the complete PR review request as event {id}. Draft comments were not sent; the AI must be waiting or resume later to read it.',
+                          { id: requestMessage.id },
+                        )
+                      : t('Request not saved: {error}', { error: requestMessage.error ?? '' })}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {(['overview', 'files', 'checks'] as const).map((value) => (
                     <Button
@@ -528,25 +547,33 @@ function GithubPR() {
                       key={value}
                       onClick={() => void navigate(value)}
                     >
-                      {{ overview: '概览与说明', files: '文件改动', checks: '检查' }[value]}
+                      {
+                        { overview: t('概览与说明'), files: t('文件改动'), checks: t('检查') }[
+                          value
+                        ]
+                      }
                     </Button>
                   ))}
                 </div>
                 {tabLoading && (
-                  <p role="status">读取 {tab === 'files' ? '固定版本代码' : '检查'}…</p>
+                  <p role="status">
+                    {t('读取')} {tab === 'files' ? t('固定版本代码') : t('检查')}…
+                  </p>
                 )}
                 {tabError && (
                   <Alert variant="destructive">
-                    <AlertTitle>内容查询失败</AlertTitle>
+                    <AlertTitle>{t('内容查询失败')}</AlertTitle>
                     <AlertDescription>
-                      {tabError}{' '}
+                      {typeof tabError === 'string'
+                        ? tabError
+                        : t('Could not completely read file {filename}: {error}', tabError)}{' '}
                       <a
                         href={safeLink(`${shown.url}/files`)}
                         target="_blank"
                         rel="noreferrer"
                         className="underline"
                       >
-                        查看 GitHub 原始页面
+                        {t('查看 GitHub 原始页面')}
                       </a>
                     </AlertDescription>
                   </Alert>
@@ -557,7 +584,7 @@ function GithubPR() {
                       target={{ sourceId: bodySnapshot.id, kind: 'description' }}
                     >
                       <h3 className="rounded-md border p-2 font-medium">
-                        PR 说明（可选择整段说明）
+                        {t('PR 说明（可选择整段说明）')}
                       </h3>
                     </FeedbackTarget>
                     {bodySnapshot.body ? (
@@ -566,22 +593,32 @@ function GithubPR() {
                         target={{ sourceId: bodySnapshot.id, kind: 'description' }}
                       />
                     ) : (
-                      <p>没有说明。</p>
+                      <p>{t('没有说明。')}</p>
                     )}
                   </div>
                 )}
                 {tab === 'checks' && (
-                  <section aria-label="PR 检查" className="space-y-2">
+                  <section aria-label={t('PR 检查')} className="space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      按固定 head 读取 statusCheckRollup；检查失败是所见业务状态。
+                      {t('按固定 head 读取 statusCheckRollup；检查失败是所见业务状态。')}
                       {old?.source.kind === 'check'
-                        ? ` 观察于 ${old.source.observedAt}`
+                        ? t('Observed at {date}', {
+                            date: new Intl.DateTimeFormat(language, {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            }).format(new Date(old.source.observedAt)),
+                          })
                         : checks
-                          ? ` 观察于 ${checks.observedAt}`
+                          ? t('Observed at {date}', {
+                              date: new Intl.DateTimeFormat(language, {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              }).format(new Date(checks.observedAt)),
+                            })
                           : ''}
                     </p>
                     {displayedChecks.length === 0 && !tabLoading && !tabError && (
-                      <p>没有检查记录。</p>
+                      <p>{t('没有检查记录。')}</p>
                     )}
                     {displayedChecks.map(
                       (snapshot) =>
@@ -608,7 +645,7 @@ function GithubPR() {
                                   rel="noreferrer"
                                   className="underline"
                                 >
-                                  检查详情
+                                  {t('检查详情')}
                                 </a>
                               )}
                             </div>
@@ -622,15 +659,21 @@ function GithubPR() {
                     {comparison && !old && (
                       <>
                         <p className="text-xs break-all text-muted-foreground">
-                          固定比较：merge-base {comparison.mergeBaseCommit} → head{' '}
+                          {t('固定比较：merge-base')} {comparison.mergeBaseCommit} → head{' '}
                           {comparison.headCommit}
                         </p>
-                        {comparison.notes.map((note) => (
+                        <p className="text-sm text-muted-foreground">
+                          {t(
+                            'GitHub compare API returns at most 300 files; listed {listed}, PR reports {reported}.',
+                            { listed: comparison.files.length, reported: comparison.reportedFiles },
+                          )}
+                        </p>
+                        {comparison.notes.slice(1).map((note) => (
                           <p
-                            key={note}
+                            key={message(note)}
                             className={`text-sm ${comparison.complete ? 'text-muted-foreground' : 'text-destructive'}`}
                           >
-                            {note}
+                            {message(note)}
                           </p>
                         ))}
                         <a
@@ -639,13 +682,13 @@ function GithubPR() {
                           rel="noreferrer"
                           className="underline"
                         >
-                          GitHub 原始文件改动
+                          {t('GitHub 原始文件改动')}
                         </a>
                         <Input
-                          aria-label="搜索文件"
+                          aria-label={t('搜索文件')}
                           value={fileFilter}
                           onChange={(event) => setFileFilter(event.target.value)}
-                          placeholder="搜索文件路径"
+                          placeholder={t('搜索文件路径')}
                         />
                         <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                           {comparison.files
@@ -665,14 +708,14 @@ function GithubPR() {
                               </Button>
                             ))}
                         </div>
-                        {comparison.files.length === 0 && <p>该固定比较没有文件改动。</p>}
+                        {comparison.files.length === 0 && <p>{t('该固定比较没有文件改动。')}</p>}
                       </>
                     )}
                     {displayedDiff?.source.kind === 'diff' && displayedDiff.model && (
                       <>
-                        {displayedDiff.notes?.map((note) => (
-                          <p key={note} className="text-sm text-muted-foreground">
-                            {note}
+                        {displayedDiff.notesUI?.map((note) => (
+                          <p key={note.key} className="text-sm text-muted-foreground">
+                            {message(note.key, note.params)}
                           </p>
                         ))}
                         <DiffView
@@ -703,7 +746,14 @@ function GithubPR() {
             )}
           </main>
         </div>
-        {saved && <p role="status">{saved}</p>}
+        {saved && (
+          <p role="status">
+            {t(
+              'Saved complete comments as event {id}. Comments go only to the current AI and were not published to GitHub.',
+              { id: saved },
+            )}
+          </p>
+        )}
       </Page>
     </FeedbackProvider>
   );

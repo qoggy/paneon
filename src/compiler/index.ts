@@ -252,7 +252,7 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
   const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
   writeFileSync(
     frameSource,
-    `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React from 'react';import {TooltipProvider} from 'paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext} from 'paneon/sdk/client';\nlet mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(TooltipProvider,null,React.createElement(definition.render))));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
+    `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React,{useSyncExternalStore} from 'react';import {TooltipProvider,UIProvider} from 'paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext,getUI,subscribeUI} from 'paneon/sdk/client';\nfunction Environment(){const ui=useSyncExternalStore(subscribeUI,getUI);return React.createElement(UIProvider,{ui},React.createElement(TooltipProvider,null,React.createElement(definition.render)));}let mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(Environment)));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
   );
   try {
     await build({
@@ -297,7 +297,7 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
       .join('');
     writeFileSync(
       join(temporary, 'client/frame.html'),
-      `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${css}</head><body><div id="root"></div><script type="module" src="./client.js"></script></body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${css}</head><body style="background:transparent"><div id="root"></div><script type="module" src="./client.js"></script></body></html>`,
     );
     const manifest: Manifest = {
       definitionId: metadata.definitionId,

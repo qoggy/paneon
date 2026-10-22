@@ -168,7 +168,7 @@ try {
   await button('提交评论').click();
   await frame
     .getByRole('status')
-    .filter({ hasText: /Saved as event/i })
+    .filter({ hasText: /已保存为事件/ })
     .waitFor();
   const events = await f.events(panel);
   assert.equal(events.length, 1);

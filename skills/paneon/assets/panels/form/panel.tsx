@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useRef, useState } from 'react';
 import { agent, definePanel, usePanelInput } from 'paneon/sdk';
 import {
@@ -36,6 +37,7 @@ import {
 import type { FormDraft, FormParams, FormValue } from './schema';
 
 function FormPanel() {
+  const { t, message } = useLocale();
   const params = usePanelInput<FormParams>();
   const [draft, setDraft] = useState(() => initialDraft(params));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,6 +47,19 @@ function FormPanel() {
   );
   function update(name: string, value: FormDraft[string]) {
     setDraft((previous) => ({ ...previous, [name]: value }));
+  }
+  function fieldError(error: string) {
+    const patterns = [
+      [/^Use at least (.+) characters\.$/, 'Use at least {count} characters.'],
+      [/^Use at most (.+) characters\.$/, 'Use at most {count} characters.'],
+      [/^Use a number at least (.+)\.$/, 'Use a number at least {count}.'],
+      [/^Use a number at most (.+)\.$/, 'Use a number at most {count}.'],
+    ] as const;
+    for (const [pattern, key] of patterns) {
+      const match = pattern.exec(error);
+      if (match) return t(key, { count: match[1] });
+    }
+    return message(error);
   }
   function submit() {
     const result = collectForm(params, draft);
@@ -58,7 +73,7 @@ function FormPanel() {
     void submission.submit({ values: result.values });
   }
   return (
-    <Page title={params.title}>
+    <Page title={params.title} className="max-w-160 min-w-0 [overflow-wrap:anywhere] md:p-6">
       {params.description && <Markdown>{params.description}</Markdown>}
       <form
         ref={form}
@@ -81,7 +96,7 @@ function FormPanel() {
         }}
       >
         <fieldset disabled={submission.pending}>
-          <FieldGroup>
+          <FieldGroup className="gap-6">
             {params.fields.map((field, index) => {
               const id = `field-${index}`;
               const error = Object.hasOwn(errors, field.name) ? errors[field.name] : undefined;
@@ -98,14 +113,16 @@ function FormPanel() {
               const description = field.description && (
                 <FieldDescription id={`${id}-description`}>{field.description}</FieldDescription>
               );
-              const errorMessage = error && <FieldError id={`${id}-error`}>{error}</FieldError>;
+              const errorMessage = error && (
+                <FieldError id={`${id}-error`}>{fieldError(error)}</FieldError>
+              );
               const clear = value !== '' && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Clear ${field.label}`}
-                  title={`Clear ${field.label}`}
+                  aria-label={t('Clear {label}', { label: field.label })}
+                  title={t('Clear {label}', { label: field.label })}
                   className="shrink-0"
                   onClick={() => {
                     update(field.name, '');
@@ -131,7 +148,7 @@ function FormPanel() {
                         onCheckedChange={(checked) => update(field.name, checked)}
                       />
                     )}
-                    <FieldContent>
+                    <FieldContent className="min-w-0">
                       <FieldLabel htmlFor={id}>{label}</FieldLabel>
                       {description}
                       {errorMessage}
@@ -152,27 +169,34 @@ function FormPanel() {
                         onChange={(event) => update(field.name, event.target.value)}
                       />
                     ) : (
-                      <Input
-                        {...props}
-                        type={field.type === 'number' ? 'number' : 'text'}
-                        step={field.type === 'number' ? 'any' : undefined}
-                        value={String(value)}
-                        onChange={(event) => update(field.name, event.target.value)}
-                      />
+                      <div className="min-w-0">
+                        <Input
+                          {...props}
+                          type={field.type === 'number' ? 'number' : 'text'}
+                          step={field.type === 'number' ? 'any' : undefined}
+                          className={field.type === 'number' ? 'w-36 max-w-full' : undefined}
+                          value={String(value)}
+                          onChange={(event) => update(field.name, event.target.value)}
+                        />
+                      </div>
                     ))}
                   {field.type === 'select' && (
-                    <div className="flex max-w-md min-w-0 items-center gap-1">
+                    <div className="flex max-w-72 min-w-0 items-center gap-1">
                       <Select
                         value={String(value)}
                         onValueChange={(selected) => update(field.name, selected)}
                         disabled={submission.pending}
                       >
                         <SelectTrigger {...props} className="min-w-0 flex-1">
-                          <SelectValue placeholder="Select an option" />
+                          <SelectValue placeholder={t('Select an option')} />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-w-[calc(100vw-2rem)] [overflow-wrap:anywhere]">
                           {field.options.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              className="min-w-0 whitespace-normal"
+                            >
                               {option.label}
                             </SelectItem>
                           ))}
@@ -259,10 +283,10 @@ function FormPanel() {
             <div className="flex items-center gap-2">
               <Button type="button" disabled={submission.pending} onClick={submit}>
                 {submission.pending
-                  ? 'Saving…'
+                  ? t('Saving…')
                   : submission.hasReceipt
-                    ? 'Submit corrected form'
-                    : 'Submit form'}
+                    ? t('Submit corrected form')
+                    : t('Submit form')}
               </Button>
             </div>
           </FieldGroup>
@@ -270,7 +294,7 @@ function FormPanel() {
       </form>
       {submission.message && (
         <Alert role={submission.failed ? 'alert' : 'status'}>
-          <AlertTitle>Submission</AlertTitle>
+          <AlertTitle>{t('Submission')}</AlertTitle>
           <AlertDescription>{submission.message}</AlertDescription>
         </Alert>
       )}

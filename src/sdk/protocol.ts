@@ -1,3 +1,4 @@
+import type { UIPreferences } from '../shared/preferences.js';
 import type { JsonValue, Diagnostic } from '../shared/types.js';
 export type BridgeIdentity = {
   paneon: true;
@@ -18,5 +19,10 @@ export type BridgeResponse = BridgeIdentity & {
   data?: JsonValue;
   error?: Diagnostic;
 };
-export type BridgeInit = BridgeIdentity & { direction: 'init'; params: JsonValue };
+export type BridgeInit = BridgeIdentity & {
+  direction: 'init';
+  params: JsonValue;
+  ui: UIPreferences;
+};
+export type BridgePreferences = BridgeIdentity & { direction: 'preferences'; ui: UIPreferences };
 export type CredentialRef = { ref: string; expiresAt: string; status: 'ready' | 'expired' };

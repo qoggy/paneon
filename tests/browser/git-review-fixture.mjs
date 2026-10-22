@@ -16,6 +16,15 @@ export async function startGitReviewFixture() {
       { recursive: true },
     );
     service = await startServer(join(f.root, '.paneon'));
+    await service.app.inject({
+      method: 'POST',
+      url: '/api/preferences',
+      headers: {
+        host: `127.0.0.1:${service.descriptor.port}`,
+        authorization: `Bearer ${service.descriptor.controlToken}`,
+      },
+      payload: { ui: { language: 'zh-CN' } },
+    });
     const params = {
       title: 'Git review acceptance',
       repositories: [

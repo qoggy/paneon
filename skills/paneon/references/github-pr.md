@@ -64,9 +64,9 @@ This example keeps feedback editable after success. Another explicit submission 
 
 Read the two event types using ordinary `paneon panel events <instanceId> --consumer <name>` and acknowledge delivered IDs using `paneon panel ack`. Receiving feedback through Paneon never publishes it to GitHub.
 
-## Integration status
+## Reuse notes
 
-The example uses the public Provider/controls plus the existing shared Markdown and diff adapters, without another selection state machine. The current baseline has a reproduced shared feedback issue: programmatic Markdown phrase location leaves a browser Selection, and clicking a normal button can re-add that selection to the draft. The complete Chrome regression retains the failing draft-count assertion. This must be fixed in the shared feedback event handling and revalidated before claiming complete interaction acceptance; the PR example does not clear selections or relax assertions to hide it. See the dedicated development report for the exact reproduction and separate real-query/fixture evidence.
+The example uses the public Provider/controls plus the existing shared Markdown and diff adapters, without another selection state machine.
 
 The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so comments created with line/range controls have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
 

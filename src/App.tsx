@@ -1,3 +1,4 @@
+import { useUI } from './ui/use-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -19,12 +20,14 @@ import {
   Stack,
 } from './ui';
 import { api, errorMessage, type PanelPage } from './web/api';
+import { PreferencesSettings } from './web/preferences-settings';
 import { PanelHost } from './web/panel-host';
 export default function App() {
   const match = /^\/panels\/([^/]+)\/?$/.exec(window.location.pathname);
   return match ? <PanelHost instanceId={decodeURIComponent(match[1])} /> : <PanelList />;
 }
 function PanelList() {
+  const { t } = useUI();
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<PanelPage>();
   const [loading, setLoading] = useState(true);
@@ -85,9 +88,10 @@ function PanelList() {
   return (
     <Page title="Paneon">
       <Stack direction="row" className="items-center justify-between">
-        <h2 className="text-lg font-semibold">Panels</h2>
+        <h2 className="text-lg font-semibold">{t('Panels')}</h2>
+        <PreferencesSettings />
         <Button variant="outline" disabled={busy} onClick={() => void refresh()}>
-          Refresh
+          {t('Refresh')}
         </Button>
       </Stack>
       {error && (
@@ -99,7 +103,7 @@ function PanelList() {
       {!loading && panels?.length === 0 && (
         <Card>
           <CardContent className="pt-6">
-            <p>No panels yet. Run a panel with the Paneon CLI.</p>
+            <p>{t('No panels yet. Run a panel with the Paneon CLI.')}</p>
           </CardContent>
         </Card>
       )}
@@ -120,15 +124,17 @@ function PanelList() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Stack direction="row" gap={2}>
-                  <Badge variant="secondary">{panel.status}</Badge>
+                  <Badge variant="secondary">{t(panel.status)}</Badge>
                   <Badge variant="outline">
-                    {panel.watch ? 'Auto reload on' : 'Auto reload off'}
+                    {panel.watch ? t('Auto reload on') : t('Auto reload off')}
                   </Badge>
                 </Stack>
                 <p className="text-sm break-all text-muted-foreground">{panel.entryPath}</p>
                 <Stack direction="row" gap={2} wrap>
                   <Button asChild variant="outline">
-                    <a href={`/panels/${encodeURIComponent(panel.instanceId)}`}>Open panel</a>
+                    <a href={`/panels/${encodeURIComponent(panel.instanceId)}`}>
+                      {t('Open panel')}
+                    </a>
                   </Button>
                   <Button
                     variant="outline"
@@ -138,10 +144,10 @@ function PanelList() {
                   >
                     {closing.includes(panel.instanceId) ? (
                       <>
-                        <Spinner /> Closing…
+                        <Spinner /> {t('Closing…')}
                       </>
                     ) : (
-                      'Close'
+                      t('Close')
                     )}
                   </Button>
                 </Stack>
@@ -155,7 +161,7 @@ function PanelList() {
           ))}
       </div>
       {result && (
-        <Pagination aria-label="Panel pagination">
+        <Pagination aria-label={t('Panel pagination')}>
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
@@ -171,7 +177,11 @@ function PanelList() {
             </PaginationItem>
             <PaginationItem>
               <span aria-live="polite" className="px-3 text-sm text-muted-foreground">
-                Page {page} of {totalPages} · {result.total} panels
+                {t('Page {page} of {totalPages} · {total} panels', {
+                  page,
+                  totalPages,
+                  total: result.total,
+                })}
               </span>
             </PaginationItem>
             <PaginationItem>

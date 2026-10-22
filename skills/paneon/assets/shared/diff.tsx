@@ -1,3 +1,4 @@
+import { useLocale } from './i18n';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, CodeBlock, FeedbackTarget, Input, useFeedback } from 'paneon/ui';
 import type { FeedbackTarget as Target } from 'paneon/sdk';
@@ -44,6 +45,7 @@ export function DiffView({
   fileOnly?: boolean;
   locateTarget?: Target<GitRef>;
 }) {
+  const { t, message } = useLocale();
   const model = useMemo(
     () => supplied ?? createDiffModel(oldText, newText),
     [supplied, oldText, newText],
@@ -195,14 +197,17 @@ export function DiffView({
     )[extension ?? ''];
     return (
       <td
-        className={`border-l align-top ${changed ? (side === 'old' ? 'bg-red-50' : 'bg-green-50') : ''}`}
+        className={`border-l align-top ${changed ? (side === 'old' ? 'bg-[var(--diff-deletion)]' : 'bg-[var(--diff-addition)]') : ''}`}
       >
         <div className="flex h-6 font-mono text-sm leading-6">
           <button
             type="button"
             className="w-12 shrink-0 pr-2 text-right text-muted-foreground select-none"
             disabled={feedback.mode !== 'select' || feedback.submitting}
-            aria-label={`选择${side === 'old' ? '旧' : '新'}侧第 ${line.number} 行`}
+            aria-label={t('Select {side} line {number}', {
+              side: t(side === 'old' ? 'Old' : 'New'),
+              number: line.number,
+            })}
             onClick={() => chooseLine(side, line.number, line.number)}
           >
             {line.number}
@@ -226,7 +231,7 @@ export function DiffView({
         </div>
         {endingNote && (
           <div className="h-5 pl-16 text-xs text-muted-foreground select-none">
-            {!line.text.endsWith('\n') ? '\\ No newline at end of file' : ''}
+            {!line.text.endsWith('\n') ? `\\ ${t('No newline at end of file')}` : ''}
           </div>
         )}
       </td>
@@ -241,7 +246,7 @@ export function DiffView({
         className="min-w-0 overflow-x-auto"
         data-diff-scroll="unified"
         tabIndex={0}
-        aria-label="单列差异，横向滚动查看长行"
+        aria-label={t('单列差异，横向滚动查看长行')}
       >
         <table className="w-max min-w-full border-collapse">
           <tbody>
@@ -266,7 +271,9 @@ export function DiffView({
             className="min-w-0 overflow-x-auto"
             data-diff-scroll={side}
             tabIndex={0}
-            aria-label={`${side === 'old' ? '旧' : '新'}侧差异，横向滚动查看长行`}
+            aria-label={t('{side} diff, scroll horizontally for long lines', {
+              side: t(side === 'old' ? 'Old' : 'New'),
+            })}
           >
             <table className="w-max min-w-full border-collapse">
               <tbody>
@@ -295,7 +302,7 @@ export function DiffView({
               title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
             >
               {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
-              <span className="text-muted-foreground">（整文件）</span>
+              <span className="text-muted-foreground">{t('（整文件）')}</span>
             </div>
           </FeedbackTarget>
         </div>
@@ -326,20 +333,20 @@ export function DiffView({
           {feedback.mode === 'select' && (
             <div className="flex flex-wrap items-center gap-2">
               <label>
-                侧{' '}
+                {t('侧')}{' '}
                 <select
-                  aria-label="侧"
+                  aria-label={t('侧')}
                   value={rangeSide}
                   onChange={(e) => setRangeSide(e.target.value as 'old' | 'new')}
                 >
-                  <option value="old">旧</option>
-                  <option value="new">新</option>
+                  <option value={'old'}>{t('旧')}</option>
+                  <option value={'new'}>{t('新')}</option>
                 </select>
               </label>
               <label>
-                起始行
+                {t('起始行')}
                 <Input
-                  aria-label="起始行"
+                  aria-label={t('起始行')}
                   type="number"
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
@@ -347,9 +354,9 @@ export function DiffView({
                 />
               </label>
               <label>
-                结束行
+                {t('结束行')}
                 <Input
-                  aria-label="结束行"
+                  aria-label={t('结束行')}
                   type="number"
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
@@ -360,11 +367,11 @@ export function DiffView({
                 variant="outline"
                 onClick={() => chooseLine(rangeSide, Number(start), Number(end))}
               >
-                选择连续行
+                {t('选择连续行')}
               </Button>
             </div>
           )}
-          {error && <p role="alert">{error}</p>}
+          {error && <p role="alert">{message(error)}</p>}
           {expanded ? (
             <div className="min-w-0 rounded-md border">{display(model.rows)}</div>
           ) : (
@@ -383,14 +390,14 @@ export function DiffView({
                 >
                   <div className="bg-muted p-2 font-mono text-sm">
                     @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                    （改动块）
+                    {t('(changed block)')}
                   </div>
                 </FeedbackTarget>
                 {display(hunk.rows)}
               </section>
             ))
           )}
-          {model.hunks.length === 0 && !expanded && <p>文本内容相同；可展开查看上下文。</p>}
+          {model.hunks.length === 0 && !expanded && <p>{t('文本内容相同；可展开查看上下文。')}</p>}
         </>
       )}
     </div>

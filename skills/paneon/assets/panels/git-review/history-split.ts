@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 
@@ -6,6 +7,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 /** Page-local layout state; never replaces the history or diff subtree. */
 export function useHistorySplit(enabled: boolean) {
+  const { t } = useLocale();
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState(INITIAL_RATIO);
   const [size, setSize] = useState({ available: 0, min: 0, max: 0, handle: 1 });
@@ -65,12 +67,12 @@ export function useHistorySplit(enabled: boolean) {
     dividerProps: {
       role: 'separator',
       tabIndex: 0,
-      'aria-label': '调整提交历史与文件差异高度',
+      'aria-label': t('调整提交历史与文件差异高度'),
       'aria-orientation': 'horizontal' as const,
       'aria-valuemin': Math.round(size.min),
       'aria-valuemax': Math.round(size.max),
       'aria-valuenow': Math.round(top),
-      'aria-valuetext': `提交历史高度 ${Math.round(top)} 像素`,
+      'aria-valuetext': t('Commit history height {height} pixels', { height: Math.round(top) }),
       'data-dragging': dragging || undefined,
       onPointerDown(event: PointerEvent<HTMLDivElement>) {
         if (event.button !== 0 || !size.available || !matchMedia('(min-width: 48rem)').matches)

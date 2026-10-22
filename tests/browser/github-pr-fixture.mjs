@@ -28,6 +28,15 @@ export async function startGithubPRFixture() {
       { recursive: true },
     );
     service = await startServer(join(root, '.paneon'));
+    await service.app.inject({
+      method: 'POST',
+      url: '/api/preferences',
+      headers: {
+        host: `127.0.0.1:${service.descriptor.port}`,
+        authorization: `Bearer ${service.descriptor.controlToken}`,
+      },
+      payload: { ui: { language: 'zh-CN' } },
+    });
     const params = { repository: 'example/project', initialPullRequest: 101 };
     const run = (input = params) =>
       service.runtime.run(join(skill, 'assets/examples/github-pr/panel.tsx'), root, input, false);

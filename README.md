@@ -19,7 +19,7 @@ is available yet. Node.js **24** is required.
 ```sh
 npm ci
 npm run build
-node dist/cli/index.js panel run examples/decision-panel.tsx --cwd "$PWD" --params '{}' --open --json
+node dist/cli/index.js panel run examples/decision-panel.tsx --cwd "$PWD" --open --json
 ```
 
 The CLI returns an `instanceId` and `url`, plus the effective state and version.
@@ -91,6 +91,32 @@ After upgrading Paneon, explicitly stop an older server before running panels
 with the new CLI. Panels declare a compatible package range with
 `requires: { paneon: '0.0.0' }`. An unsupported range produces an error; Paneon does
 not silently install another SDK or modify your source.
+
+## Interface preferences
+
+Choose **Settings** on the home page, or configure the same user preferences from the CLI:
+
+```sh
+paneon config get
+paneon config set ui.theme dark
+paneon config set ui.language zh-CN
+```
+
+The defaults are `light` and `en`. Supported values are `light` / `dark` and
+`en` / `zh-CN`. Paneon saves preferences in `~/.paneon/config.json` and updates
+open home pages, panel hosts, and newly compiled panel interfaces immediately.
+Changing preferences keeps answers, comment drafts, current views, and event receipts.
+
+Paneon's own controls and standard-page instructions follow the selected language.
+Author-supplied titles, questions, Markdown, code, Git/PR content, and user input
+stay in their original language. Public UI components inherit the theme; custom
+pages can read `useUI()` from `paneon/ui`. See the bundled skill's
+[preferences guide](skills/paneon/references/preferences.md).
+
+Existing instances compiled with an older release and previously copied custom
+TSX retain their own hardcoded text until their source is updated and recompiled.
+Paneon does not reload them automatically. Direct config-file edits are read on
+runtime startup; live updates use Settings or `config set`.
 
 ## Development
 

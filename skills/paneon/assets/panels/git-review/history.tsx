@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { GitCommit, GitCommitDetails } from './git.ts';
@@ -5,7 +6,7 @@ import { layoutGitGraph } from './graph.ts';
 import type { GraphRow } from './graph.ts';
 
 // Colors identify graph lanes only; the surrounding UI keeps its default theme.
-const colors = ['#7c3aed', '#0891b2', '#16a34a', '#ca8a04', '#db2777', '#2563eb'];
+const colors = Array.from({ length: 6 }, (_, i) => `var(--git-lane-${i})`);
 const x = (lane: number) => 10 + lane * 16;
 const rowHeight = 28;
 function Graph({ row, width, head }: { row: GraphRow; width: number; head: boolean }) {
@@ -41,19 +42,10 @@ function Graph({ row, width, head }: { row: GraphRow; width: number; head: boole
     </svg>
   );
 }
-function shortDate(value: string) {
-  const date = new Date(value);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const time = date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  if (date.toDateString() === today.toDateString()) return `今天 ${time}`;
-  if (date.toDateString() === yesterday.toDateString()) return `昨天 ${time}`;
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+function shortDate(value: string, language: string) {
+  return new Intl.DateTimeFormat(language, { dateStyle: 'short', timeStyle: 'short' }).format(
+    new Date(value),
+  );
 }
 export function HistoryRows({
   commits,
@@ -64,6 +56,7 @@ export function HistoryRows({
   selected?: string;
   onSelect: (commit: GitCommit) => void;
 }) {
+  const { language } = useLocale();
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
   const graphWidth = Math.max(42, graph.lanes * 16 + 10);
   const list = useRef<HTMLDivElement>(null);
@@ -215,7 +208,7 @@ export function HistoryRows({
               dateTime={commit.date}
               title={commit.date}
             >
-              {shortDate(commit.date)}
+              {shortDate(commit.date, language)}
             </time>
           </button>
         );
@@ -228,9 +221,10 @@ export function HistoryRows({
 }
 
 export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
+  const { t, language } = useLocale();
   return (
     <section
-      aria-label="提交说明"
+      aria-label={t('提交说明')}
       className="flex max-h-64 min-h-0 min-w-0 flex-col border-t md:max-h-none md:flex-1"
     >
       <div className="min-h-0 overflow-auto px-2 py-1.5" data-commit-details="">
@@ -242,7 +236,7 @@ export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
               </span>{' '}
               · {commit.author} ·{' '}
               <time dateTime={commit.date} title={commit.date}>
-                {shortDate(commit.date)}
+                {shortDate(commit.date, language)}
               </time>
             </p>
             <p
@@ -253,7 +247,7 @@ export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
             </p>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">选择提交查看说明。</p>
+          <p className="text-sm text-muted-foreground">{t('选择提交查看说明。')}</p>
         )}
       </div>
     </section>

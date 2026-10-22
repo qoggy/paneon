@@ -77,6 +77,17 @@ try {
     await page.goto(url);
     const frame = page.frameLocator('iframe');
     await frame.getByRole('heading', { name: 'Original frame', exact: true }).waitFor();
+    assert.equal(await page.getByRole('heading').count(), 0);
+    assert.equal(
+      await page.getByRole('button', { name: 'Refresh status', exact: true }).count(),
+      0,
+    );
+    const viewport = page.viewportSize();
+    const bounds = await page.locator('iframe').boundingBox();
+    assert.equal(bounds.x, 0);
+    assert.equal(bounds.y, 0);
+    assert.equal(bounds.width, viewport.width);
+    assert.equal(bounds.height, viewport.height);
     let releaseOld, capturedOld;
     const gate = new Promise((resolve) => (releaseOld = resolve));
     const captured = new Promise((resolve) => (capturedOld = resolve));
@@ -94,7 +105,7 @@ try {
       }
       return route.continue();
     });
-    await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
+    await page.reload({ waitUntil: 'commit' });
     await captured;
     await writeFile(entry, source('Updated frame'));
     const update = await service.runtime.reload(panel.instanceId);

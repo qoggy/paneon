@@ -22,6 +22,37 @@ try {
   await frame.getByRole('button', { name: '提交评论', exact: true }).click();
   await frame.getByRole('alert').waitFor();
   assert.equal((await fixture.events(fixture.table)).length, 0);
+  assert.equal(await frame.getByRole('button', { name: '重置视图', exact: true }).count(), 0);
+  assert.equal(await frame.getByRole('button', { name: '选择帮助', exact: true }).count(), 0);
+  assert.equal(await frame.getByLabel('筛选 Name', { exact: true }).count(), 0);
+  await frame.getByRole('button', { name: '筛选列', exact: true }).click();
+  await frame.getByLabel('筛选 Number', { exact: true }).fill('10');
+  await frame.getByLabel('筛选 Boolean', { exact: true }).fill('false');
+  await page.keyboard.press('Escape');
+  assert.deepEqual(
+    await frame
+      .locator('[data-row-index]')
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.rowIndex)),
+    ['1'],
+  );
+  assert.match(
+    await frame.locator('[data-table-statistics]').textContent(),
+    /1–1 \/ 1 行 · 原始 4 行/,
+  );
+  await frame.getByRole('button', { name: '移除筛选 Number', exact: true }).click();
+  assert.equal(
+    await frame.getByRole('button', { name: '移除筛选 Boolean', exact: true }).count(),
+    1,
+  );
+  await frame.getByRole('button', { name: '重置视图', exact: true }).click();
+  await frame.getByLabel('搜索全表', { exact: true }).fill('SAME');
+  assert.equal(await frame.locator('[data-row-index]').count(), 2);
+  await frame.getByRole('button', { name: '清除搜索', exact: true }).click();
+  assert.equal(await frame.getByRole('button', { name: '重置视图', exact: true }).count(), 0);
+  assert.equal(
+    await frame.locator('[data-row-index="0"] [data-cell-key="b"]').textContent(),
+    'true',
+  );
   await frame.getByRole('button', { name: '排序 Number', exact: true }).click();
   assert.deepEqual(
     await frame
@@ -29,7 +60,15 @@ try {
       .evaluateAll((nodes) => nodes.map((node) => node.dataset.rowIndex)),
     ['1', '2'],
   );
+  await frame.getByRole('button', { name: '排序 Number', exact: true }).click();
+  assert.equal(await frame.locator('[data-row-index]').first().getAttribute('data-row-index'), '0');
+  await frame.getByRole('button', { name: '重置视图', exact: true }).click();
+  assert.equal(await frame.locator('[data-column-key="n"]').getAttribute('aria-sort'), 'none');
+  await frame.getByRole('button', { name: '排序 Number', exact: true }).click();
   await frame.getByRole('button', { name: '选择对象', exact: true }).click();
+  await frame.getByRole('button', { name: '选择帮助', exact: true }).click();
+  await frame.getByLabel('选择帮助', { exact: true }).filter({ hasText: '输入整列' }).waitFor();
+  await page.keyboard.press('Escape');
   await frame.locator('[data-row-index="1"] [data-cell-key="n"]').click();
   await frame.locator('[data-row-index="2"] [data-cell-key="n"]').click();
   await comments.write('为什么相等？');
@@ -81,6 +120,7 @@ try {
   await comments.locate(2, 1);
   assert.equal(await frame.getByLabel('搜索全表', { exact: true }).inputValue(), '');
   await frame.locator('[data-row-index="0"]').waitFor();
+  await frame.getByRole('button', { name: '结束选择', exact: true }).click();
   const textCell = frame.locator(
     '[data-row-index="0"] [data-cell-key="name"] [data-feedback-text]',
   );
@@ -96,6 +136,8 @@ try {
   });
   await comments.write('中文🙂');
   await comments.save();
+  await comments.overall('整体评审');
+  await frame.getByRole('button', { name: '选择对象', exact: true }).click();
   await frame.getByRole('button', { name: '下一页', exact: true }).click();
   await frame.getByRole('checkbox', { name: '选择当前页的行', exact: true }).check();
   await comments.save();
@@ -112,7 +154,7 @@ try {
     }),
   );
   await frame.getByRole('button', { name: '提交评论', exact: true }).click();
-  await frame.getByRole('alert').filter({ hasText: 'Not saved.' }).waitFor();
+  await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 4);
   assert.equal(await comments.text(3), '中文🙂');
   await page.unroute(eventUrl);
@@ -144,6 +186,7 @@ try {
   const first = (await fixture.events(fixture.table))[0];
   assert.equal(first.type, 'table-submitted');
   assert.equal(first.payload.annotations.length, 4);
+  assert.equal(first.payload.comment, '整体评审');
   assert.deepEqual(first.payload.annotations[0].targets, [
     { ref: { kind: 'cell', rowIndex: 1, columnKey: 'n' } },
     { ref: { kind: 'cell', rowIndex: 2, columnKey: 'n' } },
@@ -169,12 +212,17 @@ try {
     });
   }
   await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
+  await comments.overall('');
   for (let number = 4; number >= 1; number--) await comments.remove(number);
   await frame.getByRole('button', { name: '提交评论', exact: true }).click();
   await frame.getByRole('status').waitFor();
   const revisions = await fixture.events(fixture.table);
   assert.equal(revisions.length, 2);
-  assert.deepEqual(revisions[1].payload, { annotations: [], replacesEventId: first.id });
+  assert.deepEqual(revisions[1].payload, {
+    annotations: [],
+    comment: '',
+    replacesEventId: first.id,
+  });
   const cli = await fixture.cli(
     'events',
     fixture.table.instanceId,

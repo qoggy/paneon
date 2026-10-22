@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { agent, definePanel, feedbackSchema } from 'paneon/sdk';
@@ -109,6 +110,7 @@ function Playback({
   atMs: number;
   setAtMs: React.Dispatch<React.SetStateAction<number>>;
 }) {
+  const { t, message: translateMessage } = useLocale();
   const feedback = useFeedback<SimulationRef>();
   const [playing, setPlaying] = useState(false);
   const [input, setInput] = useState(String(concurrency));
@@ -126,7 +128,7 @@ function Playback({
     <>
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-2">
-          <Label htmlFor="concurrency">并发上限（1–4）</Label>
+          <Label htmlFor="concurrency">{t('Concurrency limit (1\u20134)')}</Label>
           <Input
             id="concurrency"
             type="number"
@@ -139,7 +141,7 @@ function Playback({
               setInput(next);
               const value = Number(next);
               if (!next || !Number.isInteger(value) || value < 1 || value > 4) {
-                setError('请输入 1–4 的整数，当前排程保持不变。');
+                setError('Please enter an integer from 1 to 4; the current schedule is unchanged.');
                 return;
               }
               setError('');
@@ -156,7 +158,7 @@ function Playback({
             setPlaying(!moving);
           }}
         >
-          {moving ? '暂停' : '播放'}
+          {moving ? t('Pause') : t('Play')}
         </Button>
         <Button
           variant="outline"
@@ -165,7 +167,7 @@ function Playback({
             setPlaying(false);
           }}
         >
-          重播
+          {t('Replay')}
         </Button>
         <Button
           variant="outline"
@@ -174,11 +176,11 @@ function Playback({
             setAtMs((value) => Math.min(10000, value + 1000));
           }}
         >
-          前进 1 秒
+          {t('Advance 1 second')}
         </Button>
         <strong data-testid="clock">虚拟时间 {(atMs / 1000).toFixed(1)} 秒</strong>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{translateMessage(error)}</p>}
       <p className="text-sm text-muted-foreground">
         切换并发会重新排程并回到 0 秒。为便于对照，播放至串行结束的 10
         秒；进入选择模式会停住时钟。重播回到开头后点击播放。
@@ -209,9 +211,10 @@ function Playback({
   );
 }
 function ConcurrencyPanel() {
+  const { t } = useLocale();
   const [concurrency, setConcurrency] = useState(INITIAL_CONCURRENCY);
   const [atMs, setAtMs] = useState(0);
-  const [receipt, setReceipt] = useState('');
+  const [receipt, setReceipt] = useState<number>();
   const adapter = useMemo(
     () => ({
       resolve(target: {
@@ -239,7 +242,7 @@ function ConcurrencyPanel() {
         if (!value.annotations.length && !value.comment?.trim())
           throw new Error('请先选择关注的位置或填写整体疑问。');
         const result = await agent.emit('explanation-feedback', eventSchema.parse(value));
-        setReceipt(`已提交给 AI，事件 ${result.id}。恢复对话后可读取；页面不会自动唤醒 AI。`);
+        setReceipt(result.id);
       }}
     >
       <main className="mx-auto max-w-6xl space-y-6 p-6">
@@ -259,7 +262,14 @@ function ConcurrencyPanel() {
           atMs={atMs}
           setAtMs={setAtMs}
         />
-        {receipt && <p role="status">{receipt}</p>}
+        {receipt && (
+          <p role="status">
+            {t(
+              'Saved to the AI as event {id}. Resume the conversation to read it; this page does not wake the AI automatically.',
+              { id: receipt },
+            )}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           固定任务：{TASKS.map((task) => task.label).join('、')}
           。标题、数据和初始并发直接定义在示例源码，供 agent 复制修改。

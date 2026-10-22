@@ -420,6 +420,88 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 - /Users/yuguo/IdeaProjects/paneon/tests/skill-install.test.ts
 - /Users/yuguo/IdeaProjects/paneon/tests/skill-pages.test.ts
 
+## B47 — Choice questionnaire layout
+
+用户提供 shadcn Questionnaire 参考图，并明确要求主 agent 亲自修改、不派 subagent。主 agent 在主工作区直接完成：居中窄列、紧凑选项行及整行选择、选中边框/淡背景、内联说明、自填输入、左右导航；首题 Previous 不占视觉注意。沿用默认主题和 Radix 控件，不引入 Questionnaire 新依赖或改变 schema/事件。
+
+实际检查和证据：
+
+- npm run build 通过，包含完整 TypeScript、CLI/UI 和 Web；node --test tests/skill-pages.test.ts 为6/6通过。
+- npm run lint 为0 errors，15条已有non-null warnings；收尾格式与OpenSpec strict通过。
+- Chrome源码和完整独立npm安装包的choose/form套件均通过，保留原form流程。新增验证真实窄列居中/宽度、紧凑输入和选项行、左右导航、整行空白点击、选中样式、说明输入保持选择、390px无溢出及长标签/长词换行。单多选、自填与固定选项混合、独立草稿、详情、失败保留、完整提交/更正及CLI events/ack均保留。
+- 新增键盘验收最初的瞬时ArrowDown未选择下一项。读取本机Radix源码确认它通过setTimeout移动焦点，并只在方向键仍按下时在onFocus选择；测试改为真实keydown，等待选中后keyup。没有改产品键盘处理或增加任意延迟/重试。
+- 视觉检查发现GitHub Markdown未分层CSS会压过普通Tailwind说明样式，使用局部important utility后，实际断言说明为14px且与进度同色；未改全局Markdown样式。
+- 主 agent 已查看真实桌面/多选截图，并在应用内浏览器实际打开演示页、读取AX和截图确认中文问题渲染正常。体验URL：http://127.0.0.1:56414/panels/instance-d69eba94-6e8e-47d0-bb5c-b448382fb400 。只供体验，不代表新的产品决策问卷。
+
+日志：/tmp/paneon-choose-layout-build.log、/tmp/paneon-choose-layout-schema.log、/tmp/paneon-choose-questionnaire-browser.log、/tmp/paneon-choose-questionnaire-package.log、/tmp/paneon-choose-questionnaire-lint.log。最终源码截图在/tmp/paneon-choose-questionnaire-evidence/，独立包截图在/tmp/paneon-choose-questionnaire-package/，包括choose-desktop.png、choose-multiple-desktop.png、choose-mobile.png和choose-long-mobile.png。
+
+本轮未新建worktree、未派subagent、未提交commit或推送；之前五个页头相关脏文件原样保留。本change仍保留用户亲自体验Sentinel的未完成项。
+
+本轮改动文件：
+
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
+- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-ux.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+
+## B48 — Compact answer summary
+
+用户认可选择页主体，只要求优化红圈内的汇总。主agent直接修改该section：轻量边框分组、小标题及有效已答数量、编号分行、浅色题目、突出答案、缩进说明、轻量未作答状态；未调整其他布局或作答/提交schema，也未派subagent。有效已答数量复用现有answerSchema，不增加状态或协议。
+
+npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与OpenSpec strict通过。现有完整choose/form Chrome回归通过，包括原有答案/说明、自填、跨题草稿、完整提交/失败/更正及CLI events/ack。本次没有新增单测，也没有为这次局部样式再次运行独立包套件。
+
+主agent在隔离的浏览器标签中复现用户截图组合：第一题自填aa，第二题选择关键决定并填写bb，第三题未答。实际AX显示2/3 answered，截图确认题目/答案/说明层次；未点击提交，不向agent发答案事件。另查看390px长标签场景截图，汇总无溢出，提交按钮仍正常。主体验链接保持不变。日志：/tmp/paneon-summary-build.log、/tmp/paneon-answer-summary-browser.log；窄屏截图：/tmp/paneon-answer-summary-evidence/choose-long-mobile.png。
+
+本轮未提交commit或推送；修改文件：
+
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+
+## B49 — Independent option details
+
+用户确认采用 A，主 agent 直接实现，没有委派 subagent。宽屏（1024px 起）左右并排，详情使用独立 aside；窄屏复用已有 Dialog 的模态焦点、Esc 和关闭按钮。选项只保留 View details 入口，不再内联详情正文。局部约束 Markdown 标题大小，不修改公共 UI 或全局主题。切题关闭旧详情，跨断点保留详情及作答，关闭返回原入口。
+
+验证：完整 npm run build（含 TypeScript、CLI/UI/Web）通过，相关 ESLint、格式、git diff --check 与 OpenSpec strict 通过。真实 Chrome 的完整 choose/form 套件通过，新增检查：查看不选择也不发事件；桌面阅读区与问卷不重叠，仍可选择及填写独立说明；390px 覆盖阅读、Esc/关闭按钮和焦点恢复；跨断点保留说明；切题关闭；切换详情只更新同一阅读区；长内容独立滚动，长标题及代码不撑开页面；详情 Markdown 标题为局部限定字号。原有提交、失败保留、更正和 CLI events/ack 流程均保留。
+
+截图检查最初捕获到了 Radix 打开动画的透明过渡帧。验收截图改为等待浏览器已有的有限动画完成后捕获，并断言弹层最终 opacity=1；不添加产品延迟或改变弹层协议。最终截图：/tmp/paneon-details-final/choose-details-desktop.png、/tmp/paneon-details-final/choose-details-mobile.png。主 agent 另在应用内浏览器实际打开中文方案评审页并查看并排详情，截图：/tmp/paneon-details-desktop.png。
+
+体验链接：http://127.0.0.1:56414/panels/instance-1e152af8-1042-4bc0-93fa-a90ecf165e70 。未提交体验答案，原用户页面的作答未操作。构建日志：/tmp/paneon-detail-build.log；浏览器日志：/tmp/paneon-details-final-browser.log；scoped ESLint：/tmp/paneon-details-lint.log。本轮未重复独立安装包验证，未修改依赖、SDK 或打包入口。未提交 commit 或推送，五个既有页头相关脏文件保持不动。
+
+本轮修改文件：
+
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
+- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+
+## B50 — Separate review step
+
+主 agent 按用户要求将汇总从最后一题下方移为独立步骤。每题（含最后一题）使用 Next，末题校验成功后才进入 Review all answers；汇总不含题目控件，只显示答案和提交。Previous 返回最后一题，仍可继续返回前题修改，所有草稿保留。单题问卷的汇总也能正常返回第一题。进入汇总关闭详情并聚焦标题，不计作额外题目，不自动提交。原有 schema、完整提交和 replacesEventId 更正机制不变。
+
+完整 npm run build 通过；真实 Chrome choose/form 回归通过，包括新增多题和单题独立汇总、末题空白校验、回退保留、进入不发事件、汇总无作答控件，以及原有 pending 防重复、保存失败和明确更正。主 agent 在独立体验标签中实际操作中文问卷：第二题仍只有 Next，点击后单独显示 Review all answers、2/2 已答和统一提交，焦点落在汇总标题；未提交演示答案。构建日志：/tmp/paneon-review-build.log；浏览器日志：/tmp/paneon-review-browser.log；桌面/窄屏汇总截图：/tmp/paneon-review-evidence/choose-review-desktop.png、/tmp/paneon-review-evidence/choose-review-mobile.png。
+
+长期运行的体验服务曾显示 BUILD_FAILED，而独立源码构建和隔离浏览器流程均成功；现有诊断未保留底层异常，无法确认当次失败原因。完整构建后仅对独立演示实例显式 panel reload，成功切到新 revision，实际体验页恢复，未改框架或添加重试/兜底。刷新用户原页面的操作被自动审批拒绝（可能丢失未提交答案）；未执行或绕过，保留原页，使用独立体验链接交付。未派 subagent、未提交或推送，既有页头相关脏文件未修改。
+
+本轮修改文件：
+
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
+- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
+- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+
 ## B51 — Commit navigation without workbench clearing
 
 用户截图指出切换提交时整块界面闪烁。主 agent 亲自复现并修复，没有派 subagent。通过浏览器路由暂挂 queryGit，旧实现提交历史由 50 行变为 0，新回归明确失败（/tmp/paneon-git-flicker-before.log）。根因是 load 在请求前 save({ request }) 清除 listing/selected，使历史行、文件列表和 DiffView 被移除；独立插入 pending 文本又改变工作区布局。
@@ -486,7 +568,6 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 
 这些是已覆盖场景的证据，不宣称达到JetBrains全功能，也不将有限生成图当作任意图正确性的证明；当前仍不支持Show First Parent、搜索/筛选历史或Git写操作。任务3.5的用户Sentinel体验保持未完成。
 
-
 ## B54 / B55 — Main integration acceptance (2026-10-22)
 
 两个subagent均完成任务。主agent只集成相对各自移植基线的任务增量：B54 `f4798516caba10c7ce141728c9390a3b90a10791`、B55 `eb8d19f6e2e687771ca3d23289d5fa10c8a05b64`，没有合入移植基线。相关既有B51–B53 Git改动作为依赖一并保留，选择页与host等其他未提交工作不纳入本次提交。
@@ -547,3 +628,31 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 - 独立安装包复验通过：成功构建后 npm pack --ignore-scripts，在临时目录真实 npm install，以安装包内 runtime、完整 skill 和 CLI 运行完整 Git Chrome 与目录树 Chrome。日志 `/tmp/paneon-accept-package.log`；清单 `/tmp/paneon-git-final-package.json`；SHA-256 `937d4732548da72130bcd8d7692a2d11b8d9c43299bd7eddcbc9ce52de4a9532`。格式、OpenSpec strict 和 diff whitespace 也通过。
 
 本轮全部活动 subagent 已交付并由主 agent 联合验收；任务3.23–3.26完成。任务3.5的用户Sentinel体验保持未完成，不把整个change标为完成。
+
+## B61–B65 parent acceptance — 2026-10-22
+
+五个任务全部交付，主 agent 逐项审阅任务基线之后的增量，保留主工作区其他未提交内容，没有合入隔离基线。
+
+- B61 `354f65d → 20f066d`：自由翻题；B63 `5216477 → 6eb3730`：精简题头。
+- B62 `f5cf12f → bc225e5`：省略输入选项默认空对象。
+- B64 `6ce2ddc → b90b384`：居中单列表单。
+- B65 `6ce2ddc → 44e4777`：紧凑表格及公共评论控件组合。
+
+最终主工作区证据：
+
+- build（含 typecheck）通过：`/tmp/paneon-final-accept-build.log`。
+- 真实 CLI、choose/form/table及公共反馈相关单测32/32：`/tmp/paneon-parent-units.log`。省略输入仍经过原 schema，非法显式 JSON/两源冲突不被放宽。
+- 完整 choose/form Chrome：`/tmp/paneon-parent-choose-form.log`；桌面/390px、说明打开关闭/键盘焦点、自由翻题/独立汇总及提交更正失败。
+- 表单真实几何及交互：`/tmp/paneon-parent-form-responsive.log`；1440/2560px、360px iframe、390/320px，列宽640上限，数字144px，选择区/清除相邻，无页面横溢。
+- 表格完整交互与布局：`/tmp/paneon-parent-table-review.log`、`/tmp/paneon-parent-table-layout.log`；桌面/390px、长文本、多列区域横滚、筛选重置、原文范围和评论/更正；桌面短行40px，窄屏自然增高。
+- 公共反馈/Git/PR Chrome：`/tmp/paneon-parent-feedback.log`、`/tmp/paneon-parent-git-review.log`、`/tmp/paneon-parent-github-pr.log`，均通过；PR3/3。
+- 最终独立安装包：`/tmp/paneon-parent-package.log`，真实 npm install 后使用包内 runtime/UI/skill/CLI，完整 choose/form 及 table/review 均通过。
+- scoped ESLint、Prettier、OpenSpec strict 和 diff whitespace 通过；日志 `/tmp/paneon-parent-{lint,format,script-lint,script-format,openspec}.log`。
+
+主 agent 实际查看 `/tmp/paneon-parent-choose-form/`、`/tmp/paneon-parent-form-responsive/`、`/tmp/paneon-parent-table-layout/` 的桌面和窄屏截图。视觉验证针对最终全屏宿主，未将子任务旧宿主外框当作产品设计。
+
+验收定位并修正两个测试问题：form-responsive 原假定宿主有 main，现按实际结构测量；skill-pages 弹层 opacity 断言原仅在截图开关开启时等待动画，现始终等待实际动画完成。没有为通过验证改产品 schema 或删除旧断言。首次受沙箱 listen EPERM 阻止的测试在获准的本机进程环境复跑通过，不计为产品失败。
+
+B65 另在旧有外框宿主隔离基线复现 iframe 外释放分栏拖拽只到达父文档，200ms后仍保留状态；详见 table-layout.md 的原始日志。本次主工作区全屏宿主下完整 Git 布局、双侧拖拽/边界/cancel 与评论均通过，未将该旧宿主问题冒充本次修复。
+
+不新增主题/语言开发，不更新用户全局安装，不 push；Sentinel用户体验等既有未完成事项保持原状态。

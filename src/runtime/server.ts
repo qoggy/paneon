@@ -18,6 +18,7 @@ import { PROTOCOL_VERSION, PaneonError, diagnostic, jsonValue } from '../shared/
 import type { RuntimeDescriptor } from '../shared/types.js';
 import { Runtime } from './lifecycle.js';
 import { HTTP_BODY_LIMIT_BYTES, bodyTooLargeDiagnostic } from '../shared/limits.js';
+import { Preferences } from './preferences.js';
 const mime: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -33,6 +34,7 @@ export async function startServer(home = PANEON_HOME): Promise<{
   descriptor: RuntimeDescriptor;
   stop: () => Promise<void>;
 }> {
+  const preferences = new Preferences(home);
   const runtime = new Runtime(home);
   await runtime.restore();
   const app = Fastify({ logger: false, bodyLimit: HTTP_BODY_LIMIT_BYTES });
@@ -120,6 +122,12 @@ export async function startServer(home = PANEON_HOME): Promise<{
     return value;
   };
   const access = (id: string) => ({ ...runtime.inspect(id), url: `${origin}/panels/${id}` });
+  route('GET', '/api/preferences', () => ({ ui: preferences.ui }));
+  route('POST', '/api/preferences', (request) => {
+    const result = preferences.save(body(request).ui);
+    notify('', { type: 'preferences', ...result });
+    return result;
+  });
   route('GET', '/health', () => ({ ...descriptor, controlToken: undefined }));
   route('POST', '/api/panels', async (request) => {
     const b = body(request);
@@ -232,6 +240,16 @@ export async function startServer(home = PANEON_HOME): Promise<{
     runtime.off('state', notify);
     for (const socket of subscriptions.keys()) socket.close(1001, 'Runtime stopping');
   });
+  app.get('/api/preferences/stream', { websocket: true }, (socket) => {
+    const subscription = { instanceId: '', alive: true };
+    subscriptions.set(socket, subscription);
+    socket.on('pong', () => {
+      subscription.alive = true;
+    });
+    socket.on('close', () => subscriptions.delete(socket));
+    socket.on('message', () => socket.close(1008, 'Preferences notifications are read-only'));
+    socket.send(JSON.stringify({ type: 'preferences', ui: preferences.ui }));
+  });
   app.get(
     '/api/panels/:instanceId/stream',
     {
@@ -327,7 +345,14 @@ export async function startServer(home = PANEON_HOME): Promise<{
         'WEB_ASSETS_MISSING',
         'Build the Paneon web interface before running the service.',
       );
-    return reply.type('text/html').send(readFileSync(join(web, 'index.html')));
+    return reply
+      .type('text/html')
+      .send(
+        readFileSync(join(web, 'index.html'), 'utf8').replace(
+          /<html[^>]*>/,
+          `<html lang="${preferences.ui.language}" class="${preferences.ui.theme === 'dark' ? 'dark' : ''}" data-theme="${preferences.ui.theme}" data-language="${preferences.ui.language}" style="color-scheme:${preferences.ui.theme}">`,
+        ),
+      );
   }
   app.get('/', host);
   app.get('/panels/:instanceId', host);

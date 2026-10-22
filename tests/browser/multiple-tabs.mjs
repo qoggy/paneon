@@ -22,6 +22,7 @@ try {
   const context = await browser.newContext();
   const pages = [];
   const errors = [];
+  const sockets = fixture.service.app.websocketServer.clients;
   for (let i = 0; i < 10; i++) {
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
@@ -32,10 +33,12 @@ try {
       .frameLocator('iframe')
       .getByRole('heading', { name: 'Multiple tabs original', exact: true })
       .waitFor();
-    await page.getByText('Connected', { exact: true }).waitFor();
+    await until(
+      () => sockets.size === (i + 1) * 2,
+      'Each tab must open its panel and preferences WebSockets.',
+    );
   }
-  const sockets = fixture.service.app.websocketServer.clients;
-  assert.equal(sockets.size, 10);
+  assert.equal(sockets.size, 20);
   const last = pages.at(-1);
   await last
     .frameLocator('iframe')
@@ -53,20 +56,21 @@ try {
   const disconnected = new Set(sockets);
   for (const socket of disconnected) socket.terminate();
   await until(
-    () => sockets.size === 10 && [...sockets].every((socket) => !disconnected.has(socket)),
+    () => sockets.size === 20 && [...sockets].every((socket) => !disconnected.has(socket)),
     'All ten tabs must reconnect.',
   );
-  for (const page of pages) await page.getByText('Connected', { exact: true }).waitFor();
+  for (const page of pages)
+    await page.getByText('Reconnecting to Paneon…', { exact: true }).waitFor({ state: 'hidden' });
   assert.equal(await fixture.mutationCount(), 1);
   await last.reload();
   await last
     .frameLocator('iframe')
     .getByRole('heading', { name: 'Multiple tabs updated', exact: true })
     .waitFor();
-  await last.getByText('Connected', { exact: true }).waitFor();
+  await until(() => sockets.size === 20, 'Reloading the tab must restore both WebSockets.');
   assert.equal(await fixture.mutationCount(), 1);
   await pages.shift().close();
-  await until(() => sockets.size === 9, 'Closing one tab must release its WebSocket.');
+  await until(() => sockets.size === 18, 'Closing one tab must release both WebSockets.');
   await context.close();
   await until(() => sockets.size === 0, 'Closing the context must release every WebSocket.');
   assert.deepEqual(errors, []);

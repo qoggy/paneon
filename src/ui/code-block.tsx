@@ -10,6 +10,9 @@ import bash from 'shiki/langs/bash.mjs';
 import yaml from 'shiki/langs/yaml.mjs';
 import diff from 'shiki/langs/diff.mjs';
 import githubLight from 'shiki/themes/github-light.mjs';
+import githubDark from 'shiki/themes/github-dark.mjs';
+import type { CSSProperties } from 'react';
+import type { ThemedTokenWithVariants } from 'shiki';
 import { cn } from './utils';
 
 const aliases: Record<string, string> = {
@@ -31,13 +34,13 @@ const supported = new Set([
 // Every grammar and the theme are static imports: rendering never downloads code.
 function getHighlighter() {
   return (highlighter ??= createHighlighterCore({
-    themes: [githubLight],
+    themes: [githubLight, githubDark],
     langs: [javascript, typescript, jsx, tsx, json, bash, yaml, diff],
     engine: createJavaScriptRegexEngine(),
   }));
 }
 let highlighter: ReturnType<typeof createHighlighterCore> | undefined;
-type Tokens = { content: string; color?: string; fontStyle?: number }[][];
+type Tokens = ThemedTokenWithVariants[][];
 export function CodeBlock({
   code,
   language,
@@ -54,7 +57,10 @@ export function CodeBlock({
     let active = true;
     if (highlight)
       void getHighlighter().then((h) => {
-        const tokens = h.codeToTokens(code, { lang, theme: 'github-light' }).tokens;
+        const tokens = h.codeToTokensWithThemes(code, {
+          lang,
+          themes: { light: 'github-light', dark: 'github-dark' },
+        });
         if (active) setResult({ code, lang, tokens });
       });
     return () => {
@@ -78,11 +84,22 @@ export function CodeBlock({
                 {line.map((token, j) => (
                   <span
                     key={j}
-                    style={{
-                      color: token.color,
-                      fontStyle: (token.fontStyle ?? 0) & 1 ? 'italic' : undefined,
-                      fontWeight: (token.fontStyle ?? 0) & 2 ? 'bold' : undefined,
-                    }}
+                    data-shiki-token=""
+                    style={
+                      Object.fromEntries(
+                        Object.entries(token.variants).flatMap(([theme, style]) => [
+                          [`--shiki-${theme}-color`, style.color],
+                          [
+                            `--shiki-${theme}-style`,
+                            (style.fontStyle ?? 0) & 1 ? 'italic' : 'normal',
+                          ],
+                          [
+                            `--shiki-${theme}-weight`,
+                            (style.fontStyle ?? 0) & 2 ? 'bold' : 'normal',
+                          ],
+                        ]),
+                      ) as CSSProperties
+                    }
                   >
                     {token.content}
                   </span>

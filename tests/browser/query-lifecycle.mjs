@@ -207,8 +207,8 @@ try {
   // Browser offline emulation does not reliably interrupt already-open loopback streams.
   // End the exact real transport connection instead; the host must reconnect its WebSocket.
   for (const socket of streamSockets) socket.terminate();
-  await page.getByText('Reconnecting', { exact: true }).waitFor();
-  await page.getByText('Connected', { exact: true }).waitFor();
+  await page.getByText('Reconnecting to Paneon…', { exact: true }).waitFor();
+  await page.getByText('Reconnecting to Paneon…', { exact: true }).waitFor({ state: 'hidden' });
   assert.ok(streamRequests > beforeReconnect, 'The host must open a new real WebSocket.');
   await delay(500);
   assert.equal(await mutationCount(), 1);

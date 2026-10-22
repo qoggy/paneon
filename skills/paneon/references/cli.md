@@ -21,6 +21,8 @@ After upgrading the package, an older running server produces
 the panel with the installed version. Saved compatible instances are rebuilt;
 incompatible instances remain `unavailable` with their events intact.
 
+See [interface preferences](preferences.md) for the user-level configuration shared by the CLI and browser.
+
 ## CLI commands
 
 All operational commands accept `--json` and `--debug`. With `--json`, stdout
@@ -33,13 +35,15 @@ Use readable field names; do not parse human-readable output as a protocol.
 | Command | Inputs | Successful data |
 | --- | --- | --- |
 | `init` | Optional `--agent <agents...>`, `--project` / `--global` (exclusive), `--copy`, `--yes`; `--json` requires `--yes` | `scope`, optional `projectPath`, `method`, `paneonVersion`, `recordPath`, `targets` with paths/kinds/status; cancellation returns `{ "cancelled": true }` |
-| `panel run <entry.tsx>` | Required `--cwd <directory>` and exactly one of `--params '<json>'` / `--params-file <file>`; optional `--watch` / `--no-watch`, `--open` | `instanceId`, `definitionId`, `status`, `revision`, `watch`, `paneonVersion`, `url` |
+| `panel run <entry.tsx>` | Required `--cwd <directory>`; optional `--params '<json>'` or `--params-file <file>` (exclusive; defaults to `{}`), `--watch` / `--no-watch`, `--open` | `instanceId`, `definitionId`, `status`, `revision`, `watch`, `paneonVersion`, `url` |
 | `panel list` | Optional `--page <number>` (default 1), `--page-size <count>` (default 20, 1–1000) | `panels`: instance metadata; `page`, `pageSize`, `total`, `totalPages` |
 | `panel inspect <instance-id>` | Existing instance ID | Complete instance details, saved params, requires, build version, current URL, and optional diagnostic |
 | `panel reload <instance-id>` | Existing instance ID | `previousRevision`, `revision`, `changed`, `watch` |
 | `panel close <instance-id>` | Existing instance ID | `status: "closed"`, `alreadyClosed` |
 | `panel events <instance-id>` | Required `--consumer <name>`; optional `--wait-ms <ms>` and `--limit <count>` | `events`, `lastAckId`, `lastDeliveredId`, `hasMore`, `timedOut` |
 | `panel ack <instance-id>` | Required `--consumer <name>` and `--through <event-id>` | `lastAckId` |
+| `config get` | None; starts runtime if needed | `ui`: effective `theme`, `language` |
+| `config set <key> <value>` | `ui.theme` with `light` / `dark`, or `ui.language` with `en` / `zh-CN`; starts runtime if needed | `ui`: saved effective preferences |
 | `server status` | None | `running`, `runtime` (identity, PID, host, port, package/protocol versions, start time), or `runtime: null` |
 | `server stop` | None | `stopped`, `alreadyStopped`, `runtimeId` |
 
@@ -50,7 +54,7 @@ The browser panel list also starts on page 1 with 20 instances per page.
 
 `panel run` resolves source and cwd against the invoking CLI's directory. `--cwd`
 is the author code's working directory, independently of where the TSX file
-lives. Both input forms must satisfy the panel's schema; pass `'{}'` for an empty object.
+lives. Omit both input options to use `{}`. Supplied or default input must satisfy the panel's schema.
 `--params-file` reads UTF-8 JSON once at creation, using the invoking directory for relative file paths.
 Changing or deleting that file does not alter the instance; reload and service recovery reuse its saved input.
 Start a new instance for new questions or new fixed input.

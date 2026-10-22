@@ -1,6 +1,6 @@
 # Selection and comments
 
-Use these public primitives in custom pages; reuse a [standard page](../SKILL.md#page-directory) when its contract fits. Import data types and `feedbackSchema` from `paneon/sdk`; import React components, `useFeedback` and `FeedbackAdapter` from `paneon/ui`.
+Use these public primitives in custom pages; reuse a [standard page](../SKILL.md#built-in-pages) when its contract fits. Import data types and `feedbackSchema` from `paneon/sdk`; import React components, `useFeedback` and `FeedbackAdapter` from `paneon/ui`.
 
 ## Complete custom panel
 
@@ -99,7 +99,7 @@ export default definePanel({
 });
 ```
 
-Run with `paneon panel run ./panel.tsx --cwd "$PWD" --params '{}' --json` and deliver its URL. Read `feedback-submitted` with [events/ack](cli.md#deliver-events-to-the-agent). The example retains editable feedback after success; another click saves another independent complete result. It deliberately does not implement the standard-page correction policy below.
+Run with `paneon panel run ./panel.tsx --cwd "$PWD" --json` and deliver its URL. Read `feedback-submitted` with [events/ack](cli.md#deliver-events-to-the-agent). The example retains editable feedback after success; another click saves another independent complete result. It deliberately does not implement the standard-page correction policy below.
 
 ## Data and interaction
 

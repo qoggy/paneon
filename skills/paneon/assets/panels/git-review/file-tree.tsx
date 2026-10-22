@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from 'paneon/ui';
 import type { GitSnapshot } from './git.ts';
@@ -52,6 +53,7 @@ export function ChangedFileTree({
   revealKey,
   onSelect,
 }: Props) {
+  const { t, message } = useLocale();
   const groups = useMemo(() => groupFileTrees(snapshots), [snapshots]);
   const [collapsed, setCollapsed] = useState<Record<string, Set<string>>>({});
   const root = useRef<HTMLDivElement>(null);
@@ -88,9 +90,9 @@ export function ChangedFileTree({
             data-file-status={snapshot.status}
             variant={selectedId === snapshot.id ? 'secondary' : 'ghost'}
             aria-pressed={selectedId === snapshot.id}
-            aria-label={snapshotName(snapshot)}
-            aria-description={snapshotTitle(snapshot)}
-            title={snapshotTitle(snapshot)}
+            aria-label={snapshotName(snapshot, message)}
+            aria-description={snapshotTitle(snapshot, message)}
+            title={snapshotTitle(snapshot, message)}
             className={`h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(snapshot.status)}`}
             style={{ paddingLeft: 8 + depth * 12 }}
             onClick={() => onSelect(snapshot)}
@@ -110,9 +112,9 @@ export function ChangedFileTree({
           <Button
             variant="ghost"
             data-file-directory={node.path}
-            aria-label={`目录 ${node.path}`}
+            aria-label={t('Directory {path}', { path: node.path })}
             aria-expanded={open}
-            title={`${node.path} · ${node.count} 个文件`}
+            title={t('{path} · {count} files', { path: node.path, count: node.count })}
             className="h-7 w-full min-w-0 justify-start gap-1 px-2 text-left text-xs"
             style={{ paddingLeft: 4 + depth * 12 }}
             onClick={() =>
@@ -145,7 +147,7 @@ export function ChangedFileTree({
           <div key={area} className="min-w-0" data-file-group={area}>
             {area && (
               <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">
-                {areaNames[area as keyof typeof areaNames]}
+                {t(areaNames[area as keyof typeof areaNames])}
               </div>
             )}
             {renderNodes(visible, area)}

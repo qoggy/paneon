@@ -35,6 +35,8 @@ export {
   FeedbackSurface,
   FeedbackSubmitButton,
   FeedbackToolbar,
+  FeedbackSelectionControls,
+  FeedbackOverallCommentButton,
 } from './feedback';
 export { useFeedback } from './feedback-context';
 export type {
@@ -46,3 +48,7 @@ export type {
   TextRegistration,
   FeedbackController,
 } from './feedback-types';
+
+export { UIProvider } from './ui-provider';
+export { useUI } from './use-ui';
+export type { UIPreferences, UITheme, UILanguage, UIMessage } from './use-ui';

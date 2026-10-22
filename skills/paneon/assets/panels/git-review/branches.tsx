@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useState } from 'react';
 import { Button, Input } from 'paneon/ui';
 import type { HistoryRef } from './git.ts';
@@ -54,6 +55,7 @@ export function Branches({
   currentBranch?: string;
   onSelect: (ref: string) => void;
 }) {
+  const { t } = useLocale();
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const needle = filter.trim().toLocaleLowerCase();
@@ -68,9 +70,9 @@ export function Branches({
           <Button
             key={entry.ref}
             variant={active ? 'secondary' : 'ghost'}
-            aria-label={`${{ branch: '本地分支', remote: '远程分支', tag: '标签' }[kind]} ${entry.name}`}
+            aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}
             aria-pressed={active}
-            title={`${entry.name}${current ? ' · 当前分支' : ''}`}
+            title={`${entry.name}${current ? t(' · 当前分支') : ''}`}
             data-history-ref={entry.ref}
             className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
             style={{ paddingLeft: 8 + depth * 12 }}
@@ -78,7 +80,7 @@ export function Branches({
           >
             <RefIcon tag={kind === 'tag'} />
             <span className="min-w-0 truncate">{node.name}</span>
-            {current && <span className="ml-auto text-muted-foreground">当前</span>}
+            {current && <span className="ml-auto text-muted-foreground">{t('当前')}</span>}
           </Button>
         );
       }
@@ -88,7 +90,7 @@ export function Branches({
         <div key={key}>
           <Button
             variant="ghost"
-            aria-label={`分支目录 ${node.path.slice(1)}`}
+            aria-label={t('Branch directory {path}', { path: node.path.slice(1) })}
             aria-expanded={open}
             className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
             style={{ paddingLeft: 8 + depth * 12 }}
@@ -112,24 +114,27 @@ export function Branches({
     });
   }
   return (
-    <aside aria-label="历史分支" className="flex max-h-64 min-h-0 min-w-0 flex-col md:max-h-none">
+    <aside
+      aria-label={t('历史分支')}
+      className="flex max-h-64 min-h-0 min-w-0 flex-col md:max-h-none"
+    >
       <div className="shrink-0 border-b p-1">
         <Input
-          aria-label="搜索分支或标签"
-          placeholder="搜索分支或标签"
+          aria-label={t('搜索分支或标签')}
+          placeholder={t('搜索分支或标签')}
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
         />
       </div>
-      <nav aria-label="选择历史分支" className="min-h-0 overflow-auto p-1">
+      <nav aria-label={t('选择历史分支')} className="min-h-0 overflow-auto p-1">
         <Button
           variant={!selected || selected === 'HEAD' ? 'secondary' : 'ghost'}
           aria-pressed={!selected || selected === 'HEAD'}
-          aria-label="HEAD（当前分支）"
+          aria-label={t('HEAD（当前分支）')}
           className="h-7 w-full justify-start px-2 text-xs font-normal"
           onClick={() => onSelect('HEAD')}
         >
-          HEAD（当前分支）
+          {t('HEAD（当前分支）')}
         </Button>
         {(['branch', 'remote', 'tag'] as const).map((kind) => {
           const entries = matches.filter((entry) => entry.kind === kind);
@@ -137,17 +142,17 @@ export function Branches({
           return (
             <section
               key={kind}
-              aria-label={{ branch: '本地分支', remote: '远程分支', tag: '标签' }[kind]}
+              aria-label={{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]}
             >
               <h2 className="px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground">
-                {{ branch: '本地', remote: '远程', tag: '标签' }[kind]}
+                {{ branch: t('本地'), remote: t('远程'), tag: t('标签') }[kind]}
               </h2>
               {render(branchTree(entries), kind)}
             </section>
           );
         })}
         {needle && !matches.length && (
-          <p className="px-2 py-3 text-xs text-muted-foreground">没有匹配的分支或标签。</p>
+          <p className="px-2 py-3 text-xs text-muted-foreground">{t('没有匹配的分支或标签。')}</p>
         )}
       </nav>
     </aside>

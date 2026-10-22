@@ -1,6 +1,6 @@
 # Author custom panels
 
-Use the [page directory](../SKILL.md#page-directory) first. Standard pages take data without new TSX. Write source when the interaction is genuinely custom, or adapt the [one-off explanatory examples](examples.md). Copy the **complete skill directory** before changing its resources so relative shared imports stay available. Keep unmodified resources from the same CLI release; the installation direction and `requires.paneon` are described in [the skill](../SKILL.md#installation-and-versions) and [CLI compatibility](cli.md#declare-compatibility).
+Use the [built-in pages](../SKILL.md#built-in-pages) first. Standard pages take data without new TSX. Write source when the interaction is genuinely custom, or adapt the [one-off explanatory examples](examples.md). Copy the **complete skill directory** before changing its resources so relative shared imports stay available. Keep unmodified resources from the same CLI release; `requires.paneon` is described in [CLI compatibility](cli.md#declare-compatibility).
 
 ## Start with a complete source file
 
@@ -312,3 +312,11 @@ already made by that code, or intercept business HTTP, child processes, files,
 or logs. The author is responsible for those outputs. Never describe this as
 protection against malicious author code or another program with the same OS
 user's debugging/shell access.
+
+## Theme and language
+
+Public UI components inherit user preferences automatically; do not add theme or
+language to the panel input schema. `useUI()` from `paneon/ui` exposes `theme`,
+`language`, and typed public-component translations. Use theme variables for
+custom colors. Author-supplied text and input are preserved. For optional custom
+copy selection and compatibility boundaries, see [interface preferences](preferences.md).

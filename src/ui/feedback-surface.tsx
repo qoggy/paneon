@@ -1,3 +1,4 @@
+import { useUI } from './use-ui';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -20,6 +21,7 @@ const serialize = (value: unknown) => JSON.stringify(value);
 
 /** Render once per provider. Portals keep valid table/Markdown DOM and source Text nodes intact. */
 export function FeedbackSurface({ className }: { className?: string }) {
+  const { t, message } = useUI();
   const { store, disabled } = useFeedbackContext();
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [geometry, setGeometry] = useState<Geometry>({ markers: [], highlights: [] });
@@ -181,7 +183,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
           size="icon-xs"
           data-feedback-marker={marker.id}
           data-feedback-number={marker.number}
-          aria-label={`评论 ${marker.number}`}
+          aria-label={t('Comment {number}', { number: marker.number })}
           disabled={blocked}
           className="pointer-events-auto absolute rounded-full"
           style={{ left: marker.rect.left, top: marker.rect.top }}
@@ -209,7 +211,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => store.openComment()}
           >
-            评论
+            {t('评论')}
           </Button>
         )}
       {!state.editor && (state.uiError || state.error) && (
@@ -217,14 +219,14 @@ export function FeedbackSurface({ className }: { className?: string }) {
           role="alert"
           className="pointer-events-auto absolute right-2 bottom-2 max-w-[calc(100%-16px)] rounded-md border bg-popover p-3 text-sm text-destructive shadow-md"
         >
-          {state.uiError || state.error}
+          {state.uiError ? message(state.uiError) : state.error}
         </p>
       )}
       {state.editor && (
         <div
           ref={editorElement}
           role="dialog"
-          aria-label={state.editor.kind === 'overall' ? '整体评论' : '编辑评论'}
+          aria-label={state.editor.kind === 'overall' ? t('整体评论') : t('编辑评论')}
           className="pointer-events-auto absolute max-h-[calc(100dvh-16px)] space-y-3 overflow-auto rounded-md border bg-popover p-3 text-popover-foreground shadow-md"
           style={{ ...position, width: editorWidth }}
           onKeyDown={(event) => {
@@ -240,28 +242,28 @@ export function FeedbackSurface({ className }: { className?: string }) {
         >
           <div className="text-sm font-medium">
             {state.editor.kind === 'overall'
-              ? '整体评论'
+              ? t('整体评论')
               : state.editor.id
-                ? `评论 ${store.numberFor(state.editor.id)}`
-                : '添加评论'}
+                ? t('Comment {number}', { number: store.numberFor(state.editor.id) })
+                : t('添加评论')}
           </div>
           <Textarea
             ref={input}
-            aria-label="评论内容"
-            placeholder="添加评论（可留空）"
+            aria-label={t('评论内容')}
+            placeholder={t('添加评论（可留空）')}
             disabled={blocked}
             value={state.editor.comment}
             onChange={(event) => store.changeEditor(event.target.value)}
           />
           {state.editor.kind === 'annotation' && (
             <p className="text-xs text-muted-foreground">
-              已选 {state.editor.targets.length} 个位置
-              {state.mode === 'select' ? ' · 点击对象可继续选择' : ''}
+              {t('Selected {count} locations', { count: state.editor.targets.length })}
+              {state.mode === 'select' ? t(' · 点击对象可继续选择') : ''}
             </p>
           )}
           {state.uiError && (
             <p role="alert" className="text-sm text-destructive">
-              {state.uiError}
+              {message(state.uiError)}
             </p>
           )}
           <div className="flex justify-end gap-2">
@@ -274,14 +276,14 @@ export function FeedbackSurface({ className }: { className?: string }) {
                 disabled={blocked}
                 onClick={() => store.deleteEditor()}
               >
-                删除评论
+                {t('删除评论')}
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" disabled={blocked} onClick={close}>
-              取消
+              {t('取消')}
             </Button>
             <Button type="button" size="sm" disabled={blocked} onClick={() => store.saveEditor()}>
-              保存
+              {t('保存')}
             </Button>
           </div>
         </div>
@@ -298,6 +300,7 @@ export function FeedbackSubmitButton({
   className?: string;
   children?: ReactNode;
 }) {
+  const { t } = useUI();
   const feedback = useFeedback();
   const { disabled } = useFeedbackContext();
   return (
@@ -309,12 +312,36 @@ export function FeedbackSubmitButton({
         void feedback.submit().catch(() => {});
       }}
     >
-      {feedback.submitting ? '提交中…' : (children ?? '提交评论')}
+      {feedback.submitting ? t('提交中…') : (children ?? t('提交评论'))}
     </Button>
   );
 }
 
-export function FeedbackToolbar({ className }: { className?: string }) {
+export function FeedbackOverallCommentButton() {
+  const { t } = useUI();
+  const { store, disabled } = useFeedbackContext();
+  const feedback = useFeedback();
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={disabled || feedback.submitting}
+      onClick={(event) => store.openOverall(event.currentTarget)}
+    >
+      {t('整体评论')}
+    </Button>
+  );
+}
+
+/** Registers the page toolbar once; children may add an action after the selection toggle. */
+export function FeedbackSelectionControls({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: ReactNode;
+}) {
+  const { t } = useUI();
   const { store, disabled } = useFeedbackContext();
   const feedback = useFeedback();
   const blocked = disabled || feedback.submitting;
@@ -329,16 +356,9 @@ export function FeedbackToolbar({ className }: { className?: string }) {
         aria-pressed={feedback.mode === 'select'}
         onClick={() => feedback.setMode(feedback.mode === 'browse' ? 'select' : 'browse')}
       >
-        {feedback.mode === 'select' ? '结束选择' : '选择对象'}
+        {feedback.mode === 'select' ? t('结束选择') : t('选择对象')}
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={blocked}
-        onClick={(event) => store.openOverall(event.currentTarget)}
-      >
-        整体评论
-      </Button>
+      {children}
       {store.getSnapshot().pendingKind === 'objects' && store.getSnapshot().pending.length > 0 && (
         <Button
           type="button"
@@ -346,25 +366,25 @@ export function FeedbackToolbar({ className }: { className?: string }) {
           disabled={blocked}
           onClick={() => store.openComment()}
         >
-          评论
+          {t('评论')}
         </Button>
       )}
       {feedback.value.annotations.length > 0 && (
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" disabled={feedback.submitting}>
-              评论 ({feedback.value.annotations.length})
+              {t('Comments')} ({feedback.value.annotations.length})
             </Button>
           </PopoverTrigger>
           <PopoverContent
             className="max-h-80 w-80 space-y-3 overflow-auto"
             data-feedback-controls=""
-            aria-label="评论目录"
+            aria-label={t('评论目录')}
           >
             {feedback.value.annotations.map((entry) => (
               <div key={entry.id} data-annotation-id={entry.id} className="space-y-1 text-sm">
                 <p className="truncate">
-                  <strong>{store.numberFor(entry.id)}.</strong> {entry.comment || '仅选择'}
+                  <strong>{store.numberFor(entry.id)}.</strong> {entry.comment || t('仅选择')}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   <Button
@@ -380,7 +400,7 @@ export function FeedbackToolbar({ className }: { className?: string }) {
                         .catch(() => {});
                     }}
                   >
-                    编辑评论 {store.numberFor(entry.id)}
+                    {t('编辑评论')} {store.numberFor(entry.id)}
                   </Button>
                   {entry.targets.map((target, index) => (
                     <Button
@@ -394,7 +414,10 @@ export function FeedbackToolbar({ className }: { className?: string }) {
                         void feedback.locate(target).catch(() => {});
                       }}
                     >
-                      定位评论 {store.numberFor(entry.id)} 的位置 {index + 1}
+                      {t('Locate comment {number}, location {index}', {
+                        number: store.numberFor(entry.id),
+                        index: index + 1,
+                      })}
                     </Button>
                   ))}
                 </div>
@@ -403,6 +426,16 @@ export function FeedbackToolbar({ className }: { className?: string }) {
           </PopoverContent>
         </Popover>
       )}
+    </div>
+  );
+}
+
+export function FeedbackToolbar({ className }: { className?: string }) {
+  return (
+    <div data-feedback-controls="" className={cn('flex flex-wrap items-center gap-2', className)}>
+      <FeedbackSelectionControls className="contents">
+        <FeedbackOverallCommentButton />
+      </FeedbackSelectionControls>
       <FeedbackSubmitButton />
     </div>
   );

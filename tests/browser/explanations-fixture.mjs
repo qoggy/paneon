@@ -17,6 +17,15 @@ export async function startExplanationsFixture() {
       { recursive: true },
     );
     service = await startServer(join(root, '.paneon'));
+    await service.app.inject({
+      method: 'POST',
+      url: '/api/preferences',
+      headers: {
+        host: `127.0.0.1:${service.descriptor.port}`,
+        authorization: `Bearer ${service.descriptor.controlToken}`,
+      },
+      payload: { ui: { language: 'zh-CN' } },
+    });
     const panels = {};
     for (const name of ['concurrency', 'sentinel-leap-array'])
       panels[name] = await service.runtime.run(

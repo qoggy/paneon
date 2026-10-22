@@ -1481,6 +1481,22 @@ npm run build 先生成 CLI 与 UI 公开声明，再执行完整 typecheck 和 
 
 用户截图指出表单清除按钮全宽及短选项纵向布局不佳。根因和实施范围见 [form-layout.md](form-layout.md)：仅修正 form 页对 Field/Stack 的组合，清除操作紧贴下拉框、短单选/多选横排换行、布尔控件与标签同排、提交按钮合理宽度。保留 shadcn 默认组件、字段 schema 和全部提交行为，独立 form-ux 组已交付，主 agent 的源码与独立安装包 Chrome 已验收；证据见 verification.md。
 
+## Choice questionnaire layout — B47
+
+用户要求参考 shadcn Questionnaire 截图，选择页改为居中窄列、紧凑选项行、清晰选中态、轻量自填输入及左右导航。B43 作答/schema/事件语义全部保留。主 agent 亲自实现，不派 subagent；具体边界与验收见 [choose-layout.md](choose-layout.md)。已实现并通过主 agent 源码及独立安装包 Chrome 验收，见 verification.md；本节覆盖 B43 中已交付但用户不满意的布局。
+
+## Choice answer summary — B48
+
+用户认可B47主体，要求局部优化最后一题的汇总；采用轻量分组、编号及题目/答案/说明层级，详见choose-layout.md的B48。主agent已亲自完成，构建、完整choose/form回归和实际桌面/窄屏检查通过，详见verification.md的B48。
+
+## Option details — B49
+
+用户确认采用 A，主 agent 亲自实现：选项详情改为独立查看入口，宽屏（1024px 起）右侧非模态并排，窄屏复用已有 Dialog 覆盖阅读。选项卡片不再内联展开 Markdown；正文标题层级局部约束，不改变全局 Markdown 或公共 UI 组件。查看、切换、关闭不修改答案及说明，不发事件；切题关闭旧详情。断点切换保持详情和作答，关闭恢复查看按钮焦点，长内容独立滚动。具体实现与验收见 choose-layout.md、verification.md。
+
+## Independent review — B50
+
+按用户确认，选择页在所有题目之后单独呈现 Review all answers。最后一题的 Next 直接进入汇总（B61 允许未答浏览，完整校验仅在最终提交）；答题阶段不显示汇总或提交按钮。汇总无选项或输入框，统一显示完整答案与提交操作，Previous 返回最后一题并保留草稿。更正仍需经过题目修改、回到汇总、明确提交；提交失败停留汇总并保留答案和原 receipt。进入汇总关闭详情并聚焦标题，不引入新 schema、事件或持久化状态。
+
 ## Git navigation stability — B51
 
 切换提交时保留已加载的同仓库/视图内容，queryGit 成功后统一更新描述、提交选中态、文件和 diff，失败保留原状态并显示错误。首次加载行为不变。加载提示放在固定高度的范围描述行内，避免工作区重新排版。根因及回归见 git-review-layout.md 的 B51；不改 Git 查询、SDK 或评论数据协议。
@@ -1516,3 +1532,11 @@ npm run build 先生成 CLI 与 UI 公开声明，再执行完整 typecheck 和 
 ## Compact Git review and Diff controls — B59 / B60
 
 按用户截图压缩Git页的分隔线与区域间距，移除文件搜索/数量及可见说明标题，历史切换后由用户点文件才展开Diff。共享Diff提供明确左右/单列选择、差异计数和上下箭头导航，点击计数定位。保留拖动热区、完整消息、精确评论、只读和initialView.file；分工与边界见git-review-layout.md的B59/B60。
+
+## B61–B65 — Navigation, empty input and compact panels
+
+B61 允许未答题前后浏览并进入独立汇总，最终统一提交仍校验完整答案。B62 省略两种输入选项时默认 `{}`，显式 JSON/文件和原页面 schema 继续生效。
+
+B63 选择页将问卷名、按需说明和进度合成紧凑上下文行，保留直接可见的题目说明。B64 采用居中单列，局部40rem上限、短数字/选择控件和自然换行。B65 表格采用紧凑标题操作区、搜索/筛选工具栏、按需条件和分页；公共评论控件仅做可组合拆分，旧 Toolbar 行为不变。具体设计及任务交付见 choose-layout.md、choose-navigation.md、optional-panel-params.md、form-layout.md 和 table-layout.md。
+
+五个任务已由主 agent 独立检查并在最终主工作区及安装包验收；未开发主题/语言配置，也未新增业务校验或更改 schema。

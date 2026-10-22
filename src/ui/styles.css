@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './upstream-tailwind.css';
-@import 'github-markdown-css/github-markdown-light.css';
+@import './markdown-theme.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -44,6 +44,14 @@
 }
 
 :root {
+  --diff-deletion: #ffebe9;
+  --diff-addition: #dafbe1;
+  --git-lane-0: #7c3aed;
+  --git-lane-1: #0891b2;
+  --git-lane-2: #16a34a;
+  --git-lane-3: #a16207;
+  --git-lane-4: #db2777;
+  --git-lane-5: #2563eb;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -79,6 +87,14 @@
 }
 
 .dark {
+  --diff-deletion: #4b2026;
+  --diff-addition: #183c28;
+  --git-lane-0: #b794f6;
+  --git-lane-1: #22d3ee;
+  --git-lane-2: #4ade80;
+  --git-lane-3: #facc15;
+  --git-lane-4: #f472b6;
+  --git-lane-5: #60a5fa;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -119,4 +135,22 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+[data-shiki-token] {
+  color: var(--shiki-light-color);
+  font-style: var(--shiki-light-style);
+  font-weight: var(--shiki-light-weight);
+}
+.dark [data-shiki-token] {
+  color: var(--shiki-dark-color);
+  font-style: var(--shiki-dark-style);
+  font-weight: var(--shiki-dark-weight);
+}
+
+/* A palette change is atomic; normal control transitions resume after its first paint. */
+html[data-theme-changing] *,
+html[data-theme-changing] *::before,
+html[data-theme-changing] *::after {
+  transition: none !important;
 }

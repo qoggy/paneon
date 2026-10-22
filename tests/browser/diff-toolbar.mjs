@@ -25,6 +25,15 @@ try {
     await readFile(new URL('./diff-toolbar-fixture.txt', import.meta.url), 'utf8'),
   );
   service = await startServer(join(root, 'data'));
+  await service.app.inject({
+    method: 'POST',
+    url: '/api/preferences',
+    headers: {
+      host: `127.0.0.1:${service.descriptor.port}`,
+      authorization: `Bearer ${service.descriptor.controlToken}`,
+    },
+    payload: { ui: { language: 'zh-CN' } },
+  });
   const panel = await service.runtime.run(entry, root, {}, false);
   browser = await chromium.launch({
     headless: true,

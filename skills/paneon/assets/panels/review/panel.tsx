@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useMemo, useState, useRef } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
 import type { Feedback } from 'paneon/sdk';
@@ -26,6 +27,7 @@ export const validateReview = serverAction({
   handler: (_ctx, input) => completeReviewSchema(input.snapshot).parse(input.feedback),
 });
 function DocumentSelection({ disabled }: { disabled: boolean }) {
+  const { t } = useLocale();
   const feedback = useFeedback<ReviewRef>();
   return feedback.mode === 'select' ? (
     <Button
@@ -34,11 +36,12 @@ function DocumentSelection({ disabled }: { disabled: boolean }) {
       disabled={disabled || feedback.submitting}
       onClick={() => feedback.toggleTarget({ ref: { kind: 'document' } })}
     >
-      选择整篇文档
+      {t('选择整篇文档')}
     </Button>
   ) : null;
 }
 function ReviewPanel() {
+  const { t } = useLocale();
   const params = usePanelInput<ReviewParams>();
   const [locked, setLocked] = useState(false);
   const documentRoot = useRef<HTMLDivElement>(null);
@@ -72,18 +75,20 @@ function ReviewPanel() {
         adapter={adapter}
         disabled={locked}
         onSubmit={async (feedback) => {
-          if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim())
-            throw new Error('请选择内容或填写意见后再提交。');
+          if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim()) {
+            submission.reject('Select content or write a comment before submitting.');
+            return;
+          }
           await submission.submit(feedback);
         }}
       >
         <FeedbackSurface />
-        <div className="flex flex-wrap items-center gap-2" aria-label="评论操作">
+        <div className="flex flex-wrap items-center gap-2" aria-label={t('评论操作')}>
           <FeedbackToolbar />
           <DocumentSelection disabled={locked} />
           {locked && (
             <Button type="button" onClick={() => setLocked(false)}>
-              修改反馈
+              {t('修改反馈')}
             </Button>
           )}
         </div>

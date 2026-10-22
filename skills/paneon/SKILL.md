@@ -1,47 +1,74 @@
 ---
 name: paneon
-description: Collects human decisions, structured input, and precise feedback through ready-to-run local Paneon panels. Use for option comparisons, forms, table exploration, Markdown review, multi-repository Git review, read-only GitHub PR review, or interactive explanations.
-compatibility: Requires the matching Paneon CLI (currently 0.0.0), Node.js 24, local command execution, and a browser accessible to the human.
+description: Turns agent output that would be tiring to read as long text into local interactive Paneon pages, and brings the human's choices, inputs and precise feedback back to the agent. Use proactively when explaining code, mechanisms or plans that read better with diagrams, tables or interactive views; showing changed files, commits or PR diffs; presenting data or metrics; illustrating a data model or design; asking several related questions or requesting missing parameters; or collecting line-level feedback on a document. Ready-made pages cover choices, forms, tables, Markdown review, Git review and GitHub PR review; other needs can be built as custom TSX pages. Not for prototyping the product under development.
+compatibility: Requires the Paneon CLI and Node.js 24.
 ---
 
 # Paneon
 
-1. Select a page from the directory below and read its contract. Prepare matching JSON; the explanatory examples keep their fixed topic and data in source.
-2. Resolve this skill's absolute directory, then run its ordinary TSX entry with `paneon panel run <entry> --cwd <working-directory> --params '<json>' --json`. Read the returned instance ID and deliver its browser URL to the human.
-3. Read the saved result with `paneon panel events <instance-id> --consumer <stable-consumer> --wait-ms 60000 --json`. If no result is returned, keep the instance ID and consumer for a later read. A page click cannot wake an ended agent session.
-4. Interpret the complete result against that instance's input. A result with `replacesEventId` corrects an earlier result; keep the history and decide explicitly how already-performed actions are affected. After processing, acknowledge with `paneon panel ack <instance-id> --consumer <stable-consumer> --through <event-id> --json`.
-5. Start each new question round with another `panel run` and deliver the new link. Existing instances retain their questions. Use ordinary `panel inspect`, `reload`, `close`, and `list` commands for lifecycle management.
+`paneon panel run` serves a local TSX page and returns its URL. A page can render Markdown, Mermaid, code, diffs, tables and interactive views, call local functions, and save explicit events that the agent reads afterwards.
 
-Run a listed TSX entry directly with data matching its contract; standard pages do not require generating TSX. Each page directory contains its executable schema. The standard pages use the page-level [submission helper](assets/shared/submission.ts) to retain successful receipts and save complete corrections. To customize, copy the complete skill directory so relative imports remain intact, then edit the copied TSX.
+## Decide on a page
 
-For larger inputs, write the same JSON to a file and replace `--params` with `--params-file /absolute/input.json`. Supply exactly one input source. Relative input-file paths use the invoking directory, while `--cwd` controls panel functions. The instance keeps its creation-time input after the file changes or disappears.
+Judge by the shape of the content, not its length. Prefer a page for several files or diffs, tabular data, flows and structures that need diagrams, mechanisms that unfold step by step, or several related questions. Keep short answers in chat. A page is a convenience, never an obligation: chat or the agent's own question tool remains valid.
 
-## Page directory
+Do not use Paneon to prototype the product under development; its built-in components and layout would distort the prototype.
 
-| Need                                                                                      | Contract                               | TSX entry                                                                      |
-| ----------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
-| Sequential questions with options or custom answers                                       | [Choose](references/choose.md)         | [choose/panel.tsx](assets/panels/choose/panel.tsx)                             |
-| Related parameters on one form                                                            | [Form](references/form.md)             | [form/panel.tsx](assets/panels/form/panel.tsx)                                 |
-| Search, filter, sort, select and annotate readonly data                                   | [Table](references/table.md)           | [table/panel.tsx](assets/panels/table/panel.tsx)                               |
-| Review a complete Markdown document with exact text feedback                              | [Review](references/review.md)         | [review/panel.tsx](assets/panels/review/panel.tsx)                             |
-| Working changes, history and comparisons across explicit repositories                     | [Git review](references/git-review.md) | [git-review/panel.tsx](assets/panels/git-review/panel.tsx)                     |
-| Browse GitHub PR descriptions, fixed-version diffs and checks; send opinions to the agent | [GitHub PR](references/github-pr.md)   | [github-pr/panel.tsx](assets/examples/github-pr/panel.tsx)                     |
-| Explore concurrency and queueing with fixed tasks                                         | [Examples](references/examples.md)     | [concurrency/panel.tsx](assets/examples/concurrency/panel.tsx)                 |
-| Explore Sentinel LeapArray's ring buckets                                                 | [Examples](references/examples.md)     | [sentinel-leap-array/panel.tsx](assets/examples/sentinel-leap-array/panel.tsx) |
+Then pick the source:
 
-Table, review and Git pages emit feedback only on explicit submission; navigation and draft edits do not emit results. Preserve source references when interpreting annotations. These pages support complete corrections linked by `replacesEventId`. The two explanatory examples demonstrate an author-controlled workflow and run with `--params '{}'`.
+1. A [built-in page](#built-in-pages) fits: run it with JSON input, without writing TSX.
+2. Otherwise write a [custom page](#custom-pages), for example an explanation of code, a mechanism or a plan, a data model diagram, a metrics view, or a control surface over a local CLI or HTTP service.
 
-## Installation and versions
+## Built-in pages
 
-Run `paneon init` to install the bundled, matching skill. The interactive flow selects agents, Project (default) or Global scope, and Symlink (recommended) or Copy when targets use different directories. Universal agents share one `.agents/skills` copy. Existing skill directories are replaced, including local changes; review overwrite paths before confirming. Do not ask the user to separately locate or copy this skill.
+`<skill>` stands for the absolute path of this skill directory. Each contract lists the input schema and the submitted event.
 
-For noninteractive installation, use `paneon init --agent codex claude-code --project --yes --json` (or `--global`, optionally `--copy`). Use installed help for supported agent IDs. JSON or non-terminal calls require `--yes`. Records stay in `~/.paneon/skill-installations.json`. After a CLI upgrade, rerun init to synchronize its bundled skill. A unified update command is not implemented.
-The complete `skills/paneon` resources ship with the CLI release and have no independent version sequence. Supplied panels currently declare `requires.paneon: '0.0.0'`, the package version verified for them. Preserve compatibility declarations and relative imports when customizing a copy; copying source for customization is separate from the installation flow.
+| Need                                                                         | Contract                               | Entry                                         |
+| ---------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------- |
+| Sequential questions with options or custom answers                          | [Choose](references/choose.md)         | `<skill>/assets/panels/choose/panel.tsx`      |
+| Related parameters on one form                                               | [Form](references/form.md)             | `<skill>/assets/panels/form/panel.tsx`        |
+| Tabular data to search, filter and sort                                      | [Table](references/table.md)           | `<skill>/assets/panels/table/panel.tsx`       |
+| A complete Markdown document                                                 | [Review](references/review.md)         | `<skill>/assets/panels/review/panel.tsx`      |
+| Working changes, history and comparisons across repositories                 | [Git review](references/git-review.md) | `<skill>/assets/panels/git-review/panel.tsx`  |
+| GitHub PR description, fixed-version diff and checks (read-only, needs `gh`) | [GitHub PR](references/github-pr.md)   | `<skill>/assets/examples/github-pr/panel.tsx` |
 
-## Custom pages and runtime reference
+Pages that display content let the human select parts of it, comment, and submit the comments together; each comment points back to the exact text, row, line or object it was made on. The contract states what a page's comments can target.
 
-- [Authoring](references/authoring.md): complete TSX, serverAction, CLI/HTTP calls, query states, components, Markdown/Mermaid and temporary credential input.
-- [Feedback](references/feedback.md): copyable public Provider/hook/object/text example, exact source adapters, explicit submission and correction boundaries.
-- [CLI](references/cli.md): command inputs/results, parameter snapshots, compatibility, lifecycle, events/ack and diagnostics.
+## Run and deliver
 
-The CLI executes ordinary TSX and stores declared events; the skill supplies reusable pages and workflow instructions. Business calls, scheduling, monitoring, logs and storage remain page code responsibilities.
+```sh
+paneon panel run <entry.tsx> --cwd <working-directory> --json
+```
+
+- `--cwd` is where the page's local functions run, such as the repository for Git reads.
+- Pass `--params '<json>'` for pages that need input. For large input, write the JSON to a file and use `--params-file <file>` instead. Do not supply both. The file is read once; the instance keeps that snapshot.
+- Omit both input options for pages without input; the panel receives `{}`.
+- Give the human the returned `data.url`. Keep `data.instanceId` for later commands.
+
+Source watching is on by default: editing a custom page's TSX updates the open page at the same URL, so refine an explanation in place. Input is fixed per instance, so new questions or new data need another `panel run` and a new link.
+
+## Read results
+
+Only pages that collect input produce events. A presentation-only page needs no reading.
+
+```sh
+paneon panel events <instance-id> --consumer <stable-name> --wait-ms 60000 --json
+```
+
+- Reading does not acknowledge. If nothing arrives, tell the human to say when they have submitted, then read again with the same instance ID and consumer name.
+- Results reference the input by ID (`questionId`, `optionId`, `rowIndex`, …) without repeating the questions or data. Resolve them against the params of the same instance.
+- A result carrying `replacesEventId` replaces that earlier result entirely; do not merge the two. If work was already done based on the earlier result, tell the human what the correction affects before adjusting it.
+- After handling, acknowledge: `paneon panel ack <instance-id> --consumer <stable-name> --through <event-id> --json`.
+
+`panel inspect` returns an existing instance's current URL; `panel list`, `reload` and `close` manage instances. Command details, error codes and limits are in [CLI](references/cli.md).
+
+## Custom pages
+
+Write an ordinary TSX file anywhere under `/tmp`, with `definePanel`, components from `paneon/ui`, optional `serverAction` functions and declared events. Set `requires.paneon` to a range that includes the installed CLI (`paneon --version`). Business calls, retries, logs and storage stay in page code.
+
+- [Interface preferences](references/preferences.md): user-level theme/language, inherited public UI, and original-content boundaries.
+- [Authoring](references/authoring.md): complete source, server actions, CLI/HTTP calls, queries, components, Markdown/Mermaid, temporary credentials.
+- [Feedback](references/feedback.md): selection and comments on custom content, for pages that collect precise opinions.
+- [Explanation examples](references/examples.md): two one-off explanatory pages (concurrency queueing, Sentinel LeapArray) with fixed topic and data in source; use them as patterns for new explanations.
+
+To reuse shared modules from `assets/shared/` or adapt a built-in page, copy the complete skill directory so relative imports keep working, then edit the copy.

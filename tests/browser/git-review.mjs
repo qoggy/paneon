@@ -164,7 +164,7 @@ try {
   await button('返回当前浏览').click();
   // Same repository/path, a distinct fixed branch-comparison source.
   await button('分支/版本对比').click();
-  await frame.getByLabel('Base', { exact: true }).fill('base');
+  await frame.getByLabel('基线', { exact: true }).fill('base');
   await button('比较').click();
   await frame
     .locator('[data-code-side="new"][data-line="2"]')
@@ -198,7 +198,7 @@ try {
   }
   await comments.overall('');
   await button('提交评论').click();
-  await frame.getByRole('status').filter({ hasText: 'Saved as event' }).waitFor();
+  await frame.getByRole('status').filter({ hasText: '已保存为事件' }).waitFor();
   const first = (await f.events())[0];
   assert.equal(first.type, 'git-review-submitted');
   assert.equal(first.payload.annotations.length, 4);
@@ -233,7 +233,7 @@ try {
       : route.continue(),
   );
   await button('提交评论').click();
-  await frame.getByRole('alert').filter({ hasText: 'Not saved.' }).waitFor();
+  await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 4);
   assert.equal((await f.events()).length, 1);
   await page.unroute(eventUrl);

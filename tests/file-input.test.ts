@@ -32,6 +32,32 @@ async function cli(home: string, cwd: string, ...args: string[]) {
   }
 }
 
+void test('omitted panel input creates the same empty snapshot as explicit JSON', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'paneon-empty-input-'));
+  const entry = join(home, 'panel.tsx');
+  await writeFile(
+    entry,
+    `import {definePanel,z} from 'paneon/sdk';function Panel(){return <p>No input</p>}export default definePanel({id:'empty-input',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+  );
+  const service = await startServer(join(home, '.paneon'));
+  try {
+    const snapshots = [];
+    for (const flags of [[], ['--params', '{}']]) {
+      const created = await cli(home, home, 'run', entry, '--cwd', home, '--no-watch', ...flags);
+      assert.equal(created.exitCode, 0, created.stdout + created.stderr);
+      const instanceId = String(created.result.data?.instanceId);
+      assert.deepEqual(service.runtime.inspect(instanceId).params, {});
+      const inspected = await cli(home, home, 'inspect', instanceId);
+      assert.equal(inspected.exitCode, 0, inspected.stdout + inspected.stderr);
+      snapshots.push(inspected.result.data?.params);
+    }
+    assert.deepEqual(snapshots, [{}, {}]);
+  } finally {
+    await service.stop();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 void test(
   'file input validates before creation and persists snapshots across reload and restart',
   { timeout: 120_000 },
@@ -63,8 +89,8 @@ void test(
       assert.match(help.stdout, /--params <json>/);
       assert.doesNotMatch(help.stdout, /[\u4e00-\u9fff]/);
       for (const flags of [
-        [],
         ['--params', '{}', '--params-file', 'params.json'],
+        ['--params', '{'],
         ['--params-file', 'missing.json'],
         ['--params-file', '.'],
       ]) {
@@ -73,6 +99,10 @@ void test(
         assert.equal(outcome.result.error?.code, 'INVALID_ARGUMENT');
         assert.equal(count(), 0);
       }
+      const omittedRequired = await run();
+      assert.equal(omittedRequired.exitCode, 1);
+      assert.equal(omittedRequired.result.error?.code, 'INPUT_VALIDATION_FAILED');
+      assert.equal(count(), 0);
       const privateMarker = 'PRIVATE_BUSINESS_INPUT';
       await writeFile(paramsPath, `{"topic":"${privateMarker}", BROKEN`);
       const malformed = await run('--params-file', 'params.json', '--debug');

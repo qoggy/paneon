@@ -160,6 +160,7 @@ export type GitSnapshot = {
   model: DiffModel;
   status: string;
   notes: string[];
+  notesUI: { key: string; params?: Record<string, string> }[];
 };
 export type CommitDecoration = {
   kind: 'head' | 'branch' | 'remote' | 'tag';
@@ -224,6 +225,7 @@ export type GitListing = {
   snapshots: GitSnapshot[];
   branches: string[];
   description: string;
+  descriptionUI: { key: string; params?: Record<string, string> };
   currentBranch?: string;
   historyRefs?: HistoryRef[];
   history?: GitHistory;
@@ -289,6 +291,14 @@ function capture(
     source,
     status: entry.status,
     notes,
+    notesUI: notes.map((key) =>
+      key.startsWith('Mode: ')
+        ? {
+            key: 'Mode: {old} → {next}',
+            params: { old: old?.mode ?? 'absent', next: next?.mode ?? 'absent' },
+          }
+        : { key },
+    ),
     model: binary ? createDiffModel() : createDiffModel(oldText, newText),
   };
 }
@@ -342,6 +352,7 @@ export async function readGit(
     .filter(Boolean);
   const snapshots: GitSnapshot[] = [];
   let description: string;
+  let descriptionUI: GitListing['descriptionUI'];
   let history: GitHistory | undefined;
   let historyRefs: HistoryRef[] | undefined;
   async function addEntries(
@@ -426,6 +437,9 @@ export async function readGit(
       cache.snapshots.set(snapshot.id, snapshot);
     }
     description = '手动刷新；当前读取的工作区内容已固定，读取过程不宣称原子锁定。';
+    descriptionUI = {
+      key: 'Manual refresh; the observed working tree is pinned, without claiming an atomic read.',
+    };
   } else if (request.type === 'history') {
     const tip = request.tip
       ? await commitOID(root, request.tip, signal)
@@ -531,7 +545,22 @@ export async function readGit(
       description = parent
         ? `提交 ${commit}；相对第一父 ${parent}${parents.length > 1 ? '（合并提交，只展示第一父差异）' : ''}`
         : `根提交 ${commit}；相对空树`;
-    } else description = tip ? `固定历史 tip ${tip}` : '空仓库：没有提交历史';
+      descriptionUI = parent
+        ? {
+            key: 'Commit {commit}; relative to first parent {parent}{merge}',
+            params: {
+              commit,
+              parent,
+              merge: parents.length > 1 ? ' (merge commit; showing first-parent diff only)' : '',
+            },
+          }
+        : { key: 'Root commit {commit}; relative to empty tree', params: { commit } };
+    } else {
+      description = tip ? `固定历史 tip ${tip}` : '空仓库：没有提交历史';
+      descriptionUI = tip
+        ? { key: 'Pinned history tip {tip}', params: { tip } }
+        : { key: 'Empty repository: no commit history' };
+    }
   } else {
     if (!request.base) throw new Error('Comparison base is required.');
     const baseCommit = await commitOID(root, request.base, signal),
@@ -570,6 +599,13 @@ export async function readGit(
       },
     );
     description = `${mode === 'branch' ? '三点比较，共同祖先' : '端点比较'} ${old} → ${headCommit}`;
+    descriptionUI = {
+      key:
+        mode === 'branch'
+          ? 'Three-dot comparison, merge base {old} → {head}'
+          : 'Endpoint comparison {old} → {head}',
+      params: { old, head: headCommit },
+    };
   }
   if (
     request.file &&
@@ -583,6 +619,7 @@ export async function readGit(
     branches,
     currentBranch,
     description,
+    descriptionUI,
     ...(history ? { history, historyRefs } : {}),
   };
 }

@@ -82,11 +82,8 @@ const run = panel
   .command('run <entry.tsx>')
   .description('Create a new panel instance and print its browser URL')
   .requiredOption('--cwd <directory>', 'Working directory for local panel functions')
-  .option('--params <json>', 'Panel input matching its schema (choose one input source)')
-  .option(
-    '--params-file <path>',
-    'Read panel input from a UTF-8 JSON file (choose one input source)',
-  )
+  .option('--params <json>', 'Panel input matching its schema (defaults to {})')
+  .option('--params-file <path>', 'Read panel input from a UTF-8 JSON file instead of --params')
   .addOption(new Option('--watch', 'Automatically reload source changes (default)'))
   .addOption(new Option('--no-watch', 'Disable automatic source reload'))
   .option('--open', 'Open the panel in the system browser');
@@ -100,8 +97,8 @@ execute(run, async () => {
     watch?: boolean;
     open?: boolean;
   }>();
-  if ((options.params !== undefined) === (options.paramsFile !== undefined))
-    invalid('Provide exactly one of --params or --params-file.');
+  if (options.params !== undefined && options.paramsFile !== undefined)
+    invalid('--params and --params-file cannot be used together.');
   const entryPath = resolve(run.args[0]);
   const cwd = resolve(options.cwd);
   try {
@@ -110,7 +107,7 @@ execute(run, async () => {
   } catch {
     invalid('The entry and cwd must exist and be accessible.');
   }
-  let input = options.params ?? '';
+  let input = options.params ?? '{}';
   if (options.paramsFile !== undefined) {
     try {
       input = readFileSync(resolve(options.paramsFile), 'utf8');
@@ -212,6 +209,25 @@ execute(ack, async () => {
       through: integer(o.through, 1, Number.MAX_SAFE_INTEGER),
     },
   });
+});
+const config = program.command('config').description('Read and update user interface preferences');
+const configGet = config.command('get').description('Read effective UI preferences');
+execute(configGet, async () => {
+  const path = import.meta.url.endsWith('.ts')
+    ? new URL('../../dist/cli/config.js', import.meta.url).href
+    : './config.js';
+  const { getConfig } = (await import(path)) as typeof import('./config.js');
+  return getConfig();
+});
+const configSet = config
+  .command('set <key> <value>')
+  .description('Set ui.theme (light/dark) or ui.language (en/zh-CN)');
+execute(configSet, async () => {
+  const path = import.meta.url.endsWith('.ts')
+    ? new URL('../../dist/cli/config.js', import.meta.url).href
+    : './config.js';
+  const { setConfig } = (await import(path)) as typeof import('./config.js');
+  return setConfig(configSet.args[0], configSet.args[1]);
 });
 const status = server.command('status').description('Check the service without starting it');
 execute(status, async () => (await client()).serverStatus());

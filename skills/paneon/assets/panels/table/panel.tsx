@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useMemo, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
 import type { Feedback, FeedbackTarget as Target } from 'paneon/sdk';
@@ -5,13 +6,18 @@ import {
   Button,
   Checkbox,
   FeedbackSurface,
-  FeedbackToolbar,
+  FeedbackSelectionControls,
+  FeedbackOverallCommentButton,
+  FeedbackSubmitButton,
   FeedbackProvider,
   FeedbackTarget,
   FeedbackText,
   Input,
   Markdown,
   Page,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Table,
   TableBody,
   TableCell,
@@ -52,6 +58,7 @@ function DataTable({
   setPage: (page: number) => void;
   root: React.RefObject<HTMLDivElement | null>;
 }) {
+  const { t } = useLocale();
   const feedback = useFeedback<TableRef>();
   const rows = visibleRows(params, view),
     pageSize = params.pageSize ?? 20;
@@ -72,76 +79,63 @@ function DataTable({
     const all = refs.every(selected);
     for (const ref of refs) if (selected(ref) === all) feedback.toggleTarget({ ref });
   }
+  const activeFilters = params.columns.filter(
+    (column) => Object.hasOwn(view.filters, column.key) && view.filters[column.key].length > 0,
+  );
+  const hasView = !!view.search || activeFilters.length > 0 || !!view.sort;
+  function removeFilter(key: string) {
+    const filters = { ...view.filters };
+    delete filters[key];
+    update({ ...view, filters });
+  }
   return (
-    <div ref={root} className="space-y-4">
-      <label className="block space-y-2">
-        搜索全表
-        <Input
-          aria-label="搜索全表"
-          value={view.search}
-          onChange={(event) => update({ ...view, search: event.target.value })}
-        />
-      </label>
-      <p className="text-sm text-muted-foreground">
-        {rows.length} / {params.rows.length} 行 · 已选{' '}
-        {feedback.value.annotations.reduce((count, entry) => count + entry.targets.length, 0)}{' '}
-        个位置。列选择覆盖输入整列；表头行勾选只作用当前页。
-      </p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              {selecting && (
-                <Checkbox
-                  aria-label="选择当前页的行"
-                  disabled={disabled || feedback.submitting || !shown.length}
-                  checked={
-                    shown.length > 0 &&
-                    shown.every(({ rowIndex }) => selected({ kind: 'row', rowIndex }))
-                  }
-                  onCheckedChange={togglePage}
-                />
-              )}
-            </TableHead>
-            {params.columns.map((column) => (
-              <FeedbackTarget<TableRef>
-                key={column.key}
-                target={{ kind: 'column', columnKey: column.key }}
-                asChild
+    <div ref={root} className="min-w-0 space-y-3">
+      <div
+        className="flex flex-wrap items-center justify-between gap-2"
+        aria-label={t('表格工具栏')}
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-72 max-w-full min-w-32 flex-1 sm:flex-none">
+            <Input
+              type="search"
+              aria-label={t('搜索全表')}
+              placeholder={t('搜索表格…')}
+              className="pr-9 [&::-webkit-search-cancel-button]:appearance-none"
+              value={view.search}
+              onChange={(event) => update({ ...view, search: event.target.value })}
+            />
+            {view.search && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-0.5 right-0.5"
+                aria-label={t('清除搜索')}
+                onClick={() => update({ ...view, search: '' })}
               >
-                <TableHead data-column-key={column.key}>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      aria-label={`排序 ${column.label}`}
-                      onClick={() =>
-                        update({
-                          ...view,
-                          sort: {
-                            key: column.key,
-                            descending:
-                              view.sort?.key === column.key ? !view.sort.descending : false,
-                          },
-                        })
-                      }
-                    >
-                      {column.label}
-                      {view.sort?.key === column.key ? (view.sort.descending ? ' ↓' : ' ↑') : ''}
-                    </Button>
-                    {selecting && (
-                      <Checkbox
-                        aria-label={`选择整列 ${column.label}`}
-                        disabled={disabled || feedback.submitting}
-                        checked={selected({ kind: 'column', columnKey: column.key })}
-                        onCheckedChange={() =>
-                          feedback.toggleTarget({ ref: { kind: 'column', columnKey: column.key } })
-                        }
-                      />
-                    )}
-                  </div>
+                <span aria-hidden="true">×</span>
+              </Button>
+            )}
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" aria-label={t('筛选列')}>
+                {t('筛选')}
+                {activeFilters.length > 0 && ` (${activeFilters.length})`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              collisionPadding={16}
+              className="max-h-[min(28rem,var(--radix-popover-content-available-height))] w-80 max-w-[calc(100vw-2rem)] space-y-3 overflow-auto"
+              aria-label={t('列筛选')}
+            >
+              {params.columns.map((column) => (
+                <label key={column.key} className="block space-y-1.5 text-sm break-words">
+                  <span>{column.label}</span>
                   <Input
-                    aria-label={`筛选 ${column.label}`}
+                    aria-label={t('Filter {label}', { label: column.label })}
+                    placeholder={t('包含…')}
                     value={Object.hasOwn(view.filters, column.key) ? view.filters[column.key] : ''}
                     onChange={(event) =>
                       update({
@@ -150,77 +144,223 @@ function DataTable({
                       })
                     }
                   />
-                </TableHead>
+                </label>
+              ))}
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <FeedbackSelectionControls />
+          {selecting && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label={t('选择帮助')}>
+                  <span aria-hidden="true">?</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                collisionPadding={16}
+                className="max-w-[calc(100vw-2rem)] text-sm"
+                aria-label={t('选择帮助')}
+              >
+                {t(
+                  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「评论」保存到页面草稿。普通文字圈选无需开启选择对象。',
+                )}
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      </div>
+      {hasView && (
+        <div className="flex flex-wrap items-center gap-2" aria-label={t('当前视图条件')}>
+          {activeFilters.map((column) => (
+            <Button
+              key={column.key}
+              type="button"
+              size="xs"
+              variant="outline"
+              className="h-auto min-h-7 max-w-full whitespace-normal"
+              aria-label={t('Remove filter {label}', { label: column.label })}
+              onClick={() => removeFilter(column.key)}
+            >
+              <span className="min-w-0 text-left break-all">
+                {column.label}：{view.filters[column.key]}
+              </span>
+              <span aria-hidden="true">×</span>
+            </Button>
+          ))}
+          <Button type="button" size="xs" variant="ghost" onClick={() => update(initialView)}>
+            {t('重置视图')}
+          </Button>
+        </div>
+      )}
+      <div className="min-w-0 overflow-hidden rounded-md border">
+        <Table aria-label={params.title}>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="h-10 w-10 px-3 text-center">
+                {selecting && (
+                  <Checkbox
+                    aria-label={t('选择当前页的行')}
+                    disabled={disabled || feedback.submitting || !shown.length}
+                    checked={
+                      shown.length > 0 &&
+                      shown.every(({ rowIndex }) => selected({ kind: 'row', rowIndex }))
+                    }
+                    onCheckedChange={togglePage}
+                  />
+                )}
+              </TableHead>
+              {params.columns.map((column) => (
+                <FeedbackTarget<TableRef>
+                  key={column.key}
+                  target={{ kind: 'column', columnKey: column.key }}
+                  asChild
+                >
+                  <TableHead
+                    data-column-key={column.key}
+                    aria-sort={
+                      view.sort?.key === column.key
+                        ? view.sort.descending
+                          ? 'descending'
+                          : 'ascending'
+                        : 'none'
+                    }
+                    className={`h-10 px-3 py-1 whitespace-normal ${column.type === 'number' ? 'w-px min-w-24 text-right' : column.type === 'boolean' ? 'w-px min-w-20' : 'min-w-40'}`}
+                  >
+                    <div
+                      className={`flex items-center gap-2 ${column.type === 'number' ? 'justify-end' : ''}`}
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={`h-auto min-h-8 min-w-0 shrink gap-1 px-0 whitespace-normal ${column.type === 'number' ? 'text-right' : 'text-left'}`}
+                        aria-label={t('Sort {label}', { label: column.label })}
+                        onClick={() =>
+                          update({
+                            ...view,
+                            sort: {
+                              key: column.key,
+                              descending:
+                                view.sort?.key === column.key ? !view.sort.descending : false,
+                            },
+                          })
+                        }
+                      >
+                        <span className="wrap-anywhere">{column.label}</span>
+                        <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
+                          {view.sort?.key === column.key ? (view.sort.descending ? '↓' : '↑') : '↕'}
+                        </span>
+                      </Button>
+                      {selecting && (
+                        <Checkbox
+                          aria-label={t('Select entire column {label}', { label: column.label })}
+                          disabled={disabled || feedback.submitting}
+                          checked={selected({ kind: 'column', columnKey: column.key })}
+                          onCheckedChange={() =>
+                            feedback.toggleTarget({
+                              ref: { kind: 'column', columnKey: column.key },
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+                  </TableHead>
+                </FeedbackTarget>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shown.map(({ row, rowIndex }) => (
+              <FeedbackTarget<TableRef> key={rowIndex} target={{ kind: 'row', rowIndex }} asChild>
+                <TableRow data-row-index={rowIndex}>
+                  <TableCell className="h-10 w-10 px-3 py-2 text-center text-xs text-muted-foreground">
+                    {selecting ? (
+                      <Checkbox
+                        aria-label={t('Select original row {index}', { index: rowIndex })}
+                        disabled={disabled || feedback.submitting}
+                        checked={selected({ kind: 'row', rowIndex })}
+                        onCheckedChange={() =>
+                          feedback.toggleTarget({ ref: { kind: 'row', rowIndex } })
+                        }
+                      />
+                    ) : (
+                      rowIndex + 1
+                    )}
+                  </TableCell>
+                  {params.columns.map((column) => {
+                    const ref: TableRef = { kind: 'cell', rowIndex, columnKey: column.key };
+                    return (
+                      <FeedbackTarget key={column.key} target={ref} asChild>
+                        <TableCell
+                          data-cell-key={column.key}
+                          className={`h-10 px-3 py-2 ${column.type === 'number' ? 'w-px text-right tabular-nums' : column.type === 'boolean' ? 'w-px' : 'max-w-xl min-w-40 wrap-anywhere whitespace-normal'}`}
+                        >
+                          {typeof row[column.key] === 'string' ? (
+                            <FeedbackText target={ref} text={String(row[column.key])} />
+                          ) : (
+                            cellText(row[column.key])
+                          )}
+                        </TableCell>
+                      </FeedbackTarget>
+                    );
+                  })}
+                </TableRow>
               </FeedbackTarget>
             ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {shown.map(({ row, rowIndex }) => (
-            <FeedbackTarget<TableRef> key={rowIndex} target={{ kind: 'row', rowIndex }} asChild>
-              <TableRow data-row-index={rowIndex}>
-                <TableCell>
-                  {selecting ? (
-                    <Checkbox
-                      aria-label={`选择原始行 ${rowIndex}`}
-                      disabled={disabled || feedback.submitting}
-                      checked={selected({ kind: 'row', rowIndex })}
-                      onCheckedChange={() =>
-                        feedback.toggleTarget({ ref: { kind: 'row', rowIndex } })
-                      }
-                    />
-                  ) : (
-                    rowIndex + 1
-                  )}
+            {!shown.length && (
+              <TableRow>
+                <TableCell
+                  colSpan={params.columns.length + 1}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  {params.rows.length ? t('没有匹配结果。') : t('表格没有数据。')}
                 </TableCell>
-                {params.columns.map((column) => {
-                  const ref: TableRef = { kind: 'cell', rowIndex, columnKey: column.key };
-                  return (
-                    <FeedbackTarget key={column.key} target={ref} asChild>
-                      <TableCell data-cell-key={column.key}>
-                        {typeof row[column.key] === 'string' ? (
-                          <FeedbackText target={ref} text={String(row[column.key])} />
-                        ) : (
-                          cellText(row[column.key])
-                        )}
-                      </TableCell>
-                    </FeedbackTarget>
-                  );
-                })}
               </TableRow>
-            </FeedbackTarget>
-          ))}
-        </TableBody>
-      </Table>
-      {!shown.length && <p>{params.rows.length ? '没有匹配结果。' : '表格没有数据。'}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" onClick={() => update(initialView)}>
-          清除搜索和筛选
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={currentPage === 0}
-          onClick={() => setPage(currentPage - 1)}
-        >
-          上一页
-        </Button>
-        <span>
-          第 {currentPage + 1} / {pageCount} 页
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={currentPage + 1 >= pageCount}
-          onClick={() => setPage(currentPage + 1)}
-        >
-          下一页
-        </Button>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p aria-live="polite" data-table-statistics="">
+          {shown.length ? currentPage * pageSize + 1 : 0}–{currentPage * pageSize + shown.length} /{' '}
+          {rows.length} {t('行')}
+          {rows.length !== params.rows.length &&
+            t(' · {count} original rows', { count: params.rows.length })}
+        </p>
+        <nav className="flex items-center gap-1" aria-label={t('表格分页')}>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t('上一页')}
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            <span aria-hidden="true">‹</span>
+          </Button>
+          <span className="px-1 tabular-nums">
+            {currentPage + 1} / {pageCount}
+          </span>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t('下一页')}
+            disabled={currentPage + 1 >= pageCount}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            <span aria-hidden="true">›</span>
+          </Button>
+        </nav>
       </div>
     </div>
   );
 }
 function TablePanel() {
+  const { t } = useLocale();
   const params = usePanelInput<TableParams>();
   const [view, setView] = useState<TableView>(initialView),
     [page, setPage] = useState(0),
@@ -276,26 +416,56 @@ function TablePanel() {
     [params],
   );
   return (
-    <Page title={params.title}>
-      {params.description && <Markdown>{params.description}</Markdown>}
+    <Page className="min-w-0 space-y-4">
       <FeedbackProvider<TableRef>
         adapter={adapter}
         disabled={locked}
         onSubmit={async (feedback) => {
-          if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim())
-            throw new Error('请选择内容或填写意见后再提交。');
+          if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim()) {
+            submission.reject('Select content or write a comment before submitting.');
+            return;
+          }
           await submission.submit(feedback);
         }}
       >
         <FeedbackSurface />
-        <div className="flex flex-wrap items-center gap-2" aria-label="评论操作">
-          <FeedbackToolbar />
-          {locked && (
-            <Button type="button" onClick={() => setLocked(false)}>
-              修改反馈
-            </Button>
-          )}
-        </div>
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">{params.title}</h1>
+            {params.description && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="link"
+                    className="px-0 text-muted-foreground"
+                    aria-label={t('表格说明')}
+                  >
+                    {t('说明')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  collisionPadding={16}
+                  className="max-h-[min(28rem,var(--radix-popover-content-available-height))] w-96 max-w-[calc(100vw-2rem)] overflow-auto"
+                  aria-label={t('表格说明')}
+                >
+                  <Markdown>{params.description}</Markdown>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2" aria-label={t('评论操作')}>
+            <FeedbackOverallCommentButton />
+            <FeedbackSubmitButton />
+            {locked && (
+              <Button type="button" onClick={() => setLocked(false)}>
+                {t('修改反馈')}
+              </Button>
+            )}
+          </div>
+        </header>
         <DataTable
           params={params}
           disabled={locked}

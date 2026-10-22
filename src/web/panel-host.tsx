@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   AlertDescription,
@@ -16,12 +16,12 @@ import {
   Field,
   FieldLabel,
   Input,
-  Page,
   Spinner,
   Stack,
   Switch,
   Textarea,
 } from '../ui';
+import { useUI } from '../ui';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';
 
@@ -40,10 +40,10 @@ type Prompt = {
 };
 
 export function PanelHost({ instanceId }: { instanceId: string }) {
+  const { t } = useUI();
   const [panel, setPanel] = useState<PanelDetails>();
   const [error, setError] = useState<string>();
-  const [connected, setConnected] = useState(false);
-  const [building, setBuilding] = useState(false);
+  const [connected, setConnected] = useState<boolean>();
   const refreshGeneration = useRef(0);
   const refresh = useCallback(() => {
     const generation = ++refreshGeneration.current;
@@ -87,9 +87,8 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
       socket.onmessage = (event) => {
         if (disposed) return;
         try {
-          const update = JSON.parse(event.data as string) as { type?: string; building?: boolean };
+          const update = JSON.parse(event.data as string) as { type?: string };
           if (update.type === 'state') {
-            setBuilding(update.building === true);
             void refresh();
           }
         } catch {
@@ -106,35 +105,15 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
     };
   }, [instanceId, refresh]);
   return (
-    <Page title={panel?.definitionId ?? 'Paneon'}>
-      <Stack direction="row" wrap className="items-center justify-between">
-        <Stack direction="row" gap={2} wrap className="items-center">
-          <a href="/" className="text-sm underline underline-offset-4">
-            All panels
-          </a>
-          <Badge variant={connected ? 'secondary' : 'outline'}>
-            {connected ? 'Connected' : 'Reconnecting'}
-          </Badge>
-          {panel && (
-            <>
-              <Badge variant="outline">{panel.watch ? 'Auto reload on' : 'Auto reload off'}</Badge>
-              <Badge variant="outline">Paneon {panel.paneonVersion}</Badge>
-            </>
-          )}
-          {building && (
-            <span role="status" className="flex items-center gap-2 text-sm">
-              <Spinner />
-              Building
-            </span>
-          )}
-        </Stack>
-        <Button variant="outline" size="sm" onClick={() => void refresh()}>
-          Refresh status
-        </Button>
-      </Stack>
+    <div className="flex h-dvh flex-col">
+      {connected === false && !error && (
+        <p role="status" className="shrink-0 px-4 py-2 text-sm text-muted-foreground">
+          {t('Reconnecting to Paneon…')}
+        </p>
+      )}
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Runtime connection</AlertTitle>
+          <AlertTitle>{t('Runtime connection')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -143,7 +122,7 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
           <AlertTitle>{panel.diagnostic.code}</AlertTitle>
           <AlertDescription>
             {panel.diagnostic.message}
-            {panel.status === 'running' && ' The previous working panel remains available.'}
+            {panel.status === 'running' && t(' The previous working panel remains available.')}
           </AlertDescription>
         </Alert>
       )}
@@ -154,20 +133,27 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
         ) : (
           <Card>
             <CardContent className="pt-6">
-              <h2 className="font-semibold">Panel {panel.status}</h2>
+              <h2 className="font-semibold">{t('Panel {status}', { status: t(panel.status) })}</h2>
               <p className="text-sm text-muted-foreground">
                 {panel.status === 'closed'
-                  ? 'This panel has been closed. Interaction history is retained.'
-                  : 'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.'}
+                  ? t('This panel has been closed. Interaction history is retained.')
+                  : t(
+                      'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.',
+                    )}
               </p>
             </CardContent>
           </Card>
         ))}
-    </Page>
+    </div>
   );
 }
 
 function Frame({ panel }: { panel: PanelDetails }) {
+  const { theme, language, t } = useUI();
+  const ui = useRef({ theme, language });
+  useLayoutEffect(() => {
+    ui.current = { theme, language };
+  }, [theme, language]);
   const frame = useRef<HTMLIFrameElement>(null);
   const [identity] = useState<BridgeIdentity>(() => ({
     paneon: true,
@@ -175,6 +161,12 @@ function Frame({ panel }: { panel: PanelDetails }) {
     revision: panel.revision,
     channelId: crypto.randomUUID(),
   }));
+  useEffect(() => {
+    frame.current?.contentWindow?.postMessage(
+      { ...identity, direction: 'preferences', ui: { theme, language } },
+      '*',
+    );
+  }, [theme, language, identity]);
   const [prompt, setPrompt] = useState<Prompt>();
   const currentPrompt = useRef<Prompt | undefined>(undefined);
   const secretInput = useRef<HTMLInputElement>(null);
@@ -275,7 +267,7 @@ function Frame({ panel }: { panel: PanelDetails }) {
         event.data.direction === 'ready'
       ) {
         frame.current?.contentWindow?.postMessage(
-          { ...identity, direction: 'init', params: latestPanel.current.params },
+          { ...identity, direction: 'init', params: latestPanel.current.params, ui: ui.current },
           '*',
         );
         return;
@@ -400,18 +392,18 @@ function Frame({ panel }: { panel: PanelDetails }) {
         sandbox="allow-scripts"
         referrerPolicy="same-origin"
         src={`/panels/${encodeURIComponent(panel.instanceId)}/${encodeURIComponent(panel.revision)}/frame.html`}
-        className="h-[75vh] min-h-96 w-full rounded-lg border bg-background"
+        className="block min-h-0 w-full flex-1 border-0 bg-background"
       />
       {credentials.length > 0 && (
-        <section aria-label="Credential references" className="space-y-2">
-          <h2 className="text-sm font-medium">Temporary credentials</h2>
+        <section aria-label={t('Temporary credentials')} className="space-y-2">
+          <h2 className="text-sm font-medium">{t('Temporary credentials')}</h2>
           {credentials.map((item) => (
             <Stack key={item.ref} direction="row" gap={2} className="items-center">
               <span className="text-sm">{item.label}</span>
-              <Badge variant="outline">{item.status}</Badge>
+              <Badge variant="outline">{t(item.status)}</Badge>
               {item.status === 'ready' && (
                 <Button size="sm" variant="outline" onClick={() => void revoke(item.ref)}>
-                  Revoke
+                  {t('Revoke')}
                 </Button>
               )}
             </Stack>
@@ -439,22 +431,24 @@ function Frame({ panel }: { panel: PanelDetails }) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Provide a temporary credential</DialogTitle>
+            <DialogTitle>{t('Provide a temporary credential')}</DialogTitle>
             <DialogDescription>
-              {prompt?.label}. The value is given to the declared server function; the panel and
-              agent receive only a reference.
+              {prompt?.label}.{' '}
+              {t(
+                'The value is given to the declared server function; the panel and agent receive only a reference.',
+              )}
             </DialogDescription>
           </DialogHeader>
           <dl className="space-y-1 text-xs text-muted-foreground">
-            <dt>Action</dt>
+            <dt>{t('Action')}</dt>
             <dd className="break-all">{prompt?.actionId}</dd>
-            <dt>Revision</dt>
+            <dt>{t('Revision')}</dt>
             <dd className="break-all">{panel.revision}</dd>
-            <dt>Expires after</dt>
+            <dt>{t('Expires after')}</dt>
             <dd>
               {(prompt?.ttlSeconds ?? 900) % 60 === 0
-                ? `${(prompt?.ttlSeconds ?? 900) / 60} minutes`
-                : `${prompt?.ttlSeconds ?? 900} ${(prompt?.ttlSeconds ?? 900) === 1 ? 'second' : 'seconds'}`}
+                ? t('{count} minutes', { count: (prompt?.ttlSeconds ?? 900) / 60 })
+                : t('{count} seconds', { count: prompt?.ttlSeconds ?? 900 })}
             </dd>
           </dl>
           <form
@@ -464,7 +458,7 @@ function Frame({ panel }: { panel: PanelDetails }) {
             }}
           >
             <Field>
-              <FieldLabel htmlFor="paneon-credential">Credential</FieldLabel>
+              <FieldLabel htmlFor="paneon-credential">{t('Credential')}</FieldLabel>
               {multiline ? (
                 <Textarea
                   ref={bindSecretArea}
@@ -497,7 +491,9 @@ function Frame({ panel }: { panel: PanelDetails }) {
                   setMultiline(checked);
                 }}
               />
-              <FieldLabel htmlFor="paneon-multiline">Multiline input (shown as text)</FieldLabel>
+              <FieldLabel htmlFor="paneon-multiline">
+                {t('Multiline input (shown as text)')}
+              </FieldLabel>
             </Field>
             {credentialError && (
               <p role="alert" className="mt-2 text-sm text-destructive">
@@ -506,10 +502,11 @@ function Frame({ panel }: { panel: PanelDetails }) {
             )}
             <DialogFooter className="mt-4">
               <Button type="button" variant="outline" disabled={submitting} onClick={cancel}>
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button type="submit" disabled={submitting}>
-                {submitting && <Spinner />}Provide
+                {submitting && <Spinner />}
+                {t('Provide')}
               </Button>
             </DialogFooter>
           </form>

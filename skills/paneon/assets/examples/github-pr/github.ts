@@ -102,6 +102,7 @@ export type PRSnapshot = {
   body?: string;
   model?: DiffModel;
   notes?: string[];
+  notesUI?: { key: string; params?: Record<string, string> }[];
   detailId: string;
 };
 
@@ -211,7 +212,7 @@ export class GitHubReview {
     session: Session,
     source: PRSource,
     detailId: string,
-    extra: Pick<PRSnapshot, 'body' | 'model' | 'notes'> = {},
+    extra: Pick<PRSnapshot, 'body' | 'model' | 'notes' | 'notesUI'> = {},
     identity?: unknown,
   ) {
     const id = digest(
@@ -582,6 +583,14 @@ export class GitHubReview {
     return this.put(session, source, comparison.detailId, {
       model: binary ? createDiffModel() : createDiffModel(oldText, newText),
       notes,
+      notesUI: notes.map((key) =>
+        key.startsWith('Mode: ')
+          ? {
+              key: 'Mode: {old} → {next}',
+              params: { old: old?.mode ?? 'absent', next: next?.mode ?? 'absent' },
+            }
+          : { key },
+      ),
     });
   }
   snapshot(repository: string, sessionId: string, sourceId: string) {

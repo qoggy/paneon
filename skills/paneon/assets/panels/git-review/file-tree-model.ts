@@ -17,14 +17,14 @@ export type DirectoryNode<T extends TreeSnapshot> = {
   children: TreeNode<T>[];
 };
 export type TreeNode<T extends TreeSnapshot> = FileNode<T> | DirectoryNode<T>;
-export const areaNames = { staged: '已暂存', unstaged: '未暂存', untracked: '未跟踪' };
+export const areaNames = { staged: '已暂存', unstaged: '未暂存', untracked: '未跟踪' } as const;
 export const snapshotPath = (snapshot: TreeSnapshot) =>
   snapshot.source.new?.path ?? snapshot.source.old?.path ?? '';
-export const snapshotName = (snapshot: TreeSnapshot) =>
-  `${snapshot.source.view.type === 'changes' && snapshot.source.view.area ? `${areaNames[snapshot.source.view.area]} · ` : ''}${snapshot.status} ${snapshotPath(snapshot)}`;
-export function snapshotTitle(snapshot: TreeSnapshot) {
+export const snapshotName = (snapshot: TreeSnapshot, t: (key: string) => string = (key) => key) =>
+  `${snapshot.source.view.type === 'changes' && snapshot.source.view.area ? `${t(areaNames[snapshot.source.view.area])} · ` : ''}${snapshot.status} ${snapshotPath(snapshot)}`;
+export function snapshotTitle(snapshot: TreeSnapshot, t: (key: string) => string = (key) => key) {
   const { old, new: next } = snapshot.source;
-  return `${snapshotName(snapshot)}${old && next && old.path !== next.path ? ` (${old.path} → ${next.path})` : ''}${snapshot.status[0] === 'U' ? ' · 未合并冲突' : ''}`;
+  return `${snapshotName(snapshot, t)}${old && next && old.path !== next.path ? ` (${old.path} → ${next.path})` : ''}${snapshot.status[0] === 'U' ? ` · ${t('未合并冲突')}` : ''}`;
 }
 export function matchesPath(snapshot: TreeSnapshot, filter: string) {
   const needle = filter.toLowerCase();

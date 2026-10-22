@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 
@@ -5,6 +6,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 /** The two column boundaries share one measured workspace and retain session proportions. */
 export function useHistoryColumns(enabled: boolean) {
+  const { t } = useLocale();
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ available: 0, rem: 16, wide: false });
   const [ratios, setRatios] = useState<[number, number]>();
@@ -93,14 +95,17 @@ export function useHistoryColumns(enabled: boolean) {
     dividerProps: ([0, 1] as const).map((index) => ({
       role: 'separator',
       tabIndex: 0,
-      'aria-label': index === 0 ? '调整分支栏宽度' : '调整文件区宽度',
+      'aria-label': index === 0 ? t('调整分支栏宽度') : t('调整文件区宽度'),
       'aria-orientation': 'vertical' as const,
       'aria-valuemin': Math.round(index === 0 ? minLeft : minRight),
       'aria-valuemax': Math.round(
         Math.max(index === 0 ? minLeft : minRight, size.available - minMiddle - widths[1 - index]),
       ),
       'aria-valuenow': Math.round(widths[index]),
-      'aria-valuetext': `${index === 0 ? '分支栏' : '文件区'}宽度 ${Math.round(widths[index])} 像素`,
+      'aria-valuetext': t('{area} width {width} pixels', {
+        area: t(index === 0 ? 'Branch column' : 'File area'),
+        width: Math.round(widths[index]),
+      }),
       'data-dragging': dragging === index || undefined,
       onPointerDown(event: PointerEvent<HTMLDivElement>) {
         if (event.button !== 0 || !size.available || !matchMedia('(min-width: 48rem)').matches)

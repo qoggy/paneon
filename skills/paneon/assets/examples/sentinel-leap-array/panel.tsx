@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useState } from 'react';
 import { z } from 'zod';
 import { definePanel } from 'paneon/sdk';
@@ -35,6 +36,7 @@ const SOURCE_FILES = [
   ['metric/ArrayMetric.java', '统计入口先访问 currentWindow 再聚合 values'],
 ];
 function SentinelPanel() {
+  const { t, message: translateMessage } = useLocale();
   const [slots, setSlots] = useState<Slots>(emptySlots);
   const [time, setTime] = useState(0);
   const [timeInput, setTimeInput] = useState('0');
@@ -103,13 +105,13 @@ function SentinelPanel() {
               }}
             >
               {!storyActive
-                ? '自由探索中'
+                ? t('Exploring freely')
                 : step === STORY.length
-                  ? '演示完成'
-                  : `下一步演示 ${step + 1}/${STORY.length}`}
+                  ? t('Demo complete')
+                  : t('Next demo step {step}/{total}', { step: step + 1, total: STORY.length })}
             </Button>
             <Button variant="outline" onClick={reset}>
-              重新开始
+              {t('Restart')}
             </Button>
           </div>
           <p>
@@ -119,7 +121,9 @@ function SentinelPanel() {
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-2">
-              <Label htmlFor="sentinel-time">虚拟时间（整数 ms，可回拨）</Label>
+              <Label htmlFor="sentinel-time">
+                {t('Virtual time (integer ms, can go backwards)')}
+              </Label>
               <Input
                 id="sentinel-time"
                 type="number"
@@ -133,14 +137,14 @@ function SentinelPanel() {
               onClick={() => {
                 const next = Number(timeInput);
                 if (!timeInput || !Number.isSafeInteger(next) || Math.abs(next) > 1000000) {
-                  setError('请输入 -1000000 到 1000000 的整数毫秒。');
+                  setError('Please enter an integer from -1000000 to 1000000 milliseconds.');
                   return;
                 }
                 move(next);
                 setMessage('只改变虚拟时钟。环没有被写入；下面的 values 结果按这个时间重新筛选。');
               }}
             >
-              设置时间
+              {t('Set time')}
             </Button>
             <Button
               variant="outline"
@@ -158,7 +162,7 @@ function SentinelPanel() {
                 setMessage('到达下一窗口边界，尚未访问对应槽位。');
               }}
             >
-              下一窗口边界
+              {t('Next window boundary')}
             </Button>
             <Button
               variant="outline"
@@ -170,10 +174,10 @@ function SentinelPanel() {
               +2000ms
             </Button>
           </div>
-          {error && <p role="alert">{error}</p>}
+          {error && <p role="alert">{translateMessage(error)}</p>}
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => visit(time, 0)}>访问当前窗口</Button>
-            <Button onClick={() => visit(time, 1)}>记录 1 个 PASS</Button>
+            <Button onClick={() => visit(time, 0)}>{t('Visit current window')}</Button>
+            <Button onClick={() => visit(time, 1)}>{t('Record 1 PASS')}</Button>
           </div>
           <p className="text-sm text-muted-foreground">
             「记录」先 currentWindow(time)，再给返回桶加 1。设置/推进时间不写环；页面显示的

@@ -1,6 +1,13 @@
+import { applyUI } from './ui-environment.js';
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { Action, PanelDefinition } from './server.js';
-import type { BridgeInit, BridgeRequest, BridgeResponse, CredentialRef } from './protocol.js';
+import type {
+  BridgeInit,
+  BridgePreferences,
+  BridgeRequest,
+  BridgeResponse,
+  CredentialRef,
+} from './protocol.js';
 import type { JsonValue } from '../shared/types.js';
 export { z } from 'zod';
 export type { ActionContext, Action, PanelDefinition } from './server.js';
@@ -8,25 +15,47 @@ export const PanelInputContext = createContext<unknown>({});
 export function usePanelInput<I>(): I {
   return useContext(PanelInputContext) as I;
 }
+import { defaultUI, type UIPreferences } from '../shared/preferences.js';
+let ui = defaultUI;
+const uiListeners = new Set<() => void>();
+export const getUI = () => ui;
+export function subscribeUI(listener: () => void) {
+  uiListeners.add(listener);
+  return () => {
+    uiListeners.delete(listener);
+  };
+}
+function updateUI(next: UIPreferences) {
+  if (ui.theme === next.theme && ui.language === next.language) return;
+  ui = next;
+  applyUI(ui);
+  for (const listener of uiListeners) listener();
+}
 let connection: BridgeInit | undefined;
 const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 export function initializeBridge(init: BridgeInit) {
   connection = init;
+  updateUI(init.ui ?? defaultUI);
+  applyUI(ui);
 }
 if (typeof window !== 'undefined')
-  window.addEventListener('message', (event: MessageEvent<BridgeResponse>) => {
+  window.addEventListener('message', (event: MessageEvent<BridgeResponse | BridgePreferences>) => {
     const data = event.data;
     if (
       event.source !== window.parent ||
       !connection ||
       !data ||
       data.paneon !== true ||
-      data.direction !== 'response' ||
       data.channelId !== connection.channelId ||
       data.instanceId !== connection.instanceId ||
       data.revision !== connection.revision
     )
       return;
+    if (data.direction === 'preferences') {
+      updateUI(data.ui);
+      return;
+    }
+    if (data.direction !== 'response') return;
     const request = pending.get(data.requestId);
     if (!request) return;
     pending.delete(data.requestId);

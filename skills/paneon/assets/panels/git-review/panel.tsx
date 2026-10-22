@@ -1,3 +1,4 @@
+import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
 import type { Feedback, FeedbackTarget as Target } from 'paneon/sdk';
@@ -13,7 +14,7 @@ import {
 } from 'paneon/ui';
 import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
 import { diffTargetText } from '../../shared/diff-schema.ts';
-import { useSubmission } from '../../shared/submission.ts';
+import { useSubmission, SubmissionError } from '../../shared/submission.ts';
 import { readGit, validateGitFeedback } from './git.ts';
 import { CommitDetails, HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
@@ -83,6 +84,7 @@ function initialRequest(params: GitReviewParams): GitRequest {
 }
 const keyOf = (request: GitRequest) => `${request.repositoryId}:${request.type}`;
 function Review() {
+  const { t, message } = useLocale();
   const params = usePanelInput<GitReviewParams>();
   const [sessionId] = useState(() => crypto.randomUUID());
   const first = initialRequest(params);
@@ -103,7 +105,9 @@ function Review() {
       feedback.annotations.length === 0 &&
       !feedback.comment?.trim()
     )
-      throw new Error('首次提交需要选择内容或填写整体意见。');
+      throw new SubmissionError(
+        'First submission requires selected content or an overall comment.',
+      );
     const result = await checkFeedback({ params, sessionId, feedback });
     if (!result.ok) throw new Error(result.message);
     const checked = result.data;
@@ -135,6 +139,7 @@ function Review() {
         listing.history.commits = [...previous.listing.history.commits, ...listing.history.commits];
         listing.snapshots = previous.listing.snapshots;
         listing.description = previous.listing.description;
+        listing.descriptionUI = previous.listing.descriptionUI;
         listing.history.selectedCommit = previous.listing.history.selectedCommit;
       }
       const sameHistory =
@@ -220,10 +225,12 @@ function Review() {
   const fileList = (
     <aside
       className={`flex max-h-64 min-h-0 min-w-0 flex-col ${request.type === 'history' ? 'md:max-h-1/2' : 'md:max-h-none'}`}
-      aria-label="改动文件"
+      aria-label={t('改动文件')}
     >
       <div className="min-h-0 overflow-auto p-1" data-file-scroll="">
-        {listing?.snapshots.length === 0 && <p className="p-2 text-sm">该范围没有文件改动。</p>}
+        {listing?.snapshots.length === 0 && (
+          <p className="p-2 text-sm">{t('该范围没有文件改动。')}</p>
+        )}
         <ChangedFileTree
           snapshots={listing?.snapshots ?? []}
           selectedId={selected?.id}
@@ -280,20 +287,23 @@ function Review() {
         data-git-workbench=""
       >
         <header className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="min-w-0 truncate text-lg font-semibold" title={params.title ?? 'Git 审阅'}>
-            {params.title ?? 'Git 审阅'}
+          <h1
+            className="min-w-0 truncate text-lg font-semibold"
+            title={params.title ?? t('Git 审阅')}
+          >
+            {params.title ?? t('Git 审阅')}
           </h1>
-          <span className="text-xs text-muted-foreground">只读审阅 · 评论提交给当前 AI</span>
+          <span className="text-xs text-muted-foreground">{t('只读审阅 · 评论提交给当前 AI')}</span>
         </header>
         <div
           className="flex flex-wrap items-center gap-2 border-b pb-3"
-          aria-label="Git 与评论操作"
+          aria-label={t('Git 与评论操作')}
         >
           <label className="flex items-center gap-2 text-sm">
-            仓库
+            {t('仓库')}
             <select
               className="h-9 max-w-44 rounded-md border bg-background px-2"
-              aria-label="仓库"
+              aria-label={t('仓库')}
               value={request.repositoryId}
               onChange={(e) => navigate(e.target.value, request.type)}
             >
@@ -311,7 +321,11 @@ function Review() {
               aria-pressed={request.type === type}
               onClick={() => navigate(request.repositoryId, type)}
             >
-              {{ changes: '未提交改动', history: '提交记录', compare: '分支/版本对比' }[type]}
+              {
+                { changes: t('未提交改动'), history: t('提交记录'), compare: t('分支/版本对比') }[
+                  type
+                ]
+              }
             </Button>
           ))}
           <Button
@@ -323,28 +337,28 @@ function Review() {
             }}
           >
             {request.type === 'changes'
-              ? '刷新改动'
+              ? t('刷新改动')
               : request.type === 'history'
-                ? '刷新历史'
-                : '刷新比较'}
+                ? t('刷新历史')
+                : t('刷新比较')}
           </Button>
           <FeedbackToolbar className="md:ml-auto" />
         </div>
         {request.type === 'compare' && (
           <div className="flex flex-wrap items-end gap-2">
             <label>
-              Base
+              {t('Base')}
               <Input
-                aria-label="Base"
+                aria-label={t('Base')}
                 list="git-branches"
                 value={request.base ?? ''}
                 onChange={(e) => editRequest({ base: e.target.value })}
               />
             </label>
             <label>
-              Head
+              {t('Head')}
               <Input
-                aria-label="Head"
+                aria-label={t('Head')}
                 list="git-branches"
                 placeholder="HEAD"
                 value={request.head ?? ''}
@@ -352,21 +366,21 @@ function Review() {
               />
             </label>
             <label>
-              比较方式{' '}
+              {t('比较方式')}{' '}
               <select
-                aria-label="比较方式"
+                aria-label={t('比较方式')}
                 value={request.mode ?? 'branch'}
                 onChange={(e) => editRequest({ mode: e.target.value as 'branch' | 'commits' })}
               >
-                <option value="branch">分支三点比较</option>
-                <option value="commits">提交端点比较</option>
+                <option value="branch">{t('分支三点比较')}</option>
+                <option value="commits">{t('提交端点比较')}</option>
               </select>
             </label>
             <Button
               disabled={pending || !request.base}
               onClick={() => void load({ ...request, head: request.head || 'HEAD' })}
             >
-              比较
+              {t('比较')}
             </Button>
             <datalist id="git-branches">
               {listing?.branches.map((branch) => (
@@ -378,17 +392,40 @@ function Review() {
 
         {error && (
           <Alert variant="destructive">
-            <AlertTitle>读取失败</AlertTitle>
+            <AlertTitle>{t('读取失败')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         <div className="flex h-5 min-w-0 shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          <p className="min-w-0 flex-1 truncate" title={listing?.description}>
-            {listing?.description}
+          <p
+            className="min-w-0 flex-1 truncate"
+            title={
+              listing &&
+              message(
+                listing.descriptionUI.key,
+                Object.fromEntries(
+                  Object.entries(listing.descriptionUI.params ?? {}).map(([key, value]) => [
+                    key,
+                    key === 'merge' ? message(value) : value,
+                  ]),
+                ),
+              )
+            }
+          >
+            {listing &&
+              message(
+                listing.descriptionUI.key,
+                Object.fromEntries(
+                  Object.entries(listing.descriptionUI.params ?? {}).map(([key, value]) => [
+                    key,
+                    key === 'merge' ? message(value) : value,
+                  ]),
+                ),
+              )}
           </p>
           {pending && (
             <span role="status" className="shrink-0">
-              读取 Git…
+              {t('读取 Git…')}
             </span>
           )}
         </div>
@@ -432,12 +469,12 @@ function Review() {
                 />
               </div>
               <section
-                aria-label="提交历史"
+                aria-label={t('提交历史')}
                 className="flex max-h-72 min-h-0 min-w-0 flex-col md:max-h-none"
               >
                 <div className="min-h-0 overflow-auto" data-commit-scroll="">
                   {listing?.history?.commits.length === 0 && (
-                    <p className="p-3 text-sm">没有提交记录。</p>
+                    <p className="p-3 text-sm">{t('没有提交记录。')}</p>
                   )}
                   <HistoryRows
                     key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
@@ -459,7 +496,7 @@ function Review() {
                         )
                       }
                     >
-                      加载更多（每批 50）
+                      {t('加载更多（每批 50）')}
                     </Button>
                   )}
                 </div>
@@ -494,7 +531,7 @@ function Review() {
           )}
           {(request.type !== 'history' || selected) && (
             <section
-              aria-label="文件差异"
+              aria-label={t('文件差异')}
               className="max-h-[70dvh] min-h-0 min-w-0 overflow-auto rounded-md border p-3 md:max-h-none"
               data-git-diff-scroll=""
             >
@@ -503,31 +540,35 @@ function Review() {
                   role="note"
                   className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs"
                 >
-                  <strong>回看保留快照</strong>
+                  <strong>{t('回看保留快照')}</strong>
                   <span
                     className="min-w-0 flex-1 truncate"
                     title={JSON.stringify(oldSnapshot.source.view)}
                   >
-                    仓库 {oldSnapshot.source.repositoryId} ·{' '}
+                    {t('仓库')} {oldSnapshot.source.repositoryId} ·{' '}
                     {oldSnapshot.source.view.type === 'history'
-                      ? `提交 ${oldSnapshot.source.view.commit.slice(0, 10)}`
+                      ? t('Commit {commit}', {
+                          commit: oldSnapshot.source.view.commit.slice(0, 10),
+                        })
                       : oldSnapshot.source.view.type === 'changes'
-                        ? { staged: '已暂存改动', unstaged: '未暂存改动', untracked: '未跟踪文件' }[
-                            oldSnapshot.source.view.area
-                          ]
+                        ? {
+                            staged: t('已暂存改动'),
+                            unstaged: t('未暂存改动'),
+                            untracked: t('未跟踪文件'),
+                          }[oldSnapshot.source.view.area]
                         : `${oldSnapshot.source.view.baseCommit.slice(0, 10)} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
-                    · 评论仍指向原内容
+                    {t('· 评论仍指向原内容')}
                   </span>
                   <Button size="sm" variant="outline" onClick={() => setOldSnapshot(undefined)}>
-                    返回当前浏览
+                    {t('返回当前浏览')}
                   </Button>
                 </div>
               )}
               {selected && (
                 <>
-                  {selected.notes.map((note) => (
-                    <p key={note} className="text-sm text-muted-foreground">
-                      {note}
+                  {selected.notesUI.map((note) => (
+                    <p key={note.key} className="text-sm text-muted-foreground">
+                      {message(note.key, note.params)}
                     </p>
                   ))}
                   <DiffView
@@ -548,7 +589,7 @@ function Review() {
               )}
 
               {!selected && !pending && (
-                <p className="text-sm text-muted-foreground">选择文件查看差异。</p>
+                <p className="text-sm text-muted-foreground">{t('选择文件查看差异。')}</p>
               )}
             </section>
           )}

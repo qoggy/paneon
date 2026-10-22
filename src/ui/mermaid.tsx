@@ -1,3 +1,4 @@
+import { useUI } from './use-ui';
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from './spinner';
 import { cn } from './utils';
@@ -11,9 +12,10 @@ function getMermaid() {
   }));
 }
 
-type RenderResult = { code: string } & ({ svg: string } | { error: string });
+type RenderResult = { code: string; theme: string } & ({ svg: string } | { error: string });
 
 export function Mermaid({ code, className }: { code: string; className?: string }) {
+  const { t, theme } = useUI();
   const host = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<RenderResult>();
 
@@ -35,11 +37,16 @@ export function Mermaid({ code, className }: { code: string; className?: string 
         if (width) container.style.width = `${width}px`;
         document.body.append(container);
 
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          theme: theme === 'dark' ? 'dark' : 'default',
+        });
         const { svg } = await mermaid.render(`mermaid-${crypto.randomUUID()}`, code, container);
-        if (active) setResult({ code, svg });
+        if (active) setResult({ code, theme, svg });
       } catch (error) {
         if (active)
-          setResult({ code, error: error instanceof Error ? error.message : String(error) });
+          setResult({ code, theme, error: error instanceof Error ? error.message : String(error) });
       } finally {
         container?.remove();
       }
@@ -50,17 +57,17 @@ export function Mermaid({ code, className }: { code: string; className?: string 
       // The official renderer has no abort API and still measures connected nodes.
       // Keep the hidden container until its promise settles, then remove it above.
     };
-  }, [code]);
+  }, [code, theme]);
 
-  const current = result?.code === code ? result : undefined;
+  const current = result?.code === code && result.theme === theme ? result : undefined;
 
   return (
     <div ref={host} data-slot="mermaid" className={cn('min-w-0 overflow-x-auto', className)}>
       {!current ? (
-        <Spinner aria-label="Rendering diagram" />
+        <Spinner aria-label={t('Rendering diagram')} />
       ) : 'error' in current ? (
         <div role="alert" className="text-sm text-destructive">
-          <p>Unable to render diagram.</p>
+          <p>{t('Unable to render diagram.')}</p>
           <pre className="whitespace-pre-wrap">{current.error}</pre>
         </div>
       ) : (
