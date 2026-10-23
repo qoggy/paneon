@@ -41,6 +41,38 @@ node dist/cli/index.js server stop --json
 not close a panel. `panel close` closes one instance; `server stop` stops the local
 service. Neither command deletes the source or saved interaction events.
 
+## Service logs
+
+The server writes framework logs to `~/.paneon/logs/` at `info` level by default.
+These logs are separate from panel business logs and interaction events.
+
+```sh
+paneon server status --json
+paneon server logs --tail 100
+paneon server logs --level error --json
+paneon server logs --follow
+```
+
+Reading logs never starts or contacts the server, and works after it stops.
+`--follow` also follows file rotation and later server starts; Ctrl+C ends only
+that reader. Add `--runtime <runtime-id>` or `--instance <instance-id>` to filter
+existing context. Finite JSON contains `records`, `files`, `truncated`, and
+`warnings`; follow JSON emits one envelope per record or warning.
+
+To change collection level, set `PANEON_LOG_LEVEL` when starting a new server:
+`debug`, `info`, `warn`, `error`, `fatal`, or `off`. It does not change an already
+running server. CLI `--debug` still applies only to the current command's stderr;
+`server logs --level` only filters retained records.
+
+Each server start creates its own JSONL group: one current file and two archives,
+up to 5 MiB each. Startup and rotation retain at most four groups including the
+current one, and remove historical groups last modified more than seven days ago.
+This is a retention limit, not a guarantee of seven complete days. The asynchronous
+queue is capped at 1 MiB, records at 64 KiB, and normal shutdown flushes for up to
+500 ms. Congestion, disk failures, or abrupt exits can lose records; status exposes
+writer failures and drop counts. Share logs carefully: error details are preserved,
+and the logger does not automatically redact arbitrary content.
+
 ## Examples
 
 - [Decision review](examples/decision-panel.tsx): option cards, comparison table,

@@ -1,3 +1,4 @@
+import { logLevel } from '../runtime/logging.js';
 import { spawn } from 'node:child_process';
 import { readFileSync, mkdirSync, rmSync, writeFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -53,6 +54,7 @@ function alive(pid: number) {
     return false;
   }
 }
+let loggingWarningReported = false;
 export async function discover(allowVersionMismatch = false): Promise<RuntimeDescriptor | null> {
   const descriptor = readDescriptor();
   if (!descriptor) return null;
@@ -95,7 +97,14 @@ export async function discover(allowVersionMismatch = false): Promise<RuntimeDes
       'The running service uses a different Paneon version. Run paneon server stop, then run the panel again.',
       { expectedVersion: PACKAGE_VERSION, actualVersion: result.data.paneonVersion },
     );
-  return descriptor;
+  const { logging: _oldLogging, ...identity } = descriptor;
+  if (result.data.logging?.status === 'unavailable' && !loggingWarningReported) {
+    loggingWarningReported = true;
+    process.stderr.write(
+      `[warning] Runtime logging is unavailable: ${result.data.logging.lastErrorCode ?? 'LOG_WRITE_FAILED'}.\n`,
+    );
+  }
+  return { ...identity, ...(result.data.logging ? { logging: result.data.logging } : {}) };
 }
 export async function ensureRuntime() {
   const current = await discover();
@@ -131,14 +140,15 @@ export async function ensureRuntime() {
   try {
     const running = await discover();
     if (running) return running;
+    logLevel();
     const child = spawn(process.execPath, [join(PACKAGE_ROOT, 'dist/runtime/index.js')], {
       detached: true,
       stdio: 'ignore',
       env: process.env,
     });
-    let failed = false;
-    child.once('error', () => {
-      failed = true;
+    let failed: Error | undefined;
+    child.once('error', (err) => {
+      failed = err;
     });
     child.unref();
     for (let attempt = 0; attempt < 900; attempt++) {
@@ -147,9 +157,12 @@ export async function ensureRuntime() {
       const ready = await discover();
       if (ready) return ready;
     }
-    throw new PaneonError(
-      'RUNTIME_UNAVAILABLE',
-      'The runtime did not start. Check the installed runtime dependencies and build.',
+    throw Object.assign(
+      new PaneonError(
+        'RUNTIME_UNAVAILABLE',
+        `The runtime did not start. Inspect logs with paneon server logs (${join(PANEON_HOME, 'logs')}).`,
+      ),
+      failed ? { cause: failed } : {},
     );
   } finally {
     rmSync(lock, { recursive: true, force: true });

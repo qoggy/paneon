@@ -74,6 +74,14 @@ export type StoredPanel = PanelInstance & {
   paneonVersion: string;
   diagnostic?: Diagnostic;
 };
+export type RuntimeLoggingStatus = {
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'off';
+  status: 'active' | 'off' | 'unavailable';
+  directory: string;
+  currentFile?: string;
+  lastErrorCode?: string;
+  droppedRecords: number;
+};
 export type RuntimeDescriptor = {
   runtimeId: string;
   pid: number;
@@ -82,5 +90,6 @@ export type RuntimeDescriptor = {
   paneonVersion: string;
   protocolVersion: number;
   startedAt: string;
+  logging?: RuntimeLoggingStatus;
 };
 export const PROTOCOL_VERSION = 1;

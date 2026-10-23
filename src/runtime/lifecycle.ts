@@ -1,3 +1,5 @@
+import pino from 'pino';
+import type { Logger } from 'pino';
 import { fork } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -168,12 +170,14 @@ export class Runtime extends EventEmitter {
   credentials = new Credentials();
   live = new Map<string, Live>();
   stopping = false;
-  private builds = new Map<string, Promise<StoredPanel>>();
+  private builds = new Map<string, Promise<void>>();
+  private logger: Logger;
   private compilers = new Map<string, CompilerProcess>();
   private initializing = new Map<string, Execution>();
   home: string;
-  constructor(home: string) {
+  constructor(home: string, logger: Logger = pino({}, process.stderr)) {
     super();
+    this.logger = logger;
     this.home = home;
     this.store = new Store(home);
   }
@@ -183,6 +187,7 @@ export class Runtime extends EventEmitter {
         try {
           await this.load(panel);
         } catch (e) {
+          this.logger.error({ err: e, instanceId: panel.instanceId }, 'Panel restore failed');
           panel.status = 'unavailable';
           panel.diagnostic = diagnostic(e);
           this.store.save(panel);
@@ -198,15 +203,20 @@ export class Runtime extends EventEmitter {
     if (this.stopping)
       return Promise.reject(new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.'));
     const previous = this.builds.get(panel.instanceId);
-    const promise = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() =>
-      this.buildPanel(panel),
-    );
-    this.builds.set(panel.instanceId, promise);
-    void promise
-      .finally(() => {
-        if (this.builds.get(panel.instanceId) === promise) this.builds.delete(panel.instanceId);
-      })
-      .catch(() => {});
+    const promise = (previous ?? Promise.resolve()).then(() => this.buildPanel(panel));
+    const settled = () => {
+      if (this.builds.get(panel.instanceId) === tail) this.builds.delete(panel.instanceId);
+    };
+    const tail = promise.then(settled, (err: unknown) => {
+      settled();
+      // The original promise still rejects to its caller. This queue tail is settled
+      // so that a failed build does not prevent a subsequent explicit reload.
+      this.logger.debug(
+        { err, instanceId: panel.instanceId },
+        'Panel build queue settled after failure',
+      );
+    });
+    this.builds.set(panel.instanceId, tail);
     return promise;
   }
   private async buildPanel(panel: StoredPanel) {
@@ -256,8 +266,11 @@ export class Runtime extends EventEmitter {
           async () => {
             try {
               await this.reload(next.instanceId);
-            } catch {
-              /* reload owns its framework diagnostic */
+            } catch (err) {
+              this.logger.error(
+                { err, instanceId: next.instanceId },
+                'Watched panel reload failed',
+              );
             }
           },
         );

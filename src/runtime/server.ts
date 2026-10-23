@@ -19,6 +19,8 @@ import type { RuntimeDescriptor } from '../shared/types.js';
 import { Runtime } from './lifecycle.js';
 import { HTTP_BODY_LIMIT_BYTES, bodyTooLargeDiagnostic } from '../shared/limits.js';
 import { Preferences } from './preferences.js';
+import { createRuntimeLogging } from './logging.js';
+import type { RuntimeLogging } from './logging.js';
 const mime: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -28,20 +30,56 @@ const mime: Record<string, string> = {
   '.png': 'image/png',
   '.woff2': 'font/woff2',
 };
-export async function startServer(home = PANEON_HOME): Promise<{
+type RunningServer = {
   app: FastifyInstance;
   runtime: Runtime;
   descriptor: RuntimeDescriptor;
   stop: () => Promise<void>;
-}> {
-  const preferences = new Preferences(home);
-  const runtime = new Runtime(home);
+};
+export async function startServer(
+  home = PANEON_HOME,
+  logging = createRuntimeLogging(home),
+): Promise<RunningServer> {
+  logging.logger.info('Runtime starting');
+  let runtime: Runtime | undefined;
+  let app: FastifyInstance | undefined;
+  try {
+    const preferences = new Preferences(home);
+    runtime = new Runtime(home, logging.logger.child({ component: 'runtime' }));
+    const options: import('fastify').FastifyServerOptions = {
+      loggerInstance: logging.logger,
+      logController: new Fastify.LogController({ disableRequestLogging: true }),
+      bodyLimit: HTTP_BODY_LIMIT_BYTES,
+      // Incomplete HTTP requests must not delay explicit shutdown.
+      forceCloseConnections: true,
+    };
+    app = Fastify(options);
+    return await bootServer(home, logging, preferences, runtime, app);
+  } catch (err) {
+    logging.logger.fatal({ err }, 'Runtime startup failed');
+    try {
+      await runtime?.stop();
+      await app?.close();
+    } catch (cleanupError) {
+      logging.logger.error({ err: cleanupError }, 'Startup cleanup failed');
+    }
+    await logging.close();
+    throw err;
+  }
+}
+async function bootServer(
+  home: string,
+  logging: RuntimeLogging,
+  preferences: Preferences,
+  runtime: Runtime,
+  app: FastifyInstance,
+) {
   await runtime.restore();
-  const app = Fastify({ logger: false, bodyLimit: HTTP_BODY_LIMIT_BYTES });
   await app.register(websocket, { options: { maxPayload: 1024 } });
   let origin = '';
   const descriptor: RuntimeDescriptor = {
-    runtimeId: 'runtime-' + randomUUID(),
+    runtimeId: logging.runtimeId,
+    logging: logging.status(),
     pid: process.pid,
     port: 0,
     controlToken: randomUUID() + randomUUID(),
@@ -71,15 +109,24 @@ export async function startServer(home = PANEON_HOME): Promise<{
       try {
         if (source === undefined && request.headers.referer)
           source = new URL(request.headers.referer).origin;
-      } catch {
-        /* rejected below */
+      } catch (err) {
+        throw Object.assign(
+          new PaneonError('INVALID_ORIGIN', 'A verified same-origin request is required.'),
+          {
+            cause: err,
+          },
+        );
       }
       if (source !== origin)
         throw new PaneonError('INVALID_ORIGIN', 'A verified same-origin request is required.');
     } else if (suppliedOrigin !== origin)
       throw new PaneonError('INVALID_ORIGIN', 'A same-origin Origin header is required.');
   });
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
+    logging.logger.error(
+      { err: error, requestId: request.id, method: request.method },
+      'Request failed',
+    );
     if ((error as { code?: string }).code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
       reply.status(413).send({ ok: false, error: bodyTooLargeDiagnostic() });
       return;
@@ -128,7 +175,11 @@ export async function startServer(home = PANEON_HOME): Promise<{
     notify('', { type: 'preferences', ...result });
     return result;
   });
-  route('GET', '/health', () => ({ ...descriptor, controlToken: undefined }));
+  route('GET', '/health', () => ({
+    ...descriptor,
+    controlToken: undefined,
+    logging: logging.status(),
+  }));
   route('POST', '/api/panels', async (request) => {
     const b = body(request);
     if (
@@ -288,19 +339,27 @@ export async function startServer(home = PANEON_HOME): Promise<{
     // A peer that does not acknowledge the close handshake cannot delay shutdown.
     for (const socket of subscriptions.keys()) socket.terminate();
     await app.close();
-    try {
+    if (existsSync(join(home, 'runtime.json'))) {
       const recorded = JSON.parse(
         readFileSync(join(home, 'runtime.json'), 'utf8'),
       ) as RuntimeDescriptor;
       if (recorded.runtimeId === descriptor.runtimeId) unlinkSync(join(home, 'runtime.json'));
-    } catch {
-      /* already removed */
     }
+    logging.logger.info('Runtime stopped');
+    await logging.close();
+  }
+  function shutdown() {
+    void stop().then(
+      () => process.exit(0),
+      async (err: unknown) => {
+        logging.logger.fatal({ err }, 'Runtime shutdown failed');
+        await logging.close();
+        process.exit(1);
+      },
+    );
   }
   route('POST', '/api/stop', () => {
-    setTimeout(() => {
-      void stop().then(() => process.exit(0));
-    }, 25);
+    setTimeout(shutdown, 25);
     return { stopped: true, alreadyStopped: false, runtimeId: descriptor.runtimeId };
   });
   const web = join(PACKAGE_ROOT, 'dist/web');
@@ -368,11 +427,8 @@ export async function startServer(home = PANEON_HOME): Promise<{
   const descriptorFile = join(home, `runtime-${descriptor.runtimeId}.tmp`);
   writeFileSync(descriptorFile, JSON.stringify(descriptor), { mode: 0o600 });
   renameSync(descriptorFile, join(home, 'runtime.json'));
-  process.once('SIGTERM', () => {
-    void stop().then(() => process.exit(0));
-  });
-  process.once('SIGINT', () => {
-    void stop().then(() => process.exit(0));
-  });
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
+  logging.logger.info({ port: descriptor.port }, 'Runtime ready');
   return { app, runtime, descriptor, stop };
 }

@@ -69,6 +69,7 @@
     "github-markdown-css": "5.9.0",
     "lucide-react": "1.60.0",
     "mermaid": "12.2.0",
+    "pino": "^10.4.0",
     "radix-ui": "1.8.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

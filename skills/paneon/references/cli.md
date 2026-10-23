@@ -26,7 +26,7 @@ See [interface preferences](preferences.md) for the user-level configuration sha
 ## CLI commands
 
 All operational commands accept `--json` and `--debug`. With `--json`, stdout
-contains one result envelope: `{ "ok": true, "data": ... }` or
+contains one result envelope (except streaming `server logs --follow --json`): `{ "ok": true, "data": ... }` or
 `{ "ok": false, "error": { "code": "...", "message": "..." } }`.
 Failures exit with code 1; a successful empty read or wait timeout exits with 0.
 Use readable field names; do not parse human-readable output as a protocol.
@@ -44,8 +44,9 @@ Use readable field names; do not parse human-readable output as a protocol.
 | `panel ack <instance-id>` | Required `--consumer <name>` and `--through <event-id>` | `lastAckId` |
 | `config get` | None; starts runtime if needed | `ui`: effective `theme`, `language` |
 | `config set <key> <value>` | `ui.theme` with `light` / `dark`, or `ui.language` with `en` / `zh-CN`; starts runtime if needed | `ui`: saved effective preferences |
-| `server status` | None | `running`, `runtime` (identity, PID, host, port, package/protocol versions, start time), or `runtime: null` |
+| `server status` | None | `running`, `runtime` (identity, PID, host, port, package/protocol versions, start time, and optional effective `logging` status), or `runtime: null` |
 | `server stop` | None | `stopped`, `alreadyStopped`, `runtimeId` |
+| `server logs` | Optional `--tail <count>` (default 100, 1–10000), `--level <debug/info/warn/error/fatal>`, `--instance <id>`, `--runtime <id>`, `--follow` | Finite: `records`, `files`, `truncated`, `warnings`; follow JSON: one envelope per record/warning |
 
 `panel list` returns one page in ascending creation-time/instance-ID order. For example,
 `paneon panel list --page 2 --page-size 20 --json` reads the second page.
@@ -59,8 +60,9 @@ lives. Omit both input options to use `{}`. Supplied or default input must satis
 Changing or deleting that file does not alter the instance; reload and service recovery reuse its saved input.
 Start a new instance for new questions or new fixed input.
 `--open` requests the system browser; otherwise open the returned URL yourself.
-Only `panel run` automatically starts a server. `server status` does not start
-one, and stopping an already stopped server is successful.
+`panel run` automatically starts a server when needed; config commands can also start
+one. `server status` and `server logs` do not start one. Stopping an already stopped
+server is successful.
 
 Example creation result (IDs and revisions are illustrative):
 
@@ -199,6 +201,39 @@ exit codes, and event semantics do not change. The flag is not persisted and
 does not enable ongoing background logs or business log capture. Necessary
 errors remain visible without debugging. Framework diagnostics do not dump
 request bodies, source, environment values, credentials, or handler stacks.
+
+Server logs are separate from invocation diagnostics. Use them when investigating
+framework failures, including startup errors, without rebuilding or restarting:
+
+```sh
+paneon server logs --tail 200
+paneon server logs --level error --json
+paneon server logs --follow --json
+paneon server logs --instance <instance-id> --runtime <runtime-id>
+```
+
+Logs are fixed at `~/.paneon/logs/`; the command does not contact the runtime and
+works after shutdown. Filters combine with AND; level means minimum severity.
+Finite output is limited to 4 MiB and reports truncation. Incomplete final lines
+are warned about and left untouched; invalid middle records fail explicitly.
+Follow waits for complete lines, tracks rotation and later runtimes, and respects
+stdout backpressure. Ctrl+C stops only the reader. Follow JSON emits
+`{ "ok": true, "data": { "type": "record", "record": ... } }` or a `warning`
+event with `code` and `message`, without a final result wrapper.
+
+Collection defaults to `info`. `PANEON_LOG_LEVEL=debug` affects only a newly
+started server; `off` creates no log files. Supported values are debug/info/warn/
+error/fatal/off. Do not restart a user's running service just to change collection
+level without authorization. `server status --json` reports effective logging
+level, active/off/unavailable state, directory, current file, and drop count when
+provided by the server; older services may not supply logging metadata.
+
+Each server start has one group with at most three 5 MiB files. Startup/rotation
+keep at most four groups including current, and delete history last modified over
+seven days ago. The 1 MiB write queue and 500 ms shutdown flush are bounded and
+may lose records on congestion or abrupt exit. Log only selected context, not
+credentials or whole business payloads. There is no automatic generic redaction;
+review retained error details before sharing them.
 
 For `INPUT_VALIDATION_FAILED`, compare params to the input schema. For
 `BUILD_FAILED` or `UNSUPPORTED_ACTION_CAPTURE`, use the source position to fix the

@@ -235,6 +235,53 @@ const stop = server
   .command('stop')
   .description('Stop the service and preserve stored panel history');
 execute(stop, async () => (await client()).stopServer());
+const logs = server
+  .command('logs')
+  .description('Read retained service logs without starting the service')
+  .option('--tail <count>', 'Newest matching records (1–10000)', '100')
+  .addOption(
+    new Option('--level <level>', 'Minimum log level').choices([
+      'debug',
+      'info',
+      'warn',
+      'error',
+      'fatal',
+    ]),
+  )
+  .option('--instance <instance-id>', 'Filter by instance context')
+  .option('--runtime <runtime-id>', 'Filter by runtime context')
+  .option('--follow', 'Follow appended records, rotation, and restarts')
+  .option('--json', 'Print JSON (one envelope per event when following)')
+  .option('--debug', 'Write command diagnostics to stderr');
+logs.action(async () => {
+  const options = logs.optsWithGlobals<{
+    tail: string;
+    level?: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+    instance?: string;
+    runtime?: string;
+    follow?: boolean;
+    json?: boolean;
+    debug?: boolean;
+  }>();
+  try {
+    const path = import.meta.url.endsWith('.ts')
+      ? new URL('../../dist/cli/logs.js', import.meta.url).href
+      : './logs.js';
+    const { printLogs } = (await import(path)) as typeof import('./logs.js');
+    const { interrupted } = await printLogs({
+      ...options,
+      tail: integer(options.tail, 1, 10000),
+      follow: Boolean(options.follow),
+      json: Boolean(options.json),
+      debug: Boolean(options.debug),
+    });
+    // Explicit cancellation discards pending output; an unread pipe must not
+    // keep this reader process alive after its file handles have closed.
+    if (interrupted) process.exit(0);
+  } catch (err) {
+    fail(err, options.json);
+  }
+});
 function fail(error: unknown, json: unknown) {
   const e = error as { code?: string; message?: string; details?: unknown };
   const code =

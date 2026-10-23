@@ -8,6 +8,8 @@
 
 - [Agent scope](product-agent-scope.md) — Paneon targets general-purpose agents; local CLI access enables reuse and TSX generation enables authoring
 - [Product responsibility boundary](architecture-responsibilities.md) — Paneon owns interface infrastructure; panel code owns business calls, scheduling, monitoring, logs, retries, and storage
+- [Scenario boundaries and defensive logic](coding-scenario-boundaries.md) — Design for explicit supported scenarios; avoid speculative defenses for out-of-scope operations
+- [Caught errors](coding-caught-errors.md) — Log caught errors, propagate them, or both; never silently discard failures
 - [Panel version requirements](tech-panel-version-requirements.md) — Panels declare requires.paneon package ranges; CLI, SDK, and runtime share one package version
 - [CLI output and debugging](cli-output-and-debugging.md) — English CLI text; moderate results omit repeated inputs while preserving useful information; --debug stays on stderr
 - [CLI command groups](cli-command-groups.md) — Panel/server groups, reusable instance URLs, and explicit --wait-ms millisecond units

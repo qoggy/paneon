@@ -436,10 +436,15 @@ void test('debug stderr contains only fixed framework steps and elapsed time, ne
       'inspect deliberately returns saved panel input',
     );
     assert.equal(probes[2]?.stdout.includes(runtime.controlToken), false);
+    // Persistent server logs are independent of per-command --debug diagnostics.
     assert.deepEqual(
       readdirSync(join(root, '.paneon')).filter((file) => /log|debug/i.test(file)),
-      [],
+      ['logs'],
     );
+    const logText = readFileSync(join(root, '.paneon/logs', `${runtime.runtimeId}.jsonl`), 'utf8');
+    for (const value of [business, cookie, token, runtime.controlToken])
+      assert.equal(logText.includes(value), false);
+    assert.equal(logText.includes('[debug] command.'), false);
   } finally {
     await stop(root);
     rmSync(root, { recursive: true, force: true });
