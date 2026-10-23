@@ -355,6 +355,8 @@ export async function startServer(home = PANEON_HOME): Promise<{
       );
   }
   app.get('/', host);
+  app.get('/server', host);
+  app.get('/settings', host);
   app.get('/panels/:instanceId', host);
   await app.listen({ host: '127.0.0.1', port: 0 });
   const address = app.server.address();

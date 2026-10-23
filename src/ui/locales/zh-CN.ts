@@ -1,5 +1,18 @@
 import type en from './en';
 const zh: Record<keyof typeof en, string> = {
+  Server: '服务',
+  'Management navigation': '管理导航',
+  Appearance: '外观',
+  'Saving…': '保存中…',
+  Saved: '已保存',
+  'Local Paneon service': '本地 Paneon 服务',
+  Status: '状态',
+  Version: '版本',
+  'Process ID': '进程 ID',
+  Address: '监听地址',
+  'Started at': '启动时间',
+  'Runtime ID': '运行实例',
+  'Unable to load service status. {error}': '无法加载服务状态。{error}',
   Settings: '设置',
   Theme: '主题',
   Language: '语言',

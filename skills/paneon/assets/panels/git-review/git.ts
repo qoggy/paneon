@@ -6,20 +6,9 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
-import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import { markMainlines } from './branch-model.ts';
-import {
-  gitFeedbackSchema,
-  gitReviewParamsSchema,
-  gitReviewSubmittedSchema,
-  relativeFile,
-} from './schema.ts';
-import type {
-  GitReviewParams,
-  GitReviewSource,
-  GitReviewSubmitted,
-  GitSourceView,
-} from './schema.ts';
+import { gitReviewParamsSchema, relativeFile, gitFileSchema, gitRequestSchema } from './schema.ts';
+import type { GitReviewParams, GitReviewSource, GitSourceView } from './schema.ts';
 
 const exec = promisify(execFile);
 const hash = (bytes: Uint8Array | string) =>
@@ -71,7 +60,7 @@ async function repository(params: GitReviewParams, id: string, signal?: AbortSig
   return realpath(root);
 }
 
-type Entry = {
+export type GitEntry = {
   oldMode: string;
   newMode: string;
   oldOID: string;
@@ -80,9 +69,9 @@ type Entry = {
   oldPath: string;
   newPath: string;
 };
-export function parseRaw(raw: string): Entry[] {
+export function parseRaw(raw: string): GitEntry[] {
   const parts = raw.split('\0');
-  const entries: Entry[] = [];
+  const entries: GitEntry[] = [];
   for (let i = 0; i < parts.length && parts[i];) {
     const match = /^:(\d{6}) (\d{6}) ([a-f0-9]+) ([a-f0-9]+) ([A-Z][0-9]*)$/.exec(parts[i++]);
     if (!match || !parts[i]) throw new Error('Invalid NUL-delimited Git file list.');
@@ -158,6 +147,7 @@ function decode(content?: Content) {
 export type GitFile = {
   id: string;
   status: string;
+  read: { entry: GitEntry; working: boolean; conflict: boolean };
   source: {
     repositoryId: string;
     view: GitSourceView;
@@ -247,7 +237,8 @@ async function commitDecorations(root: string, signal?: AbortSignal) {
 
 export type GitListing = {
   listingId: string;
-  historyId?: string;
+  historyContext?: GitHistoryContext;
+  historyDecorations?: Record<string, CommitDecoration[]>;
   files: GitFile[];
   snapshots: GitSnapshot[];
   branches: string[];
@@ -257,55 +248,16 @@ export type GitListing = {
   historyRefs?: HistoryRef[];
   history?: GitHistory;
 };
-type FileCapture = {
-  file: GitFile;
-  entry: Entry;
-  root: string;
-  working: boolean;
-  conflict: boolean;
-};
-type HistoryCache = {
+/** Serializable fixed ancestry context. The browser retains the separate reference catalog. */
+export type GitHistoryContext = {
   repositoryId: string;
-  branch: string;
   tip?: string;
-  currentBranch?: string;
-  branches: string[];
-  decorations: Map<string, CommitDecoration[]>;
-  refs: HistoryRef[];
+  branch: string;
 };
-type Session = {
-  params: string;
-  snapshots: Map<string, GitSnapshot>;
-  listings: Map<string, { repositoryId: string; captures: Map<string, FileCapture> }>;
-  histories: Map<string, HistoryCache>;
-};
-const sessions = new Map<string, Session>();
-function trimCache<T>(values: Map<string, T>, limit: number) {
-  while (values.size > limit) {
-    const oldest = values.keys().next().value;
-    if (oldest === undefined) break;
-    values.delete(oldest);
-  }
-}
-function session(id: string, params: GitReviewParams) {
-  if (!id || id.length > 100) throw new Error('Invalid review session.');
-  const key = JSON.stringify(params),
-    previous = sessions.get(id);
-  if (previous && previous.params !== key) throw new Error('Session parameters do not match.');
-  if (previous) return previous;
-  const created: Session = {
-    params: key,
-    snapshots: new Map(),
-    listings: new Map(),
-    histories: new Map(),
-  };
-  sessions.set(id, created);
-  return created;
-}
 function capture(
   repositoryId: string,
   view: GitSourceView,
-  entry: Entry,
+  entry: GitEntry,
   old: Content | undefined,
   next: Content | undefined,
   notes: string[],
@@ -315,6 +267,7 @@ function capture(
   const source: GitReviewSource = {
     repositoryId,
     view,
+    evidence: [],
     ...(old
       ? {
           old: {
@@ -377,6 +330,7 @@ export type GitRequest = {
   repositoryId: string;
   type: 'changes' | 'history' | 'compare';
   commit?: string;
+  parent?: string | null;
   branch?: string;
   base?: string;
   head?: string;
@@ -384,70 +338,58 @@ export type GitRequest = {
   tip?: string;
   offset?: number;
   file?: string;
-  historyId?: string;
+  historyContext?: GitHistoryContext;
   area?: 'staged' | 'unstaged' | 'untracked';
-  listingId?: string;
+  pageOnly?: boolean;
 };
 export async function readGit(
   paramsValue: GitReviewParams,
-  sessionId: string,
-  request: GitRequest,
+  requestValue: GitRequest,
   signal?: AbortSignal,
 ): Promise<GitListing> {
-  const params = gitReviewParamsSchema.parse(paramsValue),
-    cache = session(sessionId, params);
+  const params = gitReviewParamsSchema.parse(paramsValue);
+  const request = gitRequestSchema.parse(requestValue);
   const root = await repository(params, request.repositoryId, signal);
-  const pinnedHistory = request.historyId ? cache.histories.get(request.historyId) : undefined;
+  const pinnedHistory = request.historyContext;
   if (
-    request.historyId &&
-    (!pinnedHistory ||
+    pinnedHistory &&
+    (request.type !== 'history' ||
+      (request.branch !== undefined && pinnedHistory.branch !== request.branch) ||
       pinnedHistory.repositoryId !== request.repositoryId ||
-      pinnedHistory.branch !== (request.branch ?? 'HEAD') ||
-      pinnedHistory.tip !== request.tip)
+      (request.tip !== undefined && pinnedHistory.tip !== request.tip))
   )
-    throw new Error('Pinned history is unavailable. Refresh the history.');
+    throw new Error('History context does not match the requested branch.');
   const currentBranch = pinnedHistory
-    ? pinnedHistory.currentBranch
+    ? undefined
     : await text(root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], signal).catch(
         (error: Error & { cause?: { code?: number } }) => {
           if (error.cause?.code === 1) return undefined;
           throw error;
         },
       );
-  const branches =
-    pinnedHistory?.branches ??
-    (
-      await git(
-        root,
-        ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes'],
-        signal,
+  const branches = pinnedHistory
+    ? []
+    : (
+        await git(
+          root,
+          ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes'],
+          signal,
+        )
       )
-    )
-      .toString('utf8')
-      .split('\n')
-      .filter(Boolean);
-  const pagination = request.listingId ? cache.listings.get(request.listingId) : undefined;
-  if (
-    request.listingId &&
-    (!pagination ||
-      pagination.repositoryId !== request.repositoryId ||
-      request.type !== 'history' ||
-      !pinnedHistory ||
-      !request.offset ||
-      request.offset < 1)
-  )
-    throw new Error('Pinned file listing is unavailable. Refresh the history.');
-  const listingId = request.listingId ?? randomUUID();
-  const captures = pagination?.captures ?? new Map<string, FileCapture>();
-  const files: GitFile[] = [...captures.values()].map(({ file }) => file);
+        .toString('utf8')
+        .split('\n')
+        .filter(Boolean);
+  const listingId = randomUUID(); // Browser-only display scope; never used to read server state.
+  const files: GitFile[] = [];
   const snapshots: GitSnapshot[] = [];
   let description: string;
   let descriptionUI: GitListing['descriptionUI'];
   let history: GitHistory | undefined;
   let historyRefs: HistoryRef[] | undefined;
-  let historyId: string | undefined;
+  let historyContext: GitHistoryContext | undefined;
+  let historyDecorations: Record<string, CommitDecoration[]> | undefined;
   function addEntries(
-    entries: Entry[],
+    entries: GitEntry[],
     view: GitSourceView,
     working = false,
     conflicts = new Set<string>(),
@@ -464,6 +406,7 @@ export async function readGit(
           ]),
         ),
         status: entry.status,
+        read: { entry, working, conflict },
         source: {
           repositoryId: request.repositoryId,
           view,
@@ -472,7 +415,6 @@ export async function readGit(
         },
       };
       files.push(file);
-      captures.set(file.id, { file, entry, root, working, conflict });
     }
   }
   if (request.type === 'changes') {
@@ -535,21 +477,18 @@ export async function readGit(
     const offset = request.offset ?? 0;
     if (!Number.isInteger(offset) || offset < 0) throw new Error('Invalid history offset.');
     const commits: GitHistory['commits'] = [];
-    const catalog = pinnedHistory ?? (await commitDecorations(root, signal));
+    const catalog = pinnedHistory
+      ? { decorations: new Map<string, CommitDecoration[]>(), refs: [] as HistoryRef[] }
+      : await commitDecorations(root, signal);
     const { decorations, refs } = catalog;
-    historyId = request.historyId ?? randomUUID();
+    historyContext = pinnedHistory ?? {
+      repositoryId: request.repositoryId,
+      branch: request.branch ?? 'HEAD',
+      ...(tip ? { tip } : {}),
+    };
     if (!pinnedHistory) {
-      cache.histories.set(historyId, {
-        repositoryId: request.repositoryId,
-        branch: request.branch ?? 'HEAD',
-        tip,
-        currentBranch,
-        branches,
-        decorations,
-        refs,
-      });
-      trimCache(cache.histories, 8);
       historyRefs = refs;
+      historyDecorations = Object.fromEntries(decorations);
     }
     if (tip && (!pinnedHistory || (request.offset !== undefined && request.offset > 0))) {
       const log = (
@@ -584,7 +523,7 @@ export async function readGit(
       hasMore: commits.length > 50,
     };
     const selectedRef = request.commit ?? tip;
-    if (selectedRef && !pagination) {
+    if (selectedRef && !request.pageOnly) {
       const commit = await commitOID(root, selectedRef, signal);
       const detail = (
         await git(
@@ -607,7 +546,12 @@ export async function readGit(
       const parents = (await text(root, ['rev-list', '--parents', '-n', '1', commit, '--'], signal))
         .split(' ')
         .slice(1);
-      const parent = parents[0] ?? null;
+      const parent = request.parent !== undefined ? request.parent : (parents[0] ?? null);
+      if (
+        request.parent !== undefined &&
+        (parent === null ? parents.length > 0 : !parents.includes(parent))
+      )
+        throw new Error('Explicit parent must belong to the selected commit.');
       // diff-tree --root has the repository's native empty-tree semantics, including SHA-256 repos.
       const args = parent
         ? [...rawArgs, parent, commit, '--']
@@ -643,6 +587,13 @@ export async function readGit(
             },
           }
         : { key: 'Root commit {commit}; relative to empty tree', params: { commit } };
+      if (parent && parent !== parents[0]) {
+        description = `端点比较 ${parent} → ${commit}`;
+        descriptionUI = {
+          key: 'Endpoint comparison {old} → {head}',
+          params: { old: parent, head: commit },
+        };
+      }
     } else {
       description = tip ? `固定历史 tip ${tip}` : '空仓库：没有提交历史';
       descriptionUI = tip
@@ -695,11 +646,7 @@ export async function readGit(
       params: { old, head: headCommit },
     };
   }
-  if (!pagination) {
-    cache.listings.set(listingId, { repositoryId: request.repositoryId, captures });
-    trimCache(cache.listings, 32);
-  }
-  if (request.file && !pagination) {
+  if (request.file && !request.pageOnly) {
     const file = files.find(
       (item) =>
         (item.source.old?.path === request.file || item.source.new?.path === request.file) &&
@@ -707,31 +654,36 @@ export async function readGit(
           (item.source.view.type === 'changes' && item.source.view.area === request.area)),
     );
     if (!file) throw new Error(`Initial file is not present in this view: ${request.file}`);
-    snapshots.push(await readGitFile(params, sessionId, listingId, file.id, signal));
+    snapshots.push(await readGitFile(params, file, signal));
   }
   return {
     listingId,
     files,
     snapshots,
-    branches: pinnedHistory ? [] : branches,
-    currentBranch,
+    branches,
+    ...(currentBranch === undefined ? {} : { currentBranch }),
     description,
     descriptionUI,
-    ...(history ? { history, historyId, ...(historyRefs ? { historyRefs } : {}) } : {}),
+    ...(history
+      ? {
+          history,
+          ...(historyContext ? { historyContext } : {}),
+          ...(historyDecorations ? { historyDecorations } : {}),
+          ...(historyRefs ? { historyRefs } : {}),
+        }
+      : {}),
   };
 }
 /** Capture exactly the selected entry. Directory queries never read blobs or build diff models. */
 export async function readGitFile(
   paramsValue: GitReviewParams,
-  sessionId: string,
-  listingId: string,
-  fileId: string,
+  descriptor: GitFile,
   signal?: AbortSignal,
 ): Promise<GitSnapshot> {
-  const cache = session(sessionId, gitReviewParamsSchema.parse(paramsValue));
-  const item = cache.listings.get(listingId)?.captures.get(fileId);
-  if (!item) throw new Error('File listing has expired. Refresh the view.');
-  const { file, entry, root, working, conflict } = item;
+  const params = gitReviewParamsSchema.parse(paramsValue);
+  const file = gitFileSchema.parse(descriptor);
+  const root = await repository(params, file.source.repositoryId, signal);
+  const { entry, working, conflict } = file.read;
   const old = conflict ? undefined : await objectContent(root, entry.oldOID, entry.oldMode, signal);
   let next = working
     ? await workingContent(root, entry.newPath)
@@ -749,41 +701,26 @@ export async function readGitFile(
         ]
       : [],
   );
-  snapshot.fileId = fileId;
-  cache.snapshots.set(snapshot.id, snapshot);
+  snapshot.fileId = file.id;
   return snapshot;
 }
-export function validateGitFeedback(
-  paramsValue: GitReviewParams,
-  sessionId: string,
-  value: unknown,
-): GitReviewSubmitted {
-  const params = gitReviewParamsSchema.parse(paramsValue),
-    cache = session(sessionId, params),
-    feedback = gitFeedbackSchema.parse(value);
-  const sources: Record<string, GitReviewSource> = {};
-  const annotations = feedback.annotations.map((entry) => {
-    const normalized = entry.targets.map((target) => {
-      const snapshot = cache.snapshots.get(target.ref.sourceId);
-      if (!snapshot)
-        throw new Error(
-          'Original snapshot is missing. Draft retained; it cannot be reassigned to current files.',
-        );
-      diffTargetText(snapshot.model, target);
-      sources[snapshot.id] = snapshot.source;
-      return normalizeDiffTarget(snapshot.model, target);
-    });
-    // A line-button target and a whole-side text registration can normalize to
-    // the same exact target; keep its content once rather than rejecting valid gestures.
-    return {
-      ...entry,
-      targets: [...new Map(normalized.map((target) => [JSON.stringify(target), target])).values()],
-    };
+
+export { validateGitFeedback } from './feedback.ts';
+
+export async function readGitBranches(repositoryPath: string, signal?: AbortSignal) {
+  const root = await repository(
+    { repositories: [{ id: 'repository', path: repositoryPath }] },
+    'repository',
+    signal,
+  );
+  const catalog = await commitDecorations(root, signal);
+  const currentBranch = await text(
+    root,
+    ['symbolic-ref', '--quiet', '--short', 'HEAD'],
+    signal,
+  ).catch((error: Error & { cause?: { code?: number } }) => {
+    if (error.cause?.code === 1) return undefined;
+    throw error;
   });
-  const result = gitReviewSubmittedSchema.parse({ ...feedback, annotations, sources });
-  if (JSON.stringify(result).length > 65536)
-    throw new Error(
-      'Feedback exceeds the 65536-character event limit. Draft retained; reduce selected content or annotations.',
-    );
-  return result;
+  return { refs: catalog.refs, ...(currentBranch === undefined ? {} : { currentBranch }) };
 }

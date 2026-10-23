@@ -42,7 +42,7 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
   const origin = `http://127.0.0.1:${f.service.descriptor.port}`;
   const home = await context.newPage();
   await home.goto(origin);
-  await home.getByRole('button', { name: 'Settings', exact: true }).click();
+  await home.getByRole('link', { name: 'Settings', exact: true }).click();
   const choose = await context.newPage();
   await choose.goto(f.url(f.choose));
   const cf = choose.frameLocator('iframe');
@@ -184,8 +184,8 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
   const home2 = await context.newPage();
   await home2.goto(origin);
   assert.equal(await home2.locator('html').getAttribute('class'), 'dark');
-  await home2.getByRole('button', { name: '设置', exact: true }).click();
-  await home2.getByRole('button', { name: 'English', exact: true }).click();
+  await home2.getByRole('link', { name: '设置', exact: true }).click();
+  await home2.getByLabel('语言', { exact: true }).selectOption('en');
   await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).waitFor();
   assert.equal(
     await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).inputValue(),
@@ -200,7 +200,7 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
   );
   await ff.getByRole('button', { name: 'Submit corrected form', exact: true }).click();
   await ff.getByText('Not saved. Save The draft is still available.', { exact: true }).waitFor();
-  await home2.getByRole('button', { name: '简体中文', exact: true }).click();
+  await home2.getByLabel('Language', { exact: true }).selectOption('zh-CN');
   await ff.getByText('未保存。Save 草稿仍可使用。', { exact: true }).waitFor();
   await form.unroute('**/api/panels/*/events');
   const firstDark = await context.newPage();

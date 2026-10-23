@@ -209,7 +209,7 @@ async function completeAcceptance() {
     );
     await f.state({ version: 1, headVersion: 1 });
     await button('刷新 PR').click();
-    await frame.getByText(`Head ${ids.newer}`, { exact: false }).waitFor();
+    await frame.getByText(`当前版本 ${ids.newer}`, { exact: false }).waitFor();
     await comments.locate(4, 1);
     await frame
       .locator('[data-code-side="new"][data-line="2"]')

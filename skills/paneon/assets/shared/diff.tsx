@@ -1,4 +1,5 @@
 import { useLocale } from './i18n';
+import type { ReactNode } from 'react';
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, CodeBlock, FeedbackTarget, Input, useFeedback } from 'paneon/ui';
 import type { FeedbackTarget as Target } from 'paneon/sdk';
@@ -26,22 +27,8 @@ function splitRows(rows: DiffRow[]) {
   }
   return result;
 }
-/** Pure display/coordinate adapter: no repository, local Git call or source lookup. */
-export function DiffView({
-  sourceId,
-  model: supplied,
-  oldText,
-  newText,
-  oldPath,
-  newPath,
-  oldRevision,
-  newRevision,
-  fileOnly = false,
-  defaultExpanded = false,
-  locateTarget,
-  onCollapse,
-}: {
-  sourceId: string;
+type DiffViewProps = {
+  sourceId?: string;
   model?: DiffModel;
   oldText?: string;
   newText?: string;
@@ -53,7 +40,48 @@ export function DiffView({
   defaultExpanded?: boolean;
   locateTarget?: Target<GitRef>;
   onCollapse?: () => void;
+};
+/** String diff needs no provider; supplying sourceId opts into the existing annotation adapter. */
+export function DiffView(props: DiffViewProps) {
+  return props.sourceId ? <AnnotatedDiffView {...props} /> : <StringDiffView {...props} />;
+}
+function AnnotatedDiffView(props: DiffViewProps) {
+  const feedback = useFeedback<GitRef>();
+  return <StringDiffView {...props} feedback={feedback} />;
+}
+function OptionalTarget({
+  enabled,
+  target,
+  children,
+}: {
+  enabled: boolean;
+  target: GitRef;
+  children: ReactNode;
 }) {
+  return enabled ? (
+    <FeedbackTarget<GitRef> target={target}>{children}</FeedbackTarget>
+  ) : (
+    <>{children}</>
+  );
+}
+/** Pure display/coordinate adapter: no repository, local Git call or source lookup. */
+function StringDiffView({
+  sourceId: suppliedSourceId,
+  model: supplied,
+  oldText,
+  newText,
+  oldPath,
+  newPath,
+  oldRevision,
+  newRevision,
+  fileOnly = false,
+  defaultExpanded = false,
+  locateTarget,
+  onCollapse,
+  feedback,
+}: DiffViewProps & { feedback?: ReturnType<typeof useFeedback<GitRef>> }) {
+  const localSourceId = useId();
+  const sourceId = suppliedSourceId ?? localSourceId;
   const { t, message } = useLocale();
   const model = useMemo(
     () => supplied ?? createDiffModel(oldText, newText),
@@ -61,8 +89,7 @@ export function DiffView({
   );
   const changes = useMemo(() => diffChanges(model.rows), [model]);
   const headerId = useId();
-  const feedback = useFeedback<GitRef>();
-  const { registerText } = feedback;
+  const registerText = feedback?.registerText;
   const root = useRef<HTMLDivElement>(null);
   const [unified, setUnified] = useState(false),
     [expanded, setExpanded] = useState(defaultExpanded);
@@ -117,7 +144,7 @@ export function DiffView({
   }, [locateTarget]);
   useLayoutEffect(() => {
     const elementRoot = root.current;
-    if (!elementRoot || fileOnly) return;
+    if (!elementRoot || fileOnly || !registerText) return;
     let removers: (() => void)[] = [];
     const register = () => {
       removers.forEach((remove) => remove());
@@ -179,7 +206,7 @@ export function DiffView({
       return;
     }
     const quote = source.slice(lines[first - 1].start, lines[last - 1].end);
-    feedback.toggleTarget({
+    feedback?.toggleTarget({
       ref: { sourceId, kind: 'lines', side, startLine: first, endLine: last },
       text: { start: 0, end: quote.length, quote },
     });
@@ -233,7 +260,7 @@ export function DiffView({
             <button
               type="button"
               className="w-10 shrink-0 px-1 text-right text-xs tabular-nums select-none"
-              disabled={feedback.mode !== 'select' || feedback.submitting}
+              disabled={feedback?.mode !== 'select' || feedback?.submitting}
               aria-label={t('Select {side} line {number}', {
                 side: t(side === 'old' ? 'Old' : 'New'),
                 number: line.number,
@@ -339,7 +366,7 @@ export function DiffView({
       <div id={headerId} data-diff-header="" className="sticky top-0 z-10 border-b bg-background">
         <div className="flex min-w-0 flex-wrap items-center gap-1 px-1 py-1">
           <div className="min-w-0 flex-1">
-            <FeedbackTarget<GitRef> target={{ sourceId, kind: 'file' }}>
+            <OptionalTarget enabled={!!feedback} target={{ sourceId, kind: 'file' }}>
               <div
                 className="truncate rounded-md px-2 py-1 font-mono text-sm"
                 title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
@@ -347,7 +374,7 @@ export function DiffView({
                 {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
                 <span className="text-muted-foreground">{t('（整文件）')}</span>
               </div>
-            </FeedbackTarget>
+            </OptionalTarget>
           </div>
           {!fileOnly && (
             <DiffToolbar
@@ -429,7 +456,7 @@ export function DiffView({
               style={{ left: 'var(--diff-left, 50%)' }}
             />
           )}
-          {feedback.mode === 'select' && (
+          {feedback?.mode === 'select' && (
             <div className="relative z-[6] flex flex-wrap items-center gap-2 bg-background">
               <label>
                 {t('侧')}{' '}
@@ -476,7 +503,8 @@ export function DiffView({
           ) : (
             model.hunks.map((hunk, index) => (
               <section key={index} data-diff-hunk={index} className="min-w-0 border-b">
-                <FeedbackTarget<GitRef>
+                <OptionalTarget
+                  enabled={!!feedback}
                   target={{
                     sourceId,
                     kind: 'hunk',
@@ -491,7 +519,7 @@ export function DiffView({
                     @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                     {t('(changed block)')}
                   </div>
-                </FeedbackTarget>
+                </OptionalTarget>
                 {display(hunk.rows)}
               </section>
             ))

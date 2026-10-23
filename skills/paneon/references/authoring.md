@@ -320,3 +320,9 @@ language to the panel input schema. `useUI()` from `paneon/ui` exposes `theme`,
 `language`, and typed public-component translations. Use theme variables for
 custom colors. Author-supplied text and input are preserved. For optional custom
 copy selection and compatibility boundaries, see [interface preferences](preferences.md).
+
+## Reuse Git readers and a string Diff
+
+The skill's [Git component module](../assets/panels/git-review/components.tsx) exports `GitBranches`, `GitCommitGraph`, `GitChangedFiles` and their corresponding hooks. Supply a `repositoryPath`, semantic branch/fixed commit/view, controlled selection and callbacks; the module owns named server-action reads, fixed-tip paging and lazy file contents. See [Git review contracts](git-review.md#independent-git-readers) and the [minimal custom TSX](../assets/examples/git-components/panel.tsx). They are skill assets and do not require a new public package export.
+
+`<DiffView oldText="before\n" newText="after\n" />` from [diff.tsx](../assets/shared/diff.tsx) works without a repository, Git session, source ID or FeedbackProvider. Supply `sourceId` inside an author-owned Provider to opt into annotations. Keep original displayed versions in browser memory while drafts or corrections reference them; Git's evidence builder creates a complete explicit submission, and its validator needs only that request plus configured repository scope. Closing/reloading a page can discard unsubmitted drafts. Do not silently move an old annotation onto new file content.

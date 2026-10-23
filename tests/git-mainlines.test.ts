@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { markMainlines } from '../skills/paneon/assets/panels/git-review/branch-model.ts';
 import { readGit } from '../skills/paneon/assets/panels/git-review/git.ts';
 import type { HistoryRef } from '../skills/paneon/assets/panels/git-review/git.ts';
@@ -69,8 +68,7 @@ void test('real Git symbolic refs mark mainlines without changing cached history
     await git(f.repo, 'update-ref', 'refs/remotes/origin/develop', f.feature);
     await git(f.repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/develop');
     const params = { repositories: [{ id: 'repo', path: f.repo }] };
-    const session = randomUUID();
-    const first = await readGit(params, session, { repositoryId: 'repo', type: 'history' });
+    const first = await readGit(params, { repositoryId: 'repo', type: 'history' });
     assert.deepEqual(
       first.historyRefs
         ?.filter((ref) => ref.mainline)
@@ -78,10 +76,10 @@ void test('real Git symbolic refs mark mainlines without changing cached history
         .sort(),
       ['refs/heads/develop', 'refs/remotes/origin/develop'],
     );
-    const next = await readGit(params, session, {
+    const next = await readGit(params, {
       repositoryId: 'repo',
       type: 'history',
-      historyId: first.historyId,
+      historyContext: first.historyContext,
       tip: first.history?.tip,
       commit: f.rootCommit,
     });

@@ -1,6 +1,6 @@
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
+import { agent, definePanel, usePanelInput } from 'paneon/sdk';
 import type { Feedback, FeedbackTarget as Target } from 'paneon/sdk';
 import {
   Alert,
@@ -15,7 +15,9 @@ import {
 import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
 import { diffTargetText } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
-import { readGit, readGitFile, validateGitFeedback } from './git.ts';
+import { checkFeedback } from './actions.ts';
+import { buildGitFeedback } from './feedback.ts';
+import { useGitReader } from './components.tsx';
 import { CommitDetails, HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
 import { Branches } from './branches.tsx';
@@ -23,92 +25,8 @@ import { useHistorySplit } from './history-split.ts';
 import { useHistoryColumns } from './history-columns.ts';
 import { useFileSplit } from './file-split.ts';
 import type { GitFile, GitListing, GitRequest, GitSnapshot } from './git.ts';
-import { gitFeedbackSchema, gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
+import { gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
 import type { GitRef, GitReviewParams } from './schema.ts';
-
-const requestSchema = z
-  .object({
-    repositoryId: z.string().min(1),
-    type: z.enum(['changes', 'history', 'compare']),
-    commit: z.string().optional(),
-    branch: z.string().optional(),
-    base: z.string().optional(),
-    head: z.string().optional(),
-    mode: z.enum(['branch', 'commits']).optional(),
-    tip: z.string().optional(),
-    offset: z.number().int().nonnegative().optional(),
-    file: z.string().optional(),
-    historyId: z.string().optional(),
-    listingId: z.string().optional(),
-    area: z.enum(['staged', 'unstaged', 'untracked']).optional(),
-  })
-  .strict();
-export const queryGit = serverAction({
-  kind: 'query',
-  input: z.object({ params: gitReviewParamsSchema, sessionId: z.string(), request: requestSchema }),
-  handler: async (ctx, input) => {
-    try {
-      return {
-        ok: true as const,
-        data: await readGit(input.params, input.sessionId, input.request, ctx.signal),
-      };
-    } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  },
-});
-export const queryGitFile = serverAction({
-  kind: 'query',
-  input: z.object({
-    params: gitReviewParamsSchema,
-    sessionId: z.string(),
-    listingId: z.string(),
-    fileId: z.string(),
-  }),
-  handler: async (ctx, input) => {
-    try {
-      return {
-        ok: true as const,
-        data: await readGitFile(
-          input.params,
-          input.sessionId,
-          input.listingId,
-          input.fileId,
-          ctx.signal,
-        ),
-      };
-    } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  },
-});
-export const checkFeedback = serverAction({
-  kind: 'query',
-  input: z.object({
-    params: gitReviewParamsSchema,
-    sessionId: z.string(),
-    feedback: gitFeedbackSchema,
-  }),
-  handler: (_ctx, input) => {
-    try {
-      return {
-        ok: true as const,
-        data: validateGitFeedback(input.params, input.sessionId, input.feedback),
-      };
-    } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  },
-});
 
 type ViewState = {
   request: GitRequest;
@@ -123,7 +41,7 @@ const keyOf = (request: GitRequest) => `${request.repositoryId}:${request.type}`
 function Review() {
   const { t, message } = useLocale();
   const params = usePanelInput<GitReviewParams>();
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const reader = useGitReader(params);
   const first = initialRequest(params);
   const [view, setView] = useState<ViewState>({ request: first });
   const historyColumns = useHistoryColumns(view.request.type === 'history');
@@ -147,13 +65,16 @@ function Review() {
       throw new SubmissionError(
         'First submission requires selected content or an overall annotation.',
       );
-    const result = await checkFeedback({ params, sessionId, feedback });
+    const result = await checkFeedback({
+      params,
+      feedback: buildGitFeedback(
+        { ...feedback, ...(replacesEventId === undefined ? {} : { replacesEventId }) },
+        snapshots.current,
+      ),
+    });
     if (!result.ok) throw new Error(result.message);
     const checked = result.data;
-    return agent.emit('git-review-submitted', {
-      ...checked,
-      ...(replacesEventId === undefined ? {} : { replacesEventId }),
-    });
+    return agent.emit('git-review-submitted', checked);
   });
   function save(next: ViewState) {
     views.current.set(keyOf(next.request), next);
@@ -171,8 +92,8 @@ function Review() {
       setCollapsed(true);
       const sameGraph =
         request.type === 'history' &&
-        request.historyId &&
-        request.historyId === previous?.listing?.historyId;
+        request.historyContext &&
+        request.historyContext.tip === previous?.listing?.historyContext?.tip;
       // Selection responds immediately. Old files/details must never masquerade as the requested commit.
       save({
         request,
@@ -193,14 +114,7 @@ function Review() {
       });
     }
     try {
-      const result = await queryGit({
-        params,
-        sessionId,
-        request:
-          more && previous?.listing
-            ? { ...request, listingId: previous.listing.listingId }
-            : request,
-      });
+      const result = await reader.read({ ...request, ...(more ? { pageOnly: true } : {}) });
       if (!result.ok) throw new Error(result.message);
       if (id !== serial.current || activeKey.current !== key) return;
       const listing = result.data;
@@ -211,14 +125,22 @@ function Review() {
       if (
         listing.history &&
         previous?.listing?.history &&
-        listing.historyId === previous.listing.historyId
+        !!request.historyContext &&
+        listing.historyContext?.tip === previous.listing.historyContext?.tip
       ) {
         listing.history.commits = more
           ? [...previous.listing.history.commits, ...listing.history.commits]
           : previous.listing.history.commits;
         if (!more) listing.history.hasMore = previous.listing.history.hasMore;
         listing.historyRefs = previous.listing.historyRefs;
+        listing.historyDecorations = previous.listing.historyDecorations;
+        listing.currentBranch = previous.listing.currentBranch;
         listing.branches = previous.listing.branches;
+        for (const commit of listing.history.commits)
+          commit.refs = listing.historyDecorations?.[commit.oid] ?? [];
+        if (listing.history.selectedCommit)
+          listing.history.selectedCommit.refs =
+            listing.historyDecorations?.[listing.history.selectedCommit.oid] ?? [];
       }
       if (more && previous?.listing) {
         listing.files = previous.listing.files;
@@ -236,7 +158,7 @@ function Review() {
         request: {
           ...request,
           ...(listing.history?.tip ? { tip: listing.history.tip } : {}),
-          ...(listing.historyId ? { historyId: listing.historyId } : {}),
+          ...(listing.historyContext ? { historyContext: listing.historyContext } : {}),
         },
         listing,
         selected,
@@ -264,12 +186,7 @@ function Review() {
     }
     setPending(true);
     try {
-      const result = await queryGitFile({
-        params,
-        sessionId,
-        listingId: listing.listingId,
-        fileId: file.id,
-      });
+      const result = await reader.readFile(file);
       if (!result.ok) throw new Error(result.message);
       if (id !== serial.current) return;
       snapshots.current.set(result.data.id, result.data);
@@ -446,7 +363,7 @@ function Review() {
                 tip: _tip,
                 offset: _offset,
                 file: _file,
-                historyId: _historyId,
+                historyContext: _historyContext,
                 ...refresh
               } = request;
               void load({
@@ -576,7 +493,7 @@ function Review() {
                 onSelect={(branch) => {
                   const {
                     area: _area,
-                    historyId: _historyId,
+                    historyContext: _historyContext,
                     tip: _tip,
                     commit: _commit,
                     offset: _offset,

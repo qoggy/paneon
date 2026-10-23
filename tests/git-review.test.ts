@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import {
@@ -8,7 +8,11 @@ import {
   readGitFile,
   validateGitFeedback,
 } from '../skills/paneon/assets/panels/git-review/git.ts';
-import { gitReviewParamsSchema } from '../skills/paneon/assets/panels/git-review/schema.ts';
+import { buildGitFeedback } from '../skills/paneon/assets/panels/git-review/feedback.ts';
+import {
+  gitFeedbackSchema,
+  gitReviewParamsSchema,
+} from '../skills/paneon/assets/panels/git-review/schema.ts';
 import { createDiffModel, sourceLines } from '../skills/paneon/assets/shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../skills/paneon/assets/shared/diff-schema.ts';
 import type { GitRef } from '../skills/paneon/assets/shared/diff-schema.ts';
@@ -19,7 +23,7 @@ import { fixture, git } from './git-review-fixture.ts';
 async function readGit(...args: Parameters<typeof readGitListing>) {
   const listing = await readGitListing(...args);
   listing.snapshots = await Promise.all(
-    listing.files.map((file) => readGitFile(args[0], args[1], listing.listingId, file.id, args[3])),
+    listing.files.map((file) => readGitFile(args[0], file, args[2])),
   );
   return listing;
 }
@@ -95,8 +99,7 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
         { id: 'server', path: f.second },
       ],
     };
-    const session = randomUUID(),
-      listing = await readGit(params, session, { repositoryId: 'web', type: 'changes' });
+    const listing = await readGit(params, { repositoryId: 'web', type: 'changes' });
     const a = listing.snapshots.filter((s) => s.source.new?.path === 'a.ts');
     assert.equal(a.length, 2);
     const staged = a.find(
@@ -129,10 +132,10 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
       assert.equal(snapshot.source.new?.type, 'binary');
       assert.equal(snapshot.model.newText, undefined);
     }
-    const other = await readGit(params, session, { repositoryId: 'server', type: 'changes' });
+    const other = await readGit(params, { repositoryId: 'server', type: 'changes' });
     assert.equal(other.snapshots[0].source.repositoryId, 'server');
     await writeFile(join(f.repo, 'a.ts'), 'latest\n');
-    const refreshed = await readGit(params, session, { repositoryId: 'web', type: 'changes' });
+    const refreshed = await readGit(params, { repositoryId: 'web', type: 'changes' });
     assert.notEqual(
       refreshed.snapshots.find(
         (s) =>
@@ -158,7 +161,13 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
         },
       ],
     };
-    const result = validateGitFeedback(params, session, value);
+    const displayed = new Map(
+      [...listing.snapshots, ...other.snapshots].map((snapshot) => [snapshot.id, snapshot]),
+    );
+    const result = validateGitFeedback(
+      params,
+      buildGitFeedback(gitFeedbackSchema.parse(value), displayed),
+    );
     assert.equal(Object.keys(result.sources).length, 2);
     assert.equal(result.annotations[0].targets[0].ref.kind, 'lines');
     assert.deepEqual(result.annotations[0].targets[0].text, { start: 6, end: 11, quote: 'n = 4' });
@@ -167,14 +176,19 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
       ref: { sourceId: working.id, kind: 'lines', side: 'new', startLine: 2, endLine: 2 },
       text: { start: 6, end: 11, quote: 'n = 4' },
     });
-    assert.equal(validateGitFeedback(params, session, duplicated).annotations[0].targets.length, 2);
-    assert.throws(() => validateGitFeedback(params, randomUUID(), value), /snapshot is missing/);
+    assert.equal(
+      validateGitFeedback(params, buildGitFeedback(gitFeedbackSchema.parse(duplicated), displayed))
+        .annotations[0].targets.length,
+      2,
+    );
+    assert.throws(() => validateGitFeedback(params, value), /sources/);
     assert.throws(
-      () => validateGitFeedback(params, session, { annotations: [], comment: '中'.repeat(66000) }),
+      () =>
+        validateGitFeedback(params, { annotations: [], sources: {}, comment: '中'.repeat(66000) }),
       /65536/,
     );
     await assert.rejects(
-      readGit(params, session, { repositoryId: 'web', type: 'changes', file: 'missing.txt' }),
+      readGit(params, { repositoryId: 'web', type: 'changes', file: 'missing.txt' }),
       /not present/,
     );
     await mkdir(join(f.repo, 'deleted-dir'));
@@ -182,7 +196,7 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
     await git(f.repo, 'add', '--', 'deleted-dir/a');
     await git(f.repo, 'commit', '-qm', 'directory');
     await rm(join(f.repo, 'deleted-dir'), { recursive: true });
-    await readGit(params, session, { repositoryId: 'web', type: 'changes' });
+    await readGit(params, { repositoryId: 'web', type: 'changes' });
   } finally {
     await f.close();
   }
@@ -191,13 +205,12 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
   const f = await fixture();
   try {
     const params = {
-        repositories: [
-          { id: 'web', path: f.repo },
-          { id: 'empty', path: f.empty },
-        ],
-      },
-      session = randomUUID();
-    const root = await readGit(params, session, {
+      repositories: [
+        { id: 'web', path: f.repo },
+        { id: 'empty', path: f.empty },
+      ],
+    };
+    const root = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       commit: f.rootCommit,
@@ -210,7 +223,7 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
       ),
     );
     assert.match(root.description, /空树/);
-    const compare = await readGit(params, session, {
+    const compare = await readGit(params, {
       repositoryId: 'web',
       type: 'compare',
       base: 'base',
@@ -222,7 +235,7 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
         (s) => s.source.view.type === 'compare' && s.source.view.mergeBaseCommit === f.rootCommit,
       ),
     );
-    const direct = await readGit(params, session, {
+    const direct = await readGit(params, {
       repositoryId: 'web',
       type: 'compare',
       base: f.feature,
@@ -232,13 +245,13 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
     assert.match(required(direct.snapshots[0].model.newText), /n = 1/);
     for (const revision of ['--help', 'missing-branch'])
       await assert.rejects(
-        readGit(params, session, { repositoryId: 'web', type: 'history', commit: revision }),
+        readGit(params, { repositoryId: 'web', type: 'history', commit: revision }),
       );
-    const empty = await readGit(params, session, { repositoryId: 'empty', type: 'history' });
+    const empty = await readGit(params, { repositoryId: 'empty', type: 'history' });
     assert.equal(empty.history?.commits.length, 0);
     await writeFile(join(f.empty, 'new'), 'new\n');
     assert.equal(
-      (await readGit(params, session, { repositoryId: 'empty', type: 'changes' })).snapshots.length,
+      (await readGit(params, { repositoryId: 'empty', type: 'changes' })).snapshots.length,
       1,
     );
     const tree = await git(f.repo, 'rev-parse', 'HEAD^{tree}');
@@ -246,12 +259,12 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
     for (let i = 0; i < 55; i++)
       tip = await git(f.repo, 'commit-tree', tree, '-p', tip, '-m', `history ${i}`);
     await git(f.repo, 'update-ref', 'refs/heads/main', tip);
-    const first = await readGit(params, session, { repositoryId: 'web', type: 'history' });
+    const first = await readGit(params, { repositoryId: 'web', type: 'history' });
     assert.equal(first.history?.commits.length, 50);
     assert.equal(first.history?.hasMore, true);
     const newer = await git(f.repo, 'commit-tree', tree, '-p', tip, '-m', 'new tip');
     await git(f.repo, 'update-ref', 'refs/heads/main', newer);
-    const next = await readGit(params, session, {
+    const next = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       tip: first.history?.tip,
@@ -265,20 +278,56 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
       ).size,
       57,
     );
-    const side = await git(f.repo, 'commit-tree', tree, '-p', f.rootCommit, '-m', 'side');
+    const side = await git(
+      f.repo,
+      'commit-tree',
+      await git(f.repo, 'rev-parse', `${f.rootCommit}^{tree}`),
+      '-p',
+      f.rootCommit,
+      '-m',
+      'side',
+    );
     const merge = await git(f.repo, 'commit-tree', tree, '-p', tip, '-p', side, '-m', 'merge');
-    const merged = await readGit(params, session, {
+    const merged = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       commit: merge,
     });
     assert.match(merged.description, /合并提交，只展示第一父/);
+    const explicitParent = await readGit(params, {
+      repositoryId: 'web',
+      type: 'history',
+      commit: merge,
+      parent: side,
+    });
+    assert.ok(
+      explicitParent.snapshots.some(
+        (snapshot) =>
+          snapshot.source.view.type === 'history' && snapshot.source.view.parent === side,
+      ),
+    );
+    assert.match(explicitParent.description, /端点比较/);
+    const parentFile = explicitParent.snapshots.find(
+      (snapshot) => snapshot.source.new?.path === 'a.ts',
+    )!;
+    assert.match(required(parentFile.model.oldText), /n = 1/);
+    assert.match(required(parentFile.model.newText), /n = 2/);
+    await assert.rejects(
+      readGit(params, {
+        repositoryId: 'web',
+        type: 'history',
+        commit: merge,
+        parent: f.rootCommit,
+      }),
+      /Explicit parent/,
+    );
+
     const a = await git(f.repo, 'commit-tree', tree, '-p', f.rootCommit, '-m', 'A'),
       b = await git(f.repo, 'commit-tree', tree, '-p', f.rootCommit, '-m', 'B');
     const m1 = await git(f.repo, 'commit-tree', tree, '-p', a, '-p', b, '-m', 'M1'),
       m2 = await git(f.repo, 'commit-tree', tree, '-p', b, '-p', a, '-m', 'M2');
     await assert.rejects(
-      readGit(params, session, {
+      readGit(params, {
         repositoryId: 'web',
         type: 'compare',
         mode: 'branch',
@@ -289,13 +338,13 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
     );
     const orphan = await git(f.repo, 'commit-tree', tree, '-m', 'orphan');
     await assert.rejects(
-      readGit(params, session, { repositoryId: 'web', type: 'compare', base: orphan, head: tip }),
+      readGit(params, { repositoryId: 'web', type: 'compare', base: orphan, head: tip }),
       /common ancestor/,
     );
     const controller = new AbortController();
     controller.abort();
     await assert.rejects(
-      readGit(params, session, { repositoryId: 'web', type: 'changes' }, controller.signal),
+      readGit(params, { repositoryId: 'web', type: 'changes' }, controller.signal),
     );
   } finally {
     await f.close();
@@ -326,17 +375,16 @@ void test('conflicts, gitlinks, invalid UTF-8 and external diff config are repre
   const f = await fixture();
   try {
     const params = {
-        repositories: [
-          { id: 'web', path: f.repo },
-          { id: 'empty', path: f.empty },
-        ],
-      },
-      session = randomUUID();
+      repositories: [
+        { id: 'web', path: f.repo },
+        { id: 'empty', path: f.empty },
+      ],
+    };
     await git(f.repo, 'update-index', '--add', '--cacheinfo', `160000,${f.feature},module`);
     await writeFile(join(f.repo, 'invalid-utf8.txt'), Buffer.from([0xc3, 0x28]));
     await writeFile(join(f.repo, '.gitattributes'), 'a.ts diff=evil\n');
     await git(f.repo, 'config', 'diff.evil.textconv', 'false');
-    const normal = await readGit(params, session, { repositoryId: 'web', type: 'changes' });
+    const normal = await readGit(params, { repositoryId: 'web', type: 'changes' });
     const link = normal.snapshots.find((s) => s.source.new?.path === 'module');
     assert.ok(link);
     assert.equal(link.source.new?.type, 'binary');
@@ -360,7 +408,7 @@ void test('conflicts, gitlinks, invalid UTF-8 and external diff config are repre
     await writeFile(join(f.empty, 'conflict.txt'), 'main\n');
     await git(f.empty, 'commit', '-qam', 'main');
     await assert.rejects(git(f.empty, 'merge', 'side', '--no-edit'));
-    const conflicted = await readGit(params, session, { repositoryId: 'empty', type: 'changes' });
+    const conflicted = await readGit(params, { repositoryId: 'empty', type: 'changes' });
     const conflict = conflicted.snapshots.filter((s) => s.source.new?.path === 'conflict.txt');
     assert.equal(conflict.length, 1);
     assert.equal(
@@ -382,10 +430,13 @@ void test('repository root paths preserve spaces and trailing newlines', async (
     await mkdir(root);
     await git(root, 'init', '-q', '-b', 'main');
     await writeFile(join(root, 'file.txt'), 'content\n');
-    const listing = await readGit({ repositories: [{ id: 'odd', path: root }] }, randomUUID(), {
-      repositoryId: 'odd',
-      type: 'changes',
-    });
+    const listing = await readGit(
+      { repositories: [{ id: 'odd', path: root }] },
+      {
+        repositoryId: 'odd',
+        type: 'changes',
+      },
+    );
     assert.equal(listing.snapshots[0].model.newText, 'content\n');
   } finally {
     await f.close();
@@ -404,10 +455,13 @@ void test('history decorates exact commits with HEAD, local/remote branches and 
     await git(f.repo, 'tag', '-am', 'Nested tree', 'nested-tree', 'annotated-tree');
     await git(f.repo, 'update-ref', 'refs/remotes/origin/main', f.feature);
     await git(f.repo, 'tag', 'root-version', f.rootCommit);
-    const result = await readGit({ repositories: [{ id: 'repo', path: f.repo }] }, randomUUID(), {
-      repositoryId: 'repo',
-      type: 'history',
-    });
+    const result = await readGit(
+      { repositories: [{ id: 'repo', path: f.repo }] },
+      {
+        repositoryId: 'repo',
+        type: 'history',
+      },
+    );
     const tip = required(result.history?.commits.find((commit) => commit.oid === f.feature));
     for (const ref of [
       { kind: 'head', name: 'HEAD' },
@@ -437,10 +491,13 @@ void test('history decorates exact commits with HEAD, local/remote branches and 
       ['root-version'],
     );
     await git(f.repo, 'checkout', '--detach', '-q', 'HEAD');
-    const detached = await readGit({ repositories: [{ id: 'repo', path: f.repo }] }, randomUUID(), {
-      repositoryId: 'repo',
-      type: 'history',
-    });
+    const detached = await readGit(
+      { repositories: [{ id: 'repo', path: f.repo }] },
+      {
+        repositoryId: 'repo',
+        type: 'history',
+      },
+    );
     assert.ok(detached.history?.commits[0].refs.some((ref) => ref.kind === 'head'));
   } finally {
     await f.close();
@@ -450,14 +507,13 @@ void test('history decorates exact commits with HEAD, local/remote branches and 
 void test('single-branch history preserves complete messages and fixed tips without checking out', async () => {
   const f = await fixture();
   try {
-    const params = { repositories: [{ id: 'web', path: f.repo }] },
-      session = randomUUID();
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
     const tree = await git(f.repo, 'rev-parse', `${f.feature}^{tree}`);
     const message =
       'fix(workflow): retain background activity\n\nKeep timers active.\nPreserve <plain text> and 中文.\n\nAdd regression coverage.';
     const topic = await git(f.repo, 'commit-tree', tree, '-p', f.rootCommit, '-m', message);
     await git(f.repo, 'update-ref', 'refs/heads/topic', topic);
-    const listing = await readGit(params, session, {
+    const listing = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       branch: 'topic',
@@ -477,14 +533,14 @@ void test('single-branch history preserves complete messages and fixed tips with
     );
     const next = await git(f.repo, 'commit-tree', tree, '-p', topic, '-m', 'Advance topic');
     await git(f.repo, 'update-ref', 'refs/heads/topic', next);
-    const pinned = await readGit(params, session, {
+    const pinned = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       branch: 'topic',
       tip: topic,
     });
     assert.equal(pinned.history?.commits[0].oid, topic);
-    const refreshed = await readGit(params, session, {
+    const refreshed = await readGit(params, {
       repositoryId: 'web',
       type: 'history',
       branch: 'topic',
@@ -493,7 +549,7 @@ void test('single-branch history preserves complete messages and fixed tips with
     assert.equal(await git(f.repo, 'symbolic-ref', '--short', 'HEAD'), 'main');
     assert.equal(await git(f.repo, 'rev-parse', 'HEAD'), f.feature);
     await assert.rejects(
-      readGit(params, session, { repositoryId: 'web', type: 'history', branch: '--all' }),
+      readGit(params, { repositoryId: 'web', type: 'history', branch: '--all' }),
     );
     assert.equal(
       gitReviewParamsSchema.safeParse({
@@ -512,8 +568,7 @@ void test('directory-only queries, selected-file capture and pinned commit navig
   const trace = join(f.root, 'git-query.trace');
   const originalTrace = process.env.GIT_TRACE;
   try {
-    const params = { repositories: [{ id: 'web', path: f.repo }] },
-      session = randomUUID();
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
     const requests = [
       { repositoryId: 'web', type: 'changes' as const },
       { repositoryId: 'web', type: 'history' as const, commit: f.rootCommit },
@@ -528,17 +583,17 @@ void test('directory-only queries, selected-file capture and pinned commit navig
     process.env.GIT_TRACE = trace;
     for (const request of requests) {
       await writeFile(trace, '');
-      const listing = await readGitListing(params, session, request);
+      const listing = await readGitListing(params, request);
       assert.ok(listing.files.length > 0);
       assert.deepEqual(listing.snapshots, []);
       const { readFile } = await import('node:fs/promises');
       assert.doesNotMatch(await readFile(trace, 'utf8'), /cat-file/);
-      const explicit = await readGitListing(params, session, { ...request, file: 'a.ts' });
+      const explicit = await readGitListing(params, { ...request, file: 'a.ts' });
       assert.equal(explicit.snapshots.length, 1);
       assert.equal(explicit.snapshots[0].source.new?.path, 'a.ts');
       assert.ok(explicit.snapshots[0].source.new?.contentHash.startsWith('sha256:'));
     }
-    const changes = await readGitListing(params, session, requests[0]);
+    const changes = await readGitListing(params, requests[0]);
     const both = changes.files.filter((file) => file.source.new?.path === 'a.ts');
     assert.equal(both.length, 2);
     assert.notEqual(both[0].id, both[1].id);
@@ -550,32 +605,35 @@ void test('directory-only queries, selected-file capture and pinned commit navig
     // Directory metadata doesn't pretend to capture bytes before a file is opened.
     await writeFile(join(f.repo, 'a.ts'), 'opened after directory listing\n');
     await writeFile(trace, '');
-    const snapshot = await readGitFile(params, session, changes.listingId, working.id);
+    const snapshot = await readGitFile(params, working);
     const { readFile } = await import('node:fs/promises');
     assert.equal(snapshot.model.newText, 'opened after directory listing\n');
     assert.equal((await readFile(trace, 'utf8')).match(/cat-file blob/g)?.length, 1);
     await writeFile(join(f.repo, 'a.ts'), 'later disk state\n');
-    const checked = validateGitFeedback(params, session, {
-      annotations: [
+    const checked = validateGitFeedback(
+      params,
+      buildGitFeedback(
         {
-          id: 'kept',
-          comment: 'old bytes',
-          targets: [{ ref: { sourceId: snapshot.id, kind: 'file' } }],
+          annotations: [
+            {
+              id: 'kept',
+              comment: 'old bytes',
+              targets: [{ ref: { sourceId: snapshot.id, kind: 'file' } }],
+            },
+          ],
         },
-      ],
-    });
-    assert.deepEqual(checked.sources[snapshot.id], snapshot.source);
-    await assert.rejects(
-      readGitFile(params, randomUUID(), changes.listingId, working.id),
-      /expired/,
+        new Map([[snapshot.id, snapshot]]),
+      ),
     );
-    const first = await readGitListing(params, session, { repositoryId: 'web', type: 'history' });
+    assert.deepEqual(checked.sources[snapshot.id], snapshot.source);
+    assert.equal((await readGitFile(params, working)).model.newText, 'later disk state\n');
+    const first = await readGitListing(params, { repositoryId: 'web', type: 'history' });
     await writeFile(trace, '');
-    const selected = await readGitListing(params, session, {
+    const selected = await readGitListing(params, {
       repositoryId: 'web',
       type: 'history',
       tip: first.history?.tip,
-      historyId: first.historyId,
+      historyContext: first.historyContext,
       commit: f.rootCommit,
     });
     assert.equal(selected.history?.selectedCommit?.oid, f.rootCommit);
@@ -586,34 +644,34 @@ void test('directory-only queries, selected-file capture and pinned commit navig
     assert.doesNotMatch(await readFile(trace, 'utf8'), /for-each-ref|git log|cat-file/);
     // Loading many history pages must not evict the still-visible directory token.
     for (let page = 1; page <= 34; page++) {
-      const more = await readGitListing(params, session, {
+      const more = await readGitListing(params, {
         repositoryId: 'web',
         type: 'history',
         tip: first.history?.tip,
-        historyId: first.historyId,
-        listingId: first.listingId,
+        historyContext: first.historyContext,
+        pageOnly: true,
         offset: page * 50,
       });
-      assert.equal(more.listingId, first.listingId);
-      assert.deepEqual(more.files, first.files);
+      assert.notEqual(more.listingId, first.listingId);
+      assert.deepEqual(more.files, []);
       assert.equal(more.snapshots.length, 0);
     }
     const unopened = first.files[0];
     assert.ok(unopened);
-    const afterPagination = await readGitFile(params, session, first.listingId, unopened.id);
+    const afterPagination = await readGitFile(params, unopened);
     assert.equal(afterPagination.fileId, unopened.id);
-    const refresh = await readGitListing(params, session, { repositoryId: 'web', type: 'history' });
-    assert.notEqual(refresh.historyId, first.historyId);
+    const refresh = await readGitListing(params, { repositoryId: 'web', type: 'history' });
+    assert.notEqual(refresh.listingId, first.listingId);
     assert.ok(refresh.historyRefs?.length);
     await assert.rejects(
-      readGitListing(params, session, {
+      readGitListing(params, {
         repositoryId: 'web',
         type: 'history',
         branch: 'base',
         tip: first.history?.tip,
-        historyId: first.historyId,
+        historyContext: first.historyContext,
       }),
-      /Pinned history/,
+      /History context/,
     );
   } finally {
     if (originalTrace === undefined) delete process.env.GIT_TRACE;

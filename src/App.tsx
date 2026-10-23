@@ -1,5 +1,5 @@
 import { useUI } from './ui/use-ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   AlertDescription,
@@ -10,7 +10,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Page,
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -22,9 +21,110 @@ import {
 import { api, errorMessage, type PanelPage } from './web/api';
 import { PreferencesSettings } from './web/preferences-settings';
 import { PanelHost } from './web/panel-host';
+import { ServerStatus } from './web/server-status';
+import { cn } from './ui/utils';
+type ManagementPath = '/' | '/server' | '/settings';
+const managementPaths = ['/', '/server', '/settings'] as const;
+function managementPath(path: string): ManagementPath {
+  return path === '/server' || path === '/settings' ? path : '/';
+}
 export default function App() {
   const match = /^\/panels\/([^/]+)\/?$/.exec(window.location.pathname);
-  return match ? <PanelHost instanceId={decodeURIComponent(match[1])} /> : <PanelList />;
+  return match ? <PanelHost instanceId={decodeURIComponent(match[1])} /> : <ManagementApp />;
+}
+function ManagementApp() {
+  const [path, setPath] = useState(window.location.pathname);
+  const [panelsVisited, setPanelsVisited] = useState(window.location.pathname === '/');
+  const activePath = useRef(path);
+  const scrollPositions = useRef<Record<string, number>>({});
+  const navigate = useCallback((next: string, push = true) => {
+    if (activePath.current === next) return;
+    scrollPositions.current[activePath.current] = window.scrollY;
+    if (push) window.history.pushState(null, '', next);
+    if (next === '/') setPanelsVisited(true);
+    activePath.current = next;
+    setPath(next);
+  }, []);
+  useEffect(() => {
+    const previous = history.scrollRestoration;
+    history.scrollRestoration = 'manual';
+    const pop = () => navigate(window.location.pathname, false);
+    window.addEventListener('popstate', pop);
+    return () => {
+      window.removeEventListener('popstate', pop);
+      history.scrollRestoration = previous;
+    };
+  }, [navigate]);
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollPositions.current[path] ?? 0);
+  }, [path]);
+  return (
+    <Management path={managementPath(path)} navigate={navigate} panelsVisited={panelsVisited} />
+  );
+}
+function Management({
+  path,
+  navigate,
+  panelsVisited,
+}: {
+  path: ManagementPath;
+  navigate: (path: string) => void;
+  panelsVisited: boolean;
+}) {
+  const { t } = useUI();
+  const labels = { '/': t('Panels'), '/server': t('Server'), '/settings': t('Settings') };
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
+      <header className="flex flex-col gap-4 border-b py-5 sm:flex-row sm:items-center sm:gap-10 sm:py-0">
+        <a
+          className="w-fit text-2xl font-semibold tracking-tight"
+          href="/"
+          onClick={(event) => {
+            if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+              return;
+            event.preventDefault();
+            navigate('/');
+          }}
+        >
+          Paneon
+        </a>
+        <nav className="flex items-center gap-6" aria-label={t('Management navigation')}>
+          {managementPaths.map((target) => (
+            <a
+              key={target}
+              href={target}
+              aria-current={path === target ? 'page' : undefined}
+              className={cn(
+                'border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring sm:py-7',
+                path === target && 'border-foreground text-foreground',
+              )}
+              onClick={(event) => {
+                if (
+                  event.button ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                event.preventDefault();
+                navigate(target);
+              }}
+            >
+              {labels[target]}
+            </a>
+          ))}
+        </nav>
+      </header>
+      <main className="py-8">
+        <div hidden={path !== '/'}>{(panelsVisited || path === '/') && <PanelList />}</div>
+        {path === '/server' && <ServerStatus />}
+        <div hidden={path !== '/settings'}>
+          <PreferencesSettings />
+        </div>
+      </main>
+    </div>
+  );
 }
 function PanelList() {
   const { t } = useUI();
@@ -86,10 +186,11 @@ function PanelList() {
   const totalPages = Math.max(1, result?.totalPages ?? 1);
   const busy = loading || closing.length > 0;
   return (
-    <Page title="Paneon">
+    <section className="space-y-8" aria-labelledby="panels-title">
       <Stack direction="row" className="items-center justify-between">
-        <h2 className="text-lg font-semibold">{t('Panels')}</h2>
-        <PreferencesSettings />
+        <h1 id="panels-title" className="text-xl font-semibold tracking-tight">
+          {t('Panels')}
+        </h1>
         <Button variant="outline" disabled={busy} onClick={() => void refresh()}>
           {t('Refresh')}
         </Button>
@@ -201,6 +302,6 @@ function PanelList() {
           </PaginationContent>
         </Pagination>
       )}
-    </Page>
+    </section>
   );
 }

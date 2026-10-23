@@ -57,7 +57,7 @@ The page exposes no staging, commit, discard, merge or push controls. Query proc
 
 ## Submitted feedback
 
-Explicit submission emits `git-review-submitted` with the common `annotations`, optional overall `comment`, and only the referenced `sources`. Each annotation has a stable `id`, nonempty `targets` and string `comment`. Empty annotation means selection without an opinion. No separate selected list, complete source file, repository list or full diff is duplicated into the event. A selected hunk carries that hunk's patch; text targets carry only the selected quote.
+Explicit submission emits `git-review-submitted` with the common `annotations`, optional overall `comment`, and only the referenced `sources`. Each annotation has a stable `id`, nonempty `targets` and string `comment`. Empty annotation means selection without an opinion. No separate selected list, complete source file, repository list or full diff is duplicated into the event. A selected hunk carries its patch and the corresponding side fragments; text targets carry their selected quote and complete original lines in source evidence. File targets need metadata and hashes only.
 
 ```json
 {
@@ -84,7 +84,10 @@ Explicit submission emits `git-review-submitted` with the common `annotations`, 
       "repositoryId": "web",
       "view": { "type": "changes", "area": "unstaged", "headCommit": "complete-commit-oid" },
       "old": { "path": "a.ts", "contentHash": "sha256:actual-old-bytes", "type": "text" },
-      "new": { "path": "a.ts", "contentHash": "sha256:actual-new-bytes", "type": "text" }
+      "new": { "path": "a.ts", "contentHash": "sha256:actual-new-bytes", "type": "text" },
+      "evidence": [
+        { "kind": "lines", "side": "new", "startLine": 2, "endLine": 2, "text": "const n = 4;\r\n" }
+      ]
     }
   }
 }
@@ -92,18 +95,87 @@ Explicit submission emits `git-review-submitted` with the common `annotations`, 
 
 IDs and hashes above illustrate the shape; actual hashes use 64 hex characters. `old`/`new` describe this comparison, not successive refreshes; added/deleted files may omit one side. Sources include the repository ID, actual view and resolved commit IDs, side-specific paths and byte hashes. History records its commit and actual parent (null for root); branch comparisons record their merge-base OID. Sources are deduplicated by repository, view and content, never merely by file path.
 
-`file` and `hunk` targets omit `text`. A hunk includes its exact `oldStart`, `oldLines`, `newStart`, `newLines` and `patch`. A `lines` target always carries `side`, one-based inclusive `startLine`/`endLine`, and `text`. Its UTF-16 offsets address the original string formed by those lines, including original separators. Text normalized from a whole-side DOM registration is narrowed to the actually selected lines before delivery. Server-side validation checks the retained original snapshot, not latest disk contents.
+`file` and `hunk` targets omit `text`. A hunk includes its exact `oldStart`, `oldLines`, `newStart`, `newLines` and `patch`. A `lines` target always carries `side`, one-based inclusive `startLine`/`endLine`, and `text`. Its UTF-16 offsets address the original string formed by those lines, including original separators. Text normalized from a whole-side DOM registration is narrowed to the actually selected lines before delivery. The browser normalizes targets and builds evidence from its retained original text. Server validation uses only the complete submission and explicit repository configuration; it never looks up a previous backend snapshot or rereads latest disk contents.
 
 First empty feedback is rejected. After success, edit and explicitly submit the complete corrected result; `replacesEventId` references this page's last successful event. IDs survive annotation edits; removed entries disappear from the new result. A complete empty correction can clear previous feedback. Previous events remain readable. Failed validation, transport or event saves preserve drafts and the last successful receipt. Events obey the 65536 UTF-16 serialized-character limit and the complete request's 262144-byte transport limit, without truncation or automatic event splitting. Read and acknowledge them through ordinary `paneon panel events` / `paneon panel ack`.
 
-Drafts and content snapshots live only in this page's session and query environment. Browser reloads, service restarts and ordinary Vite/React source updates do not promise recovery or old-worker preservation. Parameter files are read once at instance creation, as for other standard pages.
+Drafts and displayed content live only in browser memory. The browser retains all displayed versions for this page, including every source referenced by a draft or correction; reading a new version never mutates an old one. Git backend reads have no session/listing/history/snapshot business Map. Browser reloads, service restarts and ordinary Vite/React source updates do not promise recovery or old-worker preservation. Parameter files are read once at instance creation, as for other standard pages.
 
 ## Reuse the diff adapter
 
-[DiffView](../assets/shared/diff.tsx) accepts `sourceId`, either a preserved `model` or `oldText`/`newText`, optional side paths, `fileOnly` and an optional `onCollapse` callback. With no callback the header stays unchanged. It requires a public `FeedbackProvider<GitRef>` supplied by the author and performs no local Git or repository lookup. Optional `locateTarget` reveals the relevant side/context. Import `createDiffModel`, `sourceLines` and types from [diff-model.ts](../assets/shared/diff-model.ts), and `gitRefSchema`, `diffTargetText`, `normalizeDiffTarget` from [diff-schema.ts](../assets/shared/diff-schema.ts). After mounting the preserved source and setting `locateTarget`, the adapter supplies `targetRanges: (target) => diffTargetRanges(model, target)` for explicit line/range annotation markers and can call the exported `locateDiffTarget(model, target)` to scroll and highlight exact same-side ranges, including line-button references that differ from the whole-side text registration. The page owns source identity/cache, adapter resolution/location, semantic validation and event submission; the public Provider owns interaction state. Other sources such as PRs can use this renderer with their own source map.
+[DiffView](../assets/shared/diff.tsx) accepts `oldText`/`newText` or a supplied `model`, optional side paths/revisions, `fileOnly` and an optional `onCollapse` callback. `<DiffView oldText="before\n" newText="after\n" />` works alone without a Git session, source ID or FeedbackProvider. Supplying `sourceId` opts into annotation integration and requires a public `FeedbackProvider<GitRef>` supplied by the author. With no collapse callback the header stays unchanged. It performs no local Git or repository lookup. Optional `locateTarget` reveals the relevant side/context. Import `createDiffModel`, `sourceLines` and types from [diff-model.ts](../assets/shared/diff-model.ts), and `gitRefSchema`, `diffTargetText`, `normalizeDiffTarget` from [diff-schema.ts](../assets/shared/diff-schema.ts). After mounting the preserved source and setting `locateTarget`, the adapter supplies `targetRanges: (target) => diffTargetRanges(model, target)` for explicit line/range annotation markers and can call the exported `locateDiffTarget(model, target)` to scroll and highlight exact same-side ranges, including line-button references that differ from the whole-side text registration. The page owns source identity/cache, adapter resolution/location, semantic validation and event submission; the public Provider owns interaction state. Other sources such as PRs can use this renderer with their own source map.
 
 The geometry bridge uses the same preserved source/line mapping as location. It does not create feedback or search quotes; `FeedbackSurface` clips those ranges to each pane. Keep it when copying this renderer into another page, since line-button references cover an interval while native text registration covers a whole side.
 
 Object annotations: use **选择对象** to collect targets, then click toolbar **批注** to open the editor. Only **保存** adds the page draft; cancelling discards the temporary selection. Text selection uses its nearby action directly.
 
 The shared diff toolbar offers explicit side-by-side (左右对比) and single-column (单列对比) modes. The difference count and up/down arrows navigate contiguous changed ranges, even when nearby edits share one context hunk. Clicking the count locates the current changed range; navigation disables at its boundaries. Context windows may still merge for display and hunk-level selection. Context expansion and mode switches preserve annotations and source coordinates. Native select-all and copy remain available; existing event limits may reject oversized feedback while retaining the draft.
+
+## Independent Git readers
+
+Import from [components.tsx](../assets/panels/git-review/components.tsx); the named server actions live in [actions.ts](../assets/panels/git-review/actions.ts). The [minimal custom TSX](../assets/examples/git-components/panel.tsx) combines the readers with an ordinary string Diff without copying the built-in page or creating a session. These are skill resource exports, not new `paneon/ui` package exports.
+
+| Component         | Props                                                                                                           | Owned reads and callbacks                                                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GitBranches`     | `repositoryPath: string`, `selected?: string`, `onSelect(ref: string)`                                          | Reads refs/current branch and reuses the existing searchable branch tree. Selection is controlled.                                                                                          |
+| `GitCommitGraph`  | `repositoryPath: string`, `branch?: string`, `tip?: string`, `selected?: string`, `onSelect(commit: GitCommit)` | Resolves a branch tip once (HEAD by default), reads 50-commit pages, retains the initial decoration catalog and reuses the existing graph rows. A full `tip` fixes the ancestry explicitly. |
+| `GitChangedFiles` | `repositoryPath: string`, `view: GitFilesView`, `selected?: string`, `onSelectFile(snapshot: GitSnapshot)`      | Reads the file tree first; only a file click reads its bytes. Callback includes source metadata, immutable texts/model and `fileId` for controlled selection.                               |
+
+`GitFilesView` is `{type:'changes', area:'staged'|'unstaged'|'untracked'}` (optionally a displayed `headCommit`), `{type:'history', commit:fullOID, parent?:fullOID|null}`, or `{type:'compare', mode:'branch'|'commits', baseCommit:fullOID, headCommit:fullOID, mergeBaseCommit?:fullOID}`. History defaults to the first parent; an explicit parent must belong to that commit, and null is the root commit's empty tree. Branch comparison derives its unique merge base from the fixed endpoints. A working-tree query observes a new version when bytes are opened; `headCommit` does not freeze working contents.
+
+Custom layouts can use `useGitBranches({repositoryPath})` → `{refs,currentBranch,pending,error}`, `useGitHistory({repositoryPath,branch?,tip?})` → `{commits,tip,hasMore,pending,error,loadMore}`, and `useGitFiles({repositoryPath,view})` → `{files,pending,error,readFile(file)}`. Hooks own asynchronous query ordering; the author owns selection/layout and decides how to display pending/error. The built-in page retains its existing loading controls and uses the shared `useGitReader(params)` named-action boundary to coordinate its existing multi-view layout.
+
+### Explicit backend requests
+
+`readGit(params, request, signal?)` lists metadata. The server action is `queryGit({params,request})`. `params.repositories` supplies the configured repository paths; a request selects its `repositoryId`. A subsequent history request carries a serializable context, not an in-process lookup key:
+
+```jsonc
+{
+  "params": { "repositories": [{ "id": "web", "path": "/work/web" }] },
+  "request": {
+    "repositoryId": "web",
+    "type": "history",
+    "historyContext": { "repositoryId": "web", "branch": "HEAD", "tip": "<full OID>" },
+    "offset": 50,
+    "pageOnly": true,
+  },
+}
+```
+
+First history results include `historyContext`, `historyRefs` and `historyDecorations`. The browser retains that catalog and decorates subsequent raw commit pages against it, preserving the initial graph labels without resending a large ref catalog. A commit selection sends the same context and an explicit `commit`, with no `pageOnly`; refresh drops context/tip. `listingId` is a returned browser display/cache scope only and is never accepted for a backend lookup.
+
+`readGitFile(params, file, signal?)` / `queryGitFile({params,file})` accepts a complete listed descriptor:
+
+```jsonc
+{
+  "id": "<browser file identity>",
+  "status": "M",
+  "source": {
+    "repositoryId": "web",
+    "view": { "type": "history", "commit": "<full OID>", "parent": "<full OID>" },
+    "old": { "path": "src/a.ts" },
+    "new": { "path": "src/a.ts" },
+  },
+  "read": {
+    "entry": {
+      "oldMode": "100644",
+      "newMode": "100644",
+      "oldOID": "<blob OID>",
+      "newOID": "<blob OID>",
+      "status": "M",
+      "oldPath": "src/a.ts",
+      "newPath": "src/a.ts",
+    },
+    "working": false,
+    "conflict": false,
+  },
+}
+```
+
+The result is `{id,fileId,source,model,status,notes,notesUI}`. `source` contains the actual side hashes/types and fixed view; `model` contains the captured original text and derived diff. Read descriptors are validated against configured repository IDs and relative paths, use argument arrays, and preserve the existing directory/symlink/binary/conflict boundaries. No backend cache is needed to interpret the next request.
+
+### Preserved annotation evidence
+
+`buildGitFeedback(feedback, snapshots)` in [feedback.ts](../assets/panels/git-review/feedback.ts) runs in the browser. It normalizes line targets, deduplicates identical targets per annotation, and adds only referenced sources and required evidence. `validateGitFeedback(params, completeEvent)` is pure and runs in any fresh backend environment. It checks the full schema, configured repository association, source sides, line counts, exact UTF-16 quote/grapheme coordinates, patch reconstruction and conflicting/duplicate evidence. It preserves `comment` and the complete optional `replacesEventId`.
+
+Each source has `evidence: []` for file-only targets. Line evidence is `{kind:'lines',side,startLine,endLine,text}` with the complete original selected lines. Hunk evidence is `{kind:'hunk',oldStart,oldLines,newStart,newLines,patch,oldText,newText}` with the exact old/new fragments composing that patch. Repeated targets share a deduplicated source/evidence entry. Whole-content hashes identify the displayed version; selected fragments cannot independently prove those whole hashes or Git origin. This contract deliberately adds no signature, disk snapshot, SQLite business table, localStorage draft, automatic replay, retry, truncation or implicit batching.
