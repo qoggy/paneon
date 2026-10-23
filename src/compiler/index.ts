@@ -245,9 +245,15 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
     `import definition from ${JSON.stringify(entry)};\n${server.actions.map((a, i) => `import {${a.name} as a${i}} from ${JSON.stringify(a.file)};`).join('\n')}\nexport default definition;export const __paneonActions={${server.actions.map((a, i) => `${JSON.stringify(a.id)}:a${i}`).join(',')}};`,
   );
   const authorCss = join(temporary, 'author.css');
+  const authorSource = join(temporary, 'author-source.txt');
+  // Tailwind must scan exactly the captured client graph, including shared
+  // components outside the entry directory. Transformed sources exclude action
+  // implementations and unused exports; scanning the filesystem would include
+  // unrelated/server-only content and could race the source snapshot.
+  writeFileSync(authorSource, [...client.sources.values()].join('\n'));
   writeFileSync(
     authorCss,
-    `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))};\n@source ${JSON.stringify(dirname(entry))};`,
+    `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))} source(none);\n@source ${JSON.stringify(authorSource)};`,
   );
   const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
   writeFileSync(
@@ -316,6 +322,7 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
     rmSync(frameSource, { force: true });
     rmSync(nodeSource, { force: true });
     rmSync(authorCss, { force: true });
+    rmSync(authorSource, { force: true });
     // Metadata evaluation is asynchronous too: reject a save arriving after the
     // bundles finished rather than publishing old code under a later source hash.
     snapshot.assertUnchanged(dependencies);

@@ -7,7 +7,7 @@ import {
   Checkbox,
   FeedbackSurface,
   FeedbackSelectionControls,
-  FeedbackOverallCommentButton,
+  FeedbackOverallAnnotationButton,
   FeedbackSubmitButton,
   FeedbackProvider,
   FeedbackTarget,
@@ -165,7 +165,7 @@ function DataTable({
                 aria-label={t('选择帮助')}
               >
                 {t(
-                  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「评论」保存到页面草稿。普通文字圈选无需开启选择对象。',
+                  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「批注」保存到页面草稿。普通文字圈选无需开启选择对象。',
                 )}
               </PopoverContent>
             </Popover>
@@ -422,7 +422,7 @@ function TablePanel() {
         disabled={locked}
         onSubmit={async (feedback) => {
           if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim()) {
-            submission.reject('Select content or write a comment before submitting.');
+            submission.reject('Select content or write an annotation before submitting.');
             return;
           }
           await submission.submit(feedback);
@@ -456,8 +456,8 @@ function TablePanel() {
               </Popover>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2" aria-label={t('评论操作')}>
-            <FeedbackOverallCommentButton />
+          <div className="flex flex-wrap items-center gap-2" aria-label={t('批注操作')}>
+            <FeedbackOverallAnnotationButton />
             <FeedbackSubmitButton />
             {locked && (
               <Button type="button" onClick={() => setLocked(false)}>

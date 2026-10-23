@@ -101,6 +101,6 @@ export {
   FeedbackSubmitButton,
   FeedbackToolbar,
   FeedbackSelectionControls,
-  FeedbackOverallCommentButton,
+  FeedbackOverallAnnotationButton,
   FeedbackControls,
 } from './feedback-surface';

@@ -73,9 +73,9 @@ try {
     0,
     'Recommendation must not preselect.',
   );
-  const descriptionButton = frame.getByRole('button', { name: 'Description', exact: true });
-  const descriptionPopover = frame.getByRole('dialog', { name: 'Questionnaire description' });
-  assert.equal(await frame.getByText(choices.description, { exact: true }).count(), 0);
+  const description = frame.getByLabel('Questionnaire description', { exact: true });
+  await description.getByText(choices.description, { exact: true }).waitFor();
+  assert.equal(await frame.getByRole('button', { name: 'Description', exact: true }).count(), 0);
   assert.equal(await frame.getByText('Question 1 / 3', { exact: true }).count(), 0);
   assert.equal(await frame.getByText('Select one answer or write your own.').count(), 0);
   const contextBox = await frame
@@ -85,29 +85,17 @@ try {
   const headingBox = await frame
     .getByRole('heading', { name: 'Storage', exact: true })
     .boundingBox();
-  assert.ok(contextBox && progressBox && headingBox);
+  const descriptionBox = await description.boundingBox();
+  assert.ok(contextBox && progressBox && headingBox && descriptionBox);
   assert.ok(
     Math.abs(contextBox.y - progressBox.y) <= 2,
     'Short context and progress share one row.',
   );
   assert.ok(
-    headingBox.y - progressBox.y - progressBox.height <= 12,
-    'Question follows the compact context row.',
+    descriptionBox.y > progressBox.y && headingBox.y > descriptionBox.y,
+    'Readable body description sits between compact context and question.',
   );
-  await descriptionButton.focus();
-  await descriptionButton.press('Enter');
-  await descriptionPopover.getByText(choices.description, { exact: true }).waitFor();
   await screenshot('choose-description-desktop.png');
-  await page.keyboard.press('Escape');
-  await descriptionPopover.waitFor({ state: 'hidden' });
-  await until(
-    () => descriptionButton.evaluate((element) => element === document.activeElement),
-    'Escape returns focus to Description.',
-  );
-  await descriptionButton.press('Space');
-  await descriptionPopover.waitFor();
-  await page.keyboard.press('Escape');
-  await descriptionPopover.waitFor({ state: 'hidden' });
   const choiceLayout = await frame.locator('main').evaluate((element) => {
     const main = element.getBoundingClientRect();
     const row = element.querySelector('[data-choice-option] > label').getBoundingClientRect();
@@ -155,13 +143,15 @@ try {
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   assert.equal(
     await frame.getByRole('alert').innerText(),
-    'Select an option or enter your own answer.',
+    'Complete all answers before submitting (3 incomplete).',
   );
-  const storageHeading = frame.getByRole('heading', { name: 'Storage', exact: true });
+  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
   await until(
-    () => storageHeading.evaluate((element) => element === document.activeElement),
-    'Final validation focuses the first unanswered question.',
+    () => frame.getByRole('alert').evaluate((element) => element === document.activeElement),
+    'Invalid submission focuses the inline summary error.',
   );
+  assert.equal(await emptySummary.getByText('Incomplete answer', { exact: true }).count(), 3);
+  await emptySummary.getByRole('button', { name: 'Edit answer: Storage', exact: true }).click();
   assert.equal((await fixture.events(fixture.choose)).length, 0);
   await next();
   assert.equal(
@@ -244,7 +234,7 @@ try {
   assert.equal(
     await note('PostgreSQL').inputValue(),
     '',
-    'Comments never move to a different option.',
+    'Annotations never move to a different option.',
   );
   await note('PostgreSQL').fill('PostgreSQL note');
   await radio('SQLite').check();
@@ -308,15 +298,10 @@ try {
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   assert.equal(
     await frame.getByRole('alert').innerText(),
-    'Enter your own answer or deselect Other.',
+    'Complete all answers before submitting (2 incomplete).',
   );
-  await until(
-    () =>
-      frame
-        .getByRole('heading', { name: 'Features', exact: true })
-        .evaluate((element) => element === document.activeElement),
-    'Submission returns to the first invalid custom answer.',
-  );
+  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('button', { name: 'Edit answer: Features', exact: true }).click();
   assert.equal((await fixture.events(fixture.choose)).length, 0);
   assert.equal(await checkbox('Feature A').isChecked(), true);
   assert.equal(await note('Feature A').inputValue(), 'A note');
@@ -369,6 +354,8 @@ try {
   assert.equal(await frame.getByRole('alert').count(), 0);
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   await frame.getByRole('alert').waitFor();
+  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('button', { name: 'Edit answer: Delivery', exact: true }).click();
   assert.equal(await mine().inputValue(), '   ');
   // Typing and then clearing an active custom answer must not restore an old supplied selection.
   await mine().fill('Temporary');
@@ -378,18 +365,19 @@ try {
   await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
   await frame
     .getByRole('region', { name: 'Answer summary' })
-    .getByText('No answer', { exact: true })
+    .getByText('Other: No answer', { exact: true })
     .waitFor();
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   assert.equal(
     await frame.getByRole('alert').innerText(),
-    'Enter your own answer or select a different answer.',
+    'Complete all answers before submitting (1 incomplete).',
   );
   assert.equal(
     (await fixture.events(fixture.choose)).length,
     0,
     'Navigation, edits and validation failures emit nothing.',
   );
+  await frame.getByRole('button', { name: 'Edit answer: Delivery', exact: true }).click();
   await mine().fill('  Internal center  ');
   await next();
   await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
@@ -473,13 +461,14 @@ try {
   await frame.getByRole('button', { name: 'Submit corrected answers', exact: true }).click();
   assert.equal(
     await frame.getByRole('alert').innerText(),
-    'Enter your own answer or select a different answer.',
+    'Complete all answers before submitting (1 incomplete).',
   );
   assert.equal(
     (await fixture.events(fixture.choose)).length,
     1,
     'Invalid correction retains the saved receipt and emits nothing.',
   );
+  await frame.getByRole('button', { name: 'Edit answer: Delivery', exact: true }).click();
   await mine().fill('Corrected delivery');
   await next();
   assert.equal((await fixture.events(fixture.choose)).length, 1);
@@ -522,6 +511,11 @@ try {
   assert.equal(
     await secondFrame.getByRole('button', { name: 'Description', exact: true }).count(),
     0,
+  );
+  assert.equal(
+    await secondFrame.getByLabel('Questionnaire description', { exact: true }).count(),
+    0,
+    'No empty description block is rendered.',
   );
   await secondFrame.getByRole('radio', { name: 'SQLite', exact: true }).check();
   await secondFrame.getByRole('button', { name: 'Next', exact: true }).click();
@@ -599,43 +593,38 @@ try {
       true,
       'Long header content does not overflow.',
     );
-    await descriptionButton.click();
-    await descriptionPopover.getByText(longDescriptionEnd, { exact: true }).waitFor();
-    const popoverBounds = await descriptionPopover.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        fits:
-          rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight,
-        scrolls: element.scrollHeight > element.clientHeight,
-      };
-    });
-    assert.equal(popoverBounds.fits, true, 'Description stays within the viewport.');
-    assert.equal(popoverBounds.scrolls, true, 'Long questionnaire description remains scrollable.');
-    await descriptionPopover
-      .getByText(longDescriptionEnd, { exact: true })
-      .scrollIntoViewIfNeeded();
-    await screenshot(`choose-long-description-${width}.png`);
-    await page.keyboard.press('Escape');
-    await descriptionPopover.waitFor({ state: 'hidden' });
-    assert.equal(
-      await descriptionButton.evaluate((element) => element === document.activeElement),
-      true,
+    await description.getByText(longDescriptionEnd, { exact: true }).waitFor();
+    const descriptionMetrics = await description.evaluate((element) => ({
+      overflows: element.scrollWidth > element.clientWidth,
+      clipped: ['hidden', 'clip'].includes(getComputedStyle(element).overflowY),
+    }));
+    assert.deepEqual(
+      descriptionMetrics,
+      { overflows: false, clipped: false },
+      'The complete description wraps without clipping.',
     );
+    await description.getByText(longDescriptionEnd, { exact: true }).scrollIntoViewIfNeeded();
+    await screenshot(`choose-long-description-${width}.png`);
   }
   await screenshot('choose-long-header-mobile.png');
-  // Touch uses the same disclosure, with no hover-only dependency.
+  // Touch readers see the complete guidance immediately, without a disclosure gesture.
   const touchPage = await browser.newPage({
     viewport: { width: 390, height: 844 },
     hasTouch: true,
   });
   await touchPage.goto(fixture.url(longRound));
   const touchFrame = touchPage.frameLocator('iframe');
-  const touchDescription = touchFrame.getByRole('button', { name: 'Description', exact: true });
-  await touchDescription.tap();
-  const touchPopover = touchFrame.getByRole('dialog', { name: 'Questionnaire description' });
-  await touchPopover.waitFor();
-  await touchDescription.tap();
-  await touchPopover.waitFor({ state: 'hidden' });
+  const touchDescription = touchFrame.getByLabel('Questionnaire description', { exact: true });
+  await touchDescription.getByText(longDescriptionEnd, { exact: true }).waitFor();
+  assert.equal(
+    await touchFrame.getByRole('button', { name: 'Description', exact: true }).count(),
+    0,
+  );
+  await touchFrame.getByRole('radio', { name: 'SQLite', exact: true }).tap();
+  assert.equal(
+    await touchFrame.getByRole('radio', { name: 'SQLite', exact: true }).isChecked(),
+    true,
+  );
   assert.equal((await fixture.events(longRound)).length, 0);
   await touchPage.close();
 
@@ -1148,7 +1137,7 @@ try {
     });
   }
   console.log(
-    'Copied skill: choose compact header, optional full-description Popover with keyboard/touch/Escape focus restoration, single/multiple/review progress, long header desktop/390px wrapping and scrollable description; choose compact desktop/mobile layout, independent responsive detail pane with focus/scroll/draft checks, always-visible custom answer, per-option explanation drafts, single exclusivity, multiple option/custom combinations, validation, durable complete answers, failed corrections and new-round isolation; form compact clear actions, wrapping options, inline boolean labels, desktop/mobile geometry, keyboard and required-clear validation, pending freeze, failure drafts and complete corrections; CLI events/ack passed.',
+    'Copied skill: choose compact header, always-readable full Markdown description with touch access, single/multiple/review progress, long header desktop/390px wrapping and untruncated description; choose compact desktop/mobile layout, independent responsive detail pane with focus/scroll/draft checks, always-visible custom answer, per-option explanation drafts, single exclusivity, multiple option/custom combinations, visible invalid rows without forced navigation, durable complete answers, failed corrections and new-round isolation; form compact clear actions, wrapping options, inline boolean labels, desktop/mobile geometry, keyboard and required-clear validation, pending freeze, failure drafts and complete corrections; CLI events/ack passed.',
   );
 } finally {
   await browser?.close();

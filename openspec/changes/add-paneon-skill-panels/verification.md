@@ -305,17 +305,17 @@ PR 工作台、最终指南与选择性重导出修复按 development.md 派工�
 
 首次普通沙箱执行43项中42项通过，真实Unix socket测试listen EPERM；浏览器服务同样listen 127.0.0.1 EPERM。确认权限限制后原样在主机权限下完整复验，43/43及浏览器均通过；没有删用例、延长超时或新增重试。日志：/tmp/paneon-root-accept-build.log、/tmp/paneon-root-init-choose-tests.log、/tmp/paneon-root-init-pty.log、/tmp/paneon-root-choose-browser.log。
 
-最终公共评论/页面/表单集成后的完整回归、独立npm安装包、截图检查及任务勾选仍待本轮后续完成；本节不宣称整个change完成。既有五个页头文件修改原样保留，不纳入这些交付提交。
+最终公共批注/页面/表单集成后的完整回归、独立npm安装包、截图检查及任务勾选仍待本轮后续完成；本节不宣称整个change完成。既有五个页头文件修改原样保留，不纳入这些交付提交。
 
 ### Form B46 main verification
 
-form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看了/source/form-desktop.png、form-mobile.png及form-mobile-actions.png（位于/tmp/paneon-form-ux），确认小清除、短选项同排、长标签换行和布尔控件同排。集成后 PANEON_TEST_ARTIFACTS=/tmp/paneon-root-form-evidence node tests/browser/skill-pages.mjs 再次通过，保留全部choose及form原断言，日志/tmp/paneon-root-form-browser.log。独立包会与最终评论/页面组合版本统一复验。
+form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看了/source/form-desktop.png、form-mobile.png及form-mobile-actions.png（位于/tmp/paneon-form-ux），确认小清除、短选项同排、长标签换行和布尔控件同排。集成后 PANEON_TEST_ARTIFACTS=/tmp/paneon-root-form-evidence node tests/browser/skill-pages.mjs 再次通过，保留全部choose及form原断言，日志/tmp/paneon-root-form-browser.log。独立包会与最终批注/页面组合版本统一复验。
 
-公共组件首提交b33de55非最终交付。准备代码核对时发现DiffView整侧登记ref与局部行号ref不匹配，导致局部行评论无就地编号；已由pages/core确认并修正，采用可选adapter.targetRanges的精确DOM Range桥并复用原映射，不改事件坐标。table行列及Markdown整体对象登记也一并补齐。它们尚未完成最终交付验收，不提前计为通过。
+公共组件首提交b33de55非最终交付。准备代码核对时发现DiffView整侧登记ref与局部行号ref不匹配，导致局部行批注无就地编号；已由pages/core确认并修正，采用可选adapter.targetRanges的精确DOM Range桥并复用原映射，不改事件坐标。table行列及Markdown整体对象登记也一并补齐。它们尚未完成最终交付验收，不提前计为通过。
 
 ## Main final integration acceptance — 2026-10-22
 
-本轮在主分支 0.0.x 集成 init、B43 choose、B44 公共/页面评论、B45 Git 工作台及 B46 form。未推送或发布。此前五个页头相关脏文件保持原样，不纳入本轮提交；最终主树浏览器产物包含这些既有改动，因此截图没有旧外壳。
+本轮在主分支 0.0.x 集成 init、B43 choose、B44 公共/页面批注、B45 Git 工作台及 B46 form。未推送或发布。此前五个页头相关脏文件保持原样，不纳入本轮提交；最终主树浏览器产物包含这些既有改动，因此截图没有旧外壳。
 
 主 agent 已核对源码、原始交付报告及桌面/390px 截图，并实际执行：
 
@@ -331,16 +331,16 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 | init              | 5/5真实PTY，取消/No/Project-Symlink/覆盖汇总/Global-Copy；仅临时home/project                                  |
 | choose/form       | 完整通过；单多选自填混合、独立说明、失败/更正；表单布局、清除、键盘和布尔值                                   |
 | table/Markdown    | 完整通过；多行/列/单元格/精确原文、保存与提交、编号编辑、完整更正                                             |
-| Git及布局         | 完整通过；多仓库/三视图、旧快照/跨视图评论、长行两侧末尾、行号和连续行编号重开、390px                         |
+| Git及布局         | 完整通过；多仓库/三视图、旧快照/跨视图批注、长行两侧末尾、行号和连续行编号重开、390px                         |
 | GitHub PR         | 3/3通过；原生鼠标圈词/复制、正文/diff/check/整PR、失败/更正/覆盖范围及CLI                                     |
-| 并发/Sentinel     | 完整通过；公共评论及原讲解交互、来源和窄屏；这不代表用户亲自体验通过                                          |
-| 公共评论自定义TSX | 最终安装包完整流程及截图通过；临时编辑、多目标、精确Range桥、非法范围拒绝、失败保留、编号定位及CLI events/ack |
+| 并发/Sentinel     | 完整通过；公共批注及原讲解交互、来源和窄屏；这不代表用户亲自体验通过                                          |
+| 公共批注自定义TSX | 最终安装包完整流程及截图通过；临时编辑、多目标、精确Range桥、非法范围拒绝、失败保留、编号定位及CLI events/ack |
 
-日志：/tmp/paneon-root-final-build.log、paneon-root-final-unit.log（首次并发失败）、paneon-root-final-unit-bounded.log、paneon-root-final-lint.log、paneon-root-final-format.log、paneon-root-installed-suites.log，以及paneon-root-installed-{init,chooseForm,tableReview,git,pr,explanations}.log（省略目录者均在/tmp）。安装信息：/tmp/paneon-root-final-package.json；最终截图：/tmp/paneon-root-installed-evidence/{chooseForm,tableReview,git,pr,explanations}/。主 agent 已打开最终Git桌面/窄屏及form桌面截图，确认紧凑布局、评论编辑器及分栏呈现。
+日志：/tmp/paneon-root-final-build.log、paneon-root-final-unit.log（首次并发失败）、paneon-root-final-unit-bounded.log、paneon-root-final-lint.log、paneon-root-final-format.log、paneon-root-installed-suites.log，以及paneon-root-installed-{init,chooseForm,tableReview,git,pr,explanations}.log（省略目录者均在/tmp）。安装信息：/tmp/paneon-root-final-package.json；最终截图：/tmp/paneon-root-installed-evidence/{chooseForm,tableReview,git,pr,explanations}/。主 agent 已打开最终Git桌面/窄屏及form桌面截图，确认紧凑布局、批注编辑器及分栏呈现。
 
 本 change 不整体归档：3.5 中用户亲自体验 Sentinel 尚未完成；paneon update 仍仅记录未来方案，没有混入实现。
 
-公共评论主验收两次失败均保留记录：先是页尾辅助按钮原生点击没有送入子iframe，invalid handler未执行；定位时editor=null、pending=[]，因此不是未保存门控阻止。测试fixture增加50vh滚动余量，辅助命令先真实滚至中部，再原生click，并加强精确非法5..6代理范围必须已新增的断言。之后完整功能及events/ack均通过，但末尾截图marker6点击也未打开editor；截图前补源文本居中及编号DOM实际跟随原文的前提。没有改产品/host、force或evaluate点击、加超时/重试、删原stale及首帧锚定断言。公共组使用同一最终安装包完整复验通过，主agent已查看最终comment-editor.png，日志/tmp/paneon-comment-final-installed-screens.log，截图/tmp/paneon-core-final-installed-screens/；主agent已再次独立执行同一最终安装包完整脚本，全部通过；日志/tmp/paneon-root-installed-feedback-final.log及/tmp/paneon-root-installed-feedback.log，四张截图在/tmp/paneon-root-installed-evidence/feedback/。此前失败日志/tmp/paneon-root-comment-browser.log、/tmp/paneon-root-installed-feedback.log保留。
+公共批注主验收两次失败均保留记录：先是页尾辅助按钮原生点击没有送入子iframe，invalid handler未执行；定位时editor=null、pending=[]，因此不是未保存门控阻止。测试fixture增加50vh滚动余量，辅助命令先真实滚至中部，再原生click，并加强精确非法5..6代理范围必须已新增的断言。之后完整功能及events/ack均通过，但末尾截图marker6点击也未打开editor；截图前补源文本居中及编号DOM实际跟随原文的前提。没有改产品/host、force或evaluate点击、加超时/重试、删原stale及首帧锚定断言。公共组使用同一最终安装包完整复验通过，主agent已查看最终comment-editor.png，日志/tmp/paneon-comment-final-installed-screens.log，截图/tmp/paneon-core-final-installed-screens/；主agent已再次独立执行同一最终安装包完整脚本，全部通过；日志/tmp/paneon-root-installed-feedback-final.log及/tmp/paneon-root-installed-feedback.log，四张截图在/tmp/paneon-root-installed-evidence/feedback/。此前失败日志/tmp/paneon-root-comment-browser.log、/tmp/paneon-root-installed-feedback.log保留。
 
 ### Final disposition
 
@@ -354,7 +354,7 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 - /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
 - /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/comment-interaction.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/annotation-interaction.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/form-layout.md
@@ -362,8 +362,8 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/init-implementation.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/comment-core.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/comment-pages.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/annotation-core.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/annotation-pages.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/form-ux.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/init-cli.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/init-installer.md
@@ -407,7 +407,7 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations.mjs
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback-fixture.txt
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-comment-tools.mjs
+- /Users/yuguo/IdeaProjects/paneon/tests/browser/annotation-tools.mjs
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-fixture.mjs
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-layout.mjs
 - /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review.mjs
@@ -508,9 +508,9 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 同仓库/视图已有内容时保留完整显示状态，成功后才统一替换；读取失败保留原 diff 和选中项并展示错误。描述行固定高度并在其中显示读取提示，不临时插入新行。首次加载和既有请求序号校验保持不变，没有延时/动画遮挡/重试或新的状态协议。
 
-验证结果：npm run typecheck 通过；相关 ESLint、Prettier、OpenSpec strict 和 git diff --check 通过。真实 Chrome 完整 tests/browser/git-review.mjs 通过（包含 verifyGitLayout），覆盖多仓库、未提交/history/compare、刷新及原快照评论、准确文字范围、提交/失败/更正、CLI events/ack，以及原有长代码末尾可达与 390px 布局。新增延迟请求检查：50 行历史不清空，原 row 和 diff DOM 保持连接，文件差异区域位置与尺寸完全不变，显示内容和已选提交一致；503 读取失败保留当前 diff，恢复查询正常。主 agent 查看了加载中截图，确认列表/文件/diff 均保留。
+验证结果：npm run typecheck 通过；相关 ESLint、Prettier、OpenSpec strict 和 git diff --check 通过。真实 Chrome 完整 tests/browser/git-review.mjs 通过（包含 verifyGitLayout），覆盖多仓库、未提交/history/compare、刷新及原快照批注、准确文字范围、提交/失败/更正、CLI events/ack，以及原有长代码末尾可达与 390px 布局。新增延迟请求检查：50 行历史不清空，原 row 和 diff DOM 保持连接，文件差异区域位置与尺寸完全不变，显示内容和已选提交一致；503 读取失败保留当前 diff，恢复查询正常。主 agent 查看了加载中截图，确认列表/文件/diff 均保留。
 
-新增测试往返空提交后需要显式恢复长代码文件，避免把默认第一文件误当成长行 fixture；另将旧的“点击立即选中”断言改为等待实际查询完成后检查选中态。两处测试调整后完整回归通过，没有削弱长行或评论断言。
+新增测试往返空提交后需要显式恢复长代码文件，避免把默认第一文件误当成长行 fixture；另将旧的“点击立即选中”断言改为等待实际查询完成后检查选中态。两处测试调整后完整回归通过，没有削弱长行或批注断言。
 
 日志：/tmp/paneon-git-flicker-final.log、/tmp/paneon-git-flicker-types.log、/tmp/paneon-git-flicker-lint.log。截图：/tmp/paneon-git-flicker-final/git-commit-loading.png、git-history-desktop.png、git-history-mobile.png。没有修改 SDK、Git 查询实现或共享 diff，不重复独立安装包/PR 回归，不宣称这些本轮已重验。没有操作用户当前页面或仓库内容，没有提交/推送，保留所有其他已有改动。
 
@@ -530,9 +530,9 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 单元回归：node --test tests/git-graph.test.ts tests/git-review.test.ts 共 10/10 通过。覆盖二父/三父合并、共同祖先连线、根节点结束、追加任意前缀不改图谱几何，以及真实 Git 的 HEAD、本地/远端分支、轻量/附注/嵌套标签与非 commit 标签排除、detached HEAD。去除新增的 non-null lint warnings 后，图谱 2 项单测再通过；最终 scoped ESLint 为 0 errors/0 warnings（只有本机 npm 配置警告）。最终 npm run typecheck 通过。
 
-真实 Chrome 完整 Git 回归（含评论、切换稳定、失败保留、固定历史分页、长行及移动布局）在源码与独立 npm 安装包均通过。新增断言行高 28、每提交一张 SVG、50→55 条后图谱前缀不变、实际 fork/merge 使用不同 lane、对应行存在 HEAD/分支/远端/标签、没有独立 hash 列、390px 不撑宽文档。现有评论/old-new原文范围、提交更正和 CLI events/ack 保留。独立包 SHA-256：d9c68353904cb7f686d30d409a5add9352b22388670c287ea78c642920ea6c29。其后仅对局部标签做收缩省略样式调整，通过实际应用内浏览器截图复核，不为该纯样式再次跑整套独立包。
+真实 Chrome 完整 Git 回归（含批注、切换稳定、失败保留、固定历史分页、长行及移动布局）在源码与独立 npm 安装包均通过。新增断言行高 28、每提交一张 SVG、50→55 条后图谱前缀不变、实际 fork/merge 使用不同 lane、对应行存在 HEAD/分支/远端/标签、没有独立 hash 列、390px 不撑宽文档。现有批注/old-new原文范围、提交更正和 CLI events/ack 保留。独立包 SHA-256：d9c68353904cb7f686d30d409a5add9352b22388670c287ea78c642920ea6c29。其后仅对局部标签做收缩省略样式调整，通过实际应用内浏览器截图复核，不为该纯样式再次跑整套独立包。
 
-主 agent 已查看源码的桌面与窄屏截图，并在应用内浏览器实际打开独立临时 Git 仓库：6 个真实提交、一次分叉合并、两个 tag、origin/main 和 feature 分支。图和引用与对应行对齐，未提交评论，不刷新用户原页。最终实际截图：/tmp/paneon-git-log-desktop.png；源码截图：/tmp/paneon-git-log-evidence/git-log-graph-desktop.png、git-log-graph-mobile.png。体验链接：http://127.0.0.1:56414/panels/instance-b2b0a587-1a3d-443e-949f-d126d359a3a6 。临时演示仓库在 /tmp/paneon-git-log-demo-6WXtAp/graph-repo，不操作用户仓库。
+主 agent 已查看源码的桌面与窄屏截图，并在应用内浏览器实际打开独立临时 Git 仓库：6 个真实提交、一次分叉合并、两个 tag、origin/main 和 feature 分支。图和引用与对应行对齐，未提交批注，不刷新用户原页。最终实际截图：/tmp/paneon-git-log-desktop.png；源码截图：/tmp/paneon-git-log-evidence/git-log-graph-desktop.png、git-log-graph-mobile.png。体验链接：http://127.0.0.1:56414/panels/instance-b2b0a587-1a3d-443e-949f-d126d359a3a6 。临时演示仓库在 /tmp/paneon-git-log-demo-6WXtAp/graph-repo，不操作用户仓库。
 
 日志：/tmp/paneon-git-log-unit.log、/tmp/paneon-git-graph-final.log、/tmp/paneon-git-log-browser.log、/tmp/paneon-git-log-pack.log、/tmp/paneon-git-log-types-final.log、/tmp/paneon-git-log-lint-final.log。OpenSpec strict、格式和 git diff --check 通过。本轮没有修改共享 diff/SDK 或重复无关 PR 测试；未派 subagent、未提交或推送，其他已有改动保留。
 
@@ -575,7 +575,7 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 ### Findings and fixes
 
 - B54初始实现按短窗口缩小最小值，但右侧两个6rem子区仍保持原最小高度，576/600px下提交说明越过分隔条。subagent移除缩放，保留上区204px、Diff240px、桌面workspace28.5rem；短窗口允许页面纵向滚动。主agent复核实际边界并在集成浏览器回归中重新覆盖。日志 `/tmp/paneon-b54-low-before.log`、`/tmp/paneon-b54-low-after.log`。新Tailwind规则必须完整build生成，未修改compiler或全局样式。
-- B55重复定位完全相同sourceId的评论时，原selected值未变化，无法展开刚收起的目录。主agent先添加真实Chrome回归复现（`/tmp/paneon-b55-repeat-locate-before.log`），再增加页面局部revealKey通知；定位当前列表内快照时清除阻挡搜索。修复后重复定位、折叠后定位、搜索后定位均通过；旧快照仍保持原Diff/banner语义。文件树普通折叠不触发选中滚动。
+- B55重复定位完全相同sourceId的批注时，原selected值未变化，无法展开刚收起的目录。主agent先添加真实Chrome回归复现（`/tmp/paneon-b55-repeat-locate-before.log`），再增加页面局部revealKey通知；定位当前列表内快照时清除阻挡搜索。修复后重复定位、折叠后定位、搜索后定位均通过；旧快照仍保持原Diff/banner语义。文件树普通折叠不触发选中滚动。
 - 原layout测试将目录按钮计为文件，现精确计数 `[data-file-id]`，其余原断言保留。
 - B54浏览器测试曾在ResizeObserver更新前开始新手势，以及在下一次原生pointer事件前等待lostcapture；测试现分别等待真实ARIA约束与容器一致、发送下一次真实pointermove，未添加重试或跳过原几何/capture检查。
 
@@ -584,7 +584,7 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 - `npm run build`（含完整typecheck）通过：`/tmp/paneon-git-final-build.log`。Git页面/辅助模块/相关单测和browser脚本scoped ESLint、Prettier通过：`/tmp/paneon-git-final-lint.log`、`/tmp/paneon-git-final-format.log`。
 - `node --test --test-concurrency=1 tests/git-graph.test.ts tests/git-review.test.ts tests/git-file-tree.test.ts`：20/20，`/tmp/paneon-git-main-unit.log`。覆盖graph父边、真实Git分支/完整消息、目录压缩/分叉/根文件/特殊路径、old/new搜索、area身份与状态模型。
 - 主checkout完整 `PANEON_TEST_ARTIFACTS=/tmp/paneon-git-final-source node tests/browser/git-review.mjs` 通过：真实Chrome拖动/上下限/取消/lostcapture/键盘、576/600/700px及390px、DOM/草稿/横向和纵向滚动保留、单分支/无checkout/完整纯文本说明、250条可见行渲染、原多仓库/精确文字/旧快照/更正/失败/CLI events+ack。日志 `/tmp/paneon-git-final-source.log`。
-- 目录树独立真实Git/Chrome通过，含M/A/D/R100/?颜色与文本、删除Diff、单链压缩/分叉、空格/换行/Unicode/重复文件名、staged与unstaged同路径、搜索/折叠/选择/重复评论定位、history/compare共用树、390px实际宽度。源码修复后日志 `/tmp/paneon-b55-main-accept.log`。
+- 目录树独立真实Git/Chrome通过，含M/A/D/R100/?颜色与文本、删除Diff、单链压缩/分叉、空格/换行/Unicode/重复文件名、staged与unstaged同路径、搜索/折叠/选择/重复批注定位、history/compare共用树、390px实际宽度。源码修复后日志 `/tmp/paneon-b55-main-accept.log`。
 - 成功build后 `npm pack --ignore-scripts`，临时目录真实安装，无源码链接。使用安装包内runtime、skill和CLI，显式设置 `PANEON_TEST_RUNTIME_ENTRY`、`PANEON_TEST_SKILL_SOURCE`、`PANEON_TEST_CLI_ENTRY`，再次运行完整 `git-review.mjs` 和 `git-file-tree.mjs` 均通过：`/tmp/paneon-git-final-package.log`。包SHA-256 `47ab085421825c25ab39de04b4bc4a2e86102241d7e75099ac1c80bf349d31d6`；清单 `/tmp/paneon-git-final-package.json`。这是安装包CLI events/ack的实际验证。
 - 可见Chrome打开新实例并实际将分隔条从277px拖到522px，核对完整目录、状态颜色和多段提交说明。截图 `/tmp/paneon-git-final-visible.png`；新链接 `http://127.0.0.1:56414/panels/instance-f498257c-d9d5-4145-88fa-d9e59a29f79f`。未重载用户原实例或改动其草稿。
 
@@ -599,8 +599,8 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 - `npm run build`（含完整typecheck）通过，日志 `/tmp/paneon-branches-build.log`。实现中TypeScript未对spread的kind排除head，改为显式复制已收窄的kind/name后通过；没有类型断言绕过。
 - `node --test --test-concurrency=1 tests/git-review.test.ts`：9/9，日志 `/tmp/paneon-branches-unit.log`。新增引用分组/完整名称与非commit标签排除断言。
 - Scoped ESLint、Prettier、OpenSpec strict、diff whitespace通过，日志 `/tmp/paneon-branches-lint.log`、`/tmp/paneon-branches-format.log`、`/tmp/paneon-branches-openspec.log`。
-- 完整真实Git/Chrome `PANEON_TEST_ARTIFACTS=/tmp/paneon-branches-source node tests/browser/git-review.mjs` 通过，日志 `/tmp/paneon-branches-browser.log`。新增实际几何断言分支栏在历史左侧、前缀折叠/搜索展开与清空恢复、本地/远程/标签切换、返回HEAD和无checkout；原576/600/700/390px布局、分隔条全手势/键盘、250条历史、完整说明和全部评论/CLI events/ack流程保留并通过。
-- 可见Chrome在新实例实际点击feature/api-settings，确认tip居首、左侧选中态与完整提交说明；键盘调整分隔条仍可用。截图 `/tmp/paneon-branches-visible.png`。体验链接 `http://127.0.0.1:56414/panels/instance-722bf95f-c509-428f-a5c1-190e5cbe0d53`。未重载用户原实例或动其评论草稿。
+- 完整真实Git/Chrome `PANEON_TEST_ARTIFACTS=/tmp/paneon-branches-source node tests/browser/git-review.mjs` 通过，日志 `/tmp/paneon-branches-browser.log`。新增实际几何断言分支栏在历史左侧、前缀折叠/搜索展开与清空恢复、本地/远程/标签切换、返回HEAD和无checkout；原576/600/700/390px布局、分隔条全手势/键盘、250条历史、完整说明和全部批注/CLI events/ack流程保留并通过。
+- 可见Chrome在新实例实际点击feature/api-settings，确认tip居首、左侧选中态与完整提交说明；键盘调整分隔条仍可用。截图 `/tmp/paneon-branches-visible.png`。体验链接 `http://127.0.0.1:56414/panels/instance-722bf95f-c509-428f-a5c1-190e5cbe0d53`。未重载用户原实例或动其批注草稿。
 
 本次没有另行验收独立npm安装包，没有提交、推送或发布。任务3.22完成；其他待验收项不受影响。
 
@@ -610,20 +610,20 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 ### Review findings
 
-- B57 旧测试右手柄测点被未保存整体评论编辑器遮住；改为在真实分隔条范围内查找未遮挡点后使用原生鼠标拖动，没有 force 或合成 pointerdown。B59 进一步验证视觉线外 3px 起拖，保留 12px 热区。
+- B57 旧测试右手柄测点被未保存整体批注编辑器遮住；改为在真实分隔条范围内查找未遮挡点后使用原生鼠标拖动，没有 force 或合成 pointerdown。B59 进一步验证视觉线外 3px 起拖，保留 12px 热区。
 - B58 修复的是已复现的选择、保存和后续 DOM 更新长任务，不声称复现了用户原始 renderer 崩溃。300 行收集 4123→106ms；1200 行保存 6979→527ms。详细根因、CPU profile、全选/复制及验证边界见 [git-performance-review.md](git-performance-review.md)。
 - B58 旧完整 Git fixture 曾历史读取超时；独立诊断请求实际 HTTP200/7791ms，随后遇到已修的旧 B57 遮挡测点。最终主 checkout 最新布局完整 Git 回归已通过，没有放宽加载超时。
-- 合并后首次完整 Git 测试在保存双侧评论后立即读取标记数量，赶在 B58 合并动画帧测量之前，得到0。主 agent 将断言改为等待两侧实际标记出现；完整回归通过，数量仍严格要求2，没有削弱定位检查。
+- 合并后首次完整 Git 测试在保存双侧批注后立即读取标记数量，赶在 B58 合并动画帧测量之前，得到0。主 agent 将断言改为等待两侧实际标记出现；完整回归通过，数量仍严格要求2，没有削弱定位检查。
 - 同步规范，明确历史切换后点文件才开 Diff，并移除已过时的标准页搜索框要求。初始化横向分隔条尺寸也统一为1px。
 
 ### Main checkout verification
 
 - 完整 build/typecheck：`/tmp/paneon-accept-build.log`。相关 ESLint：`/tmp/paneon-accept-lint.log`。
 - Git/graph/tree 20/20：`/tmp/paneon-integrated-git-unit.log`；feedback/字素/索引/Markdown/PR 18/18：`/tmp/paneon-accept-feedback-unit.log`。
-- 完整 Git Chrome：`/tmp/paneon-accept-git-browser2.log`。两条竖线及上下分隔条真实拖动、极限、capture/取消、键盘、resize/窄屏、同会话比例、原草稿/滚动保留；分支范围/不checkout、完整提交说明、250条窗口历史、多仓库、原文评论/旧快照、更正/失败与 CLI events/ack 全通过。
+- 完整 Git Chrome：`/tmp/paneon-accept-git-browser2.log`。两条竖线及上下分隔条真实拖动、极限、capture/取消、键盘、resize/窄屏、同会话比例、原草稿/滚动保留；分支范围/不checkout、完整提交说明、250条窗口历史、多仓库、原文批注/旧快照、更正/失败与 CLI events/ack 全通过。
 - 新的可见 Chrome 实例实际点文件展开 Diff、键盘调整右栏宽度，检查紧凑文件/完整消息、状态颜色、细线及明确工具栏；截图 `/tmp/paneon-accept-visible.png`。新体验链接 `http://127.0.0.1:56414/panels/instance-5463dba6-95ae-4112-b996-28b22dc72d33`。没有重载用户原实例或更改其草稿。
 
-- 合并后目录树、三hunk工具栏、全选、公共评论、PR Chrome 都通过，日志 `/tmp/paneon-accept-{tree,toolbar,select-all,feedback,pr}.log`；PR 3/3。主验收双侧各600行/15600 spans，全选收集111/199/152ms、保存447ms、超限拒绝250ms；真实剪贴板、完整源范围、emoji精确提交与失败保留都通过。性能数字只代表该fixture，仍有小于半秒的长任务，不承诺任意大文件无卡顿。
+- 合并后目录树、三hunk工具栏、全选、公共批注、PR Chrome 都通过，日志 `/tmp/paneon-accept-{tree,toolbar,select-all,feedback,pr}.log`；PR 3/3。主验收双侧各600行/15600 spans，全选收集111/199/152ms、保存447ms、超限拒绝250ms；真实剪贴板、完整源范围、emoji精确提交与失败保留都通过。性能数字只代表该fixture，仍有小于半秒的长任务，不承诺任意大文件无卡顿。
 
 - 独立安装包复验通过：成功构建后 npm pack --ignore-scripts，在临时目录真实 npm install，以安装包内 runtime、完整 skill 和 CLI 运行完整 Git Chrome 与目录树 Chrome。日志 `/tmp/paneon-accept-package.log`；清单 `/tmp/paneon-git-final-package.json`；SHA-256 `937d4732548da72130bcd8d7692a2d11b8d9c43299bd7eddcbc9ce52de4a9532`。格式、OpenSpec strict 和 diff whitespace 也通过。
 
@@ -636,7 +636,7 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 - B61 `354f65d → 20f066d`：自由翻题；B63 `5216477 → 6eb3730`：精简题头。
 - B62 `f5cf12f → bc225e5`：省略输入选项默认空对象。
 - B64 `6ce2ddc → b90b384`：居中单列表单。
-- B65 `6ce2ddc → 44e4777`：紧凑表格及公共评论控件组合。
+- B65 `6ce2ddc → 44e4777`：紧凑表格及公共批注控件组合。
 
 最终主工作区证据：
 
@@ -644,7 +644,7 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 - 真实 CLI、choose/form/table及公共反馈相关单测32/32：`/tmp/paneon-parent-units.log`。省略输入仍经过原 schema，非法显式 JSON/两源冲突不被放宽。
 - 完整 choose/form Chrome：`/tmp/paneon-parent-choose-form.log`；桌面/390px、说明打开关闭/键盘焦点、自由翻题/独立汇总及提交更正失败。
 - 表单真实几何及交互：`/tmp/paneon-parent-form-responsive.log`；1440/2560px、360px iframe、390/320px，列宽640上限，数字144px，选择区/清除相邻，无页面横溢。
-- 表格完整交互与布局：`/tmp/paneon-parent-table-review.log`、`/tmp/paneon-parent-table-layout.log`；桌面/390px、长文本、多列区域横滚、筛选重置、原文范围和评论/更正；桌面短行40px，窄屏自然增高。
+- 表格完整交互与布局：`/tmp/paneon-parent-table-review.log`、`/tmp/paneon-parent-table-layout.log`；桌面/390px、长文本、多列区域横滚、筛选重置、原文范围和批注/更正；桌面短行40px，窄屏自然增高。
 - 公共反馈/Git/PR Chrome：`/tmp/paneon-parent-feedback.log`、`/tmp/paneon-parent-git-review.log`、`/tmp/paneon-parent-github-pr.log`，均通过；PR3/3。
 - 最终独立安装包：`/tmp/paneon-parent-package.log`，真实 npm install 后使用包内 runtime/UI/skill/CLI，完整 choose/form 及 table/review 均通过。
 - scoped ESLint、Prettier、OpenSpec strict 和 diff whitespace 通过；日志 `/tmp/paneon-parent-{lint,format,script-lint,script-format,openspec}.log`。
@@ -653,6 +653,6 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 验收定位并修正两个测试问题：form-responsive 原假定宿主有 main，现按实际结构测量；skill-pages 弹层 opacity 断言原仅在截图开关开启时等待动画，现始终等待实际动画完成。没有为通过验证改产品 schema 或删除旧断言。首次受沙箱 listen EPERM 阻止的测试在获准的本机进程环境复跑通过，不计为产品失败。
 
-B65 另在旧有外框宿主隔离基线复现 iframe 外释放分栏拖拽只到达父文档，200ms后仍保留状态；详见 table-layout.md 的原始日志。本次主工作区全屏宿主下完整 Git 布局、双侧拖拽/边界/cancel 与评论均通过，未将该旧宿主问题冒充本次修复。
+B65 另在旧有外框宿主隔离基线复现 iframe 外释放分栏拖拽只到达父文档，200ms后仍保留状态；详见 table-layout.md 的原始日志。本次主工作区全屏宿主下完整 Git 布局、双侧拖拽/边界/cancel 与批注均通过，未将该旧宿主问题冒充本次修复。
 
 不新增主题/语言开发，不更新用户全局安装，不 push；Sentinel用户体验等既有未完成事项保持原状态。

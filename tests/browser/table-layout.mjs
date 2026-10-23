@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 import { layoutInput, longNote, startTableLayoutFixture } from './table-layout-fixture.mjs';
 
 const fixture = await startTableLayoutFixture();
@@ -140,7 +140,7 @@ try {
     await page.keyboard.press('Escape');
     await frame.getByRole('checkbox', { name: '选择当前页的行', exact: true }).check();
     await screenshot('selected');
-    const comments = commentTools(frame, page);
+    const comments = annotationTools(frame, page);
     await comments.write('本页三行');
     await comments.save();
     await measure('saved-comment');
@@ -152,7 +152,7 @@ try {
       '0',
     );
     assert.equal(await comments.text(1), '本页三行');
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('status').waitFor();
     const first = (await fixture.events(fixture.normal)).at(-1);
     assert.deepEqual(
@@ -161,9 +161,9 @@ try {
     );
     await button('修改反馈').click();
     await comments.edit(1);
-    await frame.getByLabel('评论内容', { exact: true }).fill('本页三行更正');
+    await frame.getByLabel('批注内容', { exact: true }).fill('本页三行更正');
     await comments.save();
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('status').waitFor();
     const correction = (await fixture.events(fixture.normal)).at(-1);
     assert.equal(correction.payload.replacesEventId, first.id);
@@ -205,10 +205,10 @@ try {
       selection.addRange(range);
       node.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
-    const longComments = commentTools(frame, page);
+    const longComments = annotationTools(frame, page);
     await longComments.write('原文坐标');
     await longComments.save();
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('status').waitFor();
     const event = (await fixture.events(fixture.long)).at(-1);
     assert.deepEqual(event.payload.annotations[0].targets[0], {
@@ -238,7 +238,7 @@ try {
     await writeFile(join(artifacts, 'table-layout-metrics.json'), JSON.stringify(metrics, null, 2));
   console.log(JSON.stringify(metrics, null, 2));
   console.log(
-    'Table layout Chrome: desktop/390px, keyboard/touch Popovers, compact density, raw types, filters/removal/reset, sorting/pagination, page-row comments, cross-page locate/correction, long source UTF-16, many-column scrolling, empty/no-match all passed.',
+    'Table layout Chrome: desktop/390px, keyboard/touch Popovers, compact density, raw types, filters/removal/reset, sorting/pagination, page-row annotations, cross-page locate/correction, long source UTF-16, many-column scrolling, empty/no-match all passed.',
   );
 } finally {
   await browser?.close();

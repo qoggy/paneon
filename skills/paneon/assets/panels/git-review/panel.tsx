@@ -15,13 +15,14 @@ import {
 import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
 import { diffTargetText } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
-import { readGit, validateGitFeedback } from './git.ts';
+import { readGit, readGitFile, validateGitFeedback } from './git.ts';
 import { CommitDetails, HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
 import { Branches } from './branches.tsx';
 import { useHistorySplit } from './history-split.ts';
 import { useHistoryColumns } from './history-columns.ts';
-import type { GitListing, GitRequest, GitSnapshot } from './git.ts';
+import { useFileSplit } from './file-split.ts';
+import type { GitFile, GitListing, GitRequest, GitSnapshot } from './git.ts';
 import { gitFeedbackSchema, gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
 import type { GitRef, GitReviewParams } from './schema.ts';
 
@@ -37,6 +38,9 @@ const requestSchema = z
     tip: z.string().optional(),
     offset: z.number().int().nonnegative().optional(),
     file: z.string().optional(),
+    historyId: z.string().optional(),
+    listingId: z.string().optional(),
+    area: z.enum(['staged', 'unstaged', 'untracked']).optional(),
   })
   .strict();
 export const queryGit = serverAction({
@@ -47,6 +51,34 @@ export const queryGit = serverAction({
       return {
         ok: true as const,
         data: await readGit(input.params, input.sessionId, input.request, ctx.signal),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+});
+export const queryGitFile = serverAction({
+  kind: 'query',
+  input: z.object({
+    params: gitReviewParamsSchema,
+    sessionId: z.string(),
+    listingId: z.string(),
+    fileId: z.string(),
+  }),
+  handler: async (ctx, input) => {
+    try {
+      return {
+        ok: true as const,
+        data: await readGitFile(
+          input.params,
+          input.sessionId,
+          input.listingId,
+          input.fileId,
+          ctx.signal,
+        ),
       };
     } catch (error) {
       return {
@@ -78,7 +110,12 @@ export const checkFeedback = serverAction({
   },
 });
 
-type ViewState = { request: GitRequest; listing?: GitListing; selected?: string };
+type ViewState = {
+  request: GitRequest;
+  listing?: GitListing;
+  selected?: string;
+  selectedFile?: string;
+};
 function initialRequest(params: GitReviewParams): GitRequest {
   return params.initialView ?? { repositoryId: params.repositories[0].id, type: 'changes' };
 }
@@ -92,6 +129,8 @@ function Review() {
   const historyColumns = useHistoryColumns(view.request.type === 'history');
   const views = useRef(new Map<string, ViewState>());
   const snapshots = useRef(new Map<string, GitSnapshot>());
+  const fileSnapshots = useRef(new Map<string, GitSnapshot>());
+  const [collapsed, setCollapsed] = useState(true);
   const activeKey = useRef(keyOf(first));
   const serial = useRef(0);
   const [pending, setPending] = useState(false),
@@ -106,7 +145,7 @@ function Review() {
       !feedback.comment?.trim()
     )
       throw new SubmissionError(
-        'First submission requires selected content or an overall comment.',
+        'First submission requires selected content or an overall annotation.',
       );
     const result = await checkFeedback({ params, sessionId, feedback });
     if (!result.ok) throw new Error(result.message);
@@ -127,63 +166,81 @@ function Review() {
     setPending(true);
     setError('');
     const previous = views.current.get(key);
-    // Keep the displayed commit, files and diff consistent until the replacement is ready.
-    if (!more && !previous?.listing) save({ request });
+    if (!more) {
+      setOldSnapshot(undefined);
+      setCollapsed(true);
+      const sameGraph =
+        request.type === 'history' &&
+        request.historyId &&
+        request.historyId === previous?.listing?.historyId;
+      // Selection responds immediately. Old files/details must never masquerade as the requested commit.
+      save({
+        request,
+        ...(sameGraph && previous?.listing
+          ? {
+              listing: {
+                ...previous.listing,
+                files: [],
+                snapshots: [],
+                description: '',
+                descriptionUI: { key: '' },
+                history: previous.listing.history
+                  ? { ...previous.listing.history, selectedCommit: undefined }
+                  : undefined,
+              },
+            }
+          : {}),
+      });
+    }
     try {
-      const result = await queryGit({ params, sessionId, request });
+      const result = await queryGit({
+        params,
+        sessionId,
+        request:
+          more && previous?.listing
+            ? { ...request, listingId: previous.listing.listingId }
+            : request,
+      });
       if (!result.ok) throw new Error(result.message);
-      const listing = result.data;
       if (id !== serial.current || activeKey.current !== key) return;
-      listing.snapshots.forEach((snapshot) => snapshots.current.set(snapshot.id, snapshot));
-      if (more && previous?.listing?.history && listing.history) {
-        listing.history.commits = [...previous.listing.history.commits, ...listing.history.commits];
+      const listing = result.data;
+      listing.snapshots.forEach((snapshot) => {
+        snapshots.current.set(snapshot.id, snapshot);
+        fileSnapshots.current.set(`${listing.listingId}:${snapshot.fileId}`, snapshot);
+      });
+      if (
+        listing.history &&
+        previous?.listing?.history &&
+        listing.historyId === previous.listing.historyId
+      ) {
+        listing.history.commits = more
+          ? [...previous.listing.history.commits, ...listing.history.commits]
+          : previous.listing.history.commits;
+        if (!more) listing.history.hasMore = previous.listing.history.hasMore;
+        listing.historyRefs = previous.listing.historyRefs;
+        listing.branches = previous.listing.branches;
+      }
+      if (more && previous?.listing) {
+        listing.files = previous.listing.files;
+        listing.listingId = previous.listing.listingId;
         listing.snapshots = previous.listing.snapshots;
         listing.description = previous.listing.description;
         listing.descriptionUI = previous.listing.descriptionUI;
-        listing.history.selectedCommit = previous.listing.history.selectedCommit;
+        if (listing.history)
+          listing.history.selectedCommit = previous.listing.history?.selectedCommit;
       }
-      const sameHistory =
-        request.type !== 'history' ||
-        ((request.branch ?? 'HEAD') === (previous?.request.branch ?? 'HEAD') &&
-          listing.history?.selectedCommit?.oid === previous?.listing?.history?.selectedCommit?.oid);
-      let selected = request.file
-        ? listing.snapshots.find(
-            (s) => s.source.old?.path === request.file || s.source.new?.path === request.file,
-          )?.id
-        : sameHistory
-          ? previous?.selected
-          : undefined;
-      if (selected && !listing.snapshots.some((s) => s.id === selected)) {
-        const original = snapshots.current.get(selected)?.source;
-        selected = listing.snapshots.find(
-          (s) =>
-            s.source.old?.path === original?.old?.path &&
-            s.source.new?.path === original?.new?.path &&
-            s.source.view.type === original?.view.type &&
-            (s.source.view.type !== 'changes' ||
-              (original?.view.type === 'changes' && s.source.view.area === original.view.area)),
-        )?.id;
-      }
-      if (
-        !more &&
-        request.commit &&
-        listing.history?.tip === previous?.listing?.history?.tip &&
-        previous?.listing?.history &&
-        listing.history &&
-        previous.listing.history.commits.length > listing.history.commits.length
-      ) {
-        listing.history.commits = previous.listing.history.commits;
-        listing.history.hasMore = previous.listing.history.hasMore;
-      }
-      setOldSnapshot(undefined);
+      const selected = more ? previous?.selected : listing.snapshots[0]?.id;
+      const selectedFile = more ? previous?.selectedFile : listing.snapshots[0]?.fileId;
+      if (!more) setCollapsed(!selected);
       save({
-        request: { ...request, ...(listing.history?.tip ? { tip: listing.history.tip } : {}) },
+        request: {
+          ...request,
+          ...(listing.history?.tip ? { tip: listing.history.tip } : {}),
+          ...(listing.historyId ? { historyId: listing.historyId } : {}),
+        },
         listing,
-        selected: listing.snapshots.some((s) => s.id === selected)
-          ? selected
-          : request.type === 'history'
-            ? undefined
-            : listing.snapshots[0]?.id,
+        selected,
+        selectedFile,
       });
     } catch (failure) {
       if (id === serial.current)
@@ -191,6 +248,48 @@ function Review() {
     } finally {
       if (id === serial.current) setPending(false);
     }
+  }
+  async function openFile(file: GitFile) {
+    const listing = view.listing;
+    if (!listing) return;
+    const id = ++serial.current;
+    setOldSnapshot(undefined);
+    setError('');
+    const known = fileSnapshots.current.get(`${listing.listingId}:${file.id}`);
+    setCollapsed(false);
+    save({ ...view, selectedFile: file.id, selected: known?.id });
+    if (known) {
+      setPending(false);
+      return;
+    }
+    setPending(true);
+    try {
+      const result = await queryGitFile({
+        params,
+        sessionId,
+        listingId: listing.listingId,
+        fileId: file.id,
+      });
+      if (!result.ok) throw new Error(result.message);
+      if (id !== serial.current) return;
+      snapshots.current.set(result.data.id, result.data);
+      fileSnapshots.current.set(`${listing.listingId}:${file.id}`, result.data);
+      save({ ...view, selectedFile: file.id, selected: result.data.id });
+    } catch (failure) {
+      if (id === serial.current)
+        setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      if (id === serial.current) setPending(false);
+    }
+  }
+  function collapseDiff() {
+    setCollapsed(true);
+    const file = [...document.querySelectorAll<HTMLElement>('[data-file-id]')].find(
+      (element) => element.dataset.fileId === view.selectedFile,
+    );
+    (file ?? document.querySelector<HTMLElement>('[data-commit-id][aria-pressed=true]'))?.focus({
+      preventScroll: true,
+    });
   }
   useEffect(() => {
     void load(first); /* One initial navigation; file data updates are explicit. */
@@ -200,11 +299,13 @@ function Review() {
     setPending(false);
     setError('');
     setOldSnapshot(undefined);
+    setCollapsed(true);
     const key = `${repositoryId}:${type}`;
     activeKey.current = key;
     const saved = views.current.get(key);
     if (saved) {
       setView(saved);
+      setCollapsed(!saved.selected);
       return;
     }
     const request: GitRequest = { repositoryId, type };
@@ -218,8 +319,14 @@ function Review() {
     save({ ...view, request: { ...view.request, ...patch } });
   }
   const selected = oldSnapshot ?? snapshots.current.get(view.selected ?? '');
-  const historyDiff = view.request.type === 'history' && !!selected;
+  const historyDiff = view.request.type === 'history' && !!selected && !collapsed;
   const historySplit = useHistorySplit(historyDiff);
+  const fileDiff = view.request.type !== 'history' && !!selected && !collapsed;
+  const fileDivider = useFileSplit(
+    historySplit.workspaceRef,
+    fileDiff,
+    t('调整文件列表与差异宽度'),
+  );
   const listing = view.listing,
     request = view.request;
   const fileList = (
@@ -227,20 +334,22 @@ function Review() {
       className={`flex max-h-64 min-h-0 min-w-0 flex-col ${request.type === 'history' ? 'md:max-h-1/2' : 'md:max-h-none'}`}
       aria-label={t('改动文件')}
     >
-      <div className="min-h-0 overflow-auto p-1" data-file-scroll="">
-        {listing?.snapshots.length === 0 && (
+      <div className="min-h-0 overflow-auto p-1" data-file-scroll="" aria-busy={pending}>
+        {pending && !listing?.files.length && (
+          <p role="status" className="p-2 text-xs text-muted-foreground">
+            {t('读取 Git…')}
+          </p>
+        )}
+        {listing?.files.length === 0 && !pending && (
           <p className="p-2 text-sm">{t('该范围没有文件改动。')}</p>
         )}
         <ChangedFileTree
-          snapshots={listing?.snapshots ?? []}
-          selectedId={selected?.id}
+          snapshots={listing?.files ?? []}
+          selectedId={oldSnapshot?.fileId ?? view.selectedFile}
           filter=""
           scopeKey={keyOf(request)}
           revealKey={fileReveal}
-          onSelect={(snapshot) => {
-            setOldSnapshot(undefined);
-            save({ ...view, selected: snapshot.id });
-          }}
+          onSelect={(file) => void openFile(file)}
         />
       </div>
     </aside>
@@ -271,6 +380,7 @@ function Review() {
           const snapshot = snapshots.current.get(target.ref.sourceId);
           if (snapshot) {
             setOldSnapshot(snapshot);
+            setCollapsed(false);
             setLocateTarget(target);
             setFileReveal((value) => value + 1);
             await new Promise<void>((done) =>
@@ -293,11 +403,11 @@ function Review() {
           >
             {params.title ?? t('Git 审阅')}
           </h1>
-          <span className="text-xs text-muted-foreground">{t('只读审阅 · 评论提交给当前 AI')}</span>
+          <span className="text-xs text-muted-foreground">{t('只读审阅 · 批注提交给当前 AI')}</span>
         </header>
         <div
           className="flex flex-wrap items-center gap-2 border-b pb-3"
-          aria-label={t('Git 与评论操作')}
+          aria-label={t('Git 与批注操作')}
         >
           <label className="flex items-center gap-2 text-sm">
             {t('仓库')}
@@ -332,8 +442,24 @@ function Review() {
             variant="outline"
             disabled={pending}
             onClick={() => {
-              const { tip: _tip, offset: _offset, file: _file, ...refresh } = request;
-              void load(refresh);
+              const {
+                tip: _tip,
+                offset: _offset,
+                file: _file,
+                historyId: _historyId,
+                ...refresh
+              } = request;
+              void load({
+                ...refresh,
+                ...(selected && !oldSnapshot
+                  ? {
+                      file: selected.source.new?.path ?? selected.source.old?.path,
+                      ...(selected.source.view.type === 'changes'
+                        ? { area: selected.source.view.area }
+                        : {}),
+                    }
+                  : {}),
+              });
             }}
           >
             {request.type === 'changes'
@@ -433,7 +559,7 @@ function Review() {
           ref={historySplit.workspaceRef}
           style={historySplit.workspaceStyle}
           data-git-workspace=""
-          className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(27.75rem+1px)] md:grid-rows-[var(--history-rows)] md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : 'md:grid-cols-[minmax(13rem,1fr)_minmax(0,4fr)]'}`}
+          className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(27.75rem+1px)] md:grid-rows-[var(--history-rows)] md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-[var(--file-columns,13rem_1px_minmax(0,1fr))] md:gap-x-0' : 'md:grid-cols-1'}`}
         >
           {request.type === 'history' ? (
             <div
@@ -449,6 +575,8 @@ function Review() {
                 currentBranch={listing?.currentBranch}
                 onSelect={(branch) => {
                   const {
+                    area: _area,
+                    historyId: _historyId,
                     tip: _tip,
                     commit: _commit,
                     offset: _offset,
@@ -479,9 +607,15 @@ function Review() {
                   <HistoryRows
                     key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
                     commits={listing?.history?.commits ?? []}
-                    selected={listing?.history?.selectedCommit?.oid}
+                    selected={request.commit ?? listing?.history?.selectedCommit?.oid}
                     onSelect={(commit) =>
-                      void load({ ...request, offset: 0, file: undefined, commit: commit.oid })
+                      void load({
+                        ...request,
+                        offset: 0,
+                        file: undefined,
+                        area: undefined,
+                        commit: commit.oid,
+                      })
                     }
                   />
                   {listing?.history?.hasMore && (
@@ -518,6 +652,17 @@ function Review() {
           ) : (
             fileList
           )}
+          {fileDiff && (
+            <div
+              {...fileDivider}
+              className="relative hidden bg-border outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground md:block"
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize touch-none hover:bg-muted-foreground/15"
+              />
+            </div>
+          )}
           {historyDiff && (
             <div
               {...historySplit.dividerProps}
@@ -529,11 +674,14 @@ function Review() {
               />
             </div>
           )}
-          {(request.type !== 'history' || selected) && (
+          {selected && (
             <section
               aria-label={t('文件差异')}
-              className="max-h-[70dvh] min-h-0 min-w-0 overflow-auto rounded-md border p-3 md:max-h-none"
+              className="max-h-[70dvh] min-h-0 min-w-0 overflow-auto rounded-md border md:max-h-none"
               data-git-diff-scroll=""
+              hidden={collapsed}
+              inert={collapsed}
+              style={{ display: collapsed ? 'none' : undefined }}
             >
               {oldSnapshot && (
                 <div
@@ -557,7 +705,7 @@ function Review() {
                             untracked: t('未跟踪文件'),
                           }[oldSnapshot.source.view.area]
                         : `${oldSnapshot.source.view.baseCommit.slice(0, 10)} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
-                    {t('· 评论仍指向原内容')}
+                    {t('· 批注仍指向原内容')}
                   </span>
                   <Button size="sm" variant="outline" onClick={() => setOldSnapshot(undefined)}>
                     {t('返回当前浏览')}
@@ -575,11 +723,38 @@ function Review() {
                     key={selected.id}
                     sourceId={selected.id}
                     model={selected.model}
+                    defaultExpanded
+                    onCollapse={collapseDiff}
                     locateTarget={
                       locateTarget?.ref.sourceId === selected.id ? locateTarget : undefined
                     }
                     oldPath={selected.source.old?.path}
                     newPath={selected.source.new?.path}
+                    oldRevision={
+                      !selected.source.old
+                        ? '∅'
+                        : selected.source.view.type === 'history'
+                          ? (selected.source.view.parent?.slice(0, 8) ?? '∅')
+                          : selected.source.view.type === 'compare'
+                            ? (
+                                selected.source.view.mergeBaseCommit ??
+                                selected.source.view.baseCommit
+                              ).slice(0, 8)
+                            : selected.source.view.area === 'staged'
+                              ? (selected.source.view.headCommit?.slice(0, 8) ?? '∅')
+                              : t('暂存区')
+                    }
+                    newRevision={
+                      !selected.source.new
+                        ? '∅'
+                        : selected.source.view.type === 'history'
+                          ? selected.source.view.commit.slice(0, 8)
+                          : selected.source.view.type === 'compare'
+                            ? selected.source.view.headCommit.slice(0, 8)
+                            : selected.source.view.area === 'staged'
+                              ? t('暂存区')
+                              : t('工作区')
+                    }
                     fileOnly={
                       selected.source.old?.type === 'binary' ||
                       selected.source.new?.type === 'binary'

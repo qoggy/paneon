@@ -18,7 +18,7 @@ Agent-facing usage instructions SHALL be maintained only within the product skil
 
 ### Requirement: Supply an interactive data table as a standard panel
 
-The product skill SHALL include a ready-to-run interactive data table panel. The caller SHALL be able to supply task-specific table data without rewriting the panel's TSX. The panel SHALL keep supplied cell data read-only and support selecting rows, columns, and individual cells for feedback. Results SHALL distinguish selection kinds and identify rows by their original zero-based index in the instance's input rows snapshot, columns by column key, and cells by both rather than visible positions. The input SHALL NOT require a rowKey option or a caller-supplied id field. Sorting, filtering, and pagination SHALL preserve that original index. The panel SHALL reuse the common feedback capabilities, allow mixed row, column, cell, and cell-text targets within one submission, and support multiple independent annotations. All selected targets SHALL use annotations entries, with an empty comment representing selection without a written opinion rather than a separate selected list. Exact validation and location contracts SHALL be finalized in the design before implementation.
+The product skill SHALL include a ready-to-run interactive data table panel. The caller SHALL be able to supply task-specific table data without rewriting the panel's TSX. The panel SHALL keep supplied cell data read-only and support selecting rows, columns, and individual cells for feedback. Results SHALL distinguish selection kinds and identify rows by their original zero-based index in the instance's input rows snapshot, columns by column key, and cells by both rather than visible positions. The input SHALL NOT require a rowKey option or a caller-supplied id field. Sorting, filtering, and pagination SHALL preserve that original index. The panel SHALL reuse the common feedback capabilities, allow mixed row, column, cell, and cell-text targets within one submission, and support multiple independent annotations. All selected targets SHALL use annotations entries, with an empty annotation representing selection without a written opinion rather than a separate selected list. Exact validation and location contracts SHALL be finalized in the design before implementation.
 
 #### Scenario: Present data without authoring a table page
 
@@ -113,7 +113,7 @@ The panel SHALL emit form-submitted with a values object keyed by field name, wi
 
 The skill SHALL provide a content-review panel accepting title and a complete markdown string without requiring callers to split the document into sections or assign paragraph identifiers. The panel SHALL render that document using the existing Markdown presentation and allow feedback on the whole document, body paragraphs, and selected body words or phrases. It SHALL preserve ordinary reading and text copying and allow editing or deleting feedback drafts before explicit submission.
 
-The panel SHALL use the common annotations structure, including empty comments for selection without an opinion, and SHALL emit review-submitted only on explicit submission. Whole-document targets SHALL use a document reference without a text range. Paragraph and phrase targets SHALL retain source Markdown UTF-16 offsets and an exact quote matching the saved input substring. A Markdown-specific adapter SHALL map rendered selections to their original source ranges rather than treating display offsets as source offsets. A discontiguous source mapping SHALL use multiple targets in the same entry without silently dropping selected content. This requirement SHALL NOT imply selecting arbitrary internal coordinates of rendered diagrams.
+The panel SHALL use the common annotations structure, including empty annotations for selection without an opinion, and SHALL emit review-submitted only on explicit submission. Whole-document targets SHALL use a document reference without a text range. Paragraph and phrase targets SHALL retain source Markdown UTF-16 offsets and an exact quote matching the saved input substring. A Markdown-specific adapter SHALL map rendered selections to their original source ranges rather than treating display offsets as source offsets. A discontiguous source mapping SHALL use multiple targets in the same entry without silently dropping selected content. This requirement SHALL NOT imply selecting arbitrary internal coordinates of rendered diagrams.
 
 The instance SHALL retain its original input while being reviewed. Results SHALL NOT duplicate the complete Markdown. Event-saving failures SHALL preserve feedback drafts and SHALL NOT be shown as successful submissions. The page SHALL collect opinions while leaving edits to the document itself to the agent.
 
@@ -334,7 +334,7 @@ The PR example SHALL declare pr-feedback-submitted using PRFeedbackSubmitted fro
 
 #### Scenario: PR content changes without changing head
 
-- **WHEN** a person comments on a description or check and later refreshes that PR
+- **WHEN** a person annotations on a description or check and later refreshes that PR
 - **THEN** the submitted feedback retains the original content association and observation, rather than treating the unchanged head OID as the description or check version
 
 ### Requirement: Keep table navigation separate from target identity
@@ -443,7 +443,7 @@ The Git history SHALL support arrow, Home/End and PageUp/PageDown keyboard navig
 
 ### Requirement: Adjust the history and diff split without replacing review state
 
-The desktop history view SHALL provide a pointer-draggable and keyboard-accessible horizontal separator between the entire history/files/details region and the diff region. Resizing SHALL change only layout and SHALL preserve mounted review content, selected commits/files, loaded history, scroll positions where still valid, and comment drafts without querying Git or emitting events. Minimum sizes SHALL accommodate each pane's real children; short windows SHALL allow page scrolling rather than overlap panes. Ending or cancelling a drag, leaving history, or switching to a narrow layout SHALL release capture and restore temporary interaction styles. Narrow layouts SHALL retain stacked content without the desktop separator.
+The desktop history view SHALL provide a pointer-draggable and keyboard-accessible horizontal separator between the entire history/files/details region and the diff region. Resizing SHALL change only layout and SHALL preserve mounted review content, selected commits/files, loaded history, scroll positions where still valid, and annotation drafts without querying Git or emitting events. Minimum sizes SHALL accommodate each pane's real children; short windows SHALL allow page scrolling rather than overlap panes. Ending or cancelling a drag, leaving history, or switching to a narrow layout SHALL release capture and restore temporary interaction styles. Narrow layouts SHALL retain stacked content without the desktop separator.
 
 #### Scenario: Resize while reviewing a commit
 
@@ -501,21 +501,21 @@ The desktop history region SHALL provide two vertical draggable separators aroun
 
 ### Requirement: Compact history with explicit file opening
 
-The standard Git history page SHALL use visually one-pixel separators while preserving pointer drag hit areas and keyboard access. It SHALL omit the visible commit-details title bar, retain complete plain-text messages and metadata, and place the message directly after the changed-file tree. Selecting another branch or commit SHALL clear the open file and hide the diff; history SHALL use the available workspace until a file is chosen. An explicit initial file SHALL open its diff, refreshing the same commit SHALL preserve a chosen file, and locating a retained comment SHALL reveal its original snapshot.
+The standard Git history page SHALL use visually one-pixel separators while preserving pointer drag hit areas and keyboard access. It SHALL omit the visible commit-details title bar, retain complete plain-text messages and metadata, and place the message directly after the changed-file tree. Selecting another branch or commit SHALL clear the open file and hide the diff; history SHALL use the available workspace until a file is chosen. An explicit initial file SHALL open its diff, refreshing the same commit SHALL preserve a chosen file, and locating a retained annotation SHALL reveal its original snapshot.
 
 #### Scenario: Browse history before opening a file
 
 - **WHEN** the user selects another commit
-- **THEN** its files and complete message appear with no default file diff, and clicking a file opens the diff without discarding comments
+- **THEN** its files and complete message appear with no default file diff, and clicking a file opens the diff without discarding annotations
 
 ### Requirement: Explicit diff modes and hunk navigation
 
-The shared diff SHALL offer explicit side-by-side and single-column mode buttons with their current pressed state. Its toolbar SHALL show the current and total existing model hunks, navigate using accessible up/down arrow buttons, and locate the current hunk when its count is clicked. Boundary and empty navigation SHALL be disabled. Mode changes and context expansion SHALL preserve exact original source coordinates and comments. Narrow layouts SHALL wrap controls without widening the page.
+The shared diff SHALL offer explicit side-by-side and single-column mode buttons with their current pressed state. Its toolbar SHALL show the current and total contiguous changed ranges, navigate using accessible up/down arrow buttons, and locate the current changed range when its count is clicked. Separate edits SHALL remain separate navigation stops when their surrounding context windows merge into one display hunk. Boundary and empty navigation SHALL be disabled. Mode changes and context expansion SHALL preserve exact original source coordinates and annotations. Narrow layouts SHALL wrap controls without widening the page.
 
 #### Scenario: Navigate and change diff display
 
 - **WHEN** the user advances to another hunk, switches display mode, and clicks the difference count
-- **THEN** the same hunk is revealed, its position remains accurate, and comments still identify the original source
+- **THEN** the same hunk is revealed, its position remains accurate, and annotations still identify the original source
 
 ### Requirement: Preserve native selection without repeated full-source work
 
@@ -523,5 +523,5 @@ Shared feedback SHALL preserve normal native select-all and copy behavior. Selec
 
 #### Scenario: Select a long highlighted diff
 
-- **WHEN** the user selects and copies a long diff, saves a comment and changes its display mode
+- **WHEN** the user selects and copies a long diff, saves an annotation and changes its display mode
 - **THEN** the complete selection and Unicode text remain intact, the draft remains editable, and oversized submission is rejected without discarding it

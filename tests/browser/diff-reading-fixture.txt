@@ -1,0 +1,102 @@
+import { useLayoutEffect, useMemo, useState } from 'react';
+import { definePanel, z } from 'paneon/sdk';
+import { Button, FeedbackProvider, FeedbackSurface, FeedbackToolbar } from 'paneon/ui';
+import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
+import { createDiffModel } from './shared/diff-model.ts';
+import { diffTargetText } from './shared/diff-schema.ts';
+import type { GitRef } from './shared/diff-schema.ts';
+const original = Array.from(
+  { length: 340 },
+  (_, i) =>
+    `const line${i + 1} = "original ${i + 1} ${'long_readable_source_'.repeat(i === 249 ? 60 : 1)}";\r\n`,
+).join('');
+const modified = original
+  .replace('original 250', 'changed 250')
+  .replace('original 290', 'changed 290');
+function Panel() {
+  const [kind, setKind] = useState('changed'),
+    [collapsed, setCollapsed] = useState(false);
+  const model = useMemo(
+    () =>
+      createDiffModel(
+        kind === 'added' ? undefined : original,
+        kind === 'deleted' ? undefined : kind === 'same' ? original : modified,
+      ),
+    [kind],
+  );
+  const target = useMemo(
+    () =>
+      kind === 'located'
+        ? {
+            ref: {
+              sourceId: kind,
+              kind: 'lines' as const,
+              side: 'new' as const,
+              startLine: 12,
+              endLine: 12,
+            },
+            text: { start: 0, end: 5, quote: 'const' },
+          }
+        : undefined,
+    [kind],
+  );
+  useLayoutEffect(() => {
+    if (!target) return;
+    const frame = requestAnimationFrame(() => locateDiffTarget(model, target));
+    return () => cancelAnimationFrame(frame);
+  }, [target, model]);
+  return (
+    <FeedbackProvider<GitRef>
+      onSubmit={async () => {}}
+      adapter={{
+        resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
+        targetRanges: (target) => diffTargetRanges(model, target),
+        locate: (target) => locateDiffTarget(model, target),
+      }}
+    >
+      <FeedbackSurface />
+      <div className="h-24 p-3">Diff reading acceptance</div>
+      <div className="flex flex-wrap gap-1 p-2">
+        {['changed', 'same', 'added', 'deleted', 'located'].map((value) => (
+          <Button
+            key={value}
+            onClick={() => {
+              setKind(value);
+              setCollapsed(false);
+            }}
+          >
+            {value}
+          </Button>
+        ))}
+        <Button onClick={() => setCollapsed(false)}>Reopen</Button>
+        <FeedbackToolbar />
+      </div>
+      <div
+        data-reading-viewport
+        className="h-[28rem] min-w-0 overflow-auto rounded-md border"
+        hidden={collapsed}
+        inert={collapsed}
+      >
+        <DiffView
+          defaultExpanded
+          key={kind}
+          sourceId={kind}
+          model={model}
+          locateTarget={target}
+          oldPath="packages/application/reader.ts"
+          newPath="packages/application/reader.ts"
+          oldRevision="764da2f4"
+          newRevision="ba6b313e"
+          onCollapse={() => setCollapsed(true)}
+        />
+      </div>
+      <div className="h-[60rem]" />
+    </FeedbackProvider>
+  );
+}
+export default definePanel({
+  id: 'diff-reading',
+  requires: { paneon: '0.0.0' },
+  input: z.object({}),
+  render: Panel,
+});

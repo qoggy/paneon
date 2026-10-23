@@ -1,7 +1,7 @@
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from 'paneon/ui';
-import type { GitSnapshot } from './git.ts';
+import type { GitFile } from './git.ts';
 import {
   areaNames,
   filterFileTree,
@@ -38,12 +38,12 @@ function TreeIcon({ kind }: { kind: 'file' | 'folder' | 'open' | 'down' | 'right
 }
 
 type Props = {
-  snapshots: GitSnapshot[];
+  snapshots: GitFile[];
   selectedId?: string;
   filter: string;
   scopeKey: string;
   revealKey: number;
-  onSelect: (snapshot: GitSnapshot) => void;
+  onSelect: (snapshot: GitFile) => void;
 };
 export function ChangedFileTree({
   snapshots,
@@ -79,7 +79,7 @@ export function ChangedFileTree({
     });
     return () => cancelAnimationFrame(handle);
   }, [selectedId, scopeKey, groups, revealKey]);
-  function renderNodes(nodes: TreeNode<GitSnapshot>[], area: string, depth = 0) {
+  function renderNodes(nodes: TreeNode<GitFile>[], area: string, depth = 0) {
     return nodes.map((node) => {
       if (node.kind === 'file') {
         const snapshot = node.snapshot;

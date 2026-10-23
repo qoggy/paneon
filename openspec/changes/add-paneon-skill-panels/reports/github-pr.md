@@ -11,7 +11,7 @@
 - `repository` 必填且限定 `owner/repo`；`initialPullRequest` 是可选正整数，不推断当前分支或 PR。省略初始编号时显示列表并等待选择；显式详情失败会显示错误。
 - 列表通过真实 `gh pr list --repo` 查询，显式字段、状态和搜索；初始最大 30，加载更多增加 30 并重新查询、按编号去重。页面显示已加载数量，不把它称为 cursor 或完整仓库快照。
 - 详情通过明确 PR 编号读取元信息、原始 Markdown、完整 base/head OID、review/merge 状态。检查按固定 head 查询 `statusCheckRollup`、遍历 contexts 分页，使用 GraphQL node ID 区分同名检查，并保存所见状态与观察时间。CI FAILURE 与查询失败分别呈现。
-- 页面自有 serverAction 直接执行 `gh`，使用 execFile 参数数组、ctx.signal、30 秒超时及 32 MiB 单命令 JSON 输出限制。REST 仅 GET；GraphQL 仅固定只读 query。没有评论、review 发布、approve、merge、close、push 或运行 CI 的 GitHub 写操作。
+- 页面自有 serverAction 直接执行 `gh`，使用 execFile 参数数组、ctx.signal、30 秒超时及 32 MiB 单命令 JSON 输出限制。REST 仅 GET；GraphQL 仅固定只读 query。没有批注、review 发布、approve、merge、close、push 或运行 CI 的 GitHub 写操作。
 - 比较先用固定 base/head 的 compare API 取得 merge base 和文件清单，再读取完整 commit/tree/blob 对象。按路径逐层读取非递归 tree，检查 tree 截断和 OID，blob 校验实际字节数与 Git SHA-1；SHA-256、diff、行号及引用均来自同一份固定字节。没有把可变 `gh pr diff` 套在另一次查询的版本上。
 - 始终显示 compare 的最多 300 文件限制、本次返回数、详情报告数和 GitHub 原始链接。达到 300 或数量不符即明确显示不完整/无法证明完整；缺 patch 明确说明并由实际原文生成差异。对象截断、缺失、损坏或输出超限明确失败，不截成伪完整结果。
 - 重命名保留双侧路径，新增/删除允许一侧缺失；CRLF、BOM 和无末尾换行保持原文。二进制、无效 UTF-8、符号链接及 gitlink 仅文件级反馈，不跟随链接或递归子模块。

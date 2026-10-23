@@ -1,4 +1,4 @@
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -16,10 +16,10 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(fixture.url(fixture.table));
   const frame = page.frameLocator('iframe');
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   await frame.getByRole('heading', { name: 'Table review acceptance', exact: true }).waitFor();
   await comments.assertNoLegacySection();
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await frame.getByRole('alert').waitFor();
   assert.equal((await fixture.events(fixture.table)).length, 0);
   assert.equal(await frame.getByRole('button', { name: '重置视图', exact: true }).count(), 0);
@@ -84,15 +84,15 @@ try {
     await frame.getByRole('checkbox', { name: '选择整列 Name', exact: true }).isChecked(),
     true,
   );
-  assert.equal(await comments.count(), 1, 'object checkboxes only edit the temporary comment');
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  assert.equal(await comments.count(), 1, 'object checkboxes only edit the temporary annotation');
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await frame.getByRole('alert').filter({ hasText: '请先点击' }).waitFor();
   assert.equal(
     (await fixture.events(fixture.table)).length,
     0,
     'unsaved object selection must not be silently omitted',
   );
-  await frame.getByRole('button', { name: '评论', exact: true }).click();
+  await frame.getByRole('button', { name: '批注', exact: true }).click();
   await frame.getByRole('button', { name: '取消', exact: true }).click();
   assert.equal(
     await frame.getByRole('checkbox', { name: '选择原始行 0', exact: true }).isChecked(),
@@ -105,15 +105,15 @@ try {
   await frame.getByRole('checkbox', { name: '选择原始行 0', exact: true }).check();
   await frame.getByRole('checkbox', { name: '选择整列 Name', exact: true }).check();
   await comments.save();
-  const objectMarkers = frame.getByRole('button', { name: '评论 2', exact: true });
+  const objectMarkers = frame.getByRole('button', { name: '批注 2', exact: true });
   await objectMarkers.first().waitFor();
   assert.equal(
     await objectMarkers.count(),
     2,
-    'row and column each show the shared comment number',
+    'row and column each show the shared annotation number',
   );
   await objectMarkers.first().click();
-  assert.equal(await frame.getByLabel('评论内容', { exact: true }).inputValue(), '');
+  assert.equal(await frame.getByLabel('批注内容', { exact: true }).inputValue(), '');
   await frame.getByRole('button', { name: '取消', exact: true }).click();
   await frame.getByLabel('搜索全表', { exact: true }).fill('last');
   assert.equal(await frame.locator('[data-row-index="0"]').count(), 0);
@@ -153,7 +153,7 @@ try {
       }),
     }),
   );
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 4);
   assert.equal(await comments.text(3), '中文🙂');
@@ -173,7 +173,7 @@ try {
     await heldEvent;
     await route.continue();
   });
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await requestedEvent;
   const saving = frame.getByRole('button', { name: '提交中…', exact: true });
   assert.equal(await saving.isDisabled(), true);
@@ -214,7 +214,7 @@ try {
   await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
   await comments.overall('');
   for (let number = 4; number >= 1; number--) await comments.remove(number);
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await frame.getByRole('status').waitFor();
   const revisions = await fixture.events(fixture.table);
   assert.equal(revisions.length, 2);
@@ -326,12 +326,12 @@ try {
     await frame.getByRole('button', { name: '选择对象', exact: true }).click();
     await frame.getByRole('button', { name: '选择整篇文档', exact: true }).click();
     await comments.save();
-    const documentMarker = frame.getByRole('button', { name: '评论 5', exact: true });
+    const documentMarker = frame.getByRole('button', { name: '批注 5', exact: true });
     await documentMarker.waitFor();
     await documentMarker.click();
-    assert.equal(await frame.getByLabel('评论内容', { exact: true }).inputValue(), '');
+    assert.equal(await frame.getByLabel('批注内容', { exact: true }).inputValue(), '');
     await frame.getByRole('button', { name: '取消', exact: true }).click();
-    await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+    await frame.getByRole('button', { name: '提交批注', exact: true }).click();
     await frame.getByRole('status').waitFor();
     const result = (await fixture.events(review))[0];
     assert.equal(result.payload.annotations.length, 5);

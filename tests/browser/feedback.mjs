@@ -33,8 +33,8 @@ try {
   };
 
   const editor = frame.getByRole('dialog');
-  const input = frame.getByRole('textbox', { name: '评论内容', exact: true });
-  const marker = (number) => button(`评论 ${number}`);
+  const input = frame.getByRole('textbox', { name: '批注内容', exact: true });
+  const marker = (number) => button(`批注 ${number}`);
   const cli = async (...args) => {
     const output = await execute(
       process.execPath,
@@ -73,7 +73,7 @@ try {
       },
       { selector, start, end, endSelector, keyboard },
     );
-    await button('评论').waitFor();
+    await button('批注').waitFor();
   };
   const clearSelection = () => content.evaluate(() => document.getSelection().removeAllRanges());
   const save = async (comment = '') => {
@@ -83,7 +83,7 @@ try {
   };
   const annotate = async (selector, start, end, comment = '', endSelector = selector) => {
     await select(selector, start, end, endSelector);
-    await button('评论').click();
+    await button('批注').click();
     await save(comment);
   };
   const plain = '[data-testid="plain"] [data-feedback-text]';
@@ -109,9 +109,9 @@ try {
   await page.keyboard.press('ControlOrMeta+C');
   assert.equal(await content.evaluate(() => window.copyPrevented), false);
   assert.equal((await read()).events.length, 0);
-  await button('评论').click();
+  await button('批注').click();
   await input.fill('暂不保存');
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
   assert.equal((await draft()).annotations.length, 0);
   assert.equal((await read()).events.length, 0);
@@ -127,37 +127,37 @@ try {
   await page.mouse.down();
   await page.mouse.move(rect.x + 28, rect.y + rect.height / 2, { steps: 8 });
   await page.mouse.up();
-  await button('评论').waitFor();
+  await button('批注').waitFor();
   assert.equal((await draft()).annotations.length, 0);
-  await button('评论').click();
+  await button('批注').click();
   await save();
   let value = await draft();
   assert.equal(value.annotations.length, 1);
   assert.equal(value.annotations[0].comment, '');
   const firstId = value.annotations[0].id;
   await marker(1).click();
-  await input.fill('中文评论');
+  await input.fill('中文批注');
   await button('取消').click();
   assert.equal((await draft()).annotations[0].comment, '');
   await marker(1).click();
-  await save('中文评论');
+  await save('中文批注');
   assert.equal((await draft()).annotations[0].id, firstId);
   await marker(1).click();
   await input.fill('Escape丢弃');
   await page.keyboard.press('Escape');
-  assert.equal((await draft()).annotations[0].comment, '中文评论');
+  assert.equal((await draft()).annotations[0].comment, '中文批注');
 
   // Selecting another range is a new comment request, never an implicit merge into this edit.
   await marker(1).click();
-  await input.fill('尚未保存的原评论');
+  await input.fill('尚未保存的原批注');
   await select(plain, 20, 24);
-  await button('评论').click();
+  await button('批注').click();
   await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
-  assert.equal(await input.inputValue(), '尚未保存的原评论');
+  assert.equal(await input.inputValue(), '尚未保存的原批注');
   assert.equal((await draft()).annotations.length, 1);
   assert.equal((await draft()).annotations[0].targets.length, 1);
   await button('取消').click();
-  assert.equal((await draft()).annotations[0].comment, '中文评论');
+  assert.equal((await draft()).annotations[0].comment, '中文批注');
 
   // locate() leaves native selection; ordinary controls cannot recapture it.
   await button('Locate first').click();
@@ -168,10 +168,10 @@ try {
   await frame.getByRole('textbox', { name: 'Ordinary input' }).focus();
   await page.keyboard.press('ArrowRight');
   assert.deepEqual(await draft(), locatedDraft);
-  assert.equal(await button('评论').count(), 0);
+  assert.equal(await button('批注').count(), 0);
   await frame.locator(plain).scrollIntoViewIfNeeded();
   await marker(1).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   assert.equal((await draft()).annotations.length, 0);
   await marker(1).waitFor({ state: 'hidden' });
 
@@ -191,7 +191,7 @@ try {
     ],
   );
   await marker(2).first().click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   await annotate(
     '[data-testid="split"] span:first-child',
     0,
@@ -204,7 +204,7 @@ try {
     [{ start: 0, end: 2, quote: 'é' }],
   );
   await marker(3).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
 
   // Explicit object selection groups targets in the temporary editor, saved only once.
   await clearSelection();
@@ -216,14 +216,14 @@ try {
     await page.screenshot({
       path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-object-selection.png`,
     });
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: '请先点击' }).waitFor();
   assert.equal((await read()).events.length, 0);
   assert.equal((await draft()).annotations.length, 0);
   await frame.getByTestId('row').click();
   assert.equal(await frame.locator('tbody > tr[data-testid="row"]').count(), 1);
   await frame.getByTestId('row').click();
-  await button('评论').click();
+  await button('批注').click();
   await save('比较两个卡片');
   value = await draft();
   assert.deepEqual(
@@ -238,11 +238,11 @@ try {
   );
   assert.equal(await marker(4).count(), 2);
   await frame.getByTestId('card-b').click();
-  await button('评论').click();
-  await save('独立评论');
+  await button('批注').click();
+  await save('独立批注');
   assert.equal((await draft()).annotations.length, 2);
   await marker(5).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   assert.equal((await draft()).annotations[0].id, value.annotations[0].id);
   await button('结束选择').click();
 
@@ -262,7 +262,7 @@ try {
   await annotate(plain, 16, 17);
   assert.equal((await draft()).annotations[2].targets[0].text.quote, 'é');
   await marker(7).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   await annotate(plain, 22, 24, '同词不同位置');
   assert.equal((await draft()).annotations[2].targets[0].text.quote, '中文');
   await annotate(plain, 20, 24, '重叠范围');
@@ -278,9 +278,9 @@ try {
     overlapPositions.length,
   );
   await marker(9).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   await marker(8).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
 
   await annotate(
     '[data-testid="mapped"] strong',
@@ -304,21 +304,21 @@ try {
   await button('Toggle mapped').click();
   const beforeMissing = await draft();
   await marker(10).waitFor({ state: 'hidden' });
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: 'not mounted' }).waitFor();
   assert.deepEqual(await draft(), beforeMissing);
   assert.equal(await frame.getByTestId('attempts').textContent(), '0');
   await button('Toggle mapped').click();
   await marker(10).waitFor();
   await button('Change source').click();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: 'stale' }).waitFor();
   assert.deepEqual(await draft(), beforeMissing);
   await frame.locator(plain).scrollIntoViewIfNeeded();
   await marker(6).waitFor({ state: 'hidden' });
   await button('Change source').click();
   await button('Toggle B').click();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: 'not mounted' }).waitFor();
   assert.equal((await draft()).annotations[0].targets.length, 2);
   await button('Adapter enabled no').click();
@@ -338,15 +338,15 @@ try {
   await button('Locate second target').click();
   await frame.getByTestId('located').filter({ hasText: /^b$/ }).waitFor();
   await button('Adapter ready').click();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: 'Snapshot unavailable' }).waitFor();
   assert.equal(await frame.getByTestId('attempts').textContent(), '0');
   await button('Adapter missing').click();
 
   // Nested-scroller, narrow iframe viewport, and marker editing use current mounted geometry.
   await select('[data-testid="nested-text"] [data-feedback-text]', 0, 2);
-  await button('评论').click();
-  await save('滚动评论');
+  await button('批注').click();
+  await save('滚动批注');
   const nestedId = (await draft()).annotations.at(-1).id;
   const nestedMarker = frame.locator(`[data-feedback-marker="${nestedId}"]`);
   await nestedMarker.waitFor();
@@ -370,24 +370,24 @@ try {
   await button('取消').click();
   await page.setViewportSize({ width: 1100, height: 900 });
   await nestedMarker.click();
-  await button('删除评论').click();
+  await button('删除批注').click();
 
   // Keyboard text selection produces the same action and a new independent comment.
   await select(plain, 0, 2, plain, true);
-  await button('评论').focus();
+  await button('批注').focus();
   await page.keyboard.press('Enter');
-  await input.fill('键盘评论');
+  await input.fill('键盘批注');
   await page.keyboard.press('ControlOrMeta+Enter');
   await editor.waitFor({ state: 'hidden' });
   const keyboardId = (await draft()).annotations.at(-1).id;
   await frame.locator(`[data-feedback-marker="${keyboardId}"]`).click();
-  await button('删除评论').click();
+  await button('删除批注').click();
   assert.equal((await read()).events.length, 0, 'Saving and navigation never emit events.');
 
   // A narrower semantic reference maps through adapter source offsets, not quote searches.
   await clickFixtureButton('Select bridge interval');
-  await button('评论').click();
-  await save('区间桥接评论');
+  await button('批注').click();
+  await save('区间桥接批注');
   const bridgeId = (await draft()).annotations.at(-1).id;
   const bridgeMarker = frame.locator(`[data-feedback-marker="${bridgeId}"]`);
   await frame.getByTestId('bridge').scrollIntoViewIfNeeded();
@@ -399,7 +399,7 @@ try {
   await clickFixtureButton('Toggle bridge');
   await frame.getByTestId('bridge').scrollIntoViewIfNeeded();
   await bridgeMarker.click();
-  await button('删除评论').click();
+  await button('删除批注').click();
 
   // Invalid programmatic ranges still fail, without destroying already saved comments.
   const beforeInvalid = (await draft()).annotations.length;
@@ -412,23 +412,23 @@ try {
   );
   const invalid = (await draft()).annotations.at(-1);
   assert.deepEqual(invalid.targets[0].text, { start: 5, end: 6, quote: '\udc68' });
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: 'stale' }).waitFor();
   // Programmatic controller-created invalid entry has no DOM marker; delete through low-level fixture.
   await clickFixtureButton('Remove last');
-  await button('整体评论').click();
+  await button('整体批注').click();
   await save('整体反馈');
   const beforeFailure = await draft();
   await clickFixtureButton('Submit twice and mutate');
   await button('提交中…').waitFor();
-  assert.equal(await button('整体评论').isDisabled(), true);
+  assert.equal(await button('整体批注').isDisabled(), true);
   await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
   assert.equal(await frame.getByTestId('attempts').textContent(), '1');
   assert.deepEqual(await draft(), beforeFailure);
   assert.match(await frame.getByTestId('hook-error').textContent(), /cannot be edited/);
   assert.equal((await read()).events.length, 0);
   await button('Failure on').click();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame
     .getByTestId('snapshot')
     .filter({ hasText: '整体反馈' })
@@ -479,7 +479,7 @@ try {
     await page.screenshot({ path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-markers.png` });
   }
   console.log(
-    'Contextual comments: native/keyboard selection, empty Save, temporary edits/Cancel/Delete, stable numbered markers, object groups, repeated/emoji/mapped ranges, nested scroll/narrow viewport, stale snapshots, locate races, frozen explicit submit/failure and CLI events/ack pass.',
+    'Contextual annotations: native/keyboard selection, empty Save, temporary edits/Cancel/Delete, stable numbered markers, object groups, repeated/emoji/mapped ranges, nested scroll/narrow viewport, stale snapshots, locate races, frozen explicit submit/failure and CLI events/ack pass.',
   );
 } finally {
   await browser?.close();

@@ -5,7 +5,7 @@ import { mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 
 const f = await startGitReviewFixture();
 const execute = promisify(execFile);
@@ -135,10 +135,10 @@ try {
     `已暂存 · M ${special}`,
   );
   await staged.click();
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   await button('选择对象').click();
   await button('选择新侧第 2 行').click();
-  await comments.write('目录树切换保留评论');
+  await comments.write('目录树切换保留批注');
   await comments.save();
   assert.equal(await comments.count(), 1);
   await unstaged.click();
@@ -153,7 +153,7 @@ try {
   assert.equal(await staged.getAttribute('aria-pressed'), 'true');
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
   assert.equal(await comments.count(), 1);
-  assert.equal(await comments.text(1), '目录树切换保留评论');
+  assert.equal(await comments.text(1), '目录树切换保留批注');
   // Locating the same source again must reveal it even when selection did not change.
   await stagedRoot.click();
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'false');

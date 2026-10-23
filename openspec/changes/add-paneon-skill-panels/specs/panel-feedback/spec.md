@@ -11,7 +11,7 @@ Paneon SHALL provide opt-in public SDK/UI capabilities for selection and annotat
 
 ### Requirement: Preserve normal interactions and author-controlled layout
 
-The common UI SHALL allow registered text to be selected during normal browsing, presenting a contextual Comment action before creating a comment draft. Explicit object-selection controls MAY be composed for multi-object selection. It SHALL operate on registered content, preserve ordinary buttons, links, form input, and text copying, and SHALL NOT treat business actions or form answers as annotation submissions. Authors SHALL be able to place or compose controls without a mandatory fixed header or sidebar. Supporting original-element composition SHALL NOT introduce invalid table wrappers.
+The common UI SHALL allow registered text to be selected during normal browsing, presenting a contextual Annotation action before creating an annotation draft. Explicit object-selection controls MAY be composed for multi-object selection. It SHALL operate on registered content, preserve ordinary buttons, links, form input, and text copying, and SHALL NOT treat business actions or form answers as annotation submissions. Authors SHALL be able to place or compose controls without a mandatory fixed header or sidebar. Supporting original-element composition SHALL NOT introduce invalid table wrappers.
 
 #### Scenario: Browse normally before selecting
 
@@ -39,7 +39,7 @@ Submitted targets SHALL contain a JSON-serializable page-defined object referenc
 
 ### Requirement: Keep independent editable annotation drafts
 
-Common feedback SHALL use one annotations list for selected objects and their optional opinions, plus optional overall feedback. Every entry SHALL have a string comment; an empty comment SHALL represent selection without an opinion. A separate selected result list SHALL NOT be emitted. Adding, clearing, or editing a comment SHALL retain the same entry and identifier. A person SHALL be able to add, edit, and delete draft annotations before explicit submission. Each annotation SHALL retain a stable identifier and its own nonempty target set. Mode changes SHALL NOT clear drafts or send events. The common implementation SHALL NOT add disk-backed draft storage or promise draft survival after page reload.
+Common feedback SHALL use one annotations list for selected objects and their optional opinions, plus optional overall feedback. Every entry SHALL have a string `comment` field for annotation text; an empty string SHALL represent selection without an opinion. A separate selected result list SHALL NOT be emitted. Adding, clearing, or editing an annotation SHALL retain the same entry and identifier. A person SHALL be able to add, edit, and delete draft annotations before explicit submission. Each annotation SHALL retain a stable identifier and its own nonempty target set. Mode changes SHALL NOT clear drafts or send events. The common implementation SHALL NOT add disk-backed draft storage or promise draft survival after page reload.
 
 #### Scenario: Annotate separate issues
 
@@ -48,12 +48,12 @@ Common feedback SHALL use one annotations list for selected objects and their op
 
 #### Scenario: Select without writing an opinion
 
-- **WHEN** a person selects registered content and submits without writing a comment
-- **THEN** the result contains an annotations entry with those targets and an empty comment, using the same structure as an entry with a written opinion
+- **WHEN** a person selects registered content and submits without writing an annotation
+- **THEN** the result contains an annotations entry with those targets and an empty annotation, using the same structure as an entry with a written opinion
 
 #### Scenario: Add or clear an opinion
 
-- **WHEN** a person adds text to or clears an existing entry's comment
+- **WHEN** a person adds text to or clears an existing entry's annotation
 - **THEN** the entry keeps its identifier and targets without moving between separate result lists
 
 ### Requirement: Respect content identity and adapter boundaries
@@ -112,28 +112,28 @@ The HTTP request body limit SHALL be 262144 UTF-8 bytes while event payloads SHA
 - **WHEN** a submission exceeds either applicable limit
 - **THEN** the corresponding limit is reported accurately and the page retains the editable draft
 
-### Requirement: Edit comments beside registered content
+### Requirement: Edit annotations beside registered content
 
-User-facing UI and guides SHALL call annotations comments, while existing annotations/targets/comment event fields SHALL remain unchanged. Selecting text SHALL show a nearby Comment action without creating a saved draft or emitting an event. Activating it SHALL open an anchored temporary editor. Save SHALL commit to page draft state only. Cancel or Escape SHALL discard the temporary edit, preserve an existing comment, and remove a cancelled new draft. Delete SHALL remove the selected comment and its markers. Each saved comment SHALL have a clickable session-stable UI number beside matching mounted targets; unmounting SHALL not delete the comment. No large independent selection-and-annotation section SHALL be required.
+UI and guides SHALL call this feature 批注 in Chinese and annotation (annotations in the plural) in English. API names SHALL use annotation without legacy-name aliases. Event entries use annotations/targets/annotation, where annotation is annotation text. Selecting text SHALL show a nearby Annotation action without creating a saved draft or emitting an event. Activating it SHALL open an anchored temporary editor. Save SHALL commit to page draft state only. Cancel or Escape SHALL discard the temporary edit, preserve an existing annotation, and remove a cancelled new draft. Delete SHALL remove the selected annotation and its markers. Each saved annotation SHALL have a clickable session-stable UI number beside matching mounted targets; unmounting SHALL not delete the annotation. No large independent selection-and-annotation section SHALL be required.
 
-#### Scenario: Cancel editing an existing comment
+#### Scenario: Cancel editing an existing annotation
 
-- **WHEN** a person edits text through a comment's numbered marker and cancels
-- **THEN** the previously saved comment remains unchanged and no event is emitted
+- **WHEN** a person edits text through an annotation's numbered marker and cancels
+- **THEN** the previously saved annotation remains unchanged and no event is emitted
 
-#### Scenario: Cancel creating a comment
+#### Scenario: Cancel creating an annotation
 
 - **WHEN** a person selects text, opens the editor and cancels
-- **THEN** no saved comment or numbered marker is added
+- **THEN** no saved annotation or numbered marker is added
 
-#### Scenario: Revisit a commented target
+#### Scenario: Revisit an annotated target
 
 - **WHEN** a target is unmounted by pagination or view navigation and later restored
-- **THEN** its comment and matching numbered marker are restored against the same original source
+- **THEN** its annotation and matching numbered marker are restored against the same original source
 
-### Requirement: Separate saving a comment from submitting feedback
+### Requirement: Separate saving an annotation from submitting feedback
 
-Supplied pages SHALL place explicit submission in their own toolbar and compose the shared surface. Saving one comment SHALL not submit feedback. Pending unsaved edits SHALL block overall submission with a clear request to save or cancel, without discarding or implicitly saving them. Existing failure retention, submission locking, and page-specific complete corrections SHALL be preserved. Popovers and markers SHALL remain anchored during scrolling, resizing and reflow without modifying registered source text nodes or interfering with normal controls and copying.
+Supplied pages SHALL place explicit submission in their own toolbar and compose the shared surface. Saving one annotation SHALL not submit feedback. Pending unsaved edits SHALL block overall submission with a clear request to save or cancel, without discarding or implicitly saving them. Existing failure retention, submission locking, and page-specific complete corrections SHALL be preserved. Popovers and markers SHALL remain anchored during scrolling, resizing and reflow without modifying registered source text nodes or interfering with normal controls and copying.
 
 #### Scenario: Submit while editing
 
@@ -142,5 +142,5 @@ Supplied pages SHALL place explicit submission in their own toolbar and compose 
 
 #### Scenario: Save and submit
 
-- **WHEN** a person saves a comment and later explicitly submits feedback
+- **WHEN** a person saves an annotation and later explicitly submits feedback
 - **THEN** only the final submission emits a complete feedback event

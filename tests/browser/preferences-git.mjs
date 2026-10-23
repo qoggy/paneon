@@ -28,8 +28,8 @@ try {
   const selectedCommit = await frame
     .locator('[data-commit-id][aria-pressed=true]')
     .getAttribute('data-commit-id');
-  await frame.getByRole('button', { name: '整体评论', exact: true }).click();
-  await frame.getByLabel('评论内容', { exact: true }).fill('Git 原文缓冲 🙂');
+  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  await frame.getByLabel('批注内容', { exact: true }).fill('Git 原文缓冲 🙂');
   const calls = requests.length;
   const src = await page.locator('iframe').getAttribute('src');
   for (const [theme, language] of [
@@ -59,7 +59,7 @@ try {
     );
     assert.equal(
       await frame
-        .getByLabel(language === 'en' ? 'Comment text' : '评论内容', { exact: true })
+        .getByLabel(language === 'en' ? 'Annotation text' : '批注内容', { exact: true })
         .inputValue(),
       'Git 原文缓冲 🙂',
     );

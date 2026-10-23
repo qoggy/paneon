@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { git } from '../git-review-fixture.ts';
 import { sourceLines } from '../../skills/paneon/assets/shared/diff-model.ts';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 
 const f = await startGitReviewFixture();
 let browser;
@@ -60,7 +60,7 @@ try {
     .first()
     .waitFor();
   const content = page.frames().find((c) => c.url().endsWith('/frame.html'));
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   if (process.env.PANEON_PERF_PROFILE) {
     profiler = await context.newCDPSession(content);
     await profiler.send('Profiler.enable');
@@ -111,7 +111,7 @@ try {
   assert.ok(elapsed < 2500, `Saving a full selection blocked for ${elapsed}ms`);
   assert.equal(await comments.count(), 1);
   await comments.edit(1);
-  await frame.getByLabel('评论内容', { exact: true }).fill('Discard this edit');
+  await frame.getByLabel('批注内容', { exact: true }).fill('Discard this edit');
   await button('取消').click();
   assert.equal(await comments.text(1), 'Review both complete sources');
   await button('收起上下文').click();
@@ -127,7 +127,7 @@ try {
   // Oversized feedback is explicitly rejected by the existing event contract.
   // It must retain the complete draft, not truncate source or freeze the page.
   started = Date.now();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame
     .getByRole('alert')
     .filter({ hasText: /65536|262144/ })
@@ -165,7 +165,7 @@ try {
   });
   await comments.write('Review the emoji');
   await comments.save();
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame
     .getByRole('status')
     .filter({ hasText: /已保存为事件/ })

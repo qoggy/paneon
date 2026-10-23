@@ -10,6 +10,7 @@ import type {
 } from './feedback-types';
 import { selectedTextTargets, validTextRange } from './feedback-selection';
 import { createRectClipper } from './feedback-geometry';
+import type { ClippedRect } from './feedback-geometry';
 import { indexTextSegments, textSegmentsInRange } from './feedback-text-index';
 
 const schema = feedbackSchema(z.unknown());
@@ -62,7 +63,7 @@ export class FeedbackStore<TRef> {
       updateAnnotation: this.updateAnnotation,
       removeAnnotation: this.removeAnnotation,
       toggleTarget: this.toggleTarget,
-      setComment: this.setComment,
+      setOverallAnnotationText: this.setOverallAnnotationText,
       locate: this.locate,
       registerText: this.registerText,
       submit: this.submit,
@@ -179,7 +180,7 @@ export class FeedbackStore<TRef> {
     if (targets.length === 0) this.removeAnnotation(entry.id);
     else this.updateAnnotation(entry.id, { ...entry, targets });
   };
-  setComment: FeedbackController<TRef>['setComment'] = (comment) => {
+  setOverallAnnotationText: FeedbackController<TRef>['setOverallAnnotationText'] = (comment) => {
     this.assertEditable();
     this.save({ ...this.state.value, comment });
   };
@@ -241,7 +242,7 @@ export class FeedbackStore<TRef> {
       this.publish({
         pending: targets,
         pendingKind: 'text',
-        uiError: targets.length && this.state.editor ? '请先保存或取消正在编辑的评论。' : null,
+        uiError: targets.length && this.state.editor ? '请先保存或取消正在编辑的批注。' : null,
       });
       return;
     }
@@ -315,10 +316,10 @@ export class FeedbackStore<TRef> {
   dismissSelection = () => {
     if (this.state.pending.length) this.publish({ pending: [] });
   };
-  openComment = (id?: string) => {
+  openAnnotation = (id?: string) => {
     if (this.disabled) return;
     if (this.state.editor) {
-      this.publish({ uiError: '请先保存或取消正在编辑的评论。' });
+      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
       return;
     }
     const annotation = id ? this.state.value.annotations.find((entry) => entry.id === id) : null;
@@ -341,7 +342,7 @@ export class FeedbackStore<TRef> {
     this.overallAnchor = anchor ?? null;
     if (this.disabled) return;
     if (this.state.editor) {
-      this.publish({ uiError: '请先保存或取消正在编辑的评论。' });
+      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
       return;
     }
     this.publish({
@@ -366,7 +367,7 @@ export class FeedbackStore<TRef> {
     this.assertEditable();
     const editor = this.state.editor;
     if (!editor) return;
-    if (editor.kind === 'overall') this.setComment(editor.comment);
+    if (editor.kind === 'overall') this.setOverallAnnotationText(editor.comment);
     else {
       if (!editor.targets.length) {
         this.publish({ uiError: '请至少选择一个位置。' });
@@ -385,7 +386,7 @@ export class FeedbackStore<TRef> {
   deleteEditor = () => {
     this.assertEditable();
     const editor = this.state.editor;
-    if (editor?.kind === 'overall') this.setComment('');
+    if (editor?.kind === 'overall') this.setOverallAnnotationText('');
     else if (editor?.id) this.removeAnnotation(editor.id);
     this.cancelEditor();
   };
@@ -397,7 +398,7 @@ export class FeedbackStore<TRef> {
     this.assertEditable();
     const editor = this.state.editor;
     if (editor?.kind === 'overall') {
-      this.publish({ uiError: '请先保存或取消正在编辑的整体评论。' });
+      this.publish({ uiError: '请先保存或取消正在编辑的整体批注。' });
       return;
     }
     const targets =
@@ -428,7 +429,7 @@ export class FeedbackStore<TRef> {
     });
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
-  targetRects = (target: FeedbackTarget<TRef>, firstOnly = false): DOMRect[] => {
+  targetRects = (target: FeedbackTarget<TRef>, firstOnly = false): ClippedRect[] => {
     const key = feedbackKey(target.ref);
     const clipRect = createRectClipper();
     if (!target.text) {
@@ -453,7 +454,7 @@ export class FeedbackStore<TRef> {
         (original === undefined || item.source === original) &&
         validTextRange(item.source, target),
     );
-    const rects: DOMRect[] = [];
+    const rects: ClippedRect[] = [];
     let mapped = false;
     for (const registration of registrations) {
       for (const segment of textSegmentsInRange(registration.index, text.start, text.end)) {
@@ -490,8 +491,8 @@ export class FeedbackStore<TRef> {
     }
     return mapped ? rects : this.adapterRects(target, firstOnly);
   };
-  private adapterRects(target: FeedbackTarget<TRef>, firstOnly = false): DOMRect[] {
-    const rects: DOMRect[] = [];
+  private adapterRects(target: FeedbackTarget<TRef>, firstOnly = false): ClippedRect[] {
+    const rects: ClippedRect[] = [];
     const clipRect = createRectClipper();
     for (const range of this.options.adapter?.targetRanges?.(target) ?? []) {
       if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
@@ -606,8 +607,8 @@ export class FeedbackStore<TRef> {
     if (this.state.editor || (this.state.pendingKind === 'objects' && this.state.pending.length)) {
       this.publish({
         uiError: this.state.editor
-          ? '请先保存或取消正在编辑的评论。'
-          : '请先点击“评论”，保存或取消所选位置。',
+          ? '请先保存或取消正在编辑的批注。'
+          : '请先点击“批注”，保存或取消所选位置。',
       });
       return;
     }

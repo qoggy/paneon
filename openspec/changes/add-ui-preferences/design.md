@@ -19,11 +19,11 @@
 
 推荐设置项只有两组：主题「浅色 / 深色」和语言「English / 简体中文」。未配置时建议 light + en，保持现有默认亮色及英文产品入口；不额外增加跟随系统、项目级配置或每个实例的覆盖层级。
 
-语言设置只控制 Paneon 自己提供的默认文案：标准面板的 Next、Review all answers、提交评论、占位符、帮助、可访问标签、空状态、验证提示、提交状态和日期展示。
+语言设置只控制 Paneon 自己提供的默认文案：标准面板的 Next、Review all answers、提交批注、占位符、帮助、可访问标签、空状态、验证提示、提交状态和日期展示。
 
-大多数基础组件没有固定业务文字。Button 的 children、Input 的 placeholder、Field 的 label 等由调用方写什么就展示什么。仅分页默认 Previous/Next、Dialog 的关闭标签、Spinner 的 Loading、公共评论 UI 等确实由 Paneon 自带的默认文案需要中英字典。
+大多数基础组件没有固定业务文字。Button 的 children、Input 的 placeholder、Field 的 label 等由调用方写什么就展示什么。仅分页默认 Previous/Next、Dialog 的关闭标签、Spinner 的 Loading、公共批注 UI 等确实由 Paneon 自带的默认文案需要中英字典。
 
-“调用方传入的文字”就是 panel params 里的题目/选项/标题/文章，以及用户在表单和评论中实际输入的文字。调用方和用户想用什么语言就用什么，组件正常展示/收集原文；没有额外翻译步骤、语言校验或改写功能。Git/PR 原始内容同样保持原文。事件名、字段名、sourceId、原文坐标和 schema 不随语言改变。
+“调用方传入的文字”就是 panel params 里的题目/选项/标题/文章，以及用户在表单和批注中实际输入的文字。调用方和用户想用什么语言就用什么，组件正常展示/收集原文；没有额外翻译步骤、语言校验或改写功能。Git/PR 原始内容同样保持原文。事件名、字段名、sourceId、原文坐标和 schema 不随语言改变。
 
 CLI 的机器输出字段和英文诊断保持现状；本需求不扩展成整个终端产品的中文化。
 
@@ -31,7 +31,7 @@ CLI 的机器输出字段和英文诊断保持现状；本需求不扩展成整�
 
 - `src/ui/styles.css` 已有 light 默认变量、`.dark` 变量和 shadcn dark variant；基础组件已有主题能力。
 - 同文件固定引入 github-markdown-light.css；`CodeBlock` 固定 github-light；Mermaid 没有主题联动；共享 Diff 使用 bg-red-50/bg-green-50。现状不能称完整 dark 支持。
-- 公共分页、Dialog、Spinner、评论操作等自带文案，目前中文/英文散落。
+- 公共分页、Dialog、Spinner、批注操作等自带文案，目前中文/英文散落。
 - 标准 choose/form/table/review/Git 和 PR 页自带文案也未集中管理；`useSubmission` 把提交状态保存成已解析的英文句子，切语言后不会自然更新。
 - panel 运行于隔离 iframe。compiler 在初始化消息后挂载 React，`BridgeInit` 只有业务 params；host 主题不能通过 CSS 自动穿透 iframe。
 - runtime 已有同源访问约束和 WebSocket 机制，但现有订阅只针对单个 panel 的状态。当前没有通用用户偏好存储或主题/语言配置入口。
@@ -121,20 +121,20 @@ host 返回 HTML 时直接写入当前 theme/class、lang 和初始偏好属性�
 
 iframe 在 init 到来前保持内容未挂载、背景透明；收到 ui 后先设置根节点 `.dark`、`lang` 和 `color-scheme`，再挂载 React。之后切换只更新 Provider 和文档属性，不改 iframe src/key，不 remount panel。
 
-必须保留当前题目和汇总位置、所有答案/说明草稿、评论编辑缓冲和已保存评论、Git 当前分支/提交/文件、折叠和滚动状态、事件 receipt。已有状态中由 Paneon 产生的提示存 message key + 参数，在 render 时翻译；不能只在创建时保存最终字符串，也不能靠重新执行操作刷新语言。
+必须保留当前题目和汇总位置、所有答案/说明草稿、批注编辑缓冲和已保存批注、Git 当前分支/提交/文件、折叠和滚动状态、事件 receipt。已有状态中由 Paneon 产生的提示存 message key + 参数，在 render 时翻译；不能只在创建时保存最终字符串，也不能靠重新执行操作刷新语言。
 
 ## 主题适配
 
 | 部分                            | 做法                                                                                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 基础组件、页布局、弹层和评论 UI | 复用现有 shadcn CSS 变量，统一根 class，不逐组件传 theme                                                                                |
+| 基础组件、页布局、弹层和批注 UI | 复用现有 shadcn CSS 变量，统一根 class，不逐组件传 theme                                                                                |
 | Markdown                        | 使用当前固定版本 github-markdown-css 的 light/dark 配色，局部作用于对应主题的 markdown-body；保持排版，不以 OS 媒体查询覆盖用户显式选择 |
 | CodeBlock / Git 语法高亮        | Shiki 同时提供 github-light/github-dark 颜色，切换使用 CSS token 颜色；不因换主题重新解析整份长代码或替换原文 Text 节点                 |
 | Mermaid                         | 从 UI 偏好选对应主题；主题变化时重渲染图形，保留原 Mermaid 输入；错误和加载提示本地化                                                   |
 | Git Diff / 文件状态 / 图谱      | 将固定浅色背景和状态/轨道配色集中到明暗 CSS 变量，保证两种背景下可读；保留增删改和分支的语义                                            |
 | 原生控件和浏览器选择色          | 根 color-scheme 与主题一致；保留焦点、选中和可访问对比度                                                                                |
 
-Markdown 的明暗样式限定在其正文区域，不能覆盖外部问卷字号或颜色。主题变动不得修改 Markdown、代码、Diff 或评论 quote，也不得把主题加入快照内容 hash。
+Markdown 的明暗样式限定在其正文区域，不能覆盖外部问卷字号或颜色。主题变动不得修改 Markdown、代码、Diff 或批注 quote，也不得把主题加入快照内容 hash。
 
 ## 语言与组件 API
 
@@ -146,7 +146,7 @@ Markdown 的明暗样式限定在其正文区域，不能覆盖外部问卷字�
 | ------------------ | ------------------------------- | -------------------------- |
 | choose.next        | Next                            | 下一题                     |
 | choose.reviewTitle | Review all answers              | 检查全部答案               |
-| feedback.submit    | Submit comments                 | 提交评论                   |
+| feedback.submit    | Submit annotations              | 提交批注                   |
 | diff.sideBySide    | Side by side                    | 左右对比                   |
 | diff.position      | {current} / {total} differences | {current} / {total} 处差异 |
 
@@ -165,10 +165,10 @@ Paneon 拥有的验证提示及成功/失败摘要本地化；原有校验时机
 | 主页及 host 必要通知            | 设置、实例列表/状态、分页、连接/关闭/凭据交互                                |
 | Choose                          | 翻题、汇总、自填、选项说明、详情、未答/错误与提交提示                        |
 | Form                            | 清除、选择占位、必填提示、提交/更正/结果                                     |
-| Table                           | 搜索/筛选/分页、选择及公共评论操作                                           |
-| Review                          | 阅读辅助、公共评论及提交状态                                                 |
-| Git review                      | 分支组名、文件组名、日期、差异导航、评论、加载与错误摘要                     |
-| GitHub PR                       | 列表/详情/检查状态、Diff 和评论操作；PR 内容原样                             |
+| Table                           | 搜索/筛选/分页、选择及公共批注操作                                           |
+| Review                          | 阅读辅助、公共批注及提交状态                                                 |
+| Git review                      | 分支组名、文件组名、日期、差异导航、批注、加载与错误摘要                     |
+| GitHub PR                       | 列表/详情/检查状态、Diff 和批注操作；PR 内容原样                             |
 | Concurrency / Sentinel examples | 继承主题，公共控件和操作说明跟随语言；固定教学文章、示例数据不是自动翻译对象 |
 
 教学文章是一次性示例源码中的内容，与 agent 传入的文章具有相同内容边界。作者可以使用当前 language 主动选择另一套文章，但本方案不要求每个一次性页面准备双语正文。
@@ -256,8 +256,8 @@ skills/paneon/references/preferences.md
 - light/en、light/zh-CN、dark/en、dark/zh-CN 四个组合，主页、公共组件、全部标准页实际检查；长中文、英文换行和窄屏均可用。
 - 一处修改配置，多窗口即时一致；新实例、刷新和 runtime 重启读到同一偏好。保存失败不假装成功。
 - 深色首屏无亮色正文闪现；Markdown、代码、Mermaid、Diff、弹层/Portal、原生选择框没有残留亮色区域或不可读文字。
-- 填到一半、正在编辑评论、选中 Git 文件时切换设置，状态和原文定位保留，不多发事件、不重新查询 Git。
-- 切语言后既有错误提示和提交结果同步变化，读屏标签同语种；题目、代码、评论和事件数据不变。
+- 填到一半、正在编辑批注、选中 Git 文件时切换设置，状态和原文定位保留，不多发事件、不重新查询 Git。
+- 切语言后既有错误提示和提交结果同步变化，读屏标签同语种；题目、代码、批注和事件数据不变。
 - 自定义页面不传任何新参数也可运行，公共组件继承偏好；原有 schema、提交与错误链路不新增拒绝条件。
 - 独立安装包中的 builtin/skill 资源也能获取偏好与字典，不能只在源码工作区有效。
 

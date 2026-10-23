@@ -4,6 +4,8 @@ import { Button, Input } from 'paneon/ui';
 import type { HistoryRef } from './git.ts';
 
 type Node = { name: string; path: string; children: Map<string, Node>; entry?: HistoryRef };
+const mainlineNode = (node: Node): boolean =>
+  !!node.entry?.mainline || [...node.children.values()].some(mainlineNode);
 function branchTree(refs: HistoryRef[]) {
   const root: Node = { name: '', path: '', children: new Map() };
   for (const entry of [...refs].sort((a, b) => a.name.localeCompare(b.name))) {
@@ -20,17 +22,28 @@ function branchTree(refs: HistoryRef[]) {
   }
   return root.children;
 }
-function RefIcon({ tag = false }: { tag?: boolean }) {
+function RefIcon({
+  tag = false,
+  mainline = false,
+  current = false,
+}: {
+  tag?: boolean;
+  mainline?: boolean;
+  current?: boolean;
+}) {
   return (
     <svg
       viewBox="0 0 16 16"
-      fill="none"
+      fill={mainline ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth="1.3"
-      className="size-3.5 shrink-0 text-muted-foreground"
+      className={`size-3.5 shrink-0 ${mainline || current ? 'text-amber-500 dark:text-amber-400' : 'text-muted-foreground'}`}
+      data-ref-icon={mainline ? 'mainline' : current ? 'current' : tag ? 'tag' : 'branch'}
       aria-hidden="true"
     >
-      {tag ? (
+      {mainline ? (
+        <path d="m8 1.5 2 4.2 4.6.6-3.3 3.2.8 4.5L8 11.8l-4.1 2.2.8-4.5L1.4 6.3l4.6-.6Z" />
+      ) : tag || current ? (
         <path d="m2 8 6-6h6v6l-6 6-6-6ZM11 5h.01" />
       ) : (
         <>
@@ -61,57 +74,66 @@ export function Branches({
   const needle = filter.trim().toLocaleLowerCase();
   const matches = refs.filter((entry) => entry.name.toLocaleLowerCase().includes(needle));
   function render(nodes: Map<string, Node>, kind: HistoryRef['kind'], depth = 0) {
-    return [...nodes.values()].map((node) => {
-      if (node.entry) {
-        const entry = node.entry;
-        const active = selected === entry.ref || selected === entry.name;
-        const current = entry.kind === 'branch' && entry.name === currentBranch;
+    return [...nodes.values()]
+      .sort((a, b) => Number(mainlineNode(b)) - Number(mainlineNode(a)))
+      .map((node) => {
+        if (node.entry) {
+          const entry = node.entry;
+          const active = selected === entry.ref || selected === entry.name;
+          const current = entry.kind === 'branch' && entry.name === currentBranch;
+          return (
+            <Button
+              key={entry.ref}
+              variant={active ? 'secondary' : 'ghost'}
+              aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}
+              aria-pressed={active}
+              title={`${entry.name}${current ? t(' · 当前分支') : ''}`}
+              aria-description={
+                [entry.mainline && t('主干分支'), current && t('当前分支')]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              }
+              data-mainline={entry.mainline || undefined}
+              data-current-branch={current || undefined}
+              data-history-ref={entry.ref}
+              className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
+              style={{ paddingLeft: 8 + depth * 12 }}
+              onClick={() => onSelect(entry.ref)}
+            >
+              <RefIcon tag={kind === 'tag'} mainline={entry.mainline} current={current} />
+              <span className="min-w-0 truncate">{node.name}</span>
+              {current && <span className="ml-auto text-muted-foreground">{t('当前')}</span>}
+            </Button>
+          );
+        }
+        const key = `${kind}:${node.path}`;
+        const open = !!needle || !collapsed.has(key);
         return (
-          <Button
-            key={entry.ref}
-            variant={active ? 'secondary' : 'ghost'}
-            aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}
-            aria-pressed={active}
-            title={`${entry.name}${current ? t(' · 当前分支') : ''}`}
-            data-history-ref={entry.ref}
-            className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
-            style={{ paddingLeft: 8 + depth * 12 }}
-            onClick={() => onSelect(entry.ref)}
-          >
-            <RefIcon tag={kind === 'tag'} />
-            <span className="min-w-0 truncate">{node.name}</span>
-            {current && <span className="ml-auto text-muted-foreground">{t('当前')}</span>}
-          </Button>
+          <div key={key}>
+            <Button
+              variant="ghost"
+              aria-label={t('Branch directory {path}', { path: node.path.slice(1) })}
+              aria-expanded={open}
+              className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
+              style={{ paddingLeft: 8 + depth * 12 }}
+              onClick={() =>
+                setCollapsed((previous) => {
+                  const next = new Set(previous);
+                  if (next.has(key)) next.delete(key);
+                  else next.add(key);
+                  return next;
+                })
+              }
+            >
+              <span className="w-3.5 shrink-0 text-muted-foreground" aria-hidden="true">
+                {open ? '⌄' : '›'}
+              </span>
+              <span className="truncate">{node.name}</span>
+            </Button>
+            {open && render(node.children, kind, depth + 1)}
+          </div>
         );
-      }
-      const key = `${kind}:${node.path}`;
-      const open = !!needle || !collapsed.has(key);
-      return (
-        <div key={key}>
-          <Button
-            variant="ghost"
-            aria-label={t('Branch directory {path}', { path: node.path.slice(1) })}
-            aria-expanded={open}
-            className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
-            style={{ paddingLeft: 8 + depth * 12 }}
-            onClick={() =>
-              setCollapsed((previous) => {
-                const next = new Set(previous);
-                if (next.has(key)) next.delete(key);
-                else next.add(key);
-                return next;
-              })
-            }
-          >
-            <span className="w-3.5 shrink-0 text-muted-foreground" aria-hidden="true">
-              {open ? '⌄' : '›'}
-            </span>
-            <span className="truncate">{node.name}</span>
-          </Button>
-          {open && render(node.children, kind, depth + 1)}
-        </div>
-      );
-    });
+      });
   }
   return (
     <aside

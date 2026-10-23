@@ -3,12 +3,26 @@ import { test } from 'node:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { readGit, validateGitFeedback } from '../skills/paneon/assets/panels/git-review/git.ts';
+import {
+  readGit as readGitListing,
+  readGitFile,
+  validateGitFeedback,
+} from '../skills/paneon/assets/panels/git-review/git.ts';
 import { gitReviewParamsSchema } from '../skills/paneon/assets/panels/git-review/schema.ts';
 import { createDiffModel, sourceLines } from '../skills/paneon/assets/shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../skills/paneon/assets/shared/diff-schema.ts';
 import type { GitRef } from '../skills/paneon/assets/shared/diff-schema.ts';
 import { fixture, git } from './git-review-fixture.ts';
+
+// Existing snapshot semantics are exercised by explicitly opening every listed file.
+// New listing-only behavior is tested separately below.
+async function readGit(...args: Parameters<typeof readGitListing>) {
+  const listing = await readGitListing(...args);
+  listing.snapshots = await Promise.all(
+    listing.files.map((file) => readGitFile(args[0], args[1], listing.listingId, file.id, args[3])),
+  );
+  return listing;
+}
 
 function required<T>(value: T | undefined): T {
   assert.notEqual(value, undefined);
@@ -489,6 +503,121 @@ void test('single-branch history preserves complete messages and fixed tips with
       true,
     );
   } finally {
+    await f.close();
+  }
+});
+
+void test('directory-only queries, selected-file capture and pinned commit navigation stay separate', async () => {
+  const f = await fixture();
+  const trace = join(f.root, 'git-query.trace');
+  const originalTrace = process.env.GIT_TRACE;
+  try {
+    const params = { repositories: [{ id: 'web', path: f.repo }] },
+      session = randomUUID();
+    const requests = [
+      { repositoryId: 'web', type: 'changes' as const },
+      { repositoryId: 'web', type: 'history' as const, commit: f.rootCommit },
+      {
+        repositoryId: 'web',
+        type: 'compare' as const,
+        base: f.rootCommit,
+        head: f.feature,
+        mode: 'commits' as const,
+      },
+    ];
+    process.env.GIT_TRACE = trace;
+    for (const request of requests) {
+      await writeFile(trace, '');
+      const listing = await readGitListing(params, session, request);
+      assert.ok(listing.files.length > 0);
+      assert.deepEqual(listing.snapshots, []);
+      const { readFile } = await import('node:fs/promises');
+      assert.doesNotMatch(await readFile(trace, 'utf8'), /cat-file/);
+      const explicit = await readGitListing(params, session, { ...request, file: 'a.ts' });
+      assert.equal(explicit.snapshots.length, 1);
+      assert.equal(explicit.snapshots[0].source.new?.path, 'a.ts');
+      assert.ok(explicit.snapshots[0].source.new?.contentHash.startsWith('sha256:'));
+    }
+    const changes = await readGitListing(params, session, requests[0]);
+    const both = changes.files.filter((file) => file.source.new?.path === 'a.ts');
+    assert.equal(both.length, 2);
+    assert.notEqual(both[0].id, both[1].id);
+    const working = required(
+      both.find(
+        (file) => file.source.view.type === 'changes' && file.source.view.area === 'unstaged',
+      ),
+    );
+    // Directory metadata doesn't pretend to capture bytes before a file is opened.
+    await writeFile(join(f.repo, 'a.ts'), 'opened after directory listing\n');
+    await writeFile(trace, '');
+    const snapshot = await readGitFile(params, session, changes.listingId, working.id);
+    const { readFile } = await import('node:fs/promises');
+    assert.equal(snapshot.model.newText, 'opened after directory listing\n');
+    assert.equal((await readFile(trace, 'utf8')).match(/cat-file blob/g)?.length, 1);
+    await writeFile(join(f.repo, 'a.ts'), 'later disk state\n');
+    const checked = validateGitFeedback(params, session, {
+      annotations: [
+        {
+          id: 'kept',
+          comment: 'old bytes',
+          targets: [{ ref: { sourceId: snapshot.id, kind: 'file' } }],
+        },
+      ],
+    });
+    assert.deepEqual(checked.sources[snapshot.id], snapshot.source);
+    await assert.rejects(
+      readGitFile(params, randomUUID(), changes.listingId, working.id),
+      /expired/,
+    );
+    const first = await readGitListing(params, session, { repositoryId: 'web', type: 'history' });
+    await writeFile(trace, '');
+    const selected = await readGitListing(params, session, {
+      repositoryId: 'web',
+      type: 'history',
+      tip: first.history?.tip,
+      historyId: first.historyId,
+      commit: f.rootCommit,
+    });
+    assert.equal(selected.history?.selectedCommit?.oid, f.rootCommit);
+    assert.deepEqual(selected.history?.commits, []);
+    assert.equal(selected.historyRefs, undefined);
+    assert.deepEqual(selected.branches, []);
+    assert.equal(selected.snapshots.length, 0);
+    assert.doesNotMatch(await readFile(trace, 'utf8'), /for-each-ref|git log|cat-file/);
+    // Loading many history pages must not evict the still-visible directory token.
+    for (let page = 1; page <= 34; page++) {
+      const more = await readGitListing(params, session, {
+        repositoryId: 'web',
+        type: 'history',
+        tip: first.history?.tip,
+        historyId: first.historyId,
+        listingId: first.listingId,
+        offset: page * 50,
+      });
+      assert.equal(more.listingId, first.listingId);
+      assert.deepEqual(more.files, first.files);
+      assert.equal(more.snapshots.length, 0);
+    }
+    const unopened = first.files[0];
+    assert.ok(unopened);
+    const afterPagination = await readGitFile(params, session, first.listingId, unopened.id);
+    assert.equal(afterPagination.fileId, unopened.id);
+    const refresh = await readGitListing(params, session, { repositoryId: 'web', type: 'history' });
+    assert.notEqual(refresh.historyId, first.historyId);
+    assert.ok(refresh.historyRefs?.length);
+    await assert.rejects(
+      readGitListing(params, session, {
+        repositoryId: 'web',
+        type: 'history',
+        branch: 'base',
+        tip: first.history?.tip,
+        historyId: first.historyId,
+      }),
+      /Pinned history/,
+    );
+  } finally {
+    if (originalTrace === undefined) delete process.env.GIT_TRACE;
+    else process.env.GIT_TRACE = originalTrace;
     await f.close();
   }
 });

@@ -1,4 +1,4 @@
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFile } from 'node:child_process';
@@ -30,7 +30,7 @@ async function completeAcceptance() {
     await page.goto(f.url());
     const frame = page.frameLocator('iframe'),
       button = (name) => frame.getByRole('button', { name, exact: true });
-    const comments = commentTools(frame, page);
+    const comments = annotationTools(frame, page);
     await frame
       .getByRole('heading', { name: 'GitHub PR · example/project', exact: true })
       .waitFor();
@@ -52,7 +52,7 @@ async function completeAcceptance() {
     await frame.getByText('已加载 30 条；', { exact: false }).waitFor();
     await frame.getByLabel('PR 状态', { exact: true }).selectOption('open');
     await frame.getByText('读取 PR 列表…', { exact: true }).waitFor({ state: 'hidden' });
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('alert').filter({ hasText: '选择内容' }).waitFor();
     assert.equal((await f.events()).length, 0);
     // Native mouse text selection/copy through rendered Markdown.
@@ -249,7 +249,7 @@ async function completeAcceptance() {
       [100000, '262144'],
     ]) {
       await comments.overall('中'.repeat(length));
-      await button('提交评论').click();
+      await button('提交批注').click();
       await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
       assert.equal(await comments.count(), 5);
       assert.equal((await f.events()).length, 1);
@@ -268,11 +268,11 @@ async function completeAcceptance() {
           })
         : route.continue(),
     );
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('alert').filter({ hasText: 'Intentional PR save failure' }).waitFor();
     assert.equal(await comments.count(), 5);
     await page.unroute(eventURL);
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('status').filter({ hasText: '已保存当前完整意见' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
@@ -301,7 +301,7 @@ async function completeAcceptance() {
     await comment().fill('更正说明');
     await finish();
     assert.equal((await f.events()).length, 2);
-    await button('提交评论').click();
+    await button('提交批注').click();
     await until(async () => (await f.events()).length === 3, 'explicit corrected feedback missing');
     const corrected = (await f.events())[2];
     assert.equal(corrected.payload.annotations[0].id, first.payload.annotations[0].id);
@@ -417,7 +417,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
     await page.goto(f.url());
     const frame = page.frameLocator('iframe'),
       button = (name) => frame.getByRole('button', { name, exact: true });
-    const comments = commentTools(frame, page);
+    const comments = annotationTools(frame, page);
     const finish = () => comments.save();
     await frame.getByRole('heading', { name: '#101 Review cache behavior', exact: true }).waitFor();
     await frame.locator('[data-markdown-feedback]').waitFor();
@@ -456,7 +456,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
       [100000, '262144'],
     ]) {
       await comments.overall('中'.repeat(length));
-      await button('提交评论').click();
+      await button('提交批注').click();
       await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
       assert.equal(await comments.count(), 3);
       assert.equal((await f.events()).length, 1);
@@ -475,7 +475,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
           })
         : route.continue(),
     );
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame
       .getByRole('alert')
       .filter({ hasText: 'Intentional independent save failure' })
@@ -483,7 +483,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
     assert.equal(await comments.count(), 3);
     assert.equal((await f.events()).length, 1);
     await page.unroute(eventURL);
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('status').filter({ hasText: '已保存当前完整意见' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
@@ -505,7 +505,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
     await comments.write('明确更正');
     await finish();
     assert.equal((await f.events()).length, 2);
-    await button('提交评论').click();
+    await button('提交批注').click();
     await until(
       async () => (await f.events()).length === 3,
       'independent corrected feedback missing',

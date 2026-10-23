@@ -166,7 +166,7 @@ function Contents({
       <Button onClick={() => setChanged(!changed)}>Change source</Button>
       <div data-testid="nested-scroll" style={{ maxHeight: 140, overflow: 'auto' }}>
         <div style={{ height: 120 }} />
-        <p data-testid="nested-text"><FeedbackText target={{kind:'nested', id:'one'}} text="嵌套滚动容器中的评论位置，重复重复，中文😀。" /></p>
+        <p data-testid="nested-text"><FeedbackText target={{kind:'nested', id:'one'}} text="嵌套滚动容器中的批注位置，重复重复，中文😀。" /></p>
         <div style={{ height: 220 }} />
       </div>
       {bridgeShown && <p data-testid="bridge"><FeedbackText target={{kind:'bridge-source',id:'one'}} text={bridgeSource} className="whitespace-pre" /></p>}
@@ -208,7 +208,7 @@ function Contents({
           void feedback.submit().catch(() => {});
           void feedback.submit().catch(() => {});
           try {
-            feedback.setComment('MUST NOT CHANGE');
+            feedback.setOverallAnnotationText('MUST NOT CHANGE');
           } catch (error) {
             setHookError((error as Error).message);
           }

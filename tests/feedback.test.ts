@@ -159,7 +159,7 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
       submit(): Promise<void>;
       cancelEditor(): void;
       saveEditor(): void;
-      openComment(id?: string): void;
+      openAnnotation(id?: string): void;
       deleteEditor(): void;
       openOverall(): void;
       numberFor(id: string): number;
@@ -190,7 +190,7 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
     0,
     'Pending object selections must not silently disappear on submit.',
   );
-  store.openComment();
+  store.openAnnotation();
   store.changeEditor('临时输入');
   assert.equal(store.getSnapshot().value.annotations.length, 0);
   assert.equal(store.getSnapshot().selectionTargets.length, 2);
@@ -201,28 +201,28 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
   assert.equal(store.getSnapshot().value.annotations.length, 0);
   store.chooseObject(target);
   store.chooseObject({ ref: { kind: 'card', id: 'b' } });
-  store.openComment();
+  store.openAnnotation();
   store.saveEditor();
   const saved = store.getSnapshot().value.annotations[0];
   assert.equal(saved.targets.length, 2);
   assert.equal(saved.comment, '');
   assert.equal(store.numberFor(saved.id), 1);
-  store.openComment(saved.id);
+  store.openAnnotation(saved.id);
   store.changeEditor('取消这个改动');
   store.cancelEditor();
   assert.equal(store.getSnapshot().value.annotations[0].comment, '');
-  store.openComment(saved.id);
+  store.openAnnotation(saved.id);
   store.changeEditor('保存修改');
   store.saveEditor();
   assert.equal(store.getSnapshot().value.annotations[0].id, saved.id);
   assert.equal(store.getSnapshot().value.annotations[0].comment, '保存修改');
   store.chooseObject({ ref: { kind: 'card', id: 'c' } });
-  store.openComment();
+  store.openAnnotation();
   store.saveEditor();
   const secondId = store.getSnapshot().value.annotations[1].id;
-  store.openComment(saved.id);
+  store.openAnnotation(saved.id);
   store.deleteEditor();
-  assert.equal(store.numberFor(secondId), 2, 'Deletion must not renumber another comment.');
+  assert.equal(store.numberFor(secondId), 2, 'Deletion must not renumber another annotation.');
   assert.equal(store.getSnapshot().value.annotations.length, 1);
   store.openOverall();
   store.changeEditor('整体草稿');

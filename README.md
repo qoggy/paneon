@@ -105,7 +105,7 @@ paneon config set ui.language zh-CN
 The defaults are `light` and `en`. Supported values are `light` / `dark` and
 `en` / `zh-CN`. Paneon saves preferences in `~/.paneon/config.json` and updates
 open home pages, panel hosts, and newly compiled panel interfaces immediately.
-Changing preferences keeps answers, comment drafts, current views, and event receipts.
+Changing preferences keeps answers, annotation drafts, current views, and event receipts.
 
 Paneon's own controls and standard-page instructions follow the selected language.
 Author-supplied titles, questions, Markdown, code, Git/PR content, and user input

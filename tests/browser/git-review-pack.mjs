@@ -36,21 +36,24 @@ try {
     { cwd: project, maxBuffer: 4 * 1024 * 1024 },
   );
   const packageRoot = join(installation, 'node_modules/paneon');
-  const result = await exec(
-    process.execPath,
-    [new URL('./git-review.mjs', import.meta.url).pathname],
-    {
-      cwd: project,
-      env: {
-        ...process.env,
-        PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js')).href,
-        PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
-        PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
+  for (const script of ['git-review.mjs', 'git-review-loading.mjs']) {
+    const result = await exec(
+      process.execPath,
+      [new URL(`./${script}`, import.meta.url).pathname],
+      {
+        cwd: project,
+        env: {
+          ...process.env,
+          PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js'))
+            .href,
+          PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+          PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
+        },
+        maxBuffer: 4 * 1024 * 1024,
       },
-      maxBuffer: 4 * 1024 * 1024,
-    },
-  );
-  console.log(result.stdout.trim());
+    );
+    console.log(result.stdout.trim());
+  }
   const digest = createHash('sha256')
     .update(await readFile(join(root, metadata.filename)))
     .digest('hex');

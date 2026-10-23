@@ -10,7 +10,7 @@ export const longNote =
 export const layoutInput = {
   title: '服务数据评审',
   description:
-    '试试**排序、筛选、分页**，选择行、列、单元格或词语后评论。\n\n完整说明的第二段保留在这里。',
+    '试试**排序、筛选、分页**，选择行、列、单元格或词语后批注。\n\n完整说明的第二段保留在这里。',
   pageSize: 3,
   columns: [
     { key: 'service', label: '服务' },

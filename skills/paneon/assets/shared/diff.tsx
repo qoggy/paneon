@@ -1,11 +1,12 @@
 import { useLocale } from './i18n';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, CodeBlock, FeedbackTarget, Input, useFeedback } from 'paneon/ui';
 import type { FeedbackTarget as Target } from 'paneon/sdk';
-import { createDiffModel, sourceLines } from './diff-model.ts';
+import { createDiffModel, diffChanges, sourceLines } from './diff-model.ts';
 import type { DiffLine, DiffModel, DiffRow } from './diff-model.ts';
 import type { GitRef } from './diff-schema.ts';
 import { DiffToolbar } from './diff-toolbar.tsx';
+import { useDiffSplit } from './diff-split.ts';
 function splitRows(rows: DiffRow[]) {
   const result: { old?: DiffLine; new?: DiffLine; kind: DiffRow['kind'] }[] = [];
   for (let i = 0; i < rows.length;) {
@@ -33,8 +34,12 @@ export function DiffView({
   newText,
   oldPath,
   newPath,
+  oldRevision,
+  newRevision,
   fileOnly = false,
+  defaultExpanded = false,
   locateTarget,
+  onCollapse,
 }: {
   sourceId: string;
   model?: DiffModel;
@@ -42,51 +47,64 @@ export function DiffView({
   newText?: string;
   oldPath?: string;
   newPath?: string;
+  oldRevision?: string;
+  newRevision?: string;
   fileOnly?: boolean;
+  defaultExpanded?: boolean;
   locateTarget?: Target<GitRef>;
+  onCollapse?: () => void;
 }) {
   const { t, message } = useLocale();
   const model = useMemo(
     () => supplied ?? createDiffModel(oldText, newText),
     [supplied, oldText, newText],
   );
+  const changes = useMemo(() => diffChanges(model.rows), [model]);
+  const headerId = useId();
   const feedback = useFeedback<GitRef>();
   const { registerText } = feedback;
   const root = useRef<HTMLDivElement>(null);
   const [unified, setUnified] = useState(false),
-    [expanded, setExpanded] = useState(false);
+    [expanded, setExpanded] = useState(defaultExpanded);
+  const splitLayout = useDiffSplit(!unified && !fileOnly, t('调整差异两侧宽度'));
+  const initialLocation = useRef<string | null>(null);
   const [navigation, setNavigation] = useState({ sourceId, index: 0 });
-  const currentHunk =
+  const currentChange =
     navigation.sourceId === sourceId
-      ? Math.min(navigation.index, Math.max(0, model.hunks.length - 1))
+      ? Math.min(navigation.index, Math.max(0, changes.length - 1))
       : 0;
   const pendingLocation = useRef(false);
   useLayoutEffect(() => {
     setNavigation({ sourceId, index: 0 });
     pendingLocation.current = false;
-  }, [sourceId]);
-  const revealHunk = (index: number) => {
-    const hunk = model.hunks[index];
-    if (!hunk) return;
-    const changed = hunk.rows.find((row) => row.kind !== 'context');
-    const line = changed?.new ?? changed?.old;
-    const side = changed?.new ? 'new' : 'old';
-    const element =
-      expanded && line
-        ? root.current?.querySelector<HTMLElement>(
-            `[data-code-side="${side}"][data-line="${line.number}"]`,
-          )
-        : root.current?.querySelector<HTMLElement>(`[data-diff-hunk="${index}"]`);
-    element?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    setExpanded(defaultExpanded);
+  }, [sourceId, defaultExpanded]);
+  const revealChange = (index: number) => {
+    const change = changes[index];
+    const line = change?.new ?? change?.old;
+    if (!line) return;
+    const side = change.new ? 'new' : 'old';
+    const element = root.current?.querySelector<HTMLElement>(
+      `[data-code-side="${side}"][data-line="${line.number}"]`,
+    );
+    if (element) revealDiffElement(element);
   };
+  useLayoutEffect(() => {
+    if (initialLocation.current === sourceId || fileOnly) return;
+    if (defaultExpanded && !expanded) return;
+    initialLocation.current = sourceId;
+    if (!defaultExpanded || locateTarget) return;
+    const frame = requestAnimationFrame(() => revealChange(0));
+    return () => cancelAnimationFrame(frame);
+  }, [sourceId, expanded, fileOnly, defaultExpanded]);
   const navigate = (index: number) => {
     setNavigation({ sourceId, index });
-    revealHunk(index);
+    revealChange(index);
   };
   useLayoutEffect(() => {
     if (!pendingLocation.current) return;
     pendingLocation.current = false;
-    revealHunk(currentHunk);
+    revealChange(currentChange);
   }, [unified, expanded]);
   const [rangeSide, setRangeSide] = useState<'old' | 'new'>('new'),
     [start, setStart] = useState('1'),
@@ -197,29 +215,42 @@ export function DiffView({
     )[extension ?? ''];
     return (
       <td
-        className={`border-l align-top ${changed ? (side === 'old' ? 'bg-[var(--diff-deletion)]' : 'bg-[var(--diff-addition)]') : ''}`}
+        className={`align-top ${changed ? (side === 'old' ? 'bg-[var(--diff-deletion)]' : 'bg-[var(--diff-addition)]') : ''}`}
       >
         <div className="flex h-6 font-mono text-sm leading-6">
-          <button
-            type="button"
-            className="w-12 shrink-0 pr-2 text-right text-muted-foreground select-none"
-            disabled={feedback.mode !== 'select' || feedback.submitting}
-            aria-label={t('Select {side} line {number}', {
-              side: t(side === 'old' ? 'Old' : 'New'),
-              number: line.number,
-            })}
-            onClick={() => chooseLine(side, line.number, line.number)}
+          <span
+            className={`sticky z-[1] flex shrink-0 items-center bg-background/95 text-muted-foreground select-none ${side === 'old' && !unified ? 'right-0 order-2 border-l' : 'left-0 border-r'}`}
+            data-diff-gutter={side}
+            style={
+              changed
+                ? {
+                    backgroundColor:
+                      side === 'old' ? 'var(--diff-deletion)' : 'var(--diff-addition)',
+                  }
+                : undefined
+            }
           >
-            {line.number}
-          </button>
-          <span aria-hidden="true" className="w-4 shrink-0 select-none">
-            {changed ? (side === 'old' ? '-' : '+') : ' '}
+            <button
+              type="button"
+              className="w-10 shrink-0 px-1 text-right text-xs tabular-nums select-none"
+              disabled={feedback.mode !== 'select' || feedback.submitting}
+              aria-label={t('Select {side} line {number}', {
+                side: t(side === 'old' ? 'Old' : 'New'),
+                number: line.number,
+              })}
+              onClick={() => chooseLine(side, line.number, line.number)}
+            >
+              {line.number}
+            </button>
+            <span aria-hidden="true" className="w-3 shrink-0 text-center text-xs select-none">
+              {changed ? (side === 'old' ? '−' : '+') : ' '}
+            </span>
           </span>
           <span
             data-code-side={side}
             data-source-start={line.start}
             data-line={line.number}
-            className="min-w-max whitespace-pre"
+            className="min-w-max flex-1 px-3 whitespace-pre"
           >
             <CodeBlock
               code={body}
@@ -264,7 +295,11 @@ export function DiffView({
         </table>
       </div>
     ) : (
-      <div className="grid min-w-0 grid-cols-2 divide-x" data-diff-split="">
+      <div
+        className="grid min-w-0"
+        style={{ gridTemplateColumns: 'var(--diff-columns, 50% 50%)' }}
+        data-diff-split=""
+      >
         {(['old', 'new'] as const).map((side) => (
           <div
             key={side}
@@ -290,48 +325,112 @@ export function DiffView({
     );
   };
   return (
-    <div ref={root} data-diff-source={sourceId} className="min-w-0 space-y-2">
+    <div
+      ref={(element) => {
+        root.current = element;
+        splitLayout.root.current = element;
+      }}
+      data-diff-source={sourceId}
+      className="min-w-0"
+    >
       <style>
         {'::highlight(paneon-diff-location) { background-color: Highlight; color: HighlightText; }'}
       </style>
-      <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center gap-2 border-b bg-background py-1">
-        <div className="min-w-0 flex-1">
-          <FeedbackTarget<GitRef> target={{ sourceId, kind: 'file' }}>
-            <div
-              className="truncate rounded-md px-2 py-1 font-mono text-sm"
-              title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
+      <div id={headerId} data-diff-header="" className="sticky top-0 z-10 border-b bg-background">
+        <div className="flex min-w-0 flex-wrap items-center gap-1 px-1 py-1">
+          <div className="min-w-0 flex-1">
+            <FeedbackTarget<GitRef> target={{ sourceId, kind: 'file' }}>
+              <div
+                className="truncate rounded-md px-2 py-1 font-mono text-sm"
+                title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
+              >
+                {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
+                <span className="text-muted-foreground">{t('（整文件）')}</span>
+              </div>
+            </FeedbackTarget>
+          </div>
+          {!fileOnly && (
+            <DiffToolbar
+              unified={unified}
+              expanded={expanded}
+              current={currentChange}
+              total={changes.length}
+              onNavigate={navigate}
+              onMode={(value) => {
+                if (value === unified) {
+                  revealChange(currentChange);
+                  return;
+                }
+                pendingLocation.current = true;
+                setUnified(value);
+              }}
+              onExpanded={() => {
+                pendingLocation.current = true;
+                setExpanded(!expanded);
+              }}
+            />
+          )}
+          {onCollapse && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onCollapse}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label={message('Collapse file diff')}
+              title={message('Collapse file diff')}
             >
-              {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
-              <span className="text-muted-foreground">{t('（整文件）')}</span>
-            </div>
-          </FeedbackTarget>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                aria-hidden="true"
+                className="size-4"
+              >
+                <rect x="2" y="2" width="12" height="12" rx="1.5" />
+                <path d="M2 10h12 M6 6l2 2 2-2" />
+              </svg>
+            </Button>
+          )}
         </div>
         {!fileOnly && (
-          <DiffToolbar
-            unified={unified}
-            expanded={expanded}
-            current={currentHunk}
-            total={model.hunks.length}
-            onNavigate={navigate}
-            onMode={(value) => {
-              if (value === unified) {
-                revealHunk(currentHunk);
-                return;
-              }
-              pendingLocation.current = true;
-              setUnified(value);
+          <div
+            data-diff-source-headers=""
+            className="grid min-w-0 border-t bg-muted/30 text-xs"
+            style={{
+              gridTemplateColumns: unified ? 'minmax(0,1fr)' : 'var(--diff-columns, 50% 50%)',
             }}
-            onExpanded={() => {
-              pendingLocation.current = true;
-              setExpanded(!expanded);
-            }}
-          />
+          >
+            {(['old', 'new'] as const).map((side) => (
+              <div
+                key={side}
+                data-diff-source-header={side}
+                className="flex min-w-0 items-center gap-2 px-3 py-1.5 first:border-r"
+                title={`${side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))} · ${side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}`}
+              >
+                <span className="shrink-0 font-mono text-muted-foreground">
+                  {side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))}
+                </span>
+                <span className="truncate">
+                  {side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
       {!fileOnly && (
-        <>
+        <div className="relative min-w-0" data-diff-body="" data-feedback-clip-top={headerId}>
+          {!unified && (
+            <div
+              {...splitLayout.separatorProps}
+              data-diff-divider=""
+              className="absolute inset-y-0 z-[5] w-2 -translate-x-1/2 cursor-col-resize touch-none outline-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-border hover:bg-muted-foreground/10 focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground/15"
+              style={{ left: 'var(--diff-left, 50%)' }}
+            />
+          )}
           {feedback.mode === 'select' && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="relative z-[6] flex flex-wrap items-center gap-2 bg-background">
               <label>
                 {t('侧')}{' '}
                 <select
@@ -373,10 +472,10 @@ export function DiffView({
           )}
           {error && <p role="alert">{message(error)}</p>}
           {expanded ? (
-            <div className="min-w-0 rounded-md border">{display(model.rows)}</div>
+            <div className="min-w-0 border-b">{display(model.rows)}</div>
           ) : (
             model.hunks.map((hunk, index) => (
-              <section key={index} data-diff-hunk={index} className="min-w-0 rounded-md border">
+              <section key={index} data-diff-hunk={index} className="min-w-0 border-b">
                 <FeedbackTarget<GitRef>
                   target={{
                     sourceId,
@@ -388,7 +487,7 @@ export function DiffView({
                     patch: hunk.patch,
                   }}
                 >
-                  <div className="bg-muted p-2 font-mono text-sm">
+                  <div className="relative z-[6] bg-muted p-2 font-mono text-sm">
                     @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                     {t('(changed block)')}
                   </div>
@@ -398,7 +497,7 @@ export function DiffView({
             ))
           )}
           {model.hunks.length === 0 && !expanded && <p>{t('文本内容相同；可展开查看上下文。')}</p>}
-        </>
+        </div>
       )}
     </div>
   );
@@ -442,11 +541,33 @@ export function diffTargetRanges(model: DiffModel, target: Target<GitRef>): Rang
   return ranges;
 }
 
+/** Use the nearest vertical viewport; standalone document diffs own their page scroll. */
+function revealDiffElement(element: HTMLElement) {
+  let viewport = element.parentElement;
+  while (viewport) {
+    const overflow = getComputedStyle(viewport).overflowY;
+    if (/(auto|scroll)/.test(overflow) && viewport.scrollHeight > viewport.clientHeight + 1) break;
+    viewport = viewport.parentElement;
+  }
+  viewport ??= document.scrollingElement as HTMLElement | null;
+  if (!viewport) return;
+  const clip =
+    viewport === document.scrollingElement ? { top: 0 } : viewport.getBoundingClientRect();
+  const header = element.closest('[data-diff-source]')?.querySelector('[data-diff-header]');
+  const inset = header?.getBoundingClientRect().height ?? 0;
+  const bounds = element.getBoundingClientRect();
+  viewport.scrollTop +=
+    bounds.top -
+    clip.top -
+    inset -
+    Math.max(0, (viewport.clientHeight - inset - bounds.height) / 2);
+}
+
 /** Reveal the actual selected source fragment in its own scroll pane. */
 export function locateDiffTarget(model: DiffModel, target: Target<GitRef>) {
   const ranges = diffTargetRanges(model, target);
   const first = ranges[0]?.startContainer.parentElement;
-  first?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  if (first) revealDiffElement(first);
   // Run after the public controller's default highlight. Separate ranges avoid
   // highlighting the opposite column between consecutive same-side rows.
   requestAnimationFrame(() => {

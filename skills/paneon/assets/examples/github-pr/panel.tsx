@@ -534,7 +534,7 @@ function GithubPR() {
                   <p role="status">
                     {requestMessage.id !== undefined
                       ? t(
-                          'Saved the complete PR review request as event {id}. Draft comments were not sent; the AI must be waiting or resume later to read it.',
+                          'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.',
                           { id: requestMessage.id },
                         )
                       : t('Request not saved: {error}', { error: requestMessage.error ?? '' })}
@@ -749,7 +749,7 @@ function GithubPR() {
         {saved && (
           <p role="status">
             {t(
-              'Saved complete comments as event {id}. Comments go only to the current AI and were not published to GitHub.',
+              'Saved complete annotations as event {id}. Annotations go only to the current AI and were not published to GitHub.',
               { id: saved },
             )}
           </p>

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { feedbackTargetKey } from '../sdk/feedback.js';
 import { useFeedback, useFeedbackContext } from './feedback-context';
-import { floatingPosition } from './feedback-geometry';
+import { floatingPosition, markerPosition } from './feedback-geometry';
 import { Button } from './button';
 import { Textarea } from './textarea';
 import { cn } from './utils';
@@ -46,33 +46,22 @@ export function FeedbackSurface({ className }: { className?: string }) {
       }
       const markers: Marker[] = [];
       const highlights: DOMRect[] = [];
-      const placed: { left: number; top: number }[] = [];
+      const placed: DOMRect[] = [];
       const snapshot = store.getSnapshot();
       for (const annotation of snapshot.value.annotations) {
         for (const target of annotation.targets) {
           const rects = store.targetRects(target);
-          highlights.push(...rects);
+          highlights.push(...rects.map((item) => item.rect));
           const last = rects.at(-1);
           if (!last) continue;
-          let left = Math.max(0, Math.min(last.right - 10, window.innerWidth - 28));
-          let top = Math.max(0, last.top - 18);
-          while (
-            placed.some(
-              (point) => Math.abs(point.left - left) < 27 && Math.abs(point.top - top) < 25,
-            )
-          ) {
-            left -= 28;
-            if (left < 0) {
-              left = Math.min(last.right, window.innerWidth - 28);
-              top += 26;
-            }
-          }
-          placed.push({ left, top });
+          const position = markerPosition(last, placed);
+          if (!position) continue;
+          placed.push(position);
           markers.push({
             id: annotation.id,
             number: store.numberFor(annotation.id),
             target: feedbackTargetKey(target),
-            rect: new DOMRect(left, top, 24, 24),
+            rect: position,
           });
         }
       }
@@ -80,7 +69,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
       const firstRect = (targets: typeof snapshot.pending) => {
         for (const target of targets) {
           const rect = store.targetRects(target, true)[0];
-          if (rect) return rect;
+          if (rect) return rect.rect;
         }
       };
       let anchor = firstRect(targets);
@@ -183,11 +172,11 @@ export function FeedbackSurface({ className }: { className?: string }) {
           size="icon-xs"
           data-feedback-marker={marker.id}
           data-feedback-number={marker.number}
-          aria-label={t('Comment {number}', { number: marker.number })}
+          aria-label={t('Annotation {number}', { number: marker.number })}
           disabled={blocked}
-          className="pointer-events-auto absolute rounded-full"
+          className="pointer-events-auto absolute rounded-full transition-colors"
           style={{ left: marker.rect.left, top: marker.rect.top }}
-          onClick={() => store.openComment(marker.id)}
+          onClick={() => store.openAnnotation(marker.id)}
         >
           {marker.number}
         </Button>
@@ -201,7 +190,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
             size="sm"
             variant="outline"
             data-feedback-action=""
-            className="pointer-events-auto absolute z-10 bg-popover shadow-md"
+            className="pointer-events-auto absolute z-10 bg-popover shadow-md transition-colors"
             style={{
               ...floatingPosition(geometry.pendingAnchor, 72, 32),
               ...(state.editor
@@ -209,9 +198,9 @@ export function FeedbackSurface({ className }: { className?: string }) {
                 : {}),
             }}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => store.openComment()}
+            onClick={() => store.openAnnotation()}
           >
-            {t('评论')}
+            {t('批注')}
           </Button>
         )}
       {!state.editor && (state.uiError || state.error) && (
@@ -226,7 +215,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
         <div
           ref={editorElement}
           role="dialog"
-          aria-label={state.editor.kind === 'overall' ? t('整体评论') : t('编辑评论')}
+          aria-label={state.editor.kind === 'overall' ? t('整体批注') : t('编辑批注')}
           className="pointer-events-auto absolute max-h-[calc(100dvh-16px)] space-y-3 overflow-auto rounded-md border bg-popover p-3 text-popover-foreground shadow-md"
           style={{ ...position, width: editorWidth }}
           onKeyDown={(event) => {
@@ -242,15 +231,15 @@ export function FeedbackSurface({ className }: { className?: string }) {
         >
           <div className="text-sm font-medium">
             {state.editor.kind === 'overall'
-              ? t('整体评论')
+              ? t('整体批注')
               : state.editor.id
-                ? t('Comment {number}', { number: store.numberFor(state.editor.id) })
-                : t('添加评论')}
+                ? t('Annotation {number}', { number: store.numberFor(state.editor.id) })
+                : t('添加批注')}
           </div>
           <Textarea
             ref={input}
-            aria-label={t('评论内容')}
-            placeholder={t('添加评论（可留空）')}
+            aria-label={t('批注内容')}
+            placeholder={t('添加批注（可留空）')}
             disabled={blocked}
             value={state.editor.comment}
             onChange={(event) => store.changeEditor(event.target.value)}
@@ -276,7 +265,7 @@ export function FeedbackSurface({ className }: { className?: string }) {
                 disabled={blocked}
                 onClick={() => store.deleteEditor()}
               >
-                {t('删除评论')}
+                {t('删除批注')}
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" disabled={blocked} onClick={close}>
@@ -312,12 +301,12 @@ export function FeedbackSubmitButton({
         void feedback.submit().catch(() => {});
       }}
     >
-      {feedback.submitting ? t('提交中…') : (children ?? t('提交评论'))}
+      {feedback.submitting ? t('提交中…') : (children ?? t('提交批注'))}
     </Button>
   );
 }
 
-export function FeedbackOverallCommentButton() {
+export function FeedbackOverallAnnotationButton() {
   const { t } = useUI();
   const { store, disabled } = useFeedbackContext();
   const feedback = useFeedback();
@@ -328,7 +317,7 @@ export function FeedbackOverallCommentButton() {
       disabled={disabled || feedback.submitting}
       onClick={(event) => store.openOverall(event.currentTarget)}
     >
-      {t('整体评论')}
+      {t('整体批注')}
     </Button>
   );
 }
@@ -364,22 +353,22 @@ export function FeedbackSelectionControls({
           type="button"
           variant="outline"
           disabled={blocked}
-          onClick={() => store.openComment()}
+          onClick={() => store.openAnnotation()}
         >
-          {t('评论')}
+          {t('批注')}
         </Button>
       )}
       {feedback.value.annotations.length > 0 && (
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" disabled={feedback.submitting}>
-              {t('Comments')} ({feedback.value.annotations.length})
+              {t('Annotations')} ({feedback.value.annotations.length})
             </Button>
           </PopoverTrigger>
           <PopoverContent
             className="max-h-80 w-80 space-y-3 overflow-auto"
             data-feedback-controls=""
-            aria-label={t('评论目录')}
+            aria-label={t('批注目录')}
           >
             {feedback.value.annotations.map((entry) => (
               <div key={entry.id} data-annotation-id={entry.id} className="space-y-1 text-sm">
@@ -396,11 +385,11 @@ export function FeedbackSelectionControls({
                       setMenuOpen(false);
                       void feedback
                         .locate(entry.targets[0])
-                        .then(() => store.openComment(entry.id))
+                        .then(() => store.openAnnotation(entry.id))
                         .catch(() => {});
                     }}
                   >
-                    {t('编辑评论')} {store.numberFor(entry.id)}
+                    {t('编辑批注')} {store.numberFor(entry.id)}
                   </Button>
                   {entry.targets.map((target, index) => (
                     <Button
@@ -414,7 +403,7 @@ export function FeedbackSelectionControls({
                         void feedback.locate(target).catch(() => {});
                       }}
                     >
-                      {t('Locate comment {number}, location {index}', {
+                      {t('Locate annotation {number}, location {index}', {
                         number: store.numberFor(entry.id),
                         index: index + 1,
                       })}
@@ -434,7 +423,7 @@ export function FeedbackToolbar({ className }: { className?: string }) {
   return (
     <div data-feedback-controls="" className={cn('flex flex-wrap items-center gap-2', className)}>
       <FeedbackSelectionControls className="contents">
-        <FeedbackOverallCommentButton />
+        <FeedbackOverallAnnotationButton />
       </FeedbackSelectionControls>
       <FeedbackSubmitButton />
     </div>

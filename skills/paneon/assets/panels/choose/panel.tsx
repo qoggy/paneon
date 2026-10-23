@@ -15,9 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
   Markdown,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   RadioGroup,
   RadioGroupItem,
   Textarea,
@@ -55,7 +52,7 @@ function MultipleChoiceGroup({ children, 'aria-label': label }: ComponentProps<t
   );
 }
 function ChoosePanel() {
-  const { t, message } = useLocale();
+  const { t } = useLocale();
   const params = usePanelInput<ChooseParams>();
   const [index, setIndex] = useState(0);
   const [reviewing, setReviewing] = useState(false);
@@ -70,13 +67,15 @@ function ChoosePanel() {
       text: '',
     })),
   );
-  const [error, setError] = useState('');
+  const [showReviewError, setShowReviewError] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const reviewError = useRef<HTMLParagraphElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const question = params.questions[index];
   const detail = question.options.find((option) => option.id === detailId);
   function changeQuestion(at: number) {
     setReviewing(false);
-    setError('');
+    setShowReviewError(false);
     setDetailId(null);
     setIndex(at);
   }
@@ -94,7 +93,7 @@ function ChoosePanel() {
     setDrafts((previous) =>
       previous.map((value, at) => (at === index ? { ...value, ...patch } : value)),
     );
-    setError('');
+    setShowReviewError(false);
   }
   function answer(at: number): ChoiceAnswer {
     const value = drafts[at];
@@ -117,39 +116,29 @@ function ChoosePanel() {
       ],
     };
   }
-  function validate(at: number) {
-    const value = answer(at);
-    const parsed = answerSchema(params.questions[at]).safeParse(value);
-    if (!parsed.success) {
-      changeQuestion(at);
-      setError(
-        drafts[at].customSelected && !drafts[at].text.trim()
-          ? params.questions[at].mode === 'multiple'
-            ? 'Enter your own answer or deselect Other.'
-            : 'Enter your own answer or select a different answer.'
-          : value.selections.length === 0
-            ? 'Select an option or enter your own answer.'
-            : 'Check your answer before continuing.',
-      );
-      requestAnimationFrame(() => heading.current?.focus());
-    }
-    return parsed.success;
+  const answers = params.questions.map((_question, at) => answer(at));
+  const complete = params.questions.map(
+    (item, at) => answerSchema(item).safeParse(answers[at]).success,
+  );
+  const incompleteCount = complete.filter((valid) => !valid).length;
+  function review() {
+    setDetailId(null);
+    setShowReviewError(false);
+    setHasReviewed(true);
+    setReviewing(true);
+    requestAnimationFrame(() => heading.current?.focus());
   }
   function next() {
-    if (index === params.questions.length - 1) {
-      setDetailId(null);
-      setError('');
-      setReviewing(true);
-      requestAnimationFrame(() => heading.current?.focus());
-    } else {
-      changeQuestion(index + 1);
-    }
+    if (index === params.questions.length - 1) review();
+    else changeQuestion(index + 1);
   }
   function submit() {
-    for (let at = 0; at < params.questions.length; at++) if (!validate(at)) return;
-    const result = completeAnswersSchema(params).parse({
-      answers: params.questions.map((_question, at) => answer(at)),
-    });
+    if (incompleteCount) {
+      setShowReviewError(true);
+      requestAnimationFrame(() => reviewError.current?.focus());
+      return;
+    }
+    const result = completeAnswersSchema(params).parse({ answers });
     void submission.submit(result);
   }
   const detailBody = detail?.details && (
@@ -179,28 +168,6 @@ function ChoosePanel() {
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <h1 className="max-w-full font-medium break-words">{params.title}</h1>
-                {params.description && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto shrink-0 p-0 text-xs text-muted-foreground underline underline-offset-4"
-                      >
-                        {t('Description')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      aria-label={t('Questionnaire description')}
-                      className="max-h-[var(--radix-popover-content-available-height)] max-w-[calc(100vw-2rem)] overflow-y-auto"
-                    >
-                      <Markdown className="text-sm! leading-relaxed! break-words [&_h1]:text-base! [&_h2]:text-sm! [&_h3]:text-sm! [&_h4]:text-sm! [&_h5]:text-sm! [&_h6]:text-sm! [&_p]:my-2! [&_pre]:max-w-full! [&_pre]:overflow-x-auto!">
-                        {params.description}
-                      </Markdown>
-                    </PopoverContent>
-                  </Popover>
-                )}
               </div>
               <p aria-live="polite" className="ml-auto shrink-0 whitespace-nowrap tabular-nums">
                 {reviewing
@@ -208,6 +175,13 @@ function ChoosePanel() {
                   : `${multiple ? t('Multiple choice') : t('Single choice')} · ${index + 1} / ${params.questions.length}`}
               </p>
             </div>
+            {params.description && (
+              <div aria-label={t('Questionnaire description')}>
+                <Markdown className="text-sm! leading-relaxed! break-words text-muted-foreground! [&_h1]:text-base! [&_h2]:text-sm! [&_h3]:text-sm! [&_h4]:text-sm! [&_h5]:text-sm! [&_h6]:text-sm! [&_p]:my-2! [&_pre]:max-w-full! [&_pre]:overflow-x-auto!">
+                  {params.description}
+                </Markdown>
+              </div>
+            )}
             <h2
               ref={heading}
               tabIndex={-1}
@@ -319,17 +293,22 @@ function ChoosePanel() {
                             variant="link"
                             size="sm"
                             className="h-auto p-0 text-xs text-muted-foreground"
-                            aria-label={t('View details: {label}', { label: option.label })}
+                            aria-label={t(
+                              detailId === option.id
+                                ? 'Close details: {label}'
+                                : 'View details: {label}',
+                              { label: option.label },
+                            )}
                             aria-expanded={detailId === option.id}
                             aria-controls={detailId === option.id ? 'option-details' : undefined}
                             aria-haspopup={wide ? undefined : 'dialog'}
                             onClick={(event) => {
                               detailTrigger.current = event.currentTarget;
-                              setDetailId(option.id);
+                              setDetailId((current) => (current === option.id ? null : option.id));
                             }}
                           >
-                            {t('View details')}
-                            <span aria-hidden="true"> ↗</span>
+                            {t(detailId === option.id ? 'Close details' : 'View details')}
+                            <span aria-hidden="true">{detailId === option.id ? ' ×' : ' ↗'}</span>
                           </Button>
                         )}
                         {selected && (
@@ -413,9 +392,16 @@ function ChoosePanel() {
               </div>
             </ChoiceGroup>
           )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {message(error)}
+          {reviewing && showReviewError && incompleteCount > 0 && (
+            <p
+              ref={reviewError}
+              tabIndex={-1}
+              role="alert"
+              className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive"
+            >
+              {t('Complete all answers before submitting ({count} incomplete).', {
+                count: incompleteCount,
+              })}
             </p>
           )}
           {reviewing && (
@@ -423,77 +409,98 @@ function ChoosePanel() {
               <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
                 <h3 className="text-sm font-medium">{t('Answers')}</h3>
                 <span className="text-xs text-muted-foreground">
-                  {
-                    params.questions.filter(
-                      (item, at) => answerSchema(item).safeParse(answer(at)).success,
-                    ).length
-                  }
+                  {params.questions.length - incompleteCount}
                   {' / '}
                   {params.questions.length} {t('answered')}
                 </span>
               </div>
               <ol className="divide-y">
                 {params.questions.map((item, at) => {
-                  const result = answer(at);
+                  const result = answers[at];
+                  const invalid = !complete[at];
+                  const statusId = `answer-status-${at}`;
                   return (
-                    <li key={item.id} className="flex gap-3 px-4 py-3">
-                      <span
-                        aria-hidden="true"
-                        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        aria-label={t('Edit answer: {question}', { question: item.title })}
+                        aria-describedby={invalid ? statusId : undefined}
+                        data-answer-incomplete={invalid}
+                        className="flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset data-[answer-incomplete=true]:bg-destructive/5"
+                        onClick={() => {
+                          changeQuestion(at);
+                          requestAnimationFrame(() => heading.current?.focus());
+                        }}
                       >
-                        {at + 1}
-                      </span>
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <h4 className="text-xs leading-5 font-normal break-words text-muted-foreground">
-                          {item.title}
-                        </h4>
-                        {result.selections.length ? (
-                          <ul className="space-y-2">
-                            {result.selections.map((selection) => (
-                              <li
-                                key={
-                                  selection.kind === 'custom'
-                                    ? 'custom'
-                                    : `option:${selection.optionId}`
-                                }
-                                className="text-sm break-words whitespace-pre-wrap"
+                        <span
+                          aria-hidden="true"
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+                        >
+                          {at + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 space-y-1.5">
+                          <span className="block text-xs leading-5 break-words text-muted-foreground">
+                            {item.title}
+                          </span>
+                          {invalid && (
+                            <span
+                              id={statusId}
+                              className="flex items-center gap-1.5 text-xs font-medium text-destructive"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-current"
                               >
-                                {selection.kind === 'custom' ? (
-                                  selection.text.trim() ? (
-                                    <p className="font-medium">
+                                !
+                              </span>
+                              <span>{t('Incomplete answer')}</span>
+                            </span>
+                          )}
+                          {result.selections.length ? (
+                            <span className="block space-y-2">
+                              {result.selections.map((selection) => (
+                                <span
+                                  key={
+                                    selection.kind === 'custom'
+                                      ? 'custom'
+                                      : `option:${selection.optionId}`
+                                  }
+                                  className="block text-sm break-words whitespace-pre-wrap"
+                                >
+                                  {selection.kind === 'custom' ? (
+                                    <span className="block font-medium">
                                       <span className="text-xs font-normal text-muted-foreground">
                                         {t('Other:')}
                                       </span>{' '}
-                                      {selection.text}
-                                    </p>
-                                  ) : (
-                                    <span className="text-muted-foreground italic">
-                                      {t('No answer')}
+                                      {selection.text.trim() ? selection.text : t('No answer')}
                                     </span>
-                                  )
-                                ) : (
-                                  <>
-                                    <p className="font-medium">
-                                      {
-                                        item.options.find(
-                                          (option) => option.id === selection.optionId,
-                                        )?.label
-                                      }
-                                    </p>
-                                    {selection.comment && (
-                                      <p className="mt-1 border-l-2 pl-3 leading-relaxed text-muted-foreground">
-                                        {selection.comment}
-                                      </p>
-                                    )}
-                                  </>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-muted-foreground italic">{t('No answer')}</p>
-                        )}
-                      </div>
+                                  ) : (
+                                    <>
+                                      <span className="block font-medium">
+                                        {
+                                          item.options.find(
+                                            (option) => option.id === selection.optionId,
+                                          )?.label
+                                        }
+                                      </span>
+                                      {selection.comment && (
+                                        <span className="mt-1 block border-l-2 pl-3 leading-relaxed text-muted-foreground">
+                                          {selection.comment}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="block text-sm">{t('No answer')}</span>
+                          )}
+                        </span>
+                        <span aria-hidden="true" className="self-center text-muted-foreground">
+                          →
+                        </span>
+                      </button>
                     </li>
                   );
                 })}
@@ -512,6 +519,11 @@ function ChoosePanel() {
             >
               {t('Previous')}
             </Button>
+            {!reviewing && hasReviewed && (
+              <Button variant="ghost" onClick={review}>
+                {t('Return to summary')}
+              </Button>
+            )}
             {reviewing ? (
               <Button disabled={submission.pending} onClick={submit}>
                 {submission.pending

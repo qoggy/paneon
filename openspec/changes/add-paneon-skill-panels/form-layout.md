@@ -17,7 +17,7 @@ form/panel.tsx 将全部字段统一放在默认 vertical Field 中；src/ui/fie
 - Select 与清除操作在同一行：选择器占合理可用宽度，清除为紧贴选择器的小型 ghost/icon 操作，避免整行按钮。可用 X 图标；可访问名称保留 Clear + 字段标签，图标有可理解提示。仅在有值时出现；清除只重置对应字段，不提交、不重置其他草稿。必填字段清除后由原有校验提示，不能悄悄删除清除能力。
 - Radio 与 multiselect 的短选项横向排列并允许 flex-wrap；较长标签自然换行，窄屏不强挤在一行。不要一律每个选项独占整行，也不要设无法容纳长文本的固定宽度。Radio 清除同样是小型辅助操作。
 - 单个 checkbox/switch 与标签同排并正确关联，标签可点击；描述和错误提示位于关联字段下方。保持控件默认大小，不将 checkbox/switch 拉长。字段组标签、required标记、错误定位及键盘导航仍正确。
-- 提交按钮恢复合适的内容宽度，放在操作行，不被 FieldGroup 撑满。保留 Submit form / Submit corrected form / Saving… 既有文案，避免与其他页“提交评论”混为一谈。
+- 提交按钮恢复合适的内容宽度，放在操作行，不被 FieldGroup 撑满。保留 Submit form / Submit corrected form / Saving… 既有文案，避免与其他页“提交批注”混为一谈。
 - 保留当前单列表单内容及全部控件类型、默认值、required false/zero、空字段省略、输入原文、完整更正/replacesEventId、提交中禁用/防重复、失败草稿；不扩展字段 schema 或给调用者增加布局参数。
 
 ## Ownership and dependency

@@ -59,7 +59,7 @@ Evidence: `tests/browser/preferences-transition.mjs`,
 <!-- prettier-ignore -->
 | Flow | Verified result | Evidence |
 | --- | --- | --- |
-| Four combinations, home/choose/form/custom UI | Same iframe and CodeBlock Text node; current answer and form draft; saved comment/quote plus unsaved editor; receipt language; no extra query/event; 390px; failed Settings save; external error unchanged; first dark content mounted under dark | `/tmp/paneon-ui-browser-preferences.log` |
+| Four combinations, home/choose/form/custom UI | Same iframe and CodeBlock Text node; current answer and form draft; saved annotation/quote plus unsaved editor; receipt language; no extra query/event; 390px; failed Settings save; external error unchanged; first dark content mounted under dark | `/tmp/paneon-ui-browser-preferences.log` |
 | Git four combinations | Current commit/file/editor preserved; 3 initial queries, no preference-triggered queries, 0 events | `/tmp/paneon-ui-browser-preferences-git.log` |
 | Table/Review/PR four combinations and 390px | Filter/search and original PR title preserved; Markdown Text node identity; 2 initial PR queries and no extra queries, 0 events | `/tmp/paneon-ui-browser-standard-combinations.log` |
 | Independent parent probe | Four combinations, original params/revision, DOM/draft identity, 12 concurrent writes converge, unknown config keys, server dark HTML and restart persistence | `/tmp/paneon-ui-parent-probe.log` |
@@ -67,8 +67,8 @@ Evidence: `tests/browser/preferences-transition.mjs`,
 | Original Git regression | Multi-repository/index/worktree, old snapshots, exact Unicode ranges, branches/history/250-row virtualization, B54/B57 drag/keyboard/cancel and corrections | `/tmp/paneon-ui-browser-git.log` |
 | Original Git tree and select-all performance | Directory/search/mobile geometry; 600 lines and 47,070 UTF-16 units per side, 15,600 highlight spans, exact Meta+A/copy/ranges in split/unified/expanded modes | `/tmp/paneon-ui-browser-file-tree.log`; `/tmp/paneon-ui-browser-select-all.log` |
 | Original PR regression | Pinned sources, Markdown/diff/check/PR targets, cross-PR feedback, requests, failures, corrections, coverage and CLI events/ack | `/tmp/paneon-ui-browser-pr.log` |
-| Original compact table and Markdown review | Sorting/filter/pagination, cross-page comments and corrections, UTF-16/link/code/Markdown original ranges, narrow layouts | `/tmp/paneon-ui-browser-table.log`; `/tmp/paneon-ui-browser-table-review.log` |
-| Original contextual comments and Diff toolbar | Temporary edits/Cancel/Delete, numbered markers, raw ranges, scroll, stale snapshots, explicit submit; three-hunk navigation/layout/context/binary/390px | `/tmp/paneon-ui-browser-feedback.log`; `/tmp/paneon-ui-browser-diff.log` |
+| Original compact table and Markdown review | Sorting/filter/pagination, cross-page annotations and corrections, UTF-16/link/code/Markdown original ranges, narrow layouts | `/tmp/paneon-ui-browser-table.log`; `/tmp/paneon-ui-browser-table-review.log` |
+| Original contextual annotations and Diff toolbar | Temporary edits/Cancel/Delete, numbered markers, raw ranges, scroll, stale snapshots, explicit submit; three-hunk navigation/layout/context/binary/390px | `/tmp/paneon-ui-browser-feedback.log`; `/tmp/paneon-ui-browser-diff.log` |
 | Original Mermaid and two teaching examples | Local rendering/error recovery/nesting/update; deterministic controls and fixed teaching content; feedback and mobile behavior | `/tmp/paneon-ui-browser-mermaid.log`; `/tmp/paneon-ui-browser-examples.log` |
 | Host/query/10 shared-context tabs | Existing lifecycle and no mutation replay; every tab owns panel + preferences streams; reconnect and close release all streams | `/tmp/paneon-ui-browser-host.log`; `/tmp/paneon-ui-browser-query.log`; `/tmp/paneon-ui-browser-tabs.log` |
 

@@ -36,7 +36,7 @@ export {
   FeedbackSubmitButton,
   FeedbackToolbar,
   FeedbackSelectionControls,
-  FeedbackOverallCommentButton,
+  FeedbackOverallAnnotationButton,
 } from './feedback';
 export { useFeedback } from './feedback-context';
 export type {

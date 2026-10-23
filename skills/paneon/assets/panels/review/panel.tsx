@@ -76,14 +76,14 @@ function ReviewPanel() {
         disabled={locked}
         onSubmit={async (feedback) => {
           if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim()) {
-            submission.reject('Select content or write a comment before submitting.');
+            submission.reject('Select content or write an annotation before submitting.');
             return;
           }
           await submission.submit(feedback);
         }}
       >
         <FeedbackSurface />
-        <div className="flex flex-wrap items-center gap-2" aria-label={t('评论操作')}>
+        <div className="flex flex-wrap items-center gap-2" aria-label={t('批注操作')}>
           <FeedbackToolbar />
           <DocumentSelection disabled={locked} />
           {locked && (

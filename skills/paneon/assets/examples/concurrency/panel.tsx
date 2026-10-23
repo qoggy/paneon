@@ -253,7 +253,7 @@ function ConcurrencyPanel() {
         <FeedbackSurface />
         <FeedbackToolbar />
         <p className="text-sm text-muted-foreground">
-          暂停后划选文字或选择任务来评论，评论会保留当时的并发数和虚拟时间。
+          暂停后划选文字或选择任务来批注，批注会保留当时的并发数和虚拟时间。
         </p>
         <Playback
           key={concurrency}

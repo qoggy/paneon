@@ -1,4 +1,10 @@
 const en = {
+  工作区: 'Working tree',
+  暂存区: 'Index',
+  调整差异两侧宽度: 'Resize diff columns',
+  'Manual refresh lists files; opening a file captures its content. Annotations retain original snapshots.':
+    'Manual refresh lists files; opening a file captures its content. Annotations retain original snapshots.',
+  'Collapse file diff': 'Collapse file diff',
   Settings: 'Settings',
   设置: 'Settings',
   Theme: 'Theme',
@@ -72,59 +78,59 @@ const en = {
   '面板{status}': 'Panel {status}',
   'Save failed. {error}': 'Save failed. {error}',
   '保存失败。{error}': 'Save failed. {error}',
-  Comment: 'Comment',
-  评论: 'Comments',
-  'Comment {number}': 'Comment {number}',
-  '评论 {number}': 'Comment {number}',
-  'Overall comment': 'Overall comment',
-  整体评论: 'Overall comment',
-  'Edit comment': 'Edit comment',
-  编辑评论: 'Edit comment',
-  'Add comment': 'Add comment',
-  添加评论: 'Add comment',
-  'Comment text': 'Comment text',
-  评论内容: 'Comment text',
-  'Add a comment (optional)': 'Add a comment (optional)',
-  '添加评论（可留空）': 'Add a comment (optional)',
+  Annotation: 'Annotation',
+  批注: 'Annotation',
+  'Annotation {number}': 'Annotation {number}',
+  '批注 {number}': 'Annotation {number}',
+  'Overall annotation': 'Overall annotation',
+  整体批注: 'Overall annotation',
+  'Edit annotation': 'Edit annotation',
+  编辑批注: 'Edit annotation',
+  'Add annotation': 'Add annotation',
+  添加批注: 'Add annotation',
+  'Annotation text': 'Annotation text',
+  批注内容: 'Annotation text',
+  'Add an annotation (optional)': 'Add an annotation (optional)',
+  '添加批注（可留空）': 'Add an annotation (optional)',
   'Selected {count} locations': 'Selected {count} locations',
   '已选 {count} 个位置': 'Selected {count} locations',
   ' · Click objects to select more': ' · Click objects to select more',
   ' · 点击对象可继续选择': ' · Click objects to select more',
-  'Delete comment': 'Delete comment',
-  删除评论: 'Delete comment',
+  'Delete annotation': 'Delete annotation',
+  删除批注: 'Delete annotation',
   Cancel: 'Cancel',
   取消: 'Cancel',
   Save: 'Save',
   保存: 'Save',
   'Submitting…': 'Submitting…',
   '提交中…': 'Submitting…',
-  'Submit comments': 'Submit comments',
-  提交评论: 'Submit comments',
+  'Submit annotations': 'Submit annotations',
+  提交批注: 'Submit annotations',
   'Finish selecting': 'Finish selecting',
   结束选择: 'Finish selecting',
   'Select objects': 'Select objects',
   选择对象: 'Select objects',
-  Comments: 'Comments',
-  'Comment directory': 'Comment directory',
-  评论目录: 'Comment directory',
+  Annotations: 'Annotations',
+  'Annotation directory': 'Annotation directory',
+  批注目录: 'Annotation directory',
   'Selection only': 'Selection only',
   仅选择: 'Selection only',
-  'Edit comment {number}': 'Edit comment {number}',
-  '编辑评论 {number}': 'Edit comment {number}',
-  'Locate comment {number}, location {index}': 'Locate comment {number}, location {index}',
-  '定位评论 {number} 的位置 {index}': 'Locate comment {number}, location {index}',
-  'Save or cancel the comment being edited first.':
-    'Save or cancel the comment being edited first.',
-  '请先保存或取消正在编辑的评论。': 'Save or cancel the comment being edited first.',
+  'Edit annotation {number}': 'Edit annotation {number}',
+  '编辑批注 {number}': 'Edit annotation {number}',
+  'Locate annotation {number}, location {index}': 'Locate annotation {number}, location {index}',
+  '定位批注 {number} 的位置 {index}': 'Locate annotation {number}, location {index}',
+  'Save or cancel the annotation being edited first.':
+    'Save or cancel the annotation being edited first.',
+  '请先保存或取消正在编辑的批注。': 'Save or cancel the annotation being edited first.',
   'Select at least one location.': 'Select at least one location.',
   '请至少选择一个位置。': 'Select at least one location.',
-  'Save or cancel the overall comment being edited first.':
-    'Save or cancel the overall comment being edited first.',
-  '请先保存或取消正在编辑的整体评论。': 'Save or cancel the overall comment being edited first.',
-  'Click Comment first, then save or cancel the selected locations.':
-    'Click Comment first, then save or cancel the selected locations.',
-  '请先点击“评论”，保存或取消所选位置。':
-    'Click Comment first, then save or cancel the selected locations.',
+  'Save or cancel the overall annotation being edited first.':
+    'Save or cancel the overall annotation being edited first.',
+  '请先保存或取消正在编辑的整体批注。': 'Save or cancel the overall annotation being edited first.',
+  'Click Annotation first, then save or cancel the selected locations.':
+    'Click Annotation first, then save or cancel the selected locations.',
+  '请先点击“批注”，保存或取消所选位置。':
+    'Click Annotation first, then save or cancel the selected locations.',
   Description: 'Description',
   说明: 'Description',
   'Questionnaire description': 'Questionnaire description',
@@ -223,10 +229,10 @@ const en = {
   '包含…': 'Contains…',
   'Selection help': 'Selection help',
   选择帮助: 'Selection help',
-  'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Comment to save to the page draft. Text selection works without enabling Select objects.':
-    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Comment to save to the page draft. Text selection works without enabling Select objects.',
-  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「评论」保存到页面草稿。普通文字圈选无需开启选择对象。':
-    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Comment to save to the page draft. Text selection works without enabling Select objects.',
+  'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.':
+    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.',
+  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「批注」保存到页面草稿。普通文字圈选无需开启选择对象。':
+    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.',
   'Current view filters': 'Current view filters',
   当前视图条件: 'Current view filters',
   'Remove filter {label}': 'Remove filter {label}',
@@ -256,15 +262,15 @@ const en = {
   下一页: 'Next page',
   'Table description': 'Table description',
   表格说明: 'Table description',
-  'Comment actions': 'Comment actions',
-  评论操作: 'Comment actions',
+  'Annotation actions': 'Annotation actions',
+  批注操作: 'Annotation actions',
   'Correct feedback': 'Correct feedback',
   修改反馈: 'Correct feedback',
   'Select the entire document': 'Select the entire document',
   选择整篇文档: 'Select the entire document',
-  'Select content or write a comment before submitting.':
-    'Select content or write a comment before submitting.',
-  '请选择内容或填写意见后再提交。': 'Select content or write a comment before submitting.',
+  'Select content or write an annotation before submitting.':
+    'Select content or write an annotation before submitting.',
+  '请选择内容或填写意见后再提交。': 'Select content or write an annotation before submitting.',
   'Diff actions': 'Diff actions',
   差异操作: 'Diff actions',
   'Locate current difference': 'Locate current difference',
@@ -325,11 +331,11 @@ const en = {
   '该范围没有文件改动。': 'No file changes in this scope.',
   'Git review': 'Git review',
   'Git 审阅': 'Git review',
-  'Read-only review · Comments go to the current AI':
-    'Read-only review · Comments go to the current AI',
-  '只读审阅 · 评论提交给当前 AI': 'Read-only review · Comments go to the current AI',
-  'Git and comment actions': 'Git and comment actions',
-  'Git 与评论操作': 'Git and comment actions',
+  'Read-only review · Annotations go to the current AI':
+    'Read-only review · Annotations go to the current AI',
+  '只读审阅 · 批注提交给当前 AI': 'Read-only review · Annotations go to the current AI',
+  'Git and annotation actions': 'Git and annotation actions',
+  'Git 与批注操作': 'Git and annotation actions',
   Repository: 'Repository',
   仓库: 'Repository',
   'Uncommitted changes': 'Uncommitted changes',
@@ -374,9 +380,9 @@ const en = {
   未暂存改动: 'Unstaged changes',
   'Untracked files': 'Untracked files',
   未跟踪文件: 'Untracked files',
-  ' · Comments still refer to the original content':
-    ' · Comments still refer to the original content',
-  '· 评论仍指向原内容': ' · Comments still refer to the original content',
+  ' · Annotations still refer to the original content':
+    ' · Annotations still refer to the original content',
+  '· 批注仍指向原内容': ' · Annotations still refer to the original content',
   'Return to current view': 'Return to current view',
   返回当前浏览: 'Return to current view',
   'Select a file to view its diff.': 'Select a file to view its diff.',
@@ -441,10 +447,10 @@ const en = {
   '今天 {time}': 'Today {time}',
   'Yesterday {time}': 'Yesterday {time}',
   '昨天 {time}': 'Yesterday {time}',
-  'Real read-only gh queries; review requests and comments go only to the current AI.':
-    'Real read-only gh queries; review requests and comments go only to the current AI.',
+  'Real read-only gh queries; review requests and annotations go only to the current AI.':
+    'Real read-only gh queries; review requests and annotations go only to the current AI.',
   '真实 gh 只读查询；审阅请求和意见仅交给当前 AI。':
-    'Real read-only gh queries; review requests and comments go only to the current AI.',
+    'Real read-only gh queries; review requests and annotations go only to the current AI.',
   Status: 'Status',
   状态: 'Status',
   'PR status': 'PR status',
@@ -590,12 +596,12 @@ const en = {
   'Unmerged conflict: working file shown; index stages are not combined into a staged result.':
     'Unmerged conflict: working file shown; index stages are not combined into a staged result.',
   '首次提交需要选择内容或填写整体意见。':
-    'First submission requires selected content or an overall comment.',
-  'Saved the complete PR review request as event {id}. Draft comments were not sent; the AI must be waiting or resume later to read it.':
-    'Saved the complete PR review request as event {id}. Draft comments were not sent; the AI must be waiting or resume later to read it.',
+    'First submission requires selected content or an overall annotation.',
+  'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.':
+    'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.',
   'Request not saved: {error}': 'Request not saved: {error}',
-  'Saved complete comments as event {id}. Comments go only to the current AI and were not published to GitHub.':
-    'Saved complete comments as event {id}. Comments go only to the current AI and were not published to GitHub.',
+  'Saved complete annotations as event {id}. Annotations go only to the current AI and were not published to GitHub.':
+    'Saved complete annotations as event {id}. Annotations go only to the current AI and were not published to GitHub.',
   'Unable to open PR #{number}: {error}': 'Unable to open PR #{number}: {error}',
   'Could not completely read file {filename}: {error}':
     'Could not completely read file {filename}: {error}',
@@ -603,8 +609,8 @@ const en = {
     'Original PR snapshot is missing; it cannot be reassigned to new content.',
   'Original snapshot is missing; draft retained.': 'Original snapshot is missing; draft retained.',
   unavailable: 'Unavailable',
-  'First submission requires selected content or an overall comment.':
-    'First submission requires selected content or an overall comment.',
+  'First submission requires selected content or an overall annotation.':
+    'First submission requires selected content or an overall annotation.',
   'Concurrency limit (1–4)': 'Concurrency limit (1–4)',
   Pause: 'Pause',
   Play: 'Play',
@@ -635,12 +641,21 @@ const en = {
   'API 未提供 patch；此视图由固定版本的实际原文生成，不代表没有改动。':
     'The API did not provide a patch; this view uses the pinned original content and does not imply no changes.',
   '二进制、无效 UTF-8、符号链接或 gitlink：仅支持文件级反馈；不跟随链接或递归子模块。':
-    'Binary, invalid UTF-8, symbolic link or gitlink: file-level comments only; links and submodules are not followed.',
+    'Binary, invalid UTF-8, symbolic link or gitlink: file-level annotations only; links and submodules are not followed.',
   'Review:': 'Review:',
   'Merge:': 'Merge:',
   Base: 'Base',
   Head: 'Head',
   'deleted user': 'deleted user',
   'No newline at end of file': 'No newline at end of file',
+  'Close details: {label}': 'Close details: {label}',
+  'Incomplete answer': 'Incomplete answer',
+  'Edit answer: {question}': 'Edit answer: {question}',
+  'Return to summary': 'Return to summary',
+  'Complete all answers before submitting ({count} incomplete).':
+    'Complete all answers before submitting ({count} incomplete).',
+  调整文件列表与差异宽度: 'Resize file list and diff',
+  主干分支: 'Mainline branch',
+  当前分支: 'Current branch',
 } as const;
 export default en;

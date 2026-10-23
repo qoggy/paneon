@@ -11,14 +11,14 @@
 | 工作单元       | OpenSpec 任务                    | 独占实现范围                                                                                                                                               | 交付及边界                                                                                             |
 | -------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | feedback       | 2.6、2.7、2.8                    | src/sdk/feedback.ts、SDK 导出、src/ui/feedback.tsx、UI 导出、必要的 tsconfig.ui.json 和专用验证                                                            | 公共类型/schema、Provider/hook、对象/原文选择、可组合控件与自定义 TSX fixture；不写各标准页业务适配    |
-| input          | 2.4、2.11                        | src/cli/index.ts、src/cli/client.ts、src/shared/limits.ts、src/shared/types.ts、src/runtime/server.ts、必要的 lifecycle 限制引用、src/web/api.ts、专用验证 | 文件 JSON 入参及创建快照、完整 HTTP 体积预检与 413 诊断；不写公共评论和页面，不修改既有 panel-host.tsx |
+| input          | 2.4、2.11                        | src/cli/index.ts、src/cli/client.ts、src/shared/limits.ts、src/shared/types.ts、src/runtime/server.ts、必要的 lifecycle 限制引用、src/web/api.ts、专用验证 | 文件 JSON 入参及创建快照、完整 HTTP 体积预检与 413 诊断；不写公共批注和页面，不修改既有 panel-host.tsx |
 | standard-pages | 2.1 的资源骨架、2.2、2.3 中 form | skills/paneon/SKILL.md、choose/form 源码与说明、页面级完整提交 helper、package.json 的 files、tsconfig.examples.json、专用验证                             | 选择与表单使用普通答案流程，无需等待反馈 Provider；不建立其余页面假实现、不声称全产品资源已完成        |
 
 三组文件边界互不重叠。SDK/UI 新增的反馈类型需单一来源，避免循环依赖和 browser/Node 导出不一致。当前 tsconfig.ui.json 的 rootDir=src/ui；如 UI 引用 SDK 类型，可调整为 rootDir=src、outDir=dist，保持 UI 声明仍落在 dist/ui，不能靠旧 dist 启动构建或复制两份公共类型。
 
 HTTP 的浏览器完整请求体预检统一放 src/web/api.ts，避免把基础传输职责散落到各页面；沿用现有安全检查，不放宽 CSP 或暴露服务。CLI/HTTP 输出英文，不记录业务输入内容。
 
-choose/form 按 B34 支持同页更正并明确追加完整结果，成功回执用于 replacesEventId；失败保留草稿。表单、选择题自身的作答不是选择与评论目标。所有组均不得增加 runtime 业务任务、CLI 执行日志或自动唤醒 agent 的机制。
+choose/form 按 B34 支持同页更正并明确追加完整结果，成功回执用于 replacesEventId；失败保留草稿。表单、选择题自身的作答不是选择与批注目标。所有组均不得增加 runtime 业务任务、CLI 执行日志或自动唤醒 agent 的机制。
 
 ## Integration and acceptance
 
@@ -44,7 +44,7 @@ choose/form 按 B34 支持同页更正并明确追加完整结果，成功回执
 | git-review   | assets/panels/git-review、assets/shared/diff.tsx 和相关 diff model、references/git-review.md                                          | 多仓库工作区/历史/比较、版本化原文及 diff、跨视图精准反馈；共享 diff 不依赖本地 Git 查询，供 PR 后续复用 |
 | explanations | assets/examples/concurrency、assets/examples/sentinel-leap-array、references/examples.md                                              | 两个固定主题/数据的一次性交互讲解；Sentinel 此时阅读公开源码，不输出开发机路径                           |
 
-上述路径都位于 skills/paneon。每组可增独占 tests 与 reports/<unit>.md；不得互改共享模块。SKILL.md 总入口、package/tsconfig、中央 design/tasks 由主 agent 集成时更新，避免三组冲突。需要改核心 SDK/UI 时先说明已复现的问题和最小改动，不在页面中复制公共评论状态管理。
+上述路径都位于 skills/paneon。每组可增独占 tests 与 reports/<unit>.md；不得互改共享模块。SKILL.md 总入口、package/tsconfig、中央 design/tasks 由主 agent 集成时更新，避免三组冲突。需要改核心 SDK/UI 时先说明已复现的问题和最小改动，不在页面中复制公共批注状态管理。
 
 表格/内容审阅和 Git 标准页均采用 B34 完整更正，首次空反馈不提交，更正允许明确清空并保留旧事件；动态快照定位不悄悄改挂最新内容。讲解页不是参数化标准页，不把任务数据改成外部 JSON 协议。
 
@@ -159,9 +159,9 @@ B37 已确认安装体验只有一个入口，不让用户自行分别寻找/安
 
 B43 补充纠正：多选支持已有选项与自填同时选中，自填是同级答案，不是整题补充。选择结果统一 selections 项级 kind，取消整题 options/custom 判别；单选仍总共恰好一项。主 agent 已同步进行中的 choose-ux 组，此修正不改变其文件边界。
 
-## Contextual comments dispatch
+## Contextual annotations dispatch
 
-B44 根据六张用户截图明确；公共交互与各页接入分两组，以 [comment-interaction.md](comment-interaction.md) 为共同契约。两组新建隔离 worktree，基于本轮最新文档提交；core 独占公共 UI 和 feedback.md，pages 独占页面/适配器接入、其余指南及页面 browser 回归。不要修改事件 schema 或运行时业务协议。主工作区原有五个页头文件保留。
+B44 根据六张用户截图明确；公共交互与各页接入分两组，以 [annotation-interaction.md](annotation-interaction.md) 为共同契约。两组新建隔离 worktree，基于本轮最新文档提交；core 独占公共 UI 和 feedback.md，pages 独占页面/适配器接入、其余指南及页面 browser 回归。不要修改事件 schema 或运行时业务协议。主工作区原有五个页头文件保留。
 
 此前 choose-ux、init 两组已提交供验收。本轮主 agent 已读 choose 报告/截图并复验 schema 6/6；首次执行因交付树无 node_modules 无法解析 zod，链接现有依赖后通过，未改产品代码。choose 的浏览器/独立包仍需主 agent 核对，init 曾有一次子进程超时需组合复验；未将它们标记已全部验收或本 change 完成。
 
@@ -169,7 +169,7 @@ B44 根据六张用户截图明确；公共交互与各页接入分两组，以 
 
 - /Users/yuguo/IdeaProjects/paneon/docs/memory/MEMORY.md
 - /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/comment-interaction.md
+- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/annotation-interaction.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
 - /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
@@ -189,7 +189,7 @@ B44 根据六张用户截图明确；公共交互与各页接入分两组，以 
 
 ## Form layout dispatch — B46
 
-用户继续体验并提供表单布局截图。该问题与评论无关，新建 form-ux 工作树独占 form/panel.tsx、form.md 和 skill-pages browser 回归中的表单部分；首先叠加 choose 已交付提交 32bc21d，避免在旧共用测试文件上重复修改，交付只包含新 form 实现。原 choose 主 agent 全套验收仍单独跟踪，不因准备依赖而勾选。comment-core/pages 文件边界不变。
+用户继续体验并提供表单布局截图。该问题与批注无关，新建 form-ux 工作树独占 form/panel.tsx、form.md 和 skill-pages browser 回归中的表单部分；首先叠加 choose 已交付提交 32bc21d，避免在旧共用测试文件上重复修改，交付只包含新 form 实现。原 choose 主 agent 全套验收仍单独跟踪，不因准备依赖而勾选。comment-core/pages 文件边界不变。
 
 本轮文档文件：
 
@@ -200,8 +200,8 @@ B44 根据六张用户截图明确；公共交互与各页接入分两组，以 
 
 ## Main acceptance progress
 
-init和choose已完成源码审阅并本地集成，43/43组合回归、5个真实PTY和选择/原表单Chrome通过，见verification.md。2.13及2.14实现勾选，最终独立包/组合验收继续跟踪。评论、Git布局及表单组仍在开发，按用户要求本轮等待交付后验收；不根据其未完成代码提前勾选。
+init和choose已完成源码审阅并本地集成，43/43组合回归、5个真实PTY和选择/原表单Chrome通过，见verification.md。2.13及2.14实现勾选，最终独立包/组合验收继续跟踪。批注、Git布局及表单组仍在开发，按用户要求本轮等待交付后验收；不根据其未完成代码提前勾选。
 
 ## Final integration — 2026-10-22
 
-init两组、choose-ux、form-ux、comment-core和comment-pages均已交付并在0.0.x本地集成，主agent逐项验收，具体提交/日志/截图和全部文件见verification.md。本轮按用户明确“等待subagent完成任务，再验收”执行等待；该指令覆盖最初派工即交还的默认安排。无push或发布；此前五个页头相关脏文件不纳入提交。最终独立安装包的init及所有标准页/场景套件已通过；公共评论最后的点击/截图前提已定位并修正，最终安装包含截图完整流程通过，功能与首帧锚定断言均保留。已提交完成单元的managed worktree归档请求，工具仅返回queued，尚未确认物理移除。用户亲自体验Sentinel保留为未完成项，不归档整个change。
+init两组、choose-ux、form-ux、comment-core和comment-pages均已交付并在0.0.x本地集成，主agent逐项验收，具体提交/日志/截图和全部文件见verification.md。本轮按用户明确“等待subagent完成任务，再验收”执行等待；该指令覆盖最初派工即交还的默认安排。无push或发布；此前五个页头相关脏文件不纳入提交。最终独立安装包的init及所有标准页/场景套件已通过；公共批注最后的点击/截图前提已定位并修正，最终安装包含截图完整流程通过，功能与首帧锚定断言均保留。已提交完成单元的managed worktree归档请求，工具仅返回queued，尚未确认物理移除。用户亲自体验Sentinel保留为未完成项，不归档整个change。

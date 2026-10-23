@@ -75,10 +75,10 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
     element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
   await pf.locator('[data-feedback-action]').click();
-  await pf.getByLabel('Comment text', { exact: true }).fill('Saved 评论原文 🙂');
+  await pf.getByLabel('Annotation text', { exact: true }).fill('Saved 批注原文 🙂');
   await pf.getByRole('button', { name: 'Save', exact: true }).click();
   await pf.locator('[data-feedback-marker]').click();
-  await pf.getByLabel('Comment text', { exact: true }).fill('Unsaved 评论 🙂');
+  await pf.getByLabel('Annotation text', { exact: true }).fill('Unsaved 批注 🙂');
   const beforeSrc = await probe.locator('iframe').getAttribute('src');
   const token = pf.locator('[data-shiki-token]').first();
   await token.evaluate((element) => {
@@ -117,14 +117,14 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
     assert.equal(
       await pf
         .getByRole('textbox', {
-          name: language === 'en' ? 'Comment text' : '评论内容',
+          name: language === 'en' ? 'Annotation text' : '批注内容',
           exact: true,
         })
         .inputValue(),
-      'Unsaved 评论 🙂',
+      'Unsaved 批注 🙂',
     );
     const savedFeedback = JSON.parse(await pf.locator('[data-feedback]').textContent());
-    assert.equal(savedFeedback.annotations[0].comment, 'Saved 评论原文 🙂');
+    assert.equal(savedFeedback.annotations[0].comment, 'Saved 批注原文 🙂');
     assert.equal(savedFeedback.annotations[0].targets[0].text.quote, 'Source 原文 🙂 unchanged');
     assert.equal(
       await ff.getByLabel('Project name', { exact: false }).inputValue(),
@@ -186,10 +186,10 @@ function Panel(){return <FeedbackProvider onSubmit={value=>agent.emit('feedback-
   assert.equal(await home2.locator('html').getAttribute('class'), 'dark');
   await home2.getByRole('button', { name: '设置', exact: true }).click();
   await home2.getByRole('button', { name: 'English', exact: true }).click();
-  await pf.getByRole('textbox', { name: 'Comment text', exact: true }).waitFor();
+  await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).waitFor();
   assert.equal(
-    await pf.getByRole('textbox', { name: 'Comment text', exact: true }).inputValue(),
-    'Unsaved 评论 🙂',
+    await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).inputValue(),
+    'Unsaved 批注 🙂',
   );
   await form.route('**/api/panels/*/events', (route) =>
     route.fulfill({

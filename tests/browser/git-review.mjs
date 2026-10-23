@@ -1,5 +1,5 @@
 import { verifyGitLayout } from './git-review-layout.mjs';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
@@ -30,7 +30,7 @@ try {
   await page.goto(f.url());
   const frame = page.frameLocator('iframe'),
     button = (name) => frame.getByRole('button', { name, exact: true });
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   await frame.getByRole('heading', { name: 'Git review acceptance', exact: true }).waitFor();
   await frame.locator('[data-diff-source]').waitFor();
   await comments.assertNoLegacySection();
@@ -68,7 +68,7 @@ try {
     await frame.locator('[data-diff-source]').waitFor();
   };
   assert.equal((await f.events()).length, 0);
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: '首次提交' }).waitFor();
   assert.equal((await f.events()).length, 0);
   // Browse-mode native selection and copy remain ordinary.
@@ -128,7 +128,7 @@ try {
   await comments.write('工作区 n=4');
   await finish();
   await button('单列对比').click();
-  await button('展开全部上下文').click();
+  assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
   await button('左右对比').click();
   // Refresh never retargets an old annotation.
   await writeFile(join(f.repo, 'a.ts'), 'fresh changed\r\nsecond line\r\n');
@@ -166,6 +166,7 @@ try {
   await button('分支/版本对比').click();
   await frame.getByLabel('基线', { exact: true }).fill('base');
   await button('比较').click();
+  await frame.getByRole('button', { name: 'M a.ts', exact: true }).click();
   await frame
     .locator('[data-code-side="new"][data-line="2"]')
     .filter({ hasText: 'const n = 2' })
@@ -174,11 +175,13 @@ try {
   await frame.getByLabel('起始行', { exact: true }).fill('1');
   await frame.getByLabel('结束行', { exact: true }).fill('2');
   await button('选择连续行').click();
+  await button('收起上下文').click();
   await frame.locator('[data-feedback-target]').filter({ hasText: '@@ -' }).click();
   await finish();
   // Another repository, same file name.
   await frame.getByLabel('仓库', { exact: true }).selectOption('server');
   await button('未提交改动').click();
+  await frame.getByRole('button', { name: '未跟踪 · ? a.ts', exact: true }).click();
   await frame
     .locator('[data-code-side="new"][data-line="1"]')
     .filter({ hasText: 'server-only' })
@@ -191,13 +194,13 @@ try {
     [100000, '262144'],
   ]) {
     await comments.overall('中'.repeat(length));
-    await button('提交评论').click();
+    await button('提交批注').click();
     await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
     assert.equal(await comments.count(), 4);
     assert.equal((await f.events()).length, 0);
   }
   await comments.overall('');
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('status').filter({ hasText: '已保存为事件' }).waitFor();
   const first = (await f.events())[0];
   assert.equal(first.type, 'git-review-submitted');
@@ -232,19 +235,19 @@ try {
         })
       : route.continue(),
   );
-  await button('提交评论').click();
+  await button('提交批注').click();
   await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 4);
   assert.equal((await f.events()).length, 1);
   await page.unroute(eventUrl);
-  await button('提交评论').click();
+  await button('提交批注').click();
   await until(async () => (await f.events()).length === 2, 'correction missing');
   const second = (await f.events())[1];
   assert.equal(second.payload.replacesEventId, first.id);
   assert.deepEqual(second.payload.annotations, first.payload.annotations);
   for (let i = 4; i >= 1; i--) await comments.remove(i);
   await comments.overall('');
-  await button('提交评论').click();
+  await button('提交批注').click();
   await until(async () => (await f.events()).length === 3, 'empty correction missing');
   const cleared = (await f.events())[2];
   assert.deepEqual(cleared.payload.annotations, []);

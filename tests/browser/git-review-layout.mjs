@@ -8,7 +8,7 @@ import {
   createLayoutRepository,
   startGitReviewFixture,
 } from './git-review-fixture.mjs';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 async function verifyHistoryColumns(frame, page, content, until) {
   const separators = ['调整分支栏宽度', '调整文件区宽度'].map((name) =>
     frame.getByRole('separator', { name }),
@@ -48,8 +48,8 @@ async function verifyHistoryColumns(frame, page, content, until) {
   const retainedRow = await frame.locator('[data-commit-id][aria-pressed="true"]').elementHandle();
   const retainedDiff = await frame.locator('[data-diff-source]').elementHandle();
   const count = await frame.locator('[data-history-count]').getAttribute('data-history-count');
-  await frame.getByRole('button', { name: '整体评论', exact: true }).click();
-  const editor = frame.getByLabel('评论内容', { exact: true });
+  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved column sizing draft');
   const history = frame.locator('[data-commit-scroll]');
   await history.evaluate((el) => {
@@ -172,7 +172,7 @@ async function verifyHistoryColumns(frame, page, content, until) {
   assert.equal(await history.evaluate((el) => el.scrollTop), scrollTop);
   assert.equal(await editor.inputValue(), 'Unsaved column sizing draft');
   await frame.getByRole('button', { name: '取消', exact: true }).click();
-  assert.equal(requests, 0, 'Column resizing must not query Git or submit comments.');
+  assert.equal(requests, 0, 'Column resizing must not query Git or submit annotations.');
   page.off('request', observe);
   const outside = await start(0);
   await page.mouse.move(-3000, outside.y);
@@ -376,8 +376,8 @@ async function verifyHistorySplit(frame, page, content, until) {
     await assertStopped(point);
   }
   // Preserve both loaded content and an unsaved contextual editor across resizing.
-  await frame.getByRole('button', { name: '整体评论', exact: true }).click();
-  const editor = frame.getByLabel('评论内容', { exact: true });
+  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved splitter regression draft');
   await history.evaluate((el) => {
     el.scrollTop = 40;
@@ -519,7 +519,7 @@ async function verifyHistorySplit(frame, page, content, until) {
 
 export async function verifyGitLayout(f, page) {
   const frame = page.frameLocator('iframe');
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   const button = (name) => frame.getByRole('button', { name, exact: true });
   const until = async (check, message) => {
     for (let attempt = 0; attempt < 300; attempt++) {
@@ -596,9 +596,6 @@ export async function verifyGitLayout(f, page) {
     }
     await route.continue();
   });
-  const diffBounds = await frame
-    .getByRole('region', { name: '文件差异', exact: true })
-    .boundingBox();
   try {
     await frame.locator('[data-commit-id]').nth(1).click();
     await started;
@@ -614,18 +611,15 @@ export async function verifyGitLayout(f, page) {
     );
     assert.equal(
       await retainedDiff.evaluate((element) => element.isConnected),
-      true,
-      'Current diff remains visible while the next commit loads.',
+      false,
+      'Old diff closes immediately when a new commit is requested.',
     );
-    assert.deepEqual(
-      await frame.getByRole('region', { name: '文件差异', exact: true }).boundingBox(),
-      diffBounds,
-      'Loading status must not move or resize the workbench.',
-    );
+    assert.equal(await frame.locator('[data-file-id]').count(), 0);
+    assert.equal(await frame.locator('[data-file-scroll]').getAttribute('aria-busy'), 'true');
     assert.equal(
-      await frame.locator('[data-commit-id]').first().getAttribute('aria-pressed'),
+      await frame.locator(`[data-commit-id="${secondCommit}"]`).getAttribute('aria-pressed'),
       'true',
-      'Selection stays consistent with the diff still being displayed.',
+      'The intended commit is highlighted before its response arrives.',
     );
     if (process.env.PANEON_TEST_ARTIFACTS) {
       await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });
@@ -646,7 +640,7 @@ export async function verifyGitLayout(f, page) {
   await page.unroute(queryUrl);
   await frame.locator('[data-commit-id]').first().click();
   await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).waitFor();
-  // Returning from an empty commit selects the first file; restore this test's long-code file.
+  // Returning from an empty commit still requires an explicit file selection.
   await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).click();
   await frame.locator('[data-code-side="new"][data-line="1"]').waitFor();
   const beforeFailure = await frame.locator('[data-diff-source]').elementHandle();
@@ -664,11 +658,11 @@ export async function verifyGitLayout(f, page) {
   await frame.getByText('读取失败', { exact: true }).waitFor();
   assert.equal(
     await beforeFailure.evaluate((element) => element.isConnected),
-    true,
-    'A failed query retains the previous diff.',
+    false,
+    'A failed query does not relabel the old diff as a different commit.',
   );
   assert.equal(
-    await frame.locator('[data-commit-id]').first().getAttribute('aria-pressed'),
+    await frame.locator(`[data-commit-id="${secondCommit}"]`).getAttribute('aria-pressed'),
     'true',
   );
   await page.unroute(queryUrl);
@@ -704,6 +698,9 @@ export async function verifyGitLayout(f, page) {
     firstGraph,
     'Appending history retains graph geometry.',
   );
+  await frame.locator('[data-commit-id]').first().click();
+  await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).click();
+  await frame.locator('[data-diff-source]').waitFor();
   await verifyHistoryColumns(frame, page, layoutFrame, until);
   await verifyHistorySplit(frame, page, layoutFrame, until);
   await commitScroll.evaluate((el) => {
@@ -801,9 +798,9 @@ export async function verifyGitLayout(f, page) {
     selection.addRange(range);
     element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await comments.write('Long line endpoint comment');
+  await comments.write('Long line endpoint annotation');
   await comments.save();
-  const marker = frame.getByRole('button', { name: '评论 1', exact: true });
+  const marker = frame.getByRole('button', { name: '批注 1', exact: true });
   await marker.waitFor();
   await newViewport.evaluate((element) => {
     element.scrollLeft = 0;
@@ -816,7 +813,7 @@ export async function verifyGitLayout(f, page) {
   await marker.click();
   await comments.write('Temporary edit to cancel');
   await button('取消').click();
-  assert.equal(await comments.text(1), 'Long line endpoint comment');
+  assert.equal(await comments.text(1), 'Long line endpoint annotation');
   assert.equal((await f.events(layoutPanel)).length, 0);
   await oldViewport.evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
@@ -845,7 +842,7 @@ export async function verifyGitLayout(f, page) {
     selection.addRange(range);
     element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await comments.write('Old side endpoint comment');
+  await comments.write('Old side endpoint annotation');
   await comments.save();
   // Explicit line controls use interval references, while native selection registers a whole side.
   // Their saved markers must still attach beside the actual old/new source lines.
@@ -861,9 +858,9 @@ export async function verifyGitLayout(f, page) {
     ['新', 4],
   ]) {
     await button(`选择${side}侧第 3 行`).click();
-    await comments.write(`${side}侧第三行评论`);
+    await comments.write(`${side}侧第三行批注`);
     await comments.save();
-    const lineMarker = frame.getByRole('button', { name: `评论 ${number}`, exact: true });
+    const lineMarker = frame.getByRole('button', { name: `批注 ${number}`, exact: true });
     await lineMarker.waitFor();
     const markerBounds = await lineMarker.boundingBox();
     const lineBounds = await frame
@@ -871,12 +868,12 @@ export async function verifyGitLayout(f, page) {
       .boundingBox();
     assert.ok(
       Math.abs(markerBounds.y - lineBounds.y) < 50,
-      'line comment marker detached from its source',
+      'line annotation marker detached from its source',
     );
     await lineMarker.click();
     assert.equal(
-      await frame.getByLabel('评论内容', { exact: true }).inputValue(),
-      `${side}侧第三行评论`,
+      await frame.getByLabel('批注内容', { exact: true }).inputValue(),
+      `${side}侧第三行批注`,
     );
     await button('取消').click();
   }
@@ -886,16 +883,16 @@ export async function verifyGitLayout(f, page) {
     await frame.getByLabel('结束行', { exact: true }).fill('3');
     await button('选择连续行').click();
   }
-  await comments.write('同时评论两侧连续行');
+  await comments.write('同时批注两侧连续行');
   await comments.save();
   await until(
-    async () => (await frame.getByRole('button', { name: '评论 5', exact: true }).count()) === 2,
-    'both range comment markers did not appear after the scheduled geometry measurement',
+    async () => (await frame.getByRole('button', { name: '批注 5', exact: true }).count()) === 2,
+    'both range annotation markers did not appear after the scheduled geometry measurement',
   );
-  await frame.getByRole('button', { name: '评论 5', exact: true }).first().click();
+  await frame.getByRole('button', { name: '批注 5', exact: true }).first().click();
   assert.equal(
-    await frame.getByLabel('评论内容', { exact: true }).inputValue(),
-    '同时评论两侧连续行',
+    await frame.getByLabel('批注内容', { exact: true }).inputValue(),
+    '同时批注两侧连续行',
   );
   await button('取消').click();
   assert.equal((await f.events(layoutPanel)).length, 0);
@@ -907,10 +904,10 @@ export async function verifyGitLayout(f, page) {
       fullPage: true,
     });
   }
-  await button('提交评论').click();
+  await button('提交批注').click();
   await until(
     async () => (await f.events(layoutPanel)).length === 1,
-    'layout comment was not delivered',
+    'layout annotation was not delivered',
   );
   const tail = (await f.events(layoutPanel))[0].payload.annotations[0].targets[0];
   assert.equal(tail.text.quote, 'NEW_END');
@@ -930,7 +927,7 @@ export async function verifyGitLayout(f, page) {
   assert.equal(await frame.locator('[data-diff-source]').count(), 0);
   // Restore the target's exact old snapshot through the compact catalog.
   await comments.locate(2);
-  await frame.getByRole('button', { name: '评论 2', exact: true }).waitFor();
+  await frame.getByRole('button', { name: '批注 2', exact: true }).waitFor();
   await comments.locate(1);
   await frame.getByText('回看保留快照', { exact: true }).waitFor();
   await marker.waitFor();
@@ -944,7 +941,7 @@ export async function verifyGitLayout(f, page) {
     true,
     'mobile Git layout overflow',
   );
-  assert.equal(await button('提交评论').isVisible(), true);
+  assert.equal(await button('提交批注').isVisible(), true);
   await frame.locator('[data-git-diff-scroll]').scrollIntoViewIfNeeded();
   if (layoutArtifacts)
     await page.screenshot({
@@ -1179,7 +1176,7 @@ if (import.meta.main) {
     const page = await browser.newPage();
     await verifyGitLayout(fixture, page);
     console.log(
-      'Git layout Chrome: aligned history, independent scrolling, long code endpoints, comments and mobile passed.',
+      'Git layout Chrome: aligned history, independent scrolling, long code endpoints, annotations and mobile passed.',
     );
   } finally {
     await browser?.close();

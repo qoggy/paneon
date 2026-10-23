@@ -44,11 +44,11 @@ The API behavior is documented in [Compare two commits](https://docs.github.com/
 
 These are observed example OIDs; a new run queries its own actual versions. Clicking this button does not send annotation drafts. It does not wake an ended agent automatically; the agent must be waiting or later resume and read events.
 
-Select text normally to show a nearby **评论** action, then save in its anchored editor. Use **选择对象** for the whole PR overview, description/paragraph, individual check, file, hunk or side-specific code line/range. Use multiple targets for disconnected locations or different sides, and independent annotations for independent opinions. Comments may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
+Select text normally to show a nearby **批注** action, then save in its anchored editor. Use **选择对象** for the whole PR overview, description/paragraph, individual check, file, hunk or side-specific code line/range. Use multiple targets for disconnected locations or different sides, and independent annotations for independent opinions. Annotations may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
 
-A numbered marker reopens a saved comment for editing, cancellation or deletion. Saving only changes the page draft; pending edits must be saved or cancelled before submission. **整体评论** opens the optional overall editor.
+A numbered marker reopens a saved annotation for editing, cancellation or deletion. Saving only changes the page draft; pending edits must be saved or cancelled before submission. **整体批注** opens the optional overall editor.
 
-**提交评论** in the page toolbar validates the preserved snapshots and emits `pr-feedback-submitted`:
+**提交批注** in the page toolbar validates the preserved snapshots and emits `pr-feedback-submitted`:
 
 - `repository` identifies the configured repository.
 - `annotations` is the common list of stable-ID entries, each with nonempty `targets` and string `comment`; optional overall `comment` may stand alone.
@@ -68,6 +68,6 @@ Read the two event types using ordinary `paneon panel events <instanceId> --cons
 
 The example uses the public Provider/controls plus the existing shared Markdown and diff adapters, without another selection state machine.
 
-The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so comments created with line/range controls have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
+The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so annotations created with line/range controls have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
 
-Object comments: use **选择对象** to collect targets, then click toolbar **评论** to open the editor. Only **保存** adds the page draft; cancelling discards the temporary selection. Text selection uses its nearby action directly.
+Object annotations: use **选择对象** to collect targets, then click toolbar **批注** to open the editor. Only **保存** adds the page draft; cancelling discards the temporary selection. Text selection uses its nearby action directly.

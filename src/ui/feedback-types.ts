@@ -44,7 +44,7 @@ export type FeedbackController<TRef = JsonValue> = {
   updateAnnotation(id: string, value: Omit<FeedbackAnnotation<TRef>, 'id'>): void;
   removeAnnotation(id: string): void;
   toggleTarget(target: FeedbackTarget<TRef>): void;
-  setComment(comment: string): void;
+  setOverallAnnotationText(text: string): void;
   locate(target: FeedbackTarget<TRef>): Promise<void>;
   registerText: (registration: TextRegistration<TRef>) => () => void;
   submit(): Promise<void>;

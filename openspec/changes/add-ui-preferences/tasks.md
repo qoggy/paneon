@@ -17,7 +17,7 @@
 - [x] Markdown/CodeBlock/Mermaid/Diff/文件状态图谱完整明暗适配，不重复解析长代码或破坏原文选择映射。
 - [x] choose/form/table/review/Git/PR 及两个教学例子的 UI 操作/状态本地化；保留教学正文和业务内容，Intl 日期数字不改变业务排序。
 - [x] 同步 README、skill 及 references/preferences.md 与 CLI/authoring 指导，适配独立安装包。
-- [x] 真实 Chrome 四组合/多窗口/窄屏/portal/首屏及切换中草稿、评论编辑、Git 选择/滚动/receipt 保留；原事件和查询数量不因偏好改变。
+- [x] 真实 Chrome 四组合/多窗口/窄屏/portal/首屏及切换中草稿、批注编辑、Git 选择/滚动/receipt 保留；原事件和查询数量不因偏好改变。
 - [x] 相关单测、build/types/lint/format、既有核心浏览器回归及独立安装包；提供日志、截图和纯任务文件清单，主 agent 独立验收。
 
 ## Delivery boundary

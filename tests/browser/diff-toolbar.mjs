@@ -3,7 +3,7 @@ import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-diff-toolbar-'));
 let service, browser;
@@ -96,7 +96,7 @@ try {
   assert.equal(await frame.locator('[data-diff-split]').count(), 1);
   await button('选择对象').click();
   await button('选择新侧第 45 行').click();
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   await comments.write('Keep exact line 45');
   await comments.save();
   assert.equal(await comments.count(), 1);
@@ -128,7 +128,7 @@ try {
   await page.screenshot({ path: '/tmp/paneon-diff-toolbar-desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
   console.log(
-    'PASS Diff toolbar: three hunks, pointer navigation and current locate, boundaries, modes and exact CRLF, preserved comment, source reset, same/binary, 390px layout.',
+    'PASS Diff toolbar: three hunks, pointer navigation and current locate, boundaries, modes and exact CRLF, preserved annotation, source reset, same/binary, 390px layout.',
   );
 } finally {
   await browser?.close();

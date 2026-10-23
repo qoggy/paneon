@@ -110,3 +110,29 @@ The page SHALL treat a selected custom answer as a peer of supplied selections, 
 
 - **WHEN** a person deselects the custom answer in multiple mode
 - **THEN** its draft text is retained but excluded from submission, and supplied selections remain unchanged
+
+### Requirement: Keep questionnaire guidance visible
+
+Optional questionnaire Markdown SHALL be visible on initial display and on review, without a disclosure, truncation, or oversized typography. The compact title/progress row and question-specific description SHALL remain separate. Long content SHALL wrap and remain fully readable on narrow screens.
+
+### Requirement: Toggle independent option details
+
+Clicking the currently open option's details trigger SHALL close it. Clicking a different option's trigger SHALL switch the detail content. Expanded state and accessible open/close labels SHALL match the visible pane. Wide side panes and narrow dialogs SHALL preserve answer drafts and SHALL NOT emit events.
+
+### Requirement: Review without forced navigation
+
+Every invalid answer SHALL be visibly identified in the summary with explicit status text and an icon in addition to theme color. This includes a selected custom answer whose text is blank. Invalid final or corrected submission SHALL remain on review, retain all drafts, display an inline incomplete count and emit no event. It SHALL NOT automatically enter a question.
+
+#### Scenario: Submit an unfinished questionnaire from review
+
+- **WHEN** a person presses Submit while some answers are incomplete
+- **THEN** review remains visible, all invalid rows retain their status, and the inline error is focused without changing the current question or emitting an event
+
+### Requirement: Return directly from answer summaries
+
+Every summary row SHALL be a keyboard-operable control that opens its corresponding question without discarding drafts. After review has been entered, each question SHALL offer a direct return to the summary. Previous/Next SHALL remain available for free navigation, including unfinished questions, without events or implicit submission.
+
+#### Scenario: Edit the first answer in a long questionnaire
+
+- **WHEN** a person activates the first summary row, edits its answer and returns to summary
+- **THEN** the first question is opened directly, all other drafts remain intact, and returning does not require traversing the remaining questions

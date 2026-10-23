@@ -1,4 +1,4 @@
-import { commentTools } from './git-review-comment-tools.mjs';
+import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -28,7 +28,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(fixture.url('concurrency'));
   const frame = page.frameLocator('iframe');
-  const comments = commentTools(frame, page);
+  const comments = annotationTools(frame, page);
   await frame.getByRole('heading', { name: '同时跑几个任务，会怎样影响完成时间？' }).waitFor();
   await comments.assertNoLegacySection();
   assert.equal(await frame.locator('[data-timeline]').count(), 2);
@@ -87,12 +87,12 @@ try {
       }),
     }),
   );
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await frame.getByRole('alert').waitFor();
   assert.equal((await fixture.events('concurrency')).length, 0);
   assert.match(await comments.text(1), /为什么任务 C 还在等待/);
   await page.unroute(feedbackUrl);
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await until(async () => (await fixture.events('concurrency')).length === 1, 'feedback persisted');
   const event = (await fixture.events('concurrency'))[0];
   assert.equal(event.type, 'explanation-feedback');
@@ -106,7 +106,7 @@ try {
   await comments.edit(1);
   await comments.write('');
   await comments.save();
-  await frame.getByRole('button', { name: '提交评论', exact: true }).click();
+  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
   await until(
     async () => (await fixture.events('concurrency')).length === 2,
     'selection-only retained',
@@ -234,7 +234,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'Chrome: copied examples render; deterministic parallel timelines, playback/pause/replay, parameter reset, feedback snapshots + empty comments + CLI events/ack; Sentinel ring/story, strict expiration, lazy reset, rollback, sources and mobile layout pass.',
+    'Chrome: copied examples render; deterministic parallel timelines, playback/pause/replay, parameter reset, feedback snapshots + empty annotations + CLI events/ack; Sentinel ring/story, strict expiration, lazy reset, rollback, sources and mobile layout pass.',
   );
 } finally {
   await browser?.close();

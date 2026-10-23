@@ -19,7 +19,7 @@ previous preference. CLI diagnostics and machine fields remain English.
 Open home pages, hosts, and panels compiled with this version share updates
 without refreshing, remounting the panel, repeating business queries, or emitting
 interaction events. This preserves answers, current question and summary,
-comment edits, saved comments, Git selections, and event receipts. Preferences
+annotation edits, saved annotations, Git selections, and event receipts. Preferences
 are UI environment data, never panel params, event fields, or content hashes.
 
 ## Authoring
@@ -45,7 +45,7 @@ function MyPage() {
 Paneon translates only its own default controls and standard-page instructions,
 including accessible labels, placeholders, validation summaries and receipts.
 Caller-provided children, labels, titles, questions, options, Markdown, code,
-comments and external error details stay exactly as supplied. Author-controlled
+annotations and external error details stay exactly as supplied. Author-controlled
 fixed colors and prose remain the author's responsibility. Standard-page locale
 resources live alongside the complete skill under `assets/shared/`; retain them
 when copying a page.

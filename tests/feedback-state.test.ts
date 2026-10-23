@@ -31,7 +31,7 @@ const { FeedbackStore } = (await import(
       updateAnnotation(id: string, entry: { targets: { ref: string }[]; comment: string }): void;
       removeAnnotation(id: string): void;
       toggleTarget(target: { ref: string }): void;
-      setComment(comment: string): void;
+      setOverallAnnotationText(comment: string): void;
       editAnnotation(id: string | null): void;
       setMode(mode: 'browse' | 'select'): void;
       registerText(registration: {
@@ -98,11 +98,11 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
   });
   const api = store.getSnapshot();
   const id = api.createAnnotation([{ ref: 'one' }]);
-  api.setComment('overall');
+  api.setOverallAnnotationText('overall');
   const before = store.getSnapshot().value;
   const submitting = api.submit();
   assert.equal(store.getSnapshot().submitting, true);
-  assert.throws(() => api.setComment('changed'));
+  assert.throws(() => api.setOverallAnnotationText('changed'));
   assert.throws(() => api.setMode('select'));
   assert.throws(() => api.updateAnnotation(id, { targets: [{ ref: 'one' }], comment: 'changed' }));
   assert.throws(() => api.removeAnnotation(id));
@@ -125,7 +125,7 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
       return Promise.resolve();
     },
   });
-  api.setComment('corrected');
+  api.setOverallAnnotationText('corrected');
   await assert.rejects(api.submit(), /not mounted/);
   assert.equal(count, 1);
 });
@@ -139,11 +139,11 @@ void test('disabled providers prohibit mutations and duplicate callbacks without
   const store = new FeedbackStore({ onSubmit, disabled: true });
   const api = store.getSnapshot();
   assert.throws(() => api.createAnnotation([{ ref: 'one' }]));
-  assert.throws(() => api.setComment('opinion'));
+  assert.throws(() => api.setOverallAnnotationText('opinion'));
   await api.submit();
   assert.equal(count, 0);
   store.setOptions({ onSubmit, disabled: false });
-  api.setComment('overall only');
+  api.setOverallAnnotationText('overall only');
   await api.submit();
   assert.equal(count, 1);
   assert.deepEqual(store.getSnapshot().value, { annotations: [], comment: 'overall only' });

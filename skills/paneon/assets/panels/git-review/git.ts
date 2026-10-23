@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, readlink, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
+import { markMainlines } from './branch-model.ts';
 import {
   gitFeedbackSchema,
   gitReviewParamsSchema,
@@ -154,7 +155,18 @@ function decode(content?: Content) {
     return;
   }
 }
+export type GitFile = {
+  id: string;
+  status: string;
+  source: {
+    repositoryId: string;
+    view: GitSourceView;
+    old?: { path: string };
+    new?: { path: string };
+  };
+};
 export type GitSnapshot = {
+  fileId: string;
   id: string;
   source: GitReviewSource;
   model: DiffModel;
@@ -175,7 +187,12 @@ export type GitCommit = {
   refs: CommitDecoration[];
 };
 export type GitCommitDetails = GitCommit & { message: string };
-export type HistoryRef = { kind: 'branch' | 'remote' | 'tag'; name: string; ref: string };
+export type HistoryRef = {
+  kind: 'branch' | 'remote' | 'tag';
+  name: string;
+  ref: string;
+  mainline?: boolean;
+};
 export type GitHistory = {
   tip?: string;
   selectedCommit?: GitCommitDetails;
@@ -184,6 +201,8 @@ export type GitHistory = {
 };
 async function commitDecorations(root: string, signal?: AbortSignal) {
   const result = new Map<string, CommitDecoration[]>();
+  const refs: HistoryRef[] = [];
+  const defaults = new Map<string, string>();
   const add = (oid: string, decoration: CommitDecoration) => {
     const list = result.get(oid) ?? [];
     list.push(decoration);
@@ -195,7 +214,7 @@ async function commitDecorations(root: string, signal?: AbortSignal) {
     root,
     [
       'for-each-ref',
-      '--format=%(refname)%00%(objecttype)%00%(objectname)%00%(*objecttype)%00%(*objectname)',
+      '--format=%(refname)%00%(objecttype)%00%(objectname)%00%(*objecttype)%00%(*objectname)%00%(symref)',
       'refs/heads',
       'refs/remotes',
       'refs/tags',
@@ -203,7 +222,10 @@ async function commitDecorations(root: string, signal?: AbortSignal) {
     signal,
   );
   for (const line of output.split('\n').filter(Boolean)) {
-    const [ref, type, object, peeledType, peeled] = line.split('\0');
+    const [ref, type, object, peeledType, peeled, symbolic] = line.split('\0');
+    const remoteHead = /^refs\/remotes\/([^/]+)\/HEAD$/.exec(ref);
+    if (remoteHead && symbolic?.startsWith(`refs/remotes/${remoteHead[1]}/`))
+      defaults.set(remoteHead[1], symbolic);
     let oid = type === 'commit' ? object : peeledType === 'commit' ? peeled : undefined;
     // Nested annotated tags require peeling through more than one tag object.
     if (!oid && type === 'tag' && peeledType === 'tag') {
@@ -216,12 +238,17 @@ async function commitDecorations(root: string, signal?: AbortSignal) {
       : ref.startsWith('refs/remotes/')
         ? 'remote'
         : 'tag';
-    add(oid, { kind, name: ref.replace(/^refs\/(heads|remotes|tags)\//, '') });
+    const name = ref.replace(/^refs\/(heads|remotes|tags)\//, '');
+    add(oid, { kind, name });
+    refs.push({ kind, name, ref });
   }
-  return result;
+  return { decorations: result, refs: markMainlines(refs, defaults) };
 }
 
 export type GitListing = {
+  listingId: string;
+  historyId?: string;
+  files: GitFile[];
   snapshots: GitSnapshot[];
   branches: string[];
   description: string;
@@ -230,14 +257,48 @@ export type GitListing = {
   historyRefs?: HistoryRef[];
   history?: GitHistory;
 };
-const sessions = new Map<string, { params: string; snapshots: Map<string, GitSnapshot> }>();
+type FileCapture = {
+  file: GitFile;
+  entry: Entry;
+  root: string;
+  working: boolean;
+  conflict: boolean;
+};
+type HistoryCache = {
+  repositoryId: string;
+  branch: string;
+  tip?: string;
+  currentBranch?: string;
+  branches: string[];
+  decorations: Map<string, CommitDecoration[]>;
+  refs: HistoryRef[];
+};
+type Session = {
+  params: string;
+  snapshots: Map<string, GitSnapshot>;
+  listings: Map<string, { repositoryId: string; captures: Map<string, FileCapture> }>;
+  histories: Map<string, HistoryCache>;
+};
+const sessions = new Map<string, Session>();
+function trimCache<T>(values: Map<string, T>, limit: number) {
+  while (values.size > limit) {
+    const oldest = values.keys().next().value;
+    if (oldest === undefined) break;
+    values.delete(oldest);
+  }
+}
 function session(id: string, params: GitReviewParams) {
   if (!id || id.length > 100) throw new Error('Invalid review session.');
   const key = JSON.stringify(params),
     previous = sessions.get(id);
   if (previous && previous.params !== key) throw new Error('Session parameters do not match.');
   if (previous) return previous;
-  const created = { params: key, snapshots: new Map<string, GitSnapshot>() };
+  const created: Session = {
+    params: key,
+    snapshots: new Map(),
+    listings: new Map(),
+    histories: new Map(),
+  };
   sessions.set(id, created);
   return created;
 }
@@ -287,6 +348,7 @@ function capture(
     notes.push('Binary or nonordinary object: file-level feedback only.');
   const binary = source.old?.type === 'binary' || source.new?.type === 'binary';
   return {
+    fileId: '',
     id: hash(JSON.stringify(source)),
     source,
     status: entry.status,
@@ -322,6 +384,9 @@ export type GitRequest = {
   tip?: string;
   offset?: number;
   file?: string;
+  historyId?: string;
+  area?: 'staged' | 'unstaged' | 'untracked';
+  listingId?: string;
 };
 export async function readGit(
   paramsValue: GitReviewParams,
@@ -332,30 +397,56 @@ export async function readGit(
   const params = gitReviewParamsSchema.parse(paramsValue),
     cache = session(sessionId, params);
   const root = await repository(params, request.repositoryId, signal);
-  const currentBranch = await text(
-    root,
-    ['symbolic-ref', '--quiet', '--short', 'HEAD'],
-    signal,
-  ).catch((error: Error & { cause?: { code?: number } }) => {
-    if (error.cause?.code === 1) return undefined; // Detached HEAD is a valid history root.
-    throw error;
-  });
-  const branches = (
-    await git(
-      root,
-      ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes'],
-      signal,
-    )
+  const pinnedHistory = request.historyId ? cache.histories.get(request.historyId) : undefined;
+  if (
+    request.historyId &&
+    (!pinnedHistory ||
+      pinnedHistory.repositoryId !== request.repositoryId ||
+      pinnedHistory.branch !== (request.branch ?? 'HEAD') ||
+      pinnedHistory.tip !== request.tip)
   )
-    .toString('utf8')
-    .split('\n')
-    .filter(Boolean);
+    throw new Error('Pinned history is unavailable. Refresh the history.');
+  const currentBranch = pinnedHistory
+    ? pinnedHistory.currentBranch
+    : await text(root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], signal).catch(
+        (error: Error & { cause?: { code?: number } }) => {
+          if (error.cause?.code === 1) return undefined;
+          throw error;
+        },
+      );
+  const branches =
+    pinnedHistory?.branches ??
+    (
+      await git(
+        root,
+        ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes'],
+        signal,
+      )
+    )
+      .toString('utf8')
+      .split('\n')
+      .filter(Boolean);
+  const pagination = request.listingId ? cache.listings.get(request.listingId) : undefined;
+  if (
+    request.listingId &&
+    (!pagination ||
+      pagination.repositoryId !== request.repositoryId ||
+      request.type !== 'history' ||
+      !pinnedHistory ||
+      !request.offset ||
+      request.offset < 1)
+  )
+    throw new Error('Pinned file listing is unavailable. Refresh the history.');
+  const listingId = request.listingId ?? randomUUID();
+  const captures = pagination?.captures ?? new Map<string, FileCapture>();
+  const files: GitFile[] = [...captures.values()].map(({ file }) => file);
   const snapshots: GitSnapshot[] = [];
   let description: string;
   let descriptionUI: GitListing['descriptionUI'];
   let history: GitHistory | undefined;
   let historyRefs: HistoryRef[] | undefined;
-  async function addEntries(
+  let historyId: string | undefined;
+  function addEntries(
     entries: Entry[],
     view: GitSourceView,
     working = false,
@@ -363,27 +454,25 @@ export async function readGit(
   ) {
     for (const entry of entries) {
       const conflict = conflicts.has(entry.newPath) || entry.status === 'U';
-      const old = conflict
-        ? undefined
-        : await objectContent(root, entry.oldOID, entry.oldMode, signal);
-      let next = working
-        ? await workingContent(root, entry.newPath)
-        : await objectContent(root, entry.newOID, entry.newMode, signal);
-      if (conflict && next) next = { ...next, mode: 'conflict' };
-      const snapshot = capture(
-        request.repositoryId,
-        view,
-        entry,
-        old,
-        next,
-        conflict
-          ? [
-              'Unmerged conflict: working file shown; index stages are not combined into a staged result.',
-            ]
-          : [],
-      );
-      snapshots.push(snapshot);
-      cache.snapshots.set(snapshot.id, snapshot);
+      const file: GitFile = {
+        id: hash(
+          JSON.stringify([
+            request.repositoryId,
+            view,
+            entry,
+            view.type === 'changes' ? listingId : '',
+          ]),
+        ),
+        status: entry.status,
+        source: {
+          repositoryId: request.repositoryId,
+          view,
+          ...(entry.oldMode !== '000000' ? { old: { path: entry.oldPath } } : {}),
+          ...(entry.newMode !== '000000' ? { new: { path: entry.newPath } } : {}),
+        },
+      };
+      files.push(file);
+      captures.set(file.id, { file, entry, root, working, conflict });
     }
   }
   if (request.type === 'changes') {
@@ -396,14 +485,14 @@ export async function readGit(
     const staged = parseRaw(
       (await git(root, [...rawArgs, '--cached', '--'], signal)).toString('utf8'),
     ).filter((e) => !conflicts.has(e.newPath));
-    await addEntries(staged, {
+    addEntries(staged, {
       type: 'changes',
       area: 'staged',
       ...(headCommit ? { headCommit } : {}),
     });
     const unstaged = parseRaw((await git(root, [...rawArgs, '--'], signal)).toString('utf8'));
     const unique = [...new Map(unstaged.map((e) => [e.newPath, e])).values()];
-    await addEntries(
+    addEntries(
       unique,
       { type: 'changes', area: 'unstaged', ...(headCommit ? { headCommit } : {}) },
       true,
@@ -425,45 +514,44 @@ export async function readGit(
         oldPath: file,
         newPath: file,
       };
-      const snapshot = capture(
-        request.repositoryId,
+      addEntries(
+        [entry],
         { type: 'changes', area: 'untracked', ...(headCommit ? { headCommit } : {}) },
-        entry,
-        undefined,
-        await workingContent(root, file),
-        [],
+        true,
       );
-      snapshots.push(snapshot);
-      cache.snapshots.set(snapshot.id, snapshot);
     }
-    description = '手动刷新；当前读取的工作区内容已固定，读取过程不宣称原子锁定。';
+    description = '手动刷新文件列表；打开文件时捕获内容，已保存的批注保留原始快照。';
     descriptionUI = {
-      key: 'Manual refresh; the observed working tree is pinned, without claiming an atomic read.',
+      key: 'Manual refresh lists files; opening a file captures its content. Annotations retain original snapshots.',
     };
   } else if (request.type === 'history') {
-    const tip = request.tip
-      ? await commitOID(root, request.tip, signal)
-      : request.branch
-        ? await commitOID(root, request.branch, signal)
-        : await headOID(root, signal);
+    const tip = pinnedHistory
+      ? pinnedHistory.tip
+      : request.tip
+        ? await commitOID(root, request.tip, signal)
+        : request.branch
+          ? await commitOID(root, request.branch, signal)
+          : await headOID(root, signal);
     const offset = request.offset ?? 0;
     if (!Number.isInteger(offset) || offset < 0) throw new Error('Invalid history offset.');
     const commits: GitHistory['commits'] = [];
-    const decorations = await commitDecorations(root, signal);
-    historyRefs = [...decorations.values()].flatMap((items) =>
-      items.flatMap((item): HistoryRef[] =>
-        item.kind === 'head'
-          ? []
-          : [
-              {
-                kind: item.kind,
-                name: item.name,
-                ref: `refs/${{ branch: 'heads', remote: 'remotes', tag: 'tags' }[item.kind]}/${item.name}`,
-              },
-            ],
-      ),
-    );
-    if (tip) {
+    const catalog = pinnedHistory ?? (await commitDecorations(root, signal));
+    const { decorations, refs } = catalog;
+    historyId = request.historyId ?? randomUUID();
+    if (!pinnedHistory) {
+      cache.histories.set(historyId, {
+        repositoryId: request.repositoryId,
+        branch: request.branch ?? 'HEAD',
+        tip,
+        currentBranch,
+        branches,
+        decorations,
+        refs,
+      });
+      trimCache(cache.histories, 8);
+      historyRefs = refs;
+    }
+    if (tip && (!pinnedHistory || (request.offset !== undefined && request.offset > 0))) {
       const log = (
         await git(
           root,
@@ -496,7 +584,7 @@ export async function readGit(
       hasMore: commits.length > 50,
     };
     const selectedRef = request.commit ?? tip;
-    if (selectedRef) {
+    if (selectedRef && !pagination) {
       const commit = await commitOID(root, selectedRef, signal);
       const detail = (
         await git(
@@ -537,7 +625,7 @@ export async function readGit(
             commit,
             '--',
           ];
-      await addEntries(parseRaw((await git(root, args, signal)).toString('utf8')), {
+      addEntries(parseRaw((await git(root, args, signal)).toString('utf8')), {
         type: 'history',
         commit,
         parent,
@@ -588,7 +676,7 @@ export async function readGit(
       mergeBaseCommit = bases[0];
       old = mergeBaseCommit;
     }
-    await addEntries(
+    addEntries(
       parseRaw((await git(root, [...rawArgs, old, headCommit, '--'], signal)).toString('utf8')),
       {
         type: 'compare',
@@ -607,21 +695,63 @@ export async function readGit(
       params: { old, head: headCommit },
     };
   }
-  if (
-    request.file &&
-    !snapshots.some(
-      (s) => s.source.old?.path === request.file || s.source.new?.path === request.file,
-    )
-  )
-    throw new Error(`Initial file is not present in this view: ${request.file}`);
+  if (!pagination) {
+    cache.listings.set(listingId, { repositoryId: request.repositoryId, captures });
+    trimCache(cache.listings, 32);
+  }
+  if (request.file && !pagination) {
+    const file = files.find(
+      (item) =>
+        (item.source.old?.path === request.file || item.source.new?.path === request.file) &&
+        (!request.area ||
+          (item.source.view.type === 'changes' && item.source.view.area === request.area)),
+    );
+    if (!file) throw new Error(`Initial file is not present in this view: ${request.file}`);
+    snapshots.push(await readGitFile(params, sessionId, listingId, file.id, signal));
+  }
   return {
+    listingId,
+    files,
     snapshots,
-    branches,
+    branches: pinnedHistory ? [] : branches,
     currentBranch,
     description,
     descriptionUI,
-    ...(history ? { history, historyRefs } : {}),
+    ...(history ? { history, historyId, ...(historyRefs ? { historyRefs } : {}) } : {}),
   };
+}
+/** Capture exactly the selected entry. Directory queries never read blobs or build diff models. */
+export async function readGitFile(
+  paramsValue: GitReviewParams,
+  sessionId: string,
+  listingId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<GitSnapshot> {
+  const cache = session(sessionId, gitReviewParamsSchema.parse(paramsValue));
+  const item = cache.listings.get(listingId)?.captures.get(fileId);
+  if (!item) throw new Error('File listing has expired. Refresh the view.');
+  const { file, entry, root, working, conflict } = item;
+  const old = conflict ? undefined : await objectContent(root, entry.oldOID, entry.oldMode, signal);
+  let next = working
+    ? await workingContent(root, entry.newPath)
+    : await objectContent(root, entry.newOID, entry.newMode, signal);
+  if (conflict && next) next = { ...next, mode: 'conflict' };
+  const snapshot = capture(
+    file.source.repositoryId,
+    file.source.view,
+    entry,
+    old,
+    next,
+    conflict
+      ? [
+          'Unmerged conflict: working file shown; index stages are not combined into a staged result.',
+        ]
+      : [],
+  );
+  snapshot.fileId = fileId;
+  cache.snapshots.set(snapshot.id, snapshot);
+  return snapshot;
 }
 export function validateGitFeedback(
   paramsValue: GitReviewParams,
@@ -653,7 +783,7 @@ export function validateGitFeedback(
   const result = gitReviewSubmittedSchema.parse({ ...feedback, annotations, sources });
   if (JSON.stringify(result).length > 65536)
     throw new Error(
-      'Feedback exceeds the 65536-character event limit. Draft retained; reduce selected content or comments.',
+      'Feedback exceeds the 65536-character event limit. Draft retained; reduce selected content or annotations.',
     );
   return result;
 }

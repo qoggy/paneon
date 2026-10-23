@@ -32,7 +32,7 @@ Then pick the source:
 | Working changes, history and comparisons across repositories                 | [Git review](references/git-review.md) | `<skill>/assets/panels/git-review/panel.tsx`  |
 | GitHub PR description, fixed-version diff and checks (read-only, needs `gh`) | [GitHub PR](references/github-pr.md)   | `<skill>/assets/examples/github-pr/panel.tsx` |
 
-Pages that display content let the human select parts of it, comment, and submit the comments together; each comment points back to the exact text, row, line or object it was made on. The contract states what a page's comments can target.
+Pages that display content let the human select parts of it, add annotations, and submit them together; each annotation points back to the exact text, row, line or object it was made on. The contract states what a page's annotations can target.
 
 ## Run and deliver
 
@@ -68,7 +68,7 @@ Write an ordinary TSX file anywhere under `/tmp`, with `definePanel`, components
 
 - [Interface preferences](references/preferences.md): user-level theme/language, inherited public UI, and original-content boundaries.
 - [Authoring](references/authoring.md): complete source, server actions, CLI/HTTP calls, queries, components, Markdown/Mermaid, temporary credentials.
-- [Feedback](references/feedback.md): selection and comments on custom content, for pages that collect precise opinions.
+- [Feedback](references/feedback.md): selection and annotations on custom content, for pages that collect precise opinions.
 - [Explanation examples](references/examples.md): two one-off explanatory pages (concurrency queueing, Sentinel LeapArray) with fixed topic and data in source; use them as patterns for new explanations.
 
 To reuse shared modules from `assets/shared/` or adapt a built-in page, copy the complete skill directory so relative imports keep working, then edit the copy.
