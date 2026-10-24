@@ -15,7 +15,9 @@ program
   .option('--json', 'Print a machine-readable JSON result')
   .exitOverride();
 const panel = program.command('panel').description('Run and manage interactive panel instances');
-const server = program.command('server').description('Inspect and stop the local Paneon service');
+const server = program
+  .command('server')
+  .description('Start, inspect, and stop the local Paneon service');
 for (const group of [panel, server])
   group
     .option('--debug', 'Write framework diagnostics to stderr')
@@ -147,14 +149,22 @@ execute(run, async () => {
 const list = panel
   .command('list')
   .description('List a page of stored panel instances')
+  .addOption(
+    new Option('--status <status>', 'Filter by panel status').choices([
+      'running',
+      'closed',
+      'unavailable',
+    ]),
+  )
   .option('--page <number>', 'Page number, starting at 1', '1')
   .option('--page-size <count>', 'Instances per page, 1–1000', '20');
 execute(list, async () => {
-  const options = list.opts<{ page: string; pageSize: string }>();
+  const options = list.opts<{ page: string; pageSize: string; status?: string }>();
   const query = new URLSearchParams({
     page: String(integer(options.page, 1, 2147483647)),
     pageSize: String(integer(options.pageSize, 1, 1000)),
   });
+  if (options.status !== undefined) query.set('status', options.status);
   return (await client()).call(`/api/panels?${query}`);
 });
 for (const name of ['inspect', 'reload', 'close'] as const) {
@@ -228,6 +238,12 @@ execute(configSet, async () => {
     : './config.js';
   const { setConfig } = (await import(path)) as typeof import('./config.js');
   return setConfig(configSet.args[0], configSet.args[1]);
+});
+const start = server.command('start').description('Start the service if it is not already running');
+execute(start, async () => {
+  const runtimeClient = await client();
+  await runtimeClient.ensureRuntime();
+  return runtimeClient.serverStatus();
 });
 const status = server.command('status').description('Check the service without starting it');
 execute(status, async () => (await client()).serverStatus());

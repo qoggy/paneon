@@ -4,8 +4,8 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
-import { sourceMappingPlugin } from '../skills/paneon/assets/shared/markdown-feedback-mapper.ts';
-import type { SourceNode } from '../skills/paneon/assets/shared/markdown-feedback-mapper.ts';
+import { sourceMappingPlugin } from '../src/ui/markdown-annotation-mapper.ts';
+import type { SourceNode } from '../src/ui/markdown-annotation-mapper.ts';
 void test('actual GFM AST text leaves retain explicit boundaries through formatting and containers', async () => {
   const source =
     '# 标题🙂\n\nrepeat **repeat** and [linked 中文🙂](https://example.com) &amp; \\* escaped.\n\n`a  b` and ~~gone~~.\n\n- first\n  wrapped\n\n> quoted\n> continuation\n\n| name | value |\n| --- | --- |\n| cell | a\\|b |\n\n```js\nconst x = 1;\n```\n\n```\n> literal\n```';

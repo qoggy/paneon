@@ -7,6 +7,7 @@ import { startServer } from '../../dist/runtime/server.js';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-management-navigation-'));
 const artifacts = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-management-navigation-evidence';
+const widths = process.env.PANEON_TEST_DESKTOP_ONLY === '1' ? [1440] : [1440, 390];
 let service;
 let browser;
 try {
@@ -58,6 +59,23 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
   });
   await page.goto(origin);
   await page.getByText('Page 1 of 3 · 42 panels', { exact: true }).waitFor();
+  const navigation = page.getByRole('navigation', { name: 'Management navigation' });
+  assert.equal(await navigation.getAttribute('data-slot'), 'navigation-menu');
+  assert.equal(await navigation.locator('a[aria-current="page"]').getAttribute('href'), '/');
+  const headerLayout = await page.locator('header').evaluate((header) => {
+    const brand = header.querySelector('a').getBoundingClientRect();
+    const link = header.querySelector('nav a').getBoundingClientRect();
+    return {
+      height: header.getBoundingClientRect().height,
+      centerOffset: Math.abs(brand.y + brand.height / 2 - link.y - link.height / 2),
+    };
+  });
+  assert.ok(headerLayout.centerOffset < 1, 'Brand and navigation must share a vertical center.');
+  assert.ok(headerLayout.height <= 72, 'Navigation must not recreate the tall underline header.');
+  await navigation.getByRole('link', { name: 'Panels', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.activeElement?.getAttribute('href') === '/server');
+  assert.equal(await page.locator(':focus').getAttribute('href'), '/server');
   await page.getByRole('link', { name: 'Go to next page', exact: true }).click();
   await page.getByText('Page 2 of 3 · 42 panels', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'history-20', exact: true }).waitFor();
@@ -184,7 +202,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
   assert.equal(await page.getByText(service.descriptor.runtimeId, { exact: true }).count(), 0);
   await page.unroute('**/health');
 
-  // Capture all four preference combinations and all three routes at desktop/mobile widths.
+  // Capture preference combinations and routes at the requested widths.
   for (const [theme, language] of [
     ['light', 'en'],
     ['light', 'zh-CN'],
@@ -214,7 +232,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
       .selectOption(language);
     await page.locator(`html[lang="${language}"]`).waitFor();
     await second.locator(`html[data-theme="${theme}"][lang="${language}"]`).waitFor();
-    for (const width of [1440, 390]) {
+    for (const width of widths) {
       await page.setViewportSize({ width, height: 1050 });
       for (const [path, key] of [
         ['/', 'panels'],
@@ -223,6 +241,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
       ]) {
         await page.locator(`nav a[href="${path}"]`).click();
         await page.locator('main h1:visible').waitFor();
+        assert.equal(await page.locator('nav a[aria-current="page"]').getAttribute('href'), path);
         if (path === '/server')
           await page.getByText(service.descriptor.runtimeId, { exact: true }).waitFor();
         if (path === '/')
@@ -238,7 +257,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
           `${width} ${theme}/${language} ${path} must not overflow.`,
         );
         if (path === '/')
-          await page.getByRole('link', { name: 'history-0', exact: true }).waitFor();
+          await page.getByRole('link', { name: 'history-40', exact: true }).waitFor();
         await page.screenshot({
           animations: 'disabled',
           path: join(artifacts, `${key}-${theme}-${language}-${width}.png`),
@@ -273,7 +292,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},inpu
       pendingSave: true,
       multiWindow: true,
       combinations: 4,
-      widths: [1440, 390],
+      widths,
       panelHost: true,
       artifacts,
     }),

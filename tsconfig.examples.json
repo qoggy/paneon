@@ -8,8 +8,8 @@
     }
   },
   "include": [
-    "examples/**/*.ts",
-    "examples/**/*.tsx",
+    "tests/fixtures/panels/**/*.ts",
+    "tests/fixtures/panels/**/*.tsx",
     "skills/paneon/assets/**/*.ts",
     "skills/paneon/assets/**/*.tsx"
   ],

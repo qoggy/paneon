@@ -44,11 +44,11 @@ try {
       '-e',
       `
     import assert from 'node:assert/strict';
-    import {feedbackSchema,z} from 'paneon/sdk';
-    import {feedbackSchema as browser} from 'paneon/sdk/client';
+    import {annotationValueSchema,z} from 'paneon/sdk';
+    import {annotationValueSchema as browser} from 'paneon/sdk/client';
     import {existsSync} from 'node:fs';
     import {fileURLToPath} from 'node:url';
-    assert.deepEqual(feedbackSchema(z.string()).parse({annotations:[]}),browser(z.string()).parse({annotations:[]}));
+    assert.deepEqual(annotationValueSchema(z.string()).parse({annotations:[]}),browser(z.string()).parse({annotations:[]}));
     assert.ok(existsSync(fileURLToPath(import.meta.resolve('paneon/ui'))));
     console.log('Installed public feedback exports resolve.');
   `,

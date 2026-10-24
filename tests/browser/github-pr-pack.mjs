@@ -27,8 +27,8 @@ try {
     'assets/shared/diff.tsx',
     'assets/shared/diff-model.ts',
     'assets/shared/diff-schema.ts',
-    'assets/shared/markdown-feedback.tsx',
-    'assets/shared/markdown-feedback-mapper.ts',
+    'assets/shared/markdown-annotation.tsx',
+    'assets/shared/markdown-annotation-mapper.ts',
   ])
     assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
   const installation = join(root, 'installation');

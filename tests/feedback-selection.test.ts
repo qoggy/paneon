@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 const compiled = await build({
-  entryPoints: [new URL('../src/ui/feedback-selection.ts', import.meta.url).pathname],
+  entryPoints: [new URL('../src/ui/annotation-selection.ts', import.meta.url).pathname],
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -57,7 +57,7 @@ void test('endpoint normalization preserves exact UTF-16 grapheme boundaries', (
 });
 
 const indexCompiled = await build({
-  entryPoints: [new URL('../src/ui/feedback-text-index.ts', import.meta.url).pathname],
+  entryPoints: [new URL('../src/ui/annotation-text-index.ts', import.meta.url).pathname],
   bundle: true,
   platform: 'node',
   format: 'esm',

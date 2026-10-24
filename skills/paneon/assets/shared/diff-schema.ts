@@ -1,5 +1,5 @@
 import { z } from 'paneon/sdk';
-import type { FeedbackTarget } from 'paneon/sdk';
+import type { AnnotationTarget } from 'paneon/sdk';
 import { sourceLines } from './diff-model.ts';
 import type { DiffModel } from './diff-model.ts';
 export const gitRefSchema = z.intersection(
@@ -25,7 +25,7 @@ export const gitRefSchema = z.intersection(
 export type GitRef = z.infer<typeof gitRefSchema>;
 export function diffTargetText(
   model: DiffModel,
-  target: FeedbackTarget<GitRef>,
+  target: AnnotationTarget<GitRef>,
 ): string | undefined {
   const ref = target.ref;
   if (ref.kind === 'file') {
@@ -72,8 +72,8 @@ export function diffTargetText(
 /** Whole-side registrations become the actual selected line range on delivery. */
 export function normalizeDiffTarget(
   model: DiffModel,
-  target: FeedbackTarget<GitRef>,
-): FeedbackTarget<GitRef> {
+  target: AnnotationTarget<GitRef>,
+): AnnotationTarget<GitRef> {
   const registered = diffTargetText(model, target);
   if (target.ref.kind !== 'lines' || !target.text || registered === undefined) return target;
   const lines = sourceLines(registered),

@@ -12,13 +12,20 @@ void test('UI config merges atomically, preserves unrelated keys, and retains st
   try {
     const initial = new Preferences(home);
     assert.deepEqual(initial.ui, { theme: 'light', language: 'en' });
+    assert.equal(initial.port, 49321);
     await writeFile(
       join(home, 'config.json'),
-      JSON.stringify({ other: { keep: true }, ui: { extension: 42, theme: 'dark' } }),
+      JSON.stringify({
+        server: { port: 49322 },
+        other: { keep: true },
+        ui: { extension: 42, theme: 'dark' },
+      }),
     );
     const config = new Preferences(home);
+    assert.equal(config.port, 49322);
     config.save({ language: 'zh-CN' });
     assert.deepEqual(JSON.parse(await readFile(join(home, 'config.json'), 'utf8')), {
+      server: { port: 49322 },
       other: { keep: true },
       ui: { extension: 42, theme: 'dark', language: 'zh-CN' },
     });

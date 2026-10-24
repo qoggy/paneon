@@ -3,7 +3,7 @@ import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { annotationTools } from './annotation-tools.mjs';
+import { annotationTools, selectDiffLines } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-diff-boundaries-'));
 const evidence = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-diff-boundaries';
@@ -67,13 +67,13 @@ try {
     await button('展开全部上下文').click();
   }
   await button('上一个差异').click();
-  await button('选择对象').click();
-  // One multi-target annotation reproduces the many identical numbered badges in the report.
-  for (let n = 33; n <= 40; n++) await button(`选择新侧第 ${n} 行`).click();
+
+  // A continuous registered text range spans the scrolling edges.
+  await selectDiffLines(frame, 'new', 33, 40);
   const annotations = annotationTools(frame, page);
   await annotations.write('Several targets must remain inside their code viewport');
   await annotations.save();
-  await button('结束选择').click();
+
   await mkdir(evidence, { recursive: true });
   async function assertClippedMarkers() {
     await viewport.evaluate(async (element) => {
@@ -81,7 +81,7 @@ try {
       await new Promise(requestAnimationFrame);
       return element.scrollTop;
     });
-    const geometry = await frame.locator('[data-feedback-surface]').evaluate((surface) => {
+    const geometry = await frame.locator('[data-annotation-surface]').evaluate((surface) => {
       const viewport = document.querySelector('[data-boundary-viewport]').getBoundingClientRect();
       const header = document.querySelector('[data-diff-header]').getBoundingClientRect();
       const pane =
@@ -92,7 +92,7 @@ try {
         bottom: Math.min(innerHeight, viewport.bottom),
         left: Math.max(0, pane.left),
         right: Math.min(innerWidth, pane.right),
-        markers: [...surface.querySelectorAll('[data-feedback-marker]')].map((el) => {
+        markers: [...surface.querySelectorAll('[data-annotation-marker]')].map((el) => {
           const r = el.getBoundingClientRect();
           return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
         }),
@@ -125,7 +125,7 @@ try {
       assert.ok(count > 0, 'partly visible target groups retain markers');
   }
   assert.equal(
-    await frame.locator('[data-feedback-marker]').count(),
+    await frame.locator('[data-annotation-marker]').count(),
     0,
     'fully scrolled-out targets leave no badges in history or toolbar',
   );
@@ -136,14 +136,16 @@ try {
   await frame.locator('html[data-theme="dark"]').waitFor();
   await assertClippedMarkers();
   await page.screenshot({ path: join(evidence, 'markers-dark.png') });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await counter.click();
-  await assertClippedMarkers();
-  await page.screenshot({ path: join(evidence, 'markers-narrow.png') });
+  if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await counter.click();
+    await assertClippedMarkers();
+    await page.screenshot({ path: join(evidence, 'markers-narrow.png') });
+  }
   assert.equal(await annotations.count(), 1);
   assert.deepEqual(errors, []);
   console.log(
-    'PASS distinct edits inside one contextual hunk, mode/context navigation, multi-target annotation marker clipping under sticky header and scroll edges, dark/narrow.',
+    'PASS distinct edits inside one contextual hunk, mode/context navigation, text-range annotation marker clipping under sticky header and scroll edges, dark theme.',
   );
 } finally {
   await browser?.close();

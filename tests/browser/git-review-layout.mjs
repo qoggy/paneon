@@ -1,3 +1,4 @@
+import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,7 +9,7 @@ import {
   createLayoutRepository,
   startGitReviewFixture,
 } from './git-review-fixture.mjs';
-import { annotationTools } from './annotation-tools.mjs';
+import { annotationTools, selectDiffLines } from './annotation-tools.mjs';
 async function verifyHistoryColumns(frame, page, content, until) {
   const separators = ['调整分支栏宽度', '调整文件区宽度'].map((name) =>
     frame.getByRole('separator', { name }),
@@ -48,7 +49,12 @@ async function verifyHistoryColumns(frame, page, content, until) {
   const retainedRow = await frame.locator('[data-commit-id][aria-pressed="true"]').elementHandle();
   const retainedDiff = await frame.locator('[data-diff-source]').elementHandle();
   const count = await frame.locator('[data-history-count]').getAttribute('data-history-count');
-  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  await selectDiffLines(
+    frame,
+    'new',
+    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
+  );
+  await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved column sizing draft');
   const history = frame.locator('[data-commit-scroll]');
@@ -187,23 +193,25 @@ async function verifyHistoryColumns(frame, page, content, until) {
   await content.evaluate(() => window.dispatchEvent(new Event('blur')));
   await page.mouse.up();
   assert.deepEqual(await styles(), originalStyles, 'Window blur ends the gesture.');
-  await start(0);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await until(
-    async () => !(await separators[0].isVisible()),
-    'Mobile layout retained a column handle.',
-  );
-  await until(
-    async () => (await styles()).selection === originalStyles.selection,
-    'Mobile transition did not release column capture.',
-  );
-  await page.mouse.up();
-  assert.equal(await separators[1].isVisible(), false);
-  assert.deepEqual(await styles(), originalStyles);
-  assert.equal(
-    await content.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-    true,
-  );
+  if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
+    await start(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await until(
+      async () => !(await separators[0].isVisible()),
+      'Mobile layout retained a column handle.',
+    );
+    await until(
+      async () => (await styles()).selection === originalStyles.selection,
+      'Mobile transition did not release column capture.',
+    );
+    await page.mouse.up();
+    assert.equal(await separators[1].isVisible(), false);
+    assert.deepEqual(await styles(), originalStyles);
+    assert.equal(
+      await content.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+  }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await until(
     async () => Math.abs((await widths())[0] - original[0]) < 2,
@@ -224,21 +232,22 @@ async function verifyHistoryColumns(frame, page, content, until) {
     'Both side pane widths did not return after desktop resizing.',
   );
   await start(1);
-  await frame.getByRole('button', { name: '未提交改动', exact: true }).evaluate((el) => el.click());
+  // Radix Tabs activates on pointer-down/focus/keyboard, not DOM click() alone.
+  await frame.getByRole('tab', { name: '未提交改动', exact: true }).press('Enter');
   await page.mouse.up();
   await until(
     async () => (await separators[0].count()) === 0,
     'Column handles survived leaving history.',
   );
   assert.deepEqual(await styles(), originalStyles);
-  await frame.getByRole('button', { name: '提交记录', exact: true }).click();
+  await frame.getByRole('tab', { name: '提交记录', exact: true }).click();
   await separators[0].waitFor();
   await until(
     async () => (await widths()).every((width, index) => Math.abs(width - original[index]) < 2),
     'Both side pane widths did not survive returning to history.',
   );
   await until(
-    async () => !(await frame.getByRole('button', { name: '刷新历史', exact: true }).isDisabled()),
+    async () => !(await frame.getByRole('button', { name: '刷新', exact: true }).isDisabled()),
     'Returning to history did not finish its query.',
   );
   if (process.env.PANEON_TEST_ARTIFACTS) {
@@ -376,7 +385,12 @@ async function verifyHistorySplit(frame, page, content, until) {
     await assertStopped(point);
   }
   // Preserve both loaded content and an unsaved contextual editor across resizing.
-  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  await selectDiffLines(
+    frame,
+    'new',
+    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
+  );
+  await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved splitter regression draft');
   await history.evaluate((el) => {
@@ -405,19 +419,24 @@ async function verifyHistorySplit(frame, page, content, until) {
   assert.equal(requests, 0, 'Splitter interactions must not read Git or submit feedback.');
   page.off('request', observe);
 
-  await start();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await until(async () => !(await divider.isVisible()), 'Narrow layout kept the divider visible.');
-  await until(
-    async () => (await styles()).selection === originalStyles.selection,
-    'Breakpoint change did not clean up the drag.',
-  );
-  await page.mouse.up();
-  assert.deepEqual(await styles(), originalStyles);
-  assert.equal(
-    await content.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-    true,
-  );
+  if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
+    await start();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await until(
+      async () => !(await divider.isVisible()),
+      'Narrow layout kept the divider visible.',
+    );
+    await until(
+      async () => (await styles()).selection === originalStyles.selection,
+      'Breakpoint change did not clean up the drag.',
+    );
+    await page.mouse.up();
+    assert.deepEqual(await styles(), originalStyles);
+    assert.equal(
+      await content.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+  }
   await page.setViewportSize({ width: 1440, height: 700 });
   await until(async () => (await sizes()).diff >= 239, 'Resize did not re-constrain pane heights.');
   assert.ok((await sizes()).upper >= 200);
@@ -495,11 +514,11 @@ async function verifyHistorySplit(frame, page, content, until) {
   const restored = await sizes();
   // Leaving history while captured must release capture and restore styles; session ratio survives.
   await start();
-  await frame.getByRole('button', { name: '未提交改动', exact: true }).evaluate((el) => el.click());
+  await frame.getByRole('tab', { name: '未提交改动', exact: true }).press('Enter');
   await page.mouse.up();
   await until(async () => (await divider.count()) === 0, 'Divider survived leaving history.');
   assert.deepEqual(await styles(), originalStyles);
-  await frame.getByRole('button', { name: '提交记录', exact: true }).click();
+  await frame.getByRole('tab', { name: '提交记录', exact: true }).click();
   await divider.waitFor();
   await until(
     async () => Math.abs((await sizes()).upper - restored.upper) < 1,
@@ -666,7 +685,7 @@ export async function verifyGitLayout(f, page) {
     'true',
   );
   await page.unroute(queryUrl);
-  await button('刷新历史').click();
+  await button('刷新').click();
   await frame.getByText('读取失败', { exact: true }).waitFor({ state: 'hidden' });
   await until(
     async () => (await frame.getByRole('status').count()) === 0,
@@ -852,12 +871,12 @@ export async function verifyGitLayout(f, page) {
   await newViewport.evaluate((element) => {
     element.scrollLeft = 0;
   });
-  await button('选择对象').click();
+
   for (const [side, number] of [
     ['旧', 3],
     ['新', 4],
   ]) {
-    await button(`选择${side}侧第 3 行`).click();
+    await selectDiffLines(frame, side === '旧' ? 'old' : 'new', 3);
     await comments.write(`${side}侧第三行批注`);
     await comments.save();
     const lineMarker = frame.getByRole('button', { name: `批注 ${number}`, exact: true });
@@ -877,23 +896,15 @@ export async function verifyGitLayout(f, page) {
     );
     await button('取消').click();
   }
-  for (const side of ['old', 'new']) {
-    await frame.getByLabel('侧', { exact: true }).selectOption(side);
-    await frame.getByLabel('起始行', { exact: true }).fill('2');
-    await frame.getByLabel('结束行', { exact: true }).fill('3');
-    await button('选择连续行').click();
-  }
-  await comments.write('同时批注两侧连续行');
+  await selectDiffLines(frame, 'new', 2, 3);
+  await comments.write('连续行文字批注');
   await comments.save();
   await until(
     async () => (await frame.getByRole('button', { name: '批注 5', exact: true }).count()) === 2,
-    'both range annotation markers did not appear after the scheduled geometry measurement',
+    'continuous text range markers did not appear after the scheduled geometry measurement',
   );
   await frame.getByRole('button', { name: '批注 5', exact: true }).first().click();
-  assert.equal(
-    await frame.getByLabel('批注内容', { exact: true }).inputValue(),
-    '同时批注两侧连续行',
-  );
+  assert.equal(await frame.getByLabel('批注内容', { exact: true }).inputValue(), '连续行文字批注');
   await button('取消').click();
   assert.equal((await f.events(layoutPanel)).length, 0);
   const layoutArtifacts = process.env.PANEON_TEST_ARTIFACTS;
@@ -904,7 +915,7 @@ export async function verifyGitLayout(f, page) {
       fullPage: true,
     });
   }
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await until(
     async () => (await f.events(layoutPanel)).length === 1,
     'layout annotation was not delivered',
@@ -931,23 +942,25 @@ export async function verifyGitLayout(f, page) {
   await comments.locate(1);
   await frame.getByText('回看保留快照', { exact: true }).waitFor();
   await marker.waitFor();
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(
-    await frame.getByRole('separator', { name: '调整提交历史与文件差异高度' }).isVisible(),
-    false,
-  );
-  assert.equal(
-    await layoutFrame.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    true,
-    'mobile Git layout overflow',
-  );
-  assert.equal(await button('提交批注').isVisible(), true);
-  await frame.locator('[data-git-diff-scroll]').scrollIntoViewIfNeeded();
-  if (layoutArtifacts)
-    await page.screenshot({
-      path: join(layoutArtifacts, 'git-history-mobile.png'),
-      fullPage: true,
-    });
+  if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await frame.getByRole('separator', { name: '调整提交历史与文件差异高度' }).isVisible(),
+      false,
+    );
+    assert.equal(
+      await layoutFrame.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      true,
+      'mobile Git layout overflow',
+    );
+    assert.equal(await frame.getByRole('button', { name: /^批注 \(\d+\)$/ }).isVisible(), true);
+    await frame.locator('[data-git-diff-scroll]').scrollIntoViewIfNeeded();
+    if (layoutArtifacts)
+      await page.screenshot({
+        path: join(layoutArtifacts, 'git-history-mobile.png'),
+        fullPage: true,
+      });
+  }
   await page.setViewportSize({ width: 1440, height: 1000 });
   const graphRepo = await createGraphRepository(f.root);
   const graphPanel = await f.run({
@@ -1053,13 +1066,10 @@ export async function verifyGitLayout(f, page) {
   );
   assert.equal(await frame.locator(`[data-commit-id="${graphRepo.tip}"]`).count(), 0);
   assert.equal(await frame.getByRole('region', { name: '文件差异', exact: true }).count(), 0);
-  await frame.locator('[data-file-id]').first().click();
+  await frame.locator('[data-file-id]').first().dblclick();
   await frame.locator('[data-diff-source]').waitFor();
-  await button('刷新历史').click();
-  await until(
-    async () => !(await button('刷新历史').isDisabled()),
-    'History refresh did not finish.',
-  );
+  await button('刷新').click();
+  await until(async () => !(await button('刷新').isDisabled()), 'History refresh did not finish.');
   assert.equal(
     await frame.locator('[data-diff-source]').count(),
     1,
@@ -1093,16 +1103,18 @@ export async function verifyGitLayout(f, page) {
   );
   if (layoutArtifacts)
     await page.screenshot({ path: join(layoutArtifacts, 'git-log-graph-desktop.png') });
-  await page.setViewportSize({ width: 390, height: 844 });
-  const graphFrame = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
-  assert.equal(
-    await graphFrame.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-    true,
-  );
-  if (layoutArtifacts)
-    await page.screenshot({
-      path: join(layoutArtifacts, 'git-log-graph-mobile.png'),
-    });
+  if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const graphFrame = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
+    assert.equal(
+      await graphFrame.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+    if (layoutArtifacts)
+      await page.screenshot({
+        path: join(layoutArtifacts, 'git-log-graph-mobile.png'),
+      });
+  }
   assert.equal((await f.events(graphPanel)).length, 0);
 
   // Load a real long branch, then verify windowed rendering and offscreen keyboard navigation.

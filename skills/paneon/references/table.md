@@ -21,13 +21,13 @@ Run `assets/panels/table/panel.tsx` with ordinary `paneon panel run` and either 
 
 `title`, `columns` and `rows` are required. `description` is optional Markdown. Columns have only `key`, `label` and optional `type` (`text`, `number`, `boolean`; default `text`). Keys must be unique and nonblank. Each declared key must be an own field of every row; use `null` for an empty cell. Cell values are strings, finite numbers, booleans or null. Number/boolean columns accept their native type or null. Extra row fields are retained but not shown. Rows may be empty. `pageSize` is an integer from 1 through 1000, default 20. There is no rowKey, required business id, preselection, format, overflow or detailsKey option.
 
-The compact page places **整体批注** and **提交批注** beside the title. Optional Markdown description stays available through the **说明** Popover, including keyboard and touch activation. The toolbar groups search and **筛选** on the left, with the saved-annotation catalog on the right; controls wrap to fit the panel.
+The compact page places the **批注 (N)** menu beside the title, with **提交批注** in its footer. Optional Markdown description stays available through the **说明** Popover, including keyboard and touch activation. The toolbar groups search and **筛选** on the left, with the saved-annotation catalog on the right; controls wrap to fit the panel.
 
 Search and per-column filters perform case-insensitive text containment on declared columns. Open **筛选** for the existing per-column contains inputs; active filters appear below the toolbar and can be removed individually. Search has its own clear action. **重置视图** appears only while search, filters or sorting are active and clears all three. Numeric/boolean sorting uses native values; text sorting uses displayed text, null stays last in either direction, and equal values retain original row order. A filter/sort change returns to page one and preserves feedback drafts.
 
 The table keeps its existing appearance with compact headers and rows. Declared number columns align right, booleans remain raw `true`/`false`, and text cells use the remaining width and naturally wrap without changing their source. Multiple columns scroll within the table region. The footer shows the visible range and match count, includes the original total when filtered, and provides compact previous/next controls. Empty input and no matches remain distinct states.
 
-Select a word or phrase inside a header label or an original string cell while browsing, then use the nearby **批注** action and anchored editor. No selection mode is required. Header labels remain selectable text; the separate adjacent arrow button sorts the column and does not start an annotation. The table has no object-selection toggle or row/column checkboxes. Row numbers remain visible. Save the current annotation before creating another independent annotation. Saving is page-local; a numbered marker reopens its editor, where Cancel discards only the current edit and Delete removes the annotation. **整体批注** opens an optional overall editor. **提交批注** in the top toolbar submits the complete result, and unsaved edits must first be saved or cancelled. Ordinary browsing preserves copying and controls; data is never edited.
+Select a word or phrase inside a header label or an original string cell while browsing, then use the nearby **批注** action and anchored editor. No selection mode is required. Header labels remain selectable text; the separate adjacent arrow button sorts the column and does not start an annotation. The table has no object-selection toggle or row/column checkboxes. Row numbers remain visible. Save the current annotation before creating another independent annotation. Saving is page-local; a numbered marker reopens its editor, where Cancel discards only the current edit and Delete removes the annotation. **提交批注** in the annotation menu footer submits the complete result, and unsaved edits must first be saved or cancelled. Ordinary browsing preserves copying and controls; data is never edited.
 
 The `table-submitted` event contains one complete result:
 
@@ -44,8 +44,7 @@ The `table-submitted` event contains one complete result:
       ],
       "comment": "Please clarify this column."
     }
-  ],
-  "comment": "Please explain the tradeoffs."
+  ]
 }
 ```
 

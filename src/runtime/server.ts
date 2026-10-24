@@ -204,9 +204,21 @@ async function bootServer(
   });
   route('GET', '/api/panels', (request) => {
     const query = request.query as Record<string, unknown>;
+    const status = query.status;
+    if (
+      status !== undefined &&
+      status !== 'running' &&
+      status !== 'closed' &&
+      status !== 'unavailable'
+    )
+      throw new PaneonError(
+        'INVALID_ARGUMENT',
+        'Panel status must be running, closed, or unavailable.',
+      );
     return runtime.store.listPage(
       integer(query.page, 1, 2147483647, 1),
       integer(query.pageSize, 1, 1000, 20),
+      status,
     );
   });
   route('GET', '/api/panels/:instanceId', (request) => access(params(request).instanceId));
@@ -417,7 +429,17 @@ async function bootServer(
   app.get('/server', host);
   app.get('/settings', host);
   app.get('/panels/:instanceId', host);
-  await app.listen({ host: '127.0.0.1', port: 0 });
+  try {
+    await app.listen({ host: '127.0.0.1', port: preferences.port });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE')
+      throw new PaneonError(
+        'SERVER_PORT_IN_USE',
+        `Port ${preferences.port} is already in use. Free the port or change server.port in ${join(home, 'config.json')}.`,
+        { port: preferences.port },
+      );
+    throw error;
+  }
   const address = app.server.address();
   if (!address || typeof address === 'string') throw new Error('Invalid listen address');
   descriptor.port = address.port;

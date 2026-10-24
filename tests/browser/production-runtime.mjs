@@ -12,8 +12,9 @@ let service;
 let browser;
 const source = (heading, range = '0.0.0') => `
 import {definePanel,serverAction,z} from 'paneon/sdk';
+import {Checkbox} from 'paneon/ui';
 export const environment=serverAction({kind:'query',input:z.object({}),handler:async()=>({nodeEnv:process.env.NODE_ENV??'unset'})});
-function Panel(){return <h1>${heading}</h1>}
+function Panel(){return <><h1>${heading}</h1><Checkbox aria-label="Include details" /></>}
 export default definePanel({id:'production-test',requires:{paneon:'${range}'},input:z.object({}),events:{},render:Panel});`;
 async function until(condition, description) {
   const deadline = Date.now() + 30000;
@@ -55,6 +56,9 @@ try {
   await secondPage.goto(url(second));
   const frame = secondPage.frameLocator('iframe');
   await frame.getByRole('heading', { name: 'Second panel', exact: true }).waitFor();
+  const checkbox = frame.getByRole('checkbox', { name: 'Include details', exact: true });
+  await checkbox.check();
+  assert.equal(await checkbox.isChecked(), true);
   const original = second.revision;
   await writeFile(secondEntry, source('Reloaded second panel', '>=99.0.0'));
   await until(
@@ -77,13 +81,15 @@ try {
   );
   await service.runtime.reload(second.instanceId);
   await frame.getByRole('heading', { name: 'Reloaded second panel', exact: true }).waitFor();
+  await checkbox.check();
+  assert.equal(await checkbox.isChecked(), true);
   assert.deepEqual(
     errors,
     [],
-    'All initial, second-panel and refreshed frames must execute without JSX factory errors.',
+    'All initial, second-panel and refreshed frames must execute without browser errors, including external React require calls.',
   );
   console.log(
-    'Production browser JSX remains valid after watch changes NODE_ENV, second panel creation, invalid-source recovery and reload; action NODE_ENV is preserved.',
+    'Production panels render and Base UI controls remain interactive after watch changes NODE_ENV, second panel creation, invalid-source recovery and reload; action NODE_ENV is preserved.',
   );
 } finally {
   await browser?.close();

@@ -14,7 +14,7 @@
 - 独立重新读取执行者保留的 48 张 PNG 并计算 SHA-256，确认 24 对 before/after 字节相同且与 results.json 一致，覆盖 changes/history/compare × light/dark × en/zh-CN × 1440/390。DOM/几何断言是执行者保留的浏览器脚本证据，主 Agent 未另跑完整 24 组浏览器脚本；未混称为独立全量复跑。
 - 主 Agent 通过 CUA 操作独立临时 runtime 和本地 Git fixture：未指定 file 时不出现 Diff；点击文件后才显示；切换工作区视图不自动显示；行批注选择、编辑、保存及提交保留原交互。
 - 关键真实链路：浏览器显示工作区 `const n = 4;` 并保存批注后，将仅测试目录的磁盘文件改为 `const n = 999;`，再从原浏览器提交。SQLite 事件包含 quote/evidence `const n = 4;\r\n`，磁盘仍为 n=999，提交成功；事件证据 `/tmp/paneon-git-review-root-event.json`。截图 `/tmp/paneon-git-review-root-acceptance.png`。
-- CUA 独立打开 git-components 示例：无需 Provider 的双字符串 Diff 显示 old text/new text；点击独立文件组件显示此时 n=999；切换 base 分支驱动独立 Commit 图，选中/回调正常。
+- CUA 独立组合验证（临时演示页面现已删除）：无需 Provider 的双字符串 Diff 显示 old text/new text；点击独立文件组件显示此时 n=999；切换 base 分支驱动独立 Commit 图，选中/回调正常。
 - 查找代码确认后端仅有每次调用内的临时 Map，没有必需 session/listing/history/snapshot 全局存储；buildGitFeedback 的 ReadonlyMap 属于浏览器入参，不是后端业务缓存。后端校验不导入 Git/fs 调用。
 - `git diff --check` 和 OpenSpec strict 校验通过。合入前记录并核对 12 个无关已修改 tracked 文件哈希保持不变；提交只选择本清单。
 
@@ -30,7 +30,6 @@
 - `openspec/changes/refactor-git-review-stateless/specs/stateless-git-review/spec.md`
 - `openspec/changes/refactor-git-review-stateless/tasks.md`
 - `openspec/changes/refactor-git-review-stateless/verification.md`
-- `skills/paneon/assets/examples/git-components/panel.tsx`
 - `skills/paneon/assets/panels/git-review/actions.ts`
 - `skills/paneon/assets/panels/git-review/components.tsx`
 - `skills/paneon/assets/panels/git-review/feedback.ts`
@@ -41,7 +40,6 @@
 - `skills/paneon/references/authoring.md`
 - `skills/paneon/references/feedback.md`
 - `skills/paneon/references/git-review.md`
-- `tests/browser/git-components.mjs`
 - `tests/browser/git-review-visual-baseline.mjs`
 - `tests/browser/github-pr.mjs`
 - `tests/git-mainlines.test.ts`

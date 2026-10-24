@@ -226,11 +226,13 @@ export function GitChangedFiles({
 }: GitFilesProps & { selected?: string; onSelectFile: (snapshot: GitSnapshot) => void }) {
   const data = useGitFiles(props),
     serial = useRef(0),
+    [selectedFile, setSelectedFile] = useState(selected),
     [error, setError] = useState('');
   useEffect(() => {
     serial.current++;
     setError('');
-  }, [props.repositoryPath, JSON.stringify(props.view)]);
+    setSelectedFile(selected);
+  }, [props.repositoryPath, JSON.stringify(props.view), selected]);
   async function select(file: GitFile) {
     const id = ++serial.current;
     setError('');
@@ -249,11 +251,15 @@ export function GitChangedFiles({
         viewType={props.view.type}
         pending={data.pending}
         snapshots={data.files}
-        selectedId={selected}
+        selectedId={selectedFile}
         filter=""
         scopeKey={`${props.repositoryPath}:${JSON.stringify(props.view)}`}
         revealKey={0}
-        onSelect={(file) => void select(file)}
+        onSelect={(file) => {
+          serial.current++;
+          setSelectedFile(file.id);
+        }}
+        onOpen={(file) => void select(file)}
       />
     </>
   );

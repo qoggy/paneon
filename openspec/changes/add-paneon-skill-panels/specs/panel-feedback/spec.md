@@ -39,7 +39,7 @@ Submitted targets SHALL contain a JSON-serializable page-defined object referenc
 
 ### Requirement: Keep independent editable annotation drafts
 
-Common feedback SHALL use one annotations list for selected objects and their optional opinions, plus optional overall feedback. Every entry SHALL have a string `comment` field for annotation text; an empty string SHALL represent selection without an opinion. A separate selected result list SHALL NOT be emitted. Adding, clearing, or editing an annotation SHALL retain the same entry and identifier. A person SHALL be able to add, edit, and delete draft annotations before explicit submission. Each annotation SHALL retain a stable identifier and its own nonempty target set. Mode changes SHALL NOT clear drafts or send events. The common implementation SHALL NOT add disk-backed draft storage or promise draft survival after page reload.
+Common feedback SHALL use one annotations list for selected objects and their optional opinions. Feedback SHALL NOT include a page-level comment field or offer a page-level annotation editor. Every entry SHALL have a string `comment` field for annotation text; an empty string SHALL represent selection without an opinion. A separate selected result list SHALL NOT be emitted. Adding, clearing, or editing an annotation SHALL retain the same entry and identifier. A person SHALL be able to add, edit, and delete draft annotations before explicit submission. Each annotation SHALL retain a stable identifier and its own nonempty target set. Mode changes SHALL NOT clear drafts or send events. The common implementation SHALL NOT add disk-backed draft storage or promise draft survival after page reload.
 
 #### Scenario: Annotate separate issues
 
@@ -55,6 +55,11 @@ Common feedback SHALL use one annotations list for selected objects and their op
 
 - **WHEN** a person adds text to or clears an existing entry's annotation
 - **THEN** the entry keeps its identifier and targets without moving between separate result lists
+
+#### Scenario: Reject page-level comments
+
+- **WHEN** a result includes a top-level `comment`, with or without target annotations
+- **THEN** the feedback schema rejects it; each opinion must belong to an annotation with a nonempty target set
 
 ### Requirement: Respect content identity and adapter boundaries
 

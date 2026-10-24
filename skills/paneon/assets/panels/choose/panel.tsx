@@ -12,7 +12,6 @@ import {
   Checkbox,
   Sheet,
   SheetContent,
-  SheetHeader,
   SheetTitle,
   Markdown,
   RadioGroup,
@@ -48,6 +47,7 @@ function ChoosePanel() {
   const [reviewing, setReviewing] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailTrigger = useRef<HTMLButtonElement | null>(null);
+  const detailContent = useRef<HTMLDivElement | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     params.questions.map((question) => ({
       selectedIds: question.selectedIds ?? [],
@@ -127,7 +127,7 @@ function ChoosePanel() {
     void submission.submit(result);
   }
   const detailBody = detail?.details && (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-5">
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-5 pt-12">
       <Markdown className="text-sm! leading-relaxed! break-words [&_h1]:mt-5! [&_h1]:border-0! [&_h1]:pb-0! [&_h1]:text-base! [&_h2]:mt-5! [&_h2]:border-0! [&_h2]:pb-0! [&_h2]:text-sm! [&_h3]:text-sm! [&_h4]:text-sm! [&_h5]:text-sm! [&_h6]:text-sm! [&_pre]:max-w-full! [&_pre]:overflow-x-auto!">
         {detail.details}
       </Markdown>
@@ -142,9 +142,11 @@ function ChoosePanel() {
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <h1 className="max-w-full font-medium break-words">{params.title}</h1>
               </div>
-              <p aria-live="polite" className="ml-auto shrink-0 whitespace-nowrap tabular-nums">
-                {reviewing ? t('Answer summary') : `${index + 1} / ${params.questions.length}`}
-              </p>
+              {!reviewing && (
+                <p aria-live="polite" className="ml-auto shrink-0 whitespace-nowrap tabular-nums">
+                  {index + 1} / {params.questions.length}
+                </p>
+              )}
             </div>
             {params.description && (
               <div aria-label={t('Questionnaire description')}>
@@ -523,18 +525,16 @@ function ChoosePanel() {
         }}
       >
         <SheetContent
+          ref={detailContent}
           id="option-details"
+          tabIndex={-1}
           aria-describedby={undefined}
           side="right"
-          className="w-full gap-0 overflow-hidden sm:max-w-lg"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            detailTrigger.current?.focus();
-          }}
+          className="w-[min(64rem,85vw)] gap-0 overflow-hidden outline-none sm:max-w-none"
+          initialFocus={detailContent}
+          finalFocus={detailTrigger}
         >
-          <SheetHeader className="shrink-0 border-b p-5 pr-12 text-left">
-            <SheetTitle className="text-base leading-6 break-words">{detail?.label}</SheetTitle>
-          </SheetHeader>
+          <SheetTitle className="sr-only">{detail?.label}</SheetTitle>
           {detailBody}
         </SheetContent>
       </Sheet>

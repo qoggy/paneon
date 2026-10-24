@@ -55,14 +55,14 @@ async function waitForText(locator, text) {
     .waitFor({ state: 'visible', timeout: 60_000 });
 }
 
-export async function acceptance({ cliPath, examplesPath, label = 'repository' }) {
+export async function acceptance({ cliPath, fixturesPath, label = 'repository' }) {
   const scratch = await mkdtemp(join(tmpdir(), 'paneon-acceptance-'));
   const home = join(scratch, 'home');
   const workspace = join(scratch, 'workspace');
   const artifacts =
     process.env.PANEON_TEST_ARTIFACTS || (await mkdtemp(join(tmpdir(), 'paneon-evidence-')));
   await Promise.all([mkdir(home), mkdir(workspace), mkdir(artifacts, { recursive: true })]);
-  await cp(examplesPath, join(workspace, 'examples'), { recursive: true });
+  await cp(fixturesPath, join(workspace, 'fixtures/panels'), { recursive: true });
   const env = { ...process.env, HOME: home };
   // HOME isolates os.homedir(); this does not add a Paneon storage override.
   delete env.PANEON_HOME;
@@ -81,7 +81,7 @@ export async function acceptance({ cliPath, examplesPath, label = 'repository' }
     command(
       'panel',
       'run',
-      join(workspace, 'examples', file),
+      join(workspace, 'fixtures/panels', file),
       '--cwd',
       workspace,
       '--params',
@@ -146,7 +146,7 @@ export async function acceptance({ cliPath, examplesPath, label = 'repository' }
       'CLI example: real iframe click, application-owned execFile, result, history, event redelivery and explicit ack',
     );
 
-    http = await startHttp(join(workspace, 'examples/demo-http-server.mjs'), workspace);
+    http = await startHttp(join(workspace, 'fixtures/panels/demo-http-server.mjs'), workspace);
     const counter = await run('http-panel.tsx', { baseUrl: http.url });
     await page.goto(counter.url);
     await panel.getByRole('heading', { name: 'HTTP counter' }).waitFor();
@@ -191,7 +191,7 @@ export async function acceptance({ cliPath, examplesPath, label = 'repository' }
       'acceptance',
     );
     assert.equal(decisionEvents.events[0].payload.comment, '请补充失败恢复方案\n然后再讨论');
-    const decisionFile = join(workspace, 'examples/decision-panel.tsx');
+    const decisionFile = join(workspace, 'fixtures/panels/decision-panel.tsx');
     const original = await readFile(decisionFile, 'utf8');
     await writeFile(
       decisionFile,
@@ -223,7 +223,7 @@ export async function acceptance({ cliPath, examplesPath, label = 'repository' }
     );
 
     const manual = await run('table-panel.tsx', {}, '--no-watch');
-    const tableFile = join(workspace, 'examples/table-panel.tsx');
+    const tableFile = join(workspace, 'fixtures/panels/table-panel.tsx');
     await writeFile(
       tableFile,
       (await readFile(tableFile, 'utf8')).replace('Table with actions', 'Manually updated table'),

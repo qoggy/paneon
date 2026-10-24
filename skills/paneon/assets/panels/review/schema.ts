@@ -1,5 +1,5 @@
-import { feedbackSchema, z } from 'paneon/sdk';
-import { validSourceRange } from '../../shared/markdown-feedback-schema.ts';
+import { annotationValueSchema, z } from 'paneon/sdk';
+import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 export const reviewParamsSchema = z
   .object({
     title: z.string().refine((value) => !!value.trim(), 'Title must not be blank.'),
@@ -9,7 +9,7 @@ export const reviewParamsSchema = z
 export type ReviewParams = z.infer<typeof reviewParamsSchema>;
 export const reviewRefSchema = z.object({ kind: z.literal('document') }).strict();
 export type ReviewRef = z.infer<typeof reviewRefSchema>;
-export const reviewSubmittedSchema = feedbackSchema(reviewRefSchema).safeExtend({
+export const reviewSubmittedSchema = annotationValueSchema(reviewRefSchema).safeExtend({
   replacesEventId: z.number().int().positive().optional(),
 });
 export function completeReviewSchema(params: ReviewParams) {
@@ -24,10 +24,10 @@ export function completeReviewSchema(params: ReviewParams) {
           });
       }),
     );
-    if (value.replacesEventId === undefined && !value.annotations.length && !value.comment?.trim())
+    if (value.replacesEventId === undefined && !value.annotations.length)
       ctx.addIssue({
         code: 'custom',
-        message: 'Select content or write feedback before submitting.',
+        message: 'Save at least one annotation before submitting.',
       });
   });
 }

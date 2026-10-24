@@ -1,3 +1,4 @@
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
@@ -16,7 +17,7 @@ try {
   await page.goto(f.url());
   const frame = page.frameLocator('iframe');
   await frame.locator('[data-diff-source]').waitFor();
-  await frame.getByRole('button', { name: '提交记录', exact: true }).click();
+  await frame.getByRole('tab', { name: '提交记录', exact: true }).click();
   await frame.locator('[data-commit-id]').first().waitFor();
   await frame.locator('[data-commit-id]').first().click();
   await frame.locator('[data-file-id]').first().waitFor();
@@ -28,7 +29,12 @@ try {
   const selectedCommit = await frame
     .locator('[data-commit-id][aria-pressed=true]')
     .getAttribute('data-commit-id');
-  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  await selectDiffLines(
+    frame,
+    'new',
+    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
+  );
+  await frame.getByRole('button', { name: '批注', exact: true }).click();
   await frame.getByLabel('批注内容', { exact: true }).fill('Git 原文缓冲 🙂');
   const calls = requests.length;
   const src = await page.locator('iframe').getAttribute('src');

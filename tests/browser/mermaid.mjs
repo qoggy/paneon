@@ -41,12 +41,12 @@ try {
   await frame.getByRole('heading', { name: 'Mermaid acceptance', exact: true }).waitFor();
   const diagram = (name) => frame.locator(`[data-testid="${name}"]`);
   for (const name of ['standalone-flow', 'standalone-sequence', 'editable', 'toggled'])
-    await diagram(name).locator('svg').waitFor({ state: 'visible' });
+    await diagram(name).locator('svg[id^="mermaid-"]').waitFor({ state: 'visible' });
   await until(
-    async () => (await diagram('markdown-diagrams').locator('svg').count()) === 4,
+    async () => (await diagram('markdown-diagrams').locator('svg[id^="mermaid-"]').count()) === 4,
     'All four Markdown diagrams, including a list and quote, must render.',
   );
-  for (const svg of await diagram('markdown-diagrams').locator('svg').all())
+  for (const svg of await diagram('markdown-diagrams').locator('svg[id^="mermaid-"]').all())
     assert.equal(await svg.isVisible(), true);
 
   assert.equal(
@@ -54,8 +54,8 @@ try {
     0,
     'Diagrams must replace code block wrappers.',
   );
-  assert.equal(await frame.locator('li svg').count(), 1);
-  assert.equal(await frame.locator('blockquote svg').count(), 1);
+  assert.equal(await frame.locator('li svg[id^="mermaid-"]').count(), 1);
+  assert.equal(await frame.locator('blockquote svg[id^="mermaid-"]').count(), 1);
   assert.equal(
     await frame.locator('pre code.language-typescript').textContent(),
     'const text = "ordinary code";\n',
@@ -111,11 +111,11 @@ try {
 
   await frame.getByRole('button', { name: 'Invalid diagram', exact: true }).click();
   await diagram('editable').getByRole('alert').waitFor();
-  assert.equal(await diagram('editable').locator('svg').count(), 0);
-  assert.equal(await diagram('standalone-flow').locator('svg').isVisible(), true);
+  assert.equal(await diagram('editable').locator('svg[id^="mermaid-"]').count(), 0);
+  assert.equal(await diagram('standalone-flow').locator('svg[id^="mermaid-"]').isVisible(), true);
   await checkDocument();
   await frame.getByRole('button', { name: 'Recover diagram', exact: true }).click();
-  await diagram('editable').locator('svg').waitFor({ state: 'visible' });
+  await diagram('editable').locator('svg[id^="mermaid-"]').waitFor({ state: 'visible' });
   await until(
     async () => (await diagram('editable').textContent()).includes('Recovered'),
     'Corrected source must recover without a reload.',
@@ -135,7 +135,7 @@ try {
     async () => (await diagram('editable').textContent()).includes('Safe'),
     'Strict Mermaid input must render without executing HTML or unsafe links.',
   );
-  await diagram('editable').locator('svg').waitFor({ state: 'visible' });
+  await diagram('editable').locator('svg[id^="mermaid-"]').waitFor({ state: 'visible' });
   assert.equal(await contentFrame.evaluate(() => window.__mermaidExecuted === true), false);
   assert.equal(await diagram('editable').locator('script, [onerror]').count(), 0);
   const hrefs = await diagram('editable')
@@ -160,11 +160,11 @@ try {
     .click({ clickCount: 12, delay: 1 });
   await frame.getByText('Lifecycle revision 12', { exact: true }).waitFor();
   await frame.getByRole('button', { name: 'Unmount diagram', exact: true }).click();
-  assert.equal(await diagram('toggled').locator('svg').count(), 0);
-  assert.equal(await diagram('toggled').locator('svg').count(), 0);
+  assert.equal(await diagram('toggled').locator('svg[id^="mermaid-"]').count(), 0);
+  assert.equal(await diagram('toggled').locator('svg[id^="mermaid-"]').count(), 0);
   await checkDocument();
   await frame.getByRole('button', { name: 'Mount diagram', exact: true }).click();
-  await diagram('toggled').locator('svg').waitFor({ state: 'visible' });
+  await diagram('toggled').locator('svg[id^="mermaid-"]').waitFor({ state: 'visible' });
   await until(
     async () => (await diagram('toggled').textContent()).includes('Revision12'),
     'A remounted diagram must show the latest source.',

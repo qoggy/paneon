@@ -1,3 +1,4 @@
+import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -47,7 +48,7 @@ try {
           await frame.locator('html').evaluate((el) => el.classList.contains('dark')),
           theme === 'dark',
         );
-        const label = frame.locator('[data-column-key="name"] [data-feedback-text]');
+        const label = frame.locator('[data-column-key="name"] [data-annotation-text]');
         assert.equal(await label.textContent(), '说明');
         const box = await label.boundingBox();
         assert.ok(box);
@@ -61,9 +62,7 @@ try {
           .getByLabel(zh ? '批注内容' : 'Annotation text', { exact: true })
           .fill(`header ${theme}/${language}/${width}`);
         await frame.getByRole('button', { name: zh ? '保存' : 'Save', exact: true }).click();
-        await frame
-          .getByRole('button', { name: zh ? '提交批注' : 'Submit annotations', exact: true })
-          .click();
+        await submitAnnotations(frame);
         await frame.getByRole('status').waitFor();
         const event = (await fixture.events(fixture.table)).at(-1);
         assert.deepEqual(event.payload.annotations[0].targets[0], {

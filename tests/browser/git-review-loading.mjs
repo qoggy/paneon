@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
 import { git } from '../git-review-fixture.ts';
-import { annotationTools } from './annotation-tools.mjs';
+import { annotationTools, selectDiffLines } from './annotation-tools.mjs';
 
 const f = await startGitReviewFixture();
 let browser;
@@ -71,6 +71,10 @@ try {
   const split = await separator.getAttribute('aria-valuenow');
   const upper = frame.locator('[data-history-workspace]');
   const upperBefore = (await upper.boundingBox()).height;
+  const comments = annotationTools(frame, page);
+  await selectDiffLines(frame, 'new', 320);
+  await comments.write('Preserved across collapse');
+  await comments.save();
   await frame.locator('[data-diff-viewport]').evaluate((el) => {
     el.scrollTop = 300;
   });
@@ -82,8 +86,6 @@ try {
     y: document.querySelector('[data-diff-viewport]').scrollTop,
     x: document.querySelector('[data-diff-scroll="unified"]').scrollLeft,
   }));
-  const comments = annotationTools(frame, page);
-  await comments.overall('Preserved across collapse');
   const queriesBefore = calls.length;
   await button('收起文件差异').focus();
   await page.keyboard.press('Enter');
@@ -96,7 +98,7 @@ try {
     fileId,
   );
   assert.equal(await frame.locator('[data-git-diff-scroll]').getAttribute('inert'), '');
-  await frame.locator('[data-file-id][aria-pressed=true]').click();
+  await frame.locator('[data-file-id][aria-pressed=true]').dblclick();
   await frame.locator('[data-git-diff-scroll]').waitFor({ state: 'visible' });
   assert.equal(await retained.evaluate((el) => el.isConnected), true);
   assert.equal(await frame.locator('[data-diff-source]').getAttribute('data-diff-source'), source);
@@ -111,8 +113,8 @@ try {
     scroll,
   );
   assert.equal(calls.length, queriesBefore, 'Collapse and reopen do not read blobs again.');
-  assert.equal(await comments.count(), 0); // Overall comment is retained separately from target annotations.
-  await button('整体批注').click();
+  assert.equal(await comments.count(), 1);
+  await comments.edit(1);
   assert.equal(
     await frame.getByLabel('批注内容', { exact: true }).inputValue(),
     'Preserved across collapse',

@@ -60,7 +60,6 @@ void test('fresh processes read subsequent file/page and validate retained annot
             comment: '原内容',
           },
         ],
-        comment: 'complete',
         replacesEventId: 42,
       },
       new Map([[displayed.id, displayed]]),
@@ -228,7 +227,10 @@ void test('line/character/hunk/file evidence is deduplicated and strictly intern
     });
     assert.throws(
       () =>
-        validateGitFeedback(params, { annotations: [], sources: {}, comment: 'x'.repeat(65536) }),
+        validateGitFeedback(params, {
+          ...event,
+          annotations: event.annotations.map((entry) => ({ ...entry, comment: 'x'.repeat(65536) })),
+        }),
       /65536/,
     );
     assert.deepEqual(

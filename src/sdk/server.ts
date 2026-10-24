@@ -40,11 +40,14 @@ export type PanelDefinition<I = unknown> = {
 export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<I> {
   return definition;
 }
-export { feedbackSchema } from './feedback.js';
+export { annotationValueSchema } from './annotation.js';
 export type {
-  Feedback,
-  FeedbackTarget,
-  FeedbackAnnotation,
-  FeedbackTextRange,
+  AnnotationValue,
+  AnnotationTarget,
+  Annotation,
+  AnnotationTextRange,
   JsonValue,
-} from './feedback.js';
+} from './annotation.js';
+
+export { createDiffModel, sourceLines, diffChanges } from '../shared/diff-model.js';
+export type { DiffModel, DiffLine, DiffRow, DiffHunk, DiffRef } from '../shared/diff-model.js';

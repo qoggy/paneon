@@ -2,11 +2,14 @@ export { definePanel, serverAction, z } from './server.js';
 export type { PanelDefinition, Action, ActionContext } from './server.js';
 export { usePanelInput, useQuery, agent, credentials } from './client.js';
 
-export { feedbackSchema } from './feedback.js';
+export { annotationValueSchema } from './annotation.js';
 export type {
-  Feedback,
-  FeedbackTarget,
-  FeedbackAnnotation,
-  FeedbackTextRange,
+  AnnotationValue,
+  AnnotationTarget,
+  Annotation,
+  AnnotationTextRange,
   JsonValue,
-} from './feedback.js';
+} from './annotation.js';
+
+export { createDiffModel, sourceLines, diffChanges } from '../shared/diff-model.js';
+export type { DiffModel, DiffLine, DiffRow, DiffHunk, DiffRef } from '../shared/diff-model.js';

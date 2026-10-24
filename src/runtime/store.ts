@@ -76,7 +76,7 @@ export class Store {
       ({ params: _, requires: __, paneonVersion: ___, diagnostic: ____, ...p }) => p,
     );
   }
-  listPage(page = 1, pageSize = 20) {
+  listPage(page = 1, pageSize = 20, status?: PanelInstance['status']) {
     if (
       !Number.isInteger(page) ||
       page < 1 ||
@@ -86,7 +86,11 @@ export class Store {
       pageSize > 1000
     )
       throw new PaneonError('INVALID_ARGUMENT', 'Invalid panel pagination parameters.');
-    const { total } = this.db.prepare('SELECT COUNT(*) AS total FROM panels').get() as {
+    const where = status === undefined ? '' : ' WHERE status = ?';
+    const filters = status === undefined ? [] : [status];
+    const { total } = this.db
+      .prepare(`SELECT COUNT(*) AS total FROM panels${where}`)
+      .get(...filters) as {
       total: number;
     };
     const rows = this.db
@@ -94,9 +98,11 @@ export class Store {
         `SELECT id AS instanceId, definition_id AS definitionId,
       status, entry_path AS entryPath, cwd, revision, watch,
       created_at AS createdAt, updated_at AS updatedAt
-      FROM panels ORDER BY created_at,id LIMIT ? OFFSET ?`,
+      FROM panels${where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`,
       )
-      .all(pageSize, (page - 1) * pageSize) as (Omit<PanelInstance, 'watch'> & { watch: number })[];
+      .all(...filters, pageSize, (page - 1) * pageSize) as (Omit<PanelInstance, 'watch'> & {
+      watch: number;
+    })[];
     return {
       panels: rows.map((row) => ({ ...row, watch: Boolean(row.watch) })),
       page,

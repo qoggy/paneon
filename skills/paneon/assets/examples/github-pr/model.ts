@@ -1,11 +1,11 @@
-import type { FeedbackTarget } from 'paneon/sdk';
+import type { AnnotationTarget } from 'paneon/sdk';
 import { diffTargetText } from '../../shared/diff-schema.ts';
-import { validSourceRange } from '../../shared/markdown-feedback-schema.ts';
+import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 import type { PRSnapshot } from './github.ts';
 import type { PRRef } from './schema.ts';
 export function resolvePRTarget(
   snapshot: PRSnapshot,
-  target: FeedbackTarget<PRRef>,
+  target: AnnotationTarget<PRRef>,
 ): string | undefined {
   const source = snapshot.source,
     ref = target.ref;

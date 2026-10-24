@@ -1,3 +1,5 @@
+import { submitAnnotations } from './annotation-tools.mjs';
+import { selectDiffLines } from './annotation-tools.mjs';
 import { verifyGitLayout } from './git-review-layout.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
@@ -64,12 +66,12 @@ try {
   const finish = () => comments.save();
   const selectFile = async (name) => {
     await clear();
-    await frame.getByRole('button', { name, exact: true }).click();
+    await frame.getByRole('button', { name, exact: true }).dblclick();
     await frame.locator('[data-diff-source]').waitFor();
   };
   assert.equal((await f.events()).length, 0);
-  await button('提交批注').click();
-  await frame.getByRole('alert').filter({ hasText: '首次提交' }).waitFor();
+  await submitAnnotations(frame);
+  await frame.getByRole('alert').filter({ hasText: '请先保存至少一条批注' }).waitFor();
   assert.equal((await f.events()).length, 0);
   // Browse-mode native selection and copy remain ordinary.
   await frame.locator('[data-code-side="new"][data-line="1"] [style*="color"]').first().waitFor();
@@ -117,14 +119,14 @@ try {
   await page.keyboard.press('ControlOrMeta+C');
   assert.equal(await content.evaluate(() => window.copyPrevented), false);
   await clear();
-  await button('选择对象').click();
+
   // Staged source: choose the second repeated word, precisely through highlighted nodes.
   await select('new', 1, 15, 17);
   await comments.write('检查第二个缓存');
   await finish();
   await clear();
   await selectFile('未暂存 · M a.ts');
-  await button('选择新侧第 2 行').click();
+  await selectDiffLines(frame, 'new', 2);
   await comments.write('工作区 n=4');
   await finish();
   await button('单列对比').click();
@@ -136,7 +138,7 @@ try {
     await frame.locator('[data-code-side="new"][data-line="2"]').textContent(),
     'const n = 4;\r\n',
   );
-  await button('刷新改动').click();
+  await button('刷新').click();
   await until(
     async () =>
       (await frame.locator('[data-code-side="new"][data-line="1"]').textContent()).includes(
@@ -163,44 +165,49 @@ try {
   );
   await button('返回当前浏览').click();
   // Same repository/path, a distinct fixed branch-comparison source.
-  await button('分支/版本对比').click();
-  await frame.getByLabel('基线', { exact: true }).fill('base');
+  await frame.getByRole('tab', { name: '分支/版本对比', exact: true }).click();
+  await frame.getByRole('combobox', { name: '基线', exact: true }).click();
+  await frame
+    .getByRole('listbox', { name: '基线', exact: true })
+    .getByRole('option', { name: 'base', exact: true })
+    .click();
   await button('比较').click();
-  await frame.getByRole('button', { name: 'M a.ts', exact: true }).click();
+  await frame.getByRole('button', { name: 'M a.ts', exact: true }).dblclick();
   await frame
     .locator('[data-code-side="new"][data-line="2"]')
     .filter({ hasText: 'const n = 2' })
     .waitFor();
-  await button('选择新侧第 2 行').click();
-  await frame.getByLabel('起始行', { exact: true }).fill('1');
-  await frame.getByLabel('结束行', { exact: true }).fill('2');
-  await button('选择连续行').click();
   await button('收起上下文').click();
-  await frame.locator('[data-feedback-target]').filter({ hasText: '@@ -' }).click();
+  await selectDiffLines(frame, 'new', 1, 2);
   await finish();
   // Another repository, same file name.
-  await frame.getByLabel('仓库', { exact: true }).selectOption('server');
-  await button('未提交改动').click();
-  await frame.getByRole('button', { name: '未跟踪 · ? a.ts', exact: true }).click();
+  await frame.getByRole('combobox', { name: '仓库', exact: true }).click();
+  await frame.getByRole('option', { name: 'Server', exact: true }).click();
+  await frame.getByRole('tab', { name: '未提交改动', exact: true }).click();
+  await frame.getByRole('button', { name: '未跟踪 · ? a.ts', exact: true }).dblclick();
   await frame
     .locator('[data-code-side="new"][data-line="1"]')
     .filter({ hasText: 'server-only' })
     .waitFor();
-  await frame.locator('[data-feedback-target]').first().click();
+  await selectDiffLines(frame, 'new', 1);
   await finish();
   assert.equal((await f.events()).length, 0);
   for (const [length, limit] of [
     [66000, '65536'],
     [100000, '262144'],
   ]) {
-    await comments.overall('中'.repeat(length));
-    await button('提交批注').click();
+    await comments.edit(4);
+    await comments.write('中'.repeat(length));
+    await comments.save();
+    await submitAnnotations(frame);
     await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
     assert.equal(await comments.count(), 4);
     assert.equal((await f.events()).length, 0);
   }
-  await comments.overall('');
-  await button('提交批注').click();
+  await comments.edit(4);
+  await comments.write('');
+  await comments.save();
+  await submitAnnotations(frame);
   await frame.getByRole('status').filter({ hasText: '已保存为事件' }).waitFor();
   const first = (await f.events())[0];
   assert.equal(first.type, 'git-review-submitted');
@@ -221,7 +228,9 @@ try {
     'server',
   );
   // Failed delivery keeps draft and successful receipt, then a complete correction can clear it.
-  await comments.overall('修正整体意见');
+  await comments.edit(4);
+  await comments.write('修正所选内容');
+  await comments.save();
   const eventUrl = `**/api/panels/${f.panel.instanceId}/events`;
   await page.route(eventUrl, (route) =>
     route.request().method() === 'POST'
@@ -235,19 +244,20 @@ try {
         })
       : route.continue(),
   );
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 4);
   assert.equal((await f.events()).length, 1);
   await page.unroute(eventUrl);
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await until(async () => (await f.events()).length === 2, 'correction missing');
   const second = (await f.events())[1];
   assert.equal(second.payload.replacesEventId, first.id);
-  assert.deepEqual(second.payload.annotations, first.payload.annotations);
+  assert.deepEqual(second.payload.annotations.slice(0, 3), first.payload.annotations.slice(0, 3));
+  assert.equal(second.payload.annotations[3].comment, '修正所选内容');
+  assert.equal('comment' in second.payload, false);
   for (let i = 4; i >= 1; i--) await comments.remove(i);
-  await comments.overall('');
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await until(async () => (await f.events()).length === 3, 'empty correction missing');
   const cleared = (await f.events())[2];
   assert.deepEqual(cleared.payload.annotations, []);

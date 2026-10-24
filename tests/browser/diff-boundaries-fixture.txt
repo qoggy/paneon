@@ -1,27 +1,44 @@
 import { useMemo } from 'react';
 import { definePanel, z } from 'paneon/sdk';
-import { FeedbackProvider, FeedbackSurface, FeedbackToolbar } from 'paneon/ui';
+import { AnnotationRoot, AnnotationMenu } from 'paneon/ui';
 import type { GitRef } from './shared/diff-schema.ts';
 import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
 import { diffTargetText } from './shared/diff-schema.ts';
-const original = Array.from({length: 140}, (_, i) => `source ${i + 1} 中文é🙂\r\n`).join('');
-const insertion = Array.from({length:82}, (_, i) => `insert ${i + 1} 中文é🙂\r\n`).join('');
-const modified = original.replace('source 29', `${insertion}source 29`).replace('source 33 中文é🙂\r\nsource 34', 'updated 33 中文é🙂\r\nupdated 34');
+const original = Array.from({ length: 140 }, (_, i) => `source ${i + 1} 中文é🙂\r\n`).join('');
+const insertion = Array.from({ length: 82 }, (_, i) => `insert ${i + 1} 中文é🙂\r\n`).join('');
+const modified = original
+  .replace('source 29', `${insertion}source 29`)
+  .replace('source 33 中文é🙂\r\nsource 34', 'updated 33 中文é🙂\r\nupdated 34');
 function Panel() {
   const model = useMemo(() => createDiffModel(original, modified), []);
-  return <FeedbackProvider<GitRef> onSubmit={async()=>{}} adapter={{
-    resolve: target => ({status:'ready',text:diffTargetText(model,target)}),
-    targetRanges: target => diffTargetRanges(model,target),
-    locate: target => locateDiffTarget(model,target),
-  }}>
-    <FeedbackSurface />
-    <div className="h-32 p-4">History outside the diff viewport</div>
-    <FeedbackToolbar allowObjectSelection />
-    <div data-boundary-viewport className="h-[28rem] overflow-auto border">
-      <DiffView sourceId="merged-context" model={model} oldPath="file.md" newPath="file.md" defaultExpanded />
-    </div>
-    <div className="h-96">Page outside the diff viewport</div>
-  </FeedbackProvider>;
+  return (
+    <AnnotationRoot<GitRef>
+      onSubmit={async () => {}}
+      adapter={{
+        resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
+        targetRanges: (target) => diffTargetRanges(model, target),
+        locate: (target) => locateDiffTarget(model, target),
+      }}
+    >
+      <div className="h-32 p-4">History outside the diff viewport</div>
+      <AnnotationMenu />
+      <div data-boundary-viewport className="h-[28rem] overflow-auto border">
+        <DiffView
+          sourceId="merged-context"
+          model={model}
+          oldPath="file.md"
+          newPath="file.md"
+          defaultExpanded
+        />
+      </div>
+      <div className="h-96">Page outside the diff viewport</div>
+    </AnnotationRoot>
+  );
 }
-export default definePanel({id:'diff-boundaries',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});
+export default definePanel({
+  id: 'diff-boundaries',
+  requires: { paneon: '0.0.0' },
+  input: z.object({}),
+  render: Panel,
+});

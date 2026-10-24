@@ -1,0 +1,28 @@
+import { useState } from 'react';
+import { definePanel, z } from 'paneon/sdk';
+import { AnnotationRoot, AnnotationMenu, AnnotationSubmitButton, Markdown, DiffView, Button, useAnnotations } from 'paneon/ui';
+const original = '## Review\n\nrepeat **repeat** and [linked 中文🙂](https://example.com) &amp; \u005c\u005c* escaped.';
+function Controls() {
+  const api = useAnnotations();
+  return <><AnnotationMenu showSubmit={false}/><AnnotationSubmitButton/>
+    <Button onClick={() => { for (const entry of api.value.annotations) api.removeAnnotation(entry.id); }}>Remove drafts</Button>
+    <pre data-testid="draft">{JSON.stringify(api.value)}</pre>{api.error && <p role="alert" data-testid="delivery-error">{api.error}</p>}
+  </>;
+}
+function Panel() {
+  const [source,setSource] = useState(original);
+  const [fail,setFail] = useState(true);
+  const [receipts,setReceipts] = useState<unknown[]>([]);
+  const [paths,setPaths] = useState(false);
+  return <main className="space-y-4 p-4"><h1>Promoted UI acceptance</h1>
+    <div data-testid="plain"><Markdown>{'## Plain Markdown\n\nNo annotation Root required.'}</Markdown></div>
+    <Button onClick={() => setPaths(value => !value)}>Toggle metadata</Button>
+    <div data-testid="diff"><DiffView oldText={'const answer = 1;\n'} newText={'const answer = 2;\n'} oldPath={paths ? 'only-old.ts' : undefined}/></div>
+    <AnnotationRoot onSubmit={async value => { if (fail) throw new Error('Expected delivery failure'); setReceipts(items => [...items,value]); }}>
+      <div className="flex gap-2"><Button onClick={() => setSource('## Updated document\n\nUpdated source waiting for drafts.')}>Change source</Button><Button onClick={() => setFail(false)}>Allow delivery</Button><Controls/></div>
+      <div className="grid grid-cols-2 gap-4"><section data-testid="doc-a"><Markdown annotationTarget="plan-a">{source}</Markdown></section><section data-testid="doc-b"><Markdown annotationTarget="plan-b">{original}</Markdown></section></div>
+      <pre data-testid="receipts">{JSON.stringify(receipts)}</pre>
+    </AnnotationRoot>
+  </main>;
+}
+export default definePanel({ id:'promoted-ui-acceptance', requires:{ paneon:'0.0.0' }, input:z.object({}), events:{}, render:Panel });

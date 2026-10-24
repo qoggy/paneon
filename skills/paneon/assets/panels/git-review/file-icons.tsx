@@ -89,3 +89,27 @@ export function ChevronsDownUp(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function TreeIcon({ kind }: { kind: 'file' | 'folder' | 'open' | 'down' | 'right' }) {
+  const paths = {
+    file: 'M8 2H4v12h9V7L8 2Z M8 2v5h5',
+    folder: 'M2 4h5l2 2h5v7H2V4Z',
+    open: 'M2 6V4h5l2 2h5 M2 6h13l-2 7H2V6Z',
+    down: 'm4 6 4 4 4-4',
+    right: 'm6 4 4 4-4 4',
+  };
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5 shrink-0"
+      aria-hidden="true"
+    >
+      <path d={paths[kind]} />
+    </svg>
+  );
+}

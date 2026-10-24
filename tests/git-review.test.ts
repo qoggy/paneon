@@ -6,6 +6,7 @@ import { join, relative } from 'node:path';
 import {
   readGit as readGitListing,
   readGitFile,
+  readGitRevisions,
   validateGitFeedback,
 } from '../skills/paneon/assets/panels/git-review/git.ts';
 import { buildGitFeedback } from '../skills/paneon/assets/panels/git-review/feedback.ts';
@@ -184,7 +185,13 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
     assert.throws(() => validateGitFeedback(params, value), /sources/);
     assert.throws(
       () =>
-        validateGitFeedback(params, { annotations: [], sources: {}, comment: '中'.repeat(66000) }),
+        validateGitFeedback(params, {
+          ...result,
+          annotations: result.annotations.map((entry) => ({
+            ...entry,
+            comment: '中'.repeat(66000),
+          })),
+        }),
       /65536/,
     );
     await assert.rejects(
@@ -338,7 +345,13 @@ void test('root/merge commits, comparisons, fixed-tip history pagination and inv
     );
     const orphan = await git(f.repo, 'commit-tree', tree, '-m', 'orphan');
     await assert.rejects(
-      readGit(params, { repositoryId: 'web', type: 'compare', base: orphan, head: tip }),
+      readGit(params, {
+        repositoryId: 'web',
+        type: 'compare',
+        mode: 'branch',
+        base: orphan,
+        head: tip,
+      }),
       /common ancestor/,
     );
     const controller = new AbortController();
@@ -676,6 +689,100 @@ void test('directory-only queries, selected-file capture and pinned commit navig
   } finally {
     if (originalTrace === undefined) delete process.env.GIT_TRACE;
     else process.env.GIT_TRACE = originalTrace;
+    await f.close();
+  }
+});
+
+void test('comparison revisions list branches before tags and newest activity first', async () => {
+  const f = await fixture();
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const exec = promisify(execFile);
+    const tree = await git(f.repo, 'rev-parse', 'HEAD^{tree}');
+    async function datedGit(date: string, ...args: string[]) {
+      return (
+        await exec('git', ['-C', f.repo, ...args], {
+          env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+        })
+      ).stdout.trim();
+    }
+    const older = await datedGit('2020-01-01T00:00:00Z', 'commit-tree', tree, '-m', 'Older');
+    const newer = await datedGit('2021-01-01T00:00:00Z', 'commit-tree', tree, '-m', 'Newer');
+    await git(f.repo, 'branch', 'older', older);
+    await git(f.repo, 'branch', 'newer', newer);
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/newer', newer);
+    await git(f.repo, 'tag', 'lightweight', newer);
+    await datedGit('2022-01-01T00:00:00Z', 'tag', '-a', 'annotated', older, '-m', 'Tag time');
+    // A branch/tag name collision must remain selectable without ambiguous revision resolution.
+    await git(f.repo, 'tag', 'newer', older);
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
+    const refs = await readGitRevisions(params, 'web');
+    const branches = refs.filter((ref) => ref.kind === 'branch');
+    const tags = refs.filter((ref) => ref.kind === 'tag');
+    assert.deepEqual(refs, [...branches, ...tags]);
+    for (const group of [branches, tags])
+      for (let i = 1; i < group.length; i++) assert.ok(group[i - 1].activity >= group[i].activity);
+    assert.ok(refs.some((ref) => ref.ref === 'refs/remotes/origin/newer'));
+    assert.equal(tags[0].name, 'annotated');
+    assert.equal(tags[0].activity, Date.parse('2022-01-01T00:00:00Z') / 1000);
+    assert.equal(
+      tags.find((ref) => ref.name === 'lightweight')?.activity,
+      Date.parse('2021-01-01T00:00:00Z') / 1000,
+    );
+    for (const ref of refs)
+      assert.equal(
+        await git(f.repo, 'rev-parse', `${ref.name}^{commit}`),
+        await git(f.repo, 'rev-parse', `${ref.ref}^{commit}`),
+      );
+    const direct = await readGitListing(params, {
+      repositoryId: 'web',
+      type: 'compare',
+      base: f.feature,
+      head: f.rootCommit,
+    });
+    assert.ok(direct.files.length > 0);
+    assert.ok(
+      direct.files.every(
+        (file) => file.source.view.type === 'compare' && file.source.view.mode === 'commits',
+      ),
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+void test('comparison revisions mark recorded remote defaults independently of checkout and names', async () => {
+  const f = await fixture();
+  try {
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
+    assert.equal(
+      (await readGitRevisions(params, 'web')).some((ref) => ref.isDefault),
+      false,
+    );
+    await git(f.repo, 'branch', 'integration', f.feature);
+    await git(f.repo, 'tag', 'integration', f.feature);
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/integration', f.feature);
+    await git(
+      f.repo,
+      'symbolic-ref',
+      'refs/remotes/origin/HEAD',
+      'refs/remotes/origin/integration',
+    );
+    await git(f.repo, 'update-ref', 'refs/remotes/upstream/main', f.feature);
+    await git(f.repo, 'symbolic-ref', 'refs/remotes/upstream/HEAD', 'refs/remotes/upstream/main');
+    const refs = await readGitRevisions(params, 'web');
+    assert.deepEqual(
+      refs
+        .filter((ref) => ref.isDefault)
+        .map((ref) => ref.ref)
+        .sort(),
+      ['refs/heads/integration', 'refs/remotes/origin/integration', 'refs/remotes/upstream/main'],
+    );
+    assert.equal(refs.find((ref) => ref.ref === 'refs/heads/main')?.isDefault, undefined);
+    assert.equal(refs.find((ref) => ref.ref === 'refs/tags/integration')?.isDefault, undefined);
+    assert.equal(await git(f.repo, 'symbolic-ref', '--short', 'HEAD'), 'main');
+  } finally {
     await f.close();
   }
 });

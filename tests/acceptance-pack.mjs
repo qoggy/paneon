@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acceptance, execute, repositoryRoot } from './acceptance-support.mjs';
@@ -31,6 +31,8 @@ try {
     },
   );
   const packageRoot = join(install, 'node_modules/paneon');
+  for (const directory of ['examples', 'tests'])
+    await assert.rejects(access(join(packageRoot, directory)), { code: 'ENOENT' });
   const { stdout } = await execute(
     process.execPath,
     [
@@ -43,7 +45,7 @@ try {
   assert.match(stdout, /Package exports resolve/);
   await acceptance({
     cliPath: join(packageRoot, 'dist/cli/index.js'),
-    examplesPath: join(packageRoot, 'examples'),
+    fixturesPath: join(repositoryRoot, 'tests/fixtures/panels'),
     label: 'installed-package',
   });
 } finally {

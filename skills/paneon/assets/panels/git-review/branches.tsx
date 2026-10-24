@@ -1,7 +1,9 @@
 import { useLocale } from '../../shared/i18n';
 import { useState } from 'react';
-import { Button, Input } from 'paneon/ui';
+import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Input } from 'paneon/ui';
+import { TreeIcon } from './file-icons.tsx';
 import type { HistoryRef } from './git.ts';
+import { RevisionContextMenu } from './revision-context-menu.tsx';
 
 type Node = { name: string; path: string; children: Map<string, Node>; entry?: HistoryRef };
 const mainlineNode = (node: Node): boolean =>
@@ -62,75 +64,90 @@ export function Branches({
   selected,
   currentBranch,
   onSelect,
+  onCompare,
 }: {
   refs: HistoryRef[];
   selected?: string;
   currentBranch?: string;
   onSelect: (ref: string) => void;
+  onCompare?: (ref: string) => void;
 }) {
   const { t } = useLocale();
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const needle = filter.trim().toLocaleLowerCase();
   const matches = refs.filter((entry) => entry.name.toLocaleLowerCase().includes(needle));
+  const currentNode = (node: Node) =>
+    node.entry?.kind === 'branch' && node.entry.name === currentBranch;
   function render(nodes: Map<string, Node>, kind: HistoryRef['kind'], depth = 0) {
     return [...nodes.values()]
-      .sort((a, b) => Number(mainlineNode(b)) - Number(mainlineNode(a)))
+      .sort(
+        (a, b) =>
+          Number(currentNode(b)) - Number(currentNode(a)) ||
+          Number(mainlineNode(b)) - Number(mainlineNode(a)),
+      )
       .map((node) => {
         if (node.entry) {
           const entry = node.entry;
           const active = selected === entry.ref || selected === entry.name;
-          const current = entry.kind === 'branch' && entry.name === currentBranch;
+          const current = currentNode(node);
           return (
-            <Button
-              key={entry.ref}
-              variant={active ? 'secondary' : 'ghost'}
-              aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}
-              aria-pressed={active}
-              title={`${entry.name}${current ? t(' · 当前分支') : ''}`}
-              aria-description={
-                [entry.mainline && t('主干分支'), current && t('当前分支')]
-                  .filter(Boolean)
-                  .join(' · ') || undefined
-              }
-              data-mainline={entry.mainline || undefined}
-              data-current-branch={current || undefined}
-              data-history-ref={entry.ref}
-              className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
-              style={{ paddingLeft: 8 + depth * 12 }}
-              onClick={() => onSelect(entry.ref)}
-            >
-              <RefIcon tag={kind === 'tag'} mainline={entry.mainline} current={current} />
-              <span className="min-w-0 truncate">{node.name}</span>
-            </Button>
+            <RevisionContextMenu key={entry.ref} revision={entry.ref} onCompare={onCompare}>
+              <Button
+                variant={active ? 'secondary' : 'ghost'}
+                aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}
+                aria-pressed={active}
+                title={`${entry.name}${current ? t(' · 当前分支') : ''}`}
+                aria-description={
+                  [entry.mainline && t('主干分支'), current && t('当前分支')]
+                    .filter(Boolean)
+                    .join(' · ') || undefined
+                }
+                data-mainline={entry.mainline || undefined}
+                data-current-branch={current || undefined}
+                data-history-ref={entry.ref}
+                className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
+                style={{ paddingLeft: 8 + depth * 12 }}
+                onClick={() => onSelect(entry.ref)}
+              >
+                <RefIcon tag={kind === 'tag'} mainline={entry.mainline} current={current} />
+                <span className="min-w-0 truncate">{node.name}</span>
+              </Button>
+            </RevisionContextMenu>
           );
         }
         const key = `${kind}:${node.path}`;
         const open = !!needle || !collapsed.has(key);
         return (
-          <div key={key}>
-            <Button
-              variant="ghost"
-              aria-label={t('Branch directory {path}', { path: node.path.slice(1) })}
-              aria-expanded={open}
-              className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
-              style={{ paddingLeft: 8 + depth * 12 }}
-              onClick={() =>
-                setCollapsed((previous) => {
-                  const next = new Set(previous);
-                  if (next.has(key)) next.delete(key);
-                  else next.add(key);
-                  return next;
-                })
+          <Collapsible
+            key={key}
+            open={open}
+            onOpenChange={(expanded) =>
+              setCollapsed((previous) => {
+                const next = new Set(previous);
+                if (expanded) next.delete(key);
+                else next.add(key);
+                return next;
+              })
+            }
+          >
+            <CollapsibleTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  aria-label={t('Branch directory {path}', { path: node.path.slice(1) })}
+                  className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
+                  style={{ paddingLeft: 8 + depth * 12 }}
+                >
+                  <TreeIcon kind={open ? 'down' : 'right'} />
+                  <span className="min-w-0 truncate">{node.name}</span>
+                </Button>
               }
-            >
-              <span className="w-3.5 shrink-0 text-muted-foreground" aria-hidden="true">
-                {open ? '⌄' : '›'}
-              </span>
-              <span className="truncate">{node.name}</span>
-            </Button>
-            {open && render(node.children, kind, depth + 1)}
-          </div>
+            />
+            <CollapsibleContent>
+              {open && render(node.children, kind, depth + 1)}
+            </CollapsibleContent>
+          </Collapsible>
         );
       });
   }
@@ -148,15 +165,17 @@ export function Branches({
         />
       </div>
       <nav aria-label={t('选择历史分支')} className="min-h-0 overflow-auto p-1">
-        <Button
-          variant={!selected || selected === 'HEAD' ? 'secondary' : 'ghost'}
-          aria-pressed={!selected || selected === 'HEAD'}
-          aria-label={t('HEAD（当前分支）')}
-          className="h-7 w-full justify-start px-2 text-xs font-normal"
-          onClick={() => onSelect('HEAD')}
-        >
-          {t('HEAD（当前分支）')}
-        </Button>
+        <RevisionContextMenu revision="HEAD" onCompare={onCompare}>
+          <Button
+            variant={!selected || selected === 'HEAD' ? 'secondary' : 'ghost'}
+            aria-pressed={!selected || selected === 'HEAD'}
+            aria-label={t('HEAD（当前分支）')}
+            className="h-7 w-full justify-start px-2 text-xs font-normal"
+            onClick={() => onSelect('HEAD')}
+          >
+            {t('HEAD（当前分支）')}
+          </Button>
+        </RevisionContextMenu>
         {(['branch', 'remote', 'tag'] as const).map((kind) => {
           const entries = matches.filter((entry) => entry.kind === kind);
           if (!entries.length) return null;

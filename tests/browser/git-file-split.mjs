@@ -1,3 +1,4 @@
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -106,7 +107,12 @@ try {
     .evaluate(() => window.dispatchEvent(new Event('blur')));
   await page.mouse.up();
   assert.deepEqual(await styles(), originalStyles);
-  await frame.getByRole('button', { name: '整体批注', exact: true }).click();
+  await selectDiffLines(
+    frame,
+    'new',
+    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
+  );
+  await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Keep this unsaved draft while resizing');
   await separator.press('ArrowRight');
@@ -119,7 +125,7 @@ try {
   const remembered = await width();
   await frame.getByRole('button', { name: '收起文件差异', exact: true }).click();
   assert.equal(await separator.count(), 0);
-  await frame.locator(`[data-file-id="${selectedFile}"]`).click();
+  await frame.locator(`[data-file-id="${selectedFile}"]`).dblclick();
   await separator.waitFor();
   assert.ok(Math.abs((await width()) - remembered) < 2);
   await start();
@@ -135,9 +141,9 @@ try {
   );
   await page.setViewportSize({ width: 1440, height: 1000 });
   assert.ok(Math.abs((await width()) - remembered) < 2);
-  await frame.getByRole('button', { name: '提交记录', exact: true }).click();
+  await frame.getByRole('tab', { name: '提交记录', exact: true }).click();
   assert.equal(await separator.count(), 0);
-  await frame.getByRole('button', { name: '未提交改动', exact: true }).click();
+  await frame.getByRole('tab', { name: '未提交改动', exact: true }).click();
   await separator.waitFor();
   assert.ok(Math.abs((await width()) - remembered) < 2);
   await mkdir('/tmp/paneon-file-split-evidence', { recursive: true });

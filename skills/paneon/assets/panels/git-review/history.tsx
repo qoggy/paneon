@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import type { GitCommit, GitCommitDetails } from './git.ts';
 import { layoutGitGraph } from './graph.ts';
 import type { GraphRow } from './graph.ts';
+import { RevisionContextMenu } from './revision-context-menu.tsx';
 
 // Colors identify graph lanes only; the surrounding UI keeps its default theme.
 const colors = Array.from({ length: 6 }, (_, i) => `var(--git-lane-${i})`);
@@ -51,10 +52,12 @@ export function HistoryRows({
   commits,
   selected,
   onSelect,
+  onCompare,
 }: {
   commits: GitCommit[];
   selected?: string;
   onSelect: (commit: GitCommit) => void;
+  onCompare?: (revision: string) => void;
 }) {
   const { language } = useLocale();
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
@@ -137,80 +140,90 @@ export function HistoryRows({
       {commits.slice(start, end).map((commit, offset) => {
         const index = start + offset;
         return (
-          <button
-            type="button"
-            key={commit.oid}
-            tabIndex={index === tabIndex ? 0 : -1}
-            data-commit-id={commit.oid}
-            aria-pressed={selected === commit.oid}
-            title={`${commit.oid} ${commit.subject} · ${commit.refs.map((ref) => ref.name).join(', ')} · ${commit.author} · ${commit.date}`}
-            className="grid h-7 w-full items-center gap-3 px-2 text-left text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent"
-            style={{
-              gridTemplateColumns: `${graphWidth}px minmax(0,1fr) 7rem 7rem`,
-              minWidth: graphWidth + 520,
-            }}
-            onClick={() => onSelect(commit)}
-          >
-            <Graph
-              row={graph.rows[index]}
-              width={graphWidth}
-              head={commit.refs.some((ref) => ref.kind === 'head')}
-            />
-            <span className="flex min-w-0 items-center gap-2" title={commit.subject}>
-              <span
-                className={`min-w-0 truncate ${commit.parents.length > 1 ? 'text-muted-foreground' : ''}`}
-                data-commit-subject=""
-              >
-                {commit.subject}
-              </span>
-              {!!commit.refs.length && (
-                <span
-                  className="flex max-w-[60%] shrink-0 gap-1 overflow-hidden"
-                  title={commit.refs.map((ref) => ref.name).join(', ')}
-                >
-                  {commit.refs.map((ref) => (
-                    <span
-                      key={`${ref.kind}:${ref.name}`}
-                      data-commit-ref={ref.kind}
-                      className="inline-flex h-5 min-w-0 items-center gap-1 rounded border bg-background px-1.5 text-[11px] font-normal text-muted-foreground first:shrink-0"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                      >
-                        {ref.kind === 'tag' ? (
-                          <path d="M2 2h5l7 7-5 5-7-7V2Zm3 3h.01" />
-                        ) : (
-                          <>
-                            <path d="M4 5v6M12 5v1c0 3-8 1-8 5" />
-                            <circle cx="4" cy="3" r="2" />
-                            <circle cx="4" cy="13" r="2" />
-                            <circle cx="12" cy="3" r="2" />
-                          </>
-                        )}
-                      </svg>
-                      <span className="max-w-36 truncate">{ref.name}</span>
-                    </span>
-                  ))}
-                </span>
-              )}
-            </span>
-            <span className="truncate text-xs text-muted-foreground" title={commit.author}>
-              {commit.author}
-            </span>
-            <time
-              className="truncate text-xs text-muted-foreground"
-              dateTime={commit.date}
-              title={commit.date}
+          <RevisionContextMenu key={commit.oid} revision={commit.oid} onCompare={onCompare}>
+            <button
+              type="button"
+              tabIndex={index === tabIndex ? 0 : -1}
+              data-commit-id={commit.oid}
+              aria-pressed={selected === commit.oid}
+              title={`${commit.oid} ${commit.subject} · ${commit.refs.map((ref) => ref.name).join(', ')} · ${commit.author} · ${commit.date}`}
+              className="grid h-7 w-full items-center gap-3 px-2 text-left text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent"
+              style={{
+                gridTemplateColumns: `${graphWidth}px minmax(0,1fr) 7rem 7rem`,
+                minWidth: graphWidth + 520,
+              }}
+              onClick={() => onSelect(commit)}
             >
-              {shortDate(commit.date, language)}
-            </time>
-          </button>
+              <Graph
+                row={graph.rows[index]}
+                width={graphWidth}
+                head={commit.refs.some((ref) => ref.kind === 'head')}
+              />
+              <span className="flex min-w-0 items-center gap-2" title={commit.subject}>
+                <span
+                  className={`min-w-0 truncate ${commit.parents.length > 1 ? 'text-muted-foreground' : ''}`}
+                  data-commit-subject=""
+                >
+                  {commit.subject}
+                </span>
+                {!!commit.refs.length && (
+                  <span
+                    className="flex max-w-[60%] shrink-0 gap-1 overflow-hidden"
+                    title={commit.refs.map((ref) => ref.name).join(', ')}
+                  >
+                    {commit.refs.map((ref) => (
+                      <RevisionContextMenu
+                        key={`${ref.kind}:${ref.name}`}
+                        revision={
+                          ref.kind === 'head'
+                            ? 'HEAD'
+                            : `refs/${{ branch: 'heads', remote: 'remotes', tag: 'tags' }[ref.kind]}/${ref.name}`
+                        }
+                        onCompare={onCompare}
+                      >
+                        <span
+                          data-commit-ref={ref.kind}
+                          className="inline-flex h-5 min-w-0 items-center gap-1 rounded border bg-background px-1.5 text-[11px] font-normal text-muted-foreground first:shrink-0"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                          >
+                            {ref.kind === 'tag' ? (
+                              <path d="M2 2h5l7 7-5 5-7-7V2Zm3 3h.01" />
+                            ) : (
+                              <>
+                                <path d="M4 5v6M12 5v1c0 3-8 1-8 5" />
+                                <circle cx="4" cy="3" r="2" />
+                                <circle cx="4" cy="13" r="2" />
+                                <circle cx="12" cy="3" r="2" />
+                              </>
+                            )}
+                          </svg>
+                          <span className="max-w-36 truncate">{ref.name}</span>
+                        </span>
+                      </RevisionContextMenu>
+                    ))}
+                  </span>
+                )}
+              </span>
+              <span className="truncate text-xs text-muted-foreground" title={commit.author}>
+                {commit.author}
+              </span>
+              <time
+                className="truncate text-xs text-muted-foreground"
+                dateTime={commit.date}
+                title={commit.date}
+              >
+                {shortDate(commit.date, language)}
+              </time>
+            </button>
+          </RevisionContextMenu>
         );
       })}
       {end < commits.length && (

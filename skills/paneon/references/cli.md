@@ -36,7 +36,7 @@ Use readable field names; do not parse human-readable output as a protocol.
 | --- | --- | --- |
 | `init` | Optional `--agent <agents...>`, `--project` / `--global` (exclusive), `--copy`, `--yes`; `--json` requires `--yes` | `scope`, optional `projectPath`, `method`, `paneonVersion`, `recordPath`, `targets` with paths/kinds/status; cancellation returns `{ "cancelled": true }` |
 | `panel run <entry.tsx>` | Required `--cwd <directory>`; optional `--params '<json>'` or `--params-file <file>` (exclusive; defaults to `{}`), `--watch` / `--no-watch`, `--open` | `instanceId`, `definitionId`, `status`, `revision`, `watch`, `paneonVersion`, `url` |
-| `panel list` | Optional `--page <number>` (default 1), `--page-size <count>` (default 20, 1–1000) | `panels`: instance metadata; `page`, `pageSize`, `total`, `totalPages` |
+| `panel list` | Optional `--status <running/closed/unavailable>`, `--page <number>` (default 1), `--page-size <count>` (default 20, 1–1000) | `panels`: instance metadata; `page`, `pageSize`, `total`, `totalPages` |
 | `panel inspect <instance-id>` | Existing instance ID | Complete instance details, saved params, requires, build version, current URL, and optional diagnostic |
 | `panel reload <instance-id>` | Existing instance ID | `previousRevision`, `revision`, `changed`, `watch` |
 | `panel close <instance-id>` | Existing instance ID | `status: "closed"`, `alreadyClosed` |
@@ -44,12 +44,17 @@ Use readable field names; do not parse human-readable output as a protocol.
 | `panel ack <instance-id>` | Required `--consumer <name>` and `--through <event-id>` | `lastAckId` |
 | `config get` | None; starts runtime if needed | `ui`: effective `theme`, `language` |
 | `config set <key> <value>` | `ui.theme` with `light` / `dark`, or `ui.language` with `en` / `zh-CN`; starts runtime if needed | `ui`: saved effective preferences |
+| `server start` | None | `running: true`, `runtime` (same fields as `server status`); reuses an already running service |
 | `server status` | None | `running`, `runtime` (identity, PID, host, port, package/protocol versions, start time, and optional effective `logging` status), or `runtime: null` |
 | `server stop` | None | `stopped`, `alreadyStopped`, `runtimeId` |
 | `server logs` | Optional `--tail <count>` (default 100, 1–10000), `--level <debug/info/warn/error/fatal>`, `--instance <id>`, `--runtime <id>`, `--follow` | Finite: `records`, `files`, `truncated`, `warnings`; follow JSON: one envelope per record/warning |
 
-`panel list` returns one page in ascending creation-time/instance-ID order. For example,
+`panel list` returns one page in descending creation-time/instance-ID order. For example,
 `paneon panel list --page 2 --page-size 20 --json` reads the second page.
+Use `paneon panel list --status running --json` to list running instances;
+`closed` and `unavailable` are also supported. Omit `--status` to include all statuses.
+Filtering happens before pagination, and `total` and `totalPages` describe the filtered results.
+Panel status does not indicate whether its browser tab is open.
 An out-of-range page returns no instances; an empty collection has `totalPages: 0`.
 The browser panel list also starts on page 1 with 20 instances per page.
 
@@ -61,8 +66,16 @@ Changing or deleting that file does not alter the instance; reload and service r
 Start a new instance for new questions or new fixed input.
 `--open` requests the system browser; otherwise open the returned URL yourself.
 `panel run` automatically starts a server when needed; config commands can also start
-one. `server status` and `server logs` do not start one. Stopping an already stopped
+one. Use `server start` to start the service independently without creating a panel;
+it returns after the service is ready and reuses an already running compatible service.
+`server status` and `server logs` do not start one. Stopping an already stopped
 server is successful.
+
+The service listens on `127.0.0.1:49321` by default. To use another fixed port,
+set `server.port` in `~/.paneon/config.json`, for example
+`{ "server": { "port": 49322 } }`, and restart the service. If the port is occupied,
+startup fails with `SERVER_PORT_IN_USE`; the service does not choose another port.
+The existing `config set` command manages UI preferences only.
 
 Example creation result (IDs and revisions are illustrative):
 

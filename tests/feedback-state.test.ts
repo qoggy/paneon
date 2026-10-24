@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
-import type { Feedback } from '../src/sdk/feedback.ts';
+import type { AnnotationValue } from '../src/sdk/annotation.ts';
 
 // Exercise the same UI store in Node without mocking React or relying on stale dist.
 const compiled = await build({
-  entryPoints: [new URL('../src/ui/feedback-store.ts', import.meta.url).pathname],
+  entryPoints: [new URL('../src/ui/annotation-store.ts', import.meta.url).pathname],
   bundle: true,
   platform: 'node',
   format: 'esm',
   write: false,
 });
-const { FeedbackStore } = (await import(
+const { AnnotationStore } = (await import(
   'data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].contents).toString('base64')
 )) as {
-  FeedbackStore: new (options: {
-    onSubmit(value: Feedback): Promise<unknown>;
+  AnnotationStore: new (options: {
+    onSubmit(value: AnnotationValue): Promise<unknown>;
     disabled?: boolean;
     adapter?: {
       resolve(target: unknown): Promise<{ status: 'ready' }>;
@@ -23,17 +23,14 @@ const { FeedbackStore } = (await import(
     };
   }) => {
     getSnapshot(): {
-      value: Feedback;
+      value: AnnotationValue;
       activeAnnotationId: string | null;
       submitting: boolean;
       error: string | null;
       createAnnotation(targets: { ref: string }[], comment?: string): string;
       updateAnnotation(id: string, entry: { targets: { ref: string }[]; comment: string }): void;
       removeAnnotation(id: string): void;
-      toggleTarget(target: { ref: string }): void;
-      setOverallAnnotationText(comment: string): void;
       editAnnotation(id: string | null): void;
-      setMode(mode: 'browse' | 'select'): void;
       registerText(registration: {
         ref: string;
         source: string;
@@ -41,17 +38,25 @@ const { FeedbackStore } = (await import(
       }): () => void;
       submit(): Promise<void>;
     };
-    setOptions(options: { onSubmit(value: Feedback): Promise<unknown>; disabled?: boolean }): void;
+    setOptions(options: {
+      onSubmit(value: AnnotationValue): Promise<unknown>;
+      disabled?: boolean;
+    }): void;
   };
 };
 
-void test('controller keeps stable identities, validates changes atomically and deletes the final target', () => {
-  const store = new FeedbackStore({ onSubmit: async () => {} });
+void test('controller does not expose the removed object-selection mode', () => {
+  const api = new AnnotationStore({ onSubmit: async () => {} }).getSnapshot();
+  for (const key of ['mode', 'setMode', 'toggleTarget', 'setOverallAnnotationText'])
+    assert.equal(key in api, false);
+});
+
+void test('controller keeps stable identities, validates changes atomically and explicitly deletes annotations', () => {
+  const store = new AnnotationStore({ onSubmit: async () => {} });
   const api = store.getSnapshot();
-  api.toggleTarget({ ref: 'one', text: undefined } as { ref: string });
-  const id = store.getSnapshot().activeAnnotationId;
+  const id = api.createAnnotation([{ ref: 'one' }]);
   assert.ok(id);
-  api.toggleTarget({ ref: 'two' });
+  api.updateAnnotation(id, { targets: [{ ref: 'one' }, { ref: 'two' }], comment: '' });
   assert.equal(store.getSnapshot().value.annotations[0].targets.length, 2);
   api.updateAnnotation(id, { targets: [{ ref: 'one' }, { ref: 'two' }], comment: '意见' });
   api.updateAnnotation(id, { targets: [{ ref: 'one' }, { ref: 'two' }], comment: '' });
@@ -63,14 +68,12 @@ void test('controller keeps stable identities, validates changes atomically and 
     before.annotations[0].comment = 'external mutation';
   });
   api.editAnnotation(null);
-  api.toggleTarget({ ref: 'one' });
+  const second = api.createAnnotation([{ ref: 'one' }]);
   assert.equal(store.getSnapshot().value.annotations.length, 2);
-  api.toggleTarget({ ref: 'one' });
+  api.removeAnnotation(second);
   assert.equal(store.getSnapshot().activeAnnotationId, null);
   assert.equal(store.getSnapshot().value.annotations.length, 1);
-  api.editAnnotation(id);
-  api.toggleTarget({ ref: 'one' });
-  api.toggleTarget({ ref: 'two' });
+  api.removeAnnotation(id);
   assert.deepEqual(store.getSnapshot().value.annotations, []);
 });
 
@@ -80,8 +83,8 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
     finishResolve = resolve;
   });
   let count = 0;
-  let received: Feedback | undefined;
-  const store = new FeedbackStore({
+  let received: AnnotationValue | undefined;
+  const store = new AnnotationStore({
     adapter: {
       resolve: async () => {
         await resolution;
@@ -98,12 +101,10 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
   });
   const api = store.getSnapshot();
   const id = api.createAnnotation([{ ref: 'one' }]);
-  api.setOverallAnnotationText('overall');
   const before = store.getSnapshot().value;
   const submitting = api.submit();
   assert.equal(store.getSnapshot().submitting, true);
-  assert.throws(() => api.setOverallAnnotationText('changed'));
-  assert.throws(() => api.setMode('select'));
+  assert.throws(() => api.createAnnotation([{ ref: 'two' }], 'changed'));
   assert.throws(() => api.updateAnnotation(id, { targets: [{ ref: 'one' }], comment: 'changed' }));
   assert.throws(() => api.removeAnnotation(id));
   assert.throws(() => api.editAnnotation(null));
@@ -125,7 +126,7 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
       return Promise.resolve();
     },
   });
-  api.setOverallAnnotationText('corrected');
+  api.updateAnnotation(id, { targets: [{ ref: 'one' }], comment: 'corrected' });
   await assert.rejects(api.submit(), /not mounted/);
   assert.equal(count, 1);
 });
@@ -136,23 +137,21 @@ void test('disabled providers prohibit mutations and duplicate callbacks without
     count++;
     return Promise.resolve();
   };
-  const store = new FeedbackStore({ onSubmit, disabled: true });
+  const store = new AnnotationStore({ onSubmit, disabled: true });
   const api = store.getSnapshot();
   assert.throws(() => api.createAnnotation([{ ref: 'one' }]));
-  assert.throws(() => api.setOverallAnnotationText('opinion'));
   await api.submit();
   assert.equal(count, 0);
   store.setOptions({ onSubmit, disabled: false });
-  api.setOverallAnnotationText('overall only');
   await api.submit();
   assert.equal(count, 1);
-  assert.deepEqual(store.getSnapshot().value, { annotations: [], comment: 'overall only' });
+  assert.deepEqual(store.getSnapshot().value, { annotations: [] });
   await api.submit();
   assert.equal(count, 2);
 });
 
 void test('text registration checks every UTF-16 boundary and supports explicit cleanup', () => {
-  const store = new FeedbackStore({ onSubmit: async () => {} });
+  const store = new AnnotationStore({ onSubmit: async () => {} });
   const api = store.getSnapshot();
   const node = { nodeType: 3, data: 'abc' };
   for (const sourceOffsets of [

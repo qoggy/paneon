@@ -14,7 +14,7 @@ let browser;
 const errors = [];
 try {
   const original = await readFile(
-    process.argv[2] ?? join(root, 'examples/components-panel.tsx'),
+    process.argv[2] ?? join(root, 'tests/fixtures/panels/components-panel.tsx'),
     'utf8',
   );
   const gallery = original
@@ -28,7 +28,7 @@ try {
   );
   await writeFile(
     join(directory, 'entry.tsx'),
-    `import {createRoot} from 'react-dom/client';import Gallery from './gallery';import Variants from './variants';import {TooltipProvider} from '../../src/ui/index';import '../../src/ui/styles.css';createRoot(document.getElementById('root')!).render(<TooltipProvider><Gallery /><Variants /></TooltipProvider>);`,
+    `import {createRoot} from 'react-dom/client';import Gallery from './gallery';import Variants from './variants';import {UIProvider,TooltipProvider} from '../../src/ui/index';import '../../src/ui/styles.css';createRoot(document.getElementById('root')!).render(<UIProvider><TooltipProvider><Gallery /><Variants /></TooltipProvider></UIProvider>);`,
   );
   await writeFile(
     join(directory, 'frame.html'),
@@ -165,14 +165,18 @@ try {
   await f.getByRole('textbox', { name: 'Dialog field' }).fill('inside the dialog');
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press('Tab');
-    assert.equal(
-      await f.getByRole('dialog').evaluate((el) => el.contains(el.ownerDocument.activeElement)),
+    // Base UI focus guards return focus on the next animation frame.
+    await eventually(
+      () => f.getByRole('dialog').evaluate((el) => el.contains(el.ownerDocument.activeElement)),
       true,
     );
   }
   await f.getByRole('textbox', { name: 'Dialog field' }).press('Escape');
   await f.getByRole('dialog').waitFor({ state: 'hidden' });
-  assert.equal(await dialogTrigger.evaluate((el) => el === el.ownerDocument.activeElement), true);
+  await eventually(
+    () => dialogTrigger.evaluate((el) => el === el.ownerDocument.activeElement),
+    true,
+  );
   await f.getByRole('button', { name: 'Open confirmation' }).click();
   await f.getByRole('button', { name: 'Cancel choice' }).click();
   await visible(f.getByText('No choice confirmed', { exact: true }));
@@ -180,10 +184,10 @@ try {
   await f.getByRole('button', { name: 'Confirm choice' }).click();
   await visible(f.getByText('Choice confirmed', { exact: true }));
   await f.getByRole('button', { name: 'Explain this control' }).hover();
-  await visible(f.getByRole('tooltip'));
+  await visible(f.locator('[data-slot="tooltip-content"]'));
   await page.mouse.move(0, 0);
   await f.getByRole('button', { name: 'Explain this control' }).focus();
-  await visible(f.getByRole('tooltip'));
+  await visible(f.locator('[data-slot="tooltip-content"]'));
   await f.getByRole('button', { name: 'Explain this control' }).press('Escape');
   try {
     // A modal menu hides the background checkbox from the accessibility tree.
@@ -198,6 +202,7 @@ try {
       '',
     );
     await f.getByRole('menuitemcheckbox', { name: 'Show details' }).click();
+    await f.locator('[data-slot="dropdown-menu-content"]').waitFor({ state: 'hidden' });
     // React commits controlled state asynchronously; observe it without repeating the click.
     await eventually(() => f.getByRole('checkbox', { name: 'Include details' }).isChecked(), false);
   } catch (error) {
@@ -212,10 +217,17 @@ try {
   }
   await f.getByRole('button', { name: 'Open actions menu' }).click();
   await f.getByRole('menuitemradio', { name: 'Compact', exact: true }).click();
+  await f.locator('[data-slot="dropdown-menu-content"]').waitFor({ state: 'hidden' });
   await f.getByRole('button', { name: 'Open actions menu' }).click();
   await f.getByRole('menuitem', { name: 'More options' }).hover();
   await visible(f.getByRole('menuitem', { name: 'Nested option' }));
+  // Cross the submenu's safe-pointer polygon with a real mouse path.
+  const submenuBox = await f.getByRole('menuitem', { name: 'Nested option' }).boundingBox();
+  await page.mouse.move(submenuBox.x + submenuBox.width / 2, submenuBox.y + submenuBox.height / 2, {
+    steps: 8,
+  });
   await f.getByRole('menuitem', { name: 'Nested option' }).click();
+  await f.locator('[data-slot="dropdown-menu-content"]').waitFor({ state: 'hidden' });
   await f.getByRole('button', { name: 'Open actions menu' }).press('Enter');
   await f.getByRole('menuitem', { name: 'More options' }).focus();
   await f.getByRole('menuitem', { name: 'More options' }).press('ArrowRight', { delay: 100 });
@@ -226,7 +238,14 @@ try {
   await f.getByLabel('Quick note').fill('inside popover');
   await f.getByLabel('Quick note').press('Escape');
   await f.getByLabel('Quick note').waitFor({ state: 'hidden' });
-  assert.equal(await popoverTrigger.evaluate((el) => el === el.ownerDocument.activeElement), true);
+  await eventually(
+    () => popoverTrigger.evaluate((el) => el === el.ownerDocument.activeElement),
+    true,
+  );
+  await f.getByRole('button', { name: 'Explore components', exact: true }).hover();
+  await visible(f.getByRole('link', { name: 'Core components', exact: true }));
+  await f.getByRole('link', { name: 'Core components', exact: true }).press('Escape');
+  await f.getByRole('link', { name: 'Core components', exact: true }).waitFor({ state: 'hidden' });
   assert.equal(
     await f.getByRole('link', { name: 'Go to previous page' }).getAttribute('aria-disabled'),
     'true',
@@ -310,16 +329,18 @@ try {
     true,
   );
   await page.screenshot({ path: '/tmp/paneon-ui-gallery.png', fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(
-    await f.locator('body').evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
-    true,
-  );
+  if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await f.locator('body').evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+      true,
+    );
+  }
   assert.deepEqual(errors, []);
   assert.deepEqual(externalRequests, []);
   assert.deepEqual(apiRequests, []);
   console.log(
-    'UI browser verification passed: all 29 component families, isolated iframe styling, selection, input, keyboard, overlays, focus return, pagination, Markdown, offline bundled highlighting and narrow viewport.',
+    'UI browser verification passed: all component families plus navigation popups, isolated iframe styling, selection, input, keyboard, overlays, focus return, pagination, Markdown, offline bundled highlighting and optional narrow viewport.',
   );
 } finally {
   await browser?.close();

@@ -2,6 +2,22 @@ import { useUI } from './use-ui';
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from './spinner';
 import { cn } from './utils';
+import { Code, Copy, Download, Ellipsis, Expand } from 'lucide-react';
+import { Button } from './button';
+import { Dialog, DialogContent } from './dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+import { snapshotDiagram, type DiagramImage } from './mermaid-image';
+import { DiagramIconButton, MermaidViewer } from './mermaid-viewer';
+import { useBrowserAction } from './browser-action-context';
+import type { BrowserAction } from '../shared/browser-actions';
+import { useToastManager } from './toast-manager';
 
 let library: Promise<typeof import('mermaid').default> | undefined;
 
@@ -71,8 +87,161 @@ export function Mermaid({ code, className }: { code: string; className?: string 
           <pre className="whitespace-pre-wrap">{current.error}</pre>
         </div>
       ) : (
-        <div dangerouslySetInnerHTML={{ __html: current.svg }} />
+        <MermaidDiagram key={`${code}:${theme}`} code={code} svg={current.svg} />
       )}
     </div>
+  );
+}
+
+function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
+  const { t } = useUI();
+  const browserAction = useBrowserAction();
+  const toast = useToastManager();
+  const diagram = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const [image, setImage] = useState<DiagramImage | null>(null);
+  const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  function capture() {
+    const source = diagram.current?.querySelector('svg');
+    if (!source) throw new Error('The diagram is unavailable.');
+    return snapshotDiagram(source);
+  }
+  function expand() {
+    returnFocus.current = document.activeElement as HTMLElement;
+    setImage(capture());
+    setOpen(true);
+  }
+  async function run(kind: BrowserAction['kind']) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      let action: BrowserAction;
+      if (kind === 'copy-text') action = { kind, text: code };
+      else {
+        const picture = image ?? capture();
+        action = { kind, svg: picture.svg, background: picture.background };
+      }
+      await browserAction(action);
+      toast.add({
+        title: t(
+          kind === 'copy-text'
+            ? 'Code copied'
+            : kind === 'copy-image'
+              ? 'Image copied'
+              : 'PNG downloaded',
+        ),
+        type: 'success',
+      });
+    } catch (error) {
+      console.error('Mermaid browser action failed.', error);
+      toast.add({ title: t('Unable to complete diagram action.'), type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <TooltipProvider>
+      <div className="group relative" data-slot="mermaid-diagram">
+        <div
+          ref={diagram}
+          role="button"
+          tabIndex={0}
+          aria-label={t('Expand diagram')}
+          className="cursor-zoom-in overflow-x-auto rounded-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+          onClick={(event) => {
+            if ((event.target as Element).closest('a')) return;
+            const selection = window.getSelection();
+            if (
+              selection &&
+              !selection.isCollapsed &&
+              selection.anchorNode &&
+              event.currentTarget.contains(selection.anchorNode)
+            )
+              return;
+            expand();
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              (event.key === 'Enter' || event.key === ' ')
+            ) {
+              event.preventDefault();
+              expand();
+            }
+          }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+        <div
+          className={cn(
+            'absolute top-2 right-2 flex flex-col items-center rounded-md border bg-background p-0.5 text-muted-foreground shadow-xs transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100',
+            menuOpen ? 'visible opacity-100' : 'invisible opacity-0',
+          )}
+        >
+          <DiagramIconButton label={t('Expand diagram')} onClick={expand}>
+            <Expand />
+          </DiagramIconButton>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t('More diagram options')}
+                      >
+                        <Ellipsis />
+                      </Button>
+                    }
+                  />
+                }
+              />
+              <TooltipContent>{t('More diagram options')}</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
+                <Code />
+                {t('Copy Mermaid code')}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={busy} onClick={() => void run('copy-image')}>
+                <Copy />
+                {t('Copy image')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={busy} onClick={() => void run('download-image')}>
+                <Download />
+                {t('Download PNG')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          data-slot="mermaid-viewer"
+          showCloseButton={false}
+          className="flex h-[calc(100dvh-4rem)] w-[calc(100vw-4rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          onKeyDownCapture={(event) => {
+            // A focused icon's tooltip is a nested dismissable layer. Escape still closes the viewer.
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpen(false);
+            }
+          }}
+          finalFocus={() =>
+            returnFocus.current?.isConnected ? returnFocus.current : diagram.current
+          }
+        >
+          {image && (
+            <MermaidViewer image={image} busy={busy} download={() => void run('download-image')} />
+          )}
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }

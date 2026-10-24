@@ -28,8 +28,8 @@ void test(
       total: 0,
       totalPages: 0,
     });
-    // Deliberately reverse insertion order and tie all creation times.
-    for (let i = 44; i >= 0; i--)
+    // Mix creation times and tied pairs; update times must not affect newest-first ordering.
+    for (let i = 0; i < 45; i++)
       store.save({
         instanceId: `instance-${String(i).padStart(2, '0')}`,
         definitionId: 'pagination',
@@ -39,15 +39,15 @@ void test(
         params: { private: 'not-in-list' },
         revision: 'saved',
         watch: false,
-        createdAt: '2026-10-21T00:00:00.000Z',
-        updatedAt: '2026-10-21T00:00:00.000Z',
+        createdAt: new Date(Date.UTC(2026, 9, 21, 0, Math.floor(i / 2))).toISOString(),
+        updatedAt: new Date(Date.UTC(2026, 9, 22, 0, 44 - i)).toISOString(),
         requires: { paneon: '0.0.0' },
         paneonVersion: '0.0.0',
       });
     const first = store.listPage();
     assert.equal(first.panels.length, 20);
-    assert.equal(first.panels[0].instanceId, 'instance-00');
-    assert.equal(first.panels.at(-1)?.instanceId, 'instance-19');
+    assert.equal(first.panels[0].instanceId, 'instance-44');
+    assert.equal(first.panels.at(-1)?.instanceId, 'instance-25');
     assert.equal(first.total, 45);
     assert.equal(first.totalPages, 3);
     assert.equal('params' in first.panels[0], false);
@@ -56,6 +56,10 @@ void test(
       (p) => p.instanceId,
     );
     assert.equal(new Set(ids).size, 45);
+    assert.deepEqual(
+      ids,
+      Array.from({ length: 45 }, (_, i) => `instance-${String(44 - i).padStart(2, '0')}`),
+    );
     assert.equal(store.listPage(3).panels.length, 5);
     assert.deepEqual(store.listPage(4).panels, []);
     assert.equal(store.list().length, 45, 'Internal full-list callers remain unpaginated.');
@@ -114,6 +118,9 @@ void test(
         '?pageSize=1001',
         '?pageSize=abc',
         '?page=1&page=2',
+        '?status=active',
+        '?status=',
+        '?status=running&status=closed',
       ]) {
         const bad = await read(query);
         assert.equal(bad.status, 400, query);
@@ -126,10 +133,49 @@ void test(
         ids.slice(20, 40),
       );
       assert.deepEqual((await cli('--page', '2', '--page-size', '7')).data, custom.body.data);
+      const empty = await read('?status=unavailable');
+      assert.equal(empty.status, 200);
+      assert.deepEqual(empty.body.data, {
+        panels: [],
+        page: 1,
+        pageSize: 20,
+        total: 0,
+        totalPages: 0,
+      });
+      assert.deepEqual((await cli('--status', 'unavailable')).data, empty.body.data);
+
+      // Seed persisted status metadata after restore so this test needs no panel workers.
+      const statuses = ['running', 'closed', 'unavailable'] as const;
+      for (let i = 0; i < 45; i++)
+        service.runtime.store.db
+          .prepare('UPDATE panels SET status = ? WHERE id = ?')
+          .run(statuses[i % 3], `instance-${String(i).padStart(2, '0')}`);
+      for (const [index, status] of statuses.entries()) {
+        const expected = ids.filter((id) => Number(id.slice(-2)) % 3 === index);
+        const filtered = await read(`?status=${status}&page=2&pageSize=4`);
+        assert.equal(filtered.status, 200);
+        assert.equal(filtered.body.data.total, 15);
+        assert.equal(filtered.body.data.totalPages, 4);
+        assert.deepEqual(
+          filtered.body.data.panels.map((panel) => panel.instanceId),
+          expected.slice(4, 8),
+        );
+        assert.ok(filtered.body.data.panels.every((panel) => panel.status === status));
+        assert.deepEqual(
+          (await cli('--status', status, '--page', '2', '--page-size', '4')).data,
+          filtered.body.data,
+        );
+        assert.deepEqual(service.runtime.store.listPage(2, 4, status), filtered.body.data);
+        assert.deepEqual((await read(`?status=${status}&page=5&pageSize=4`)).body.data.panels, []);
+      }
+      assert.equal((await cli()).data.total, 45, 'Omitting status still includes all instances.');
       for (const args of [
         ['--page', '0'],
         ['--page', '1.5'],
         ['--page-size', '1001'],
+        ['--status', 'active'],
+        ['--status', ''],
+        ['--status'],
       ]) {
         await assert.rejects(cli(...args), (error: unknown) => {
           const failure = error as { code: number; stdout: string };

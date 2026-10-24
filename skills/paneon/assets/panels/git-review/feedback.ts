@@ -1,4 +1,4 @@
-import type { Feedback, FeedbackTarget } from 'paneon/sdk';
+import type { AnnotationValue, AnnotationTarget } from 'paneon/sdk';
 import { sourceLines } from '../../shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import type { GitSnapshot } from './git.ts';
@@ -8,7 +8,7 @@ import type { GitRef, GitReviewParams, GitReviewSubmitted, GitReviewSource } fro
 type Evidence = GitReviewSource['evidence'][number];
 /** Build only the source fragments required by this explicit submission. Browser memory owns them. */
 export function buildGitFeedback(
-  feedback: Feedback<GitRef> & { replacesEventId?: number },
+  feedback: AnnotationValue<GitRef> & { replacesEventId?: number },
   snapshots: ReadonlyMap<string, GitSnapshot>,
 ): GitReviewSubmitted {
   const sources: Record<string, GitReviewSource> = {};
@@ -93,7 +93,7 @@ function checkHunk(evidence: Extract<Evidence, { kind: 'hunk' }>) {
   )
     throw new Error('Hunk patch does not match its preserved fragments.');
 }
-function validateTarget(source: GitReviewSource, target: FeedbackTarget<GitRef>) {
+function validateTarget(source: GitReviewSource, target: AnnotationTarget<GitRef>) {
   const ref = target.ref;
   if (ref.kind === 'file') {
     if (target.text) throw new Error('File targets cannot carry text.');
@@ -181,7 +181,7 @@ export function validateGitFeedback(
     }
   if (JSON.stringify(result).length > 65536)
     throw new Error(
-      'Feedback exceeds the 65536-character event limit. Draft retained; reduce selected content or annotations.',
+      'Annotations exceed the 65536-character event limit. Draft retained; reduce selected content or annotations.',
     );
   return result;
 }

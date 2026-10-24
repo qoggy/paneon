@@ -10,10 +10,12 @@ export * from './textarea';
 export * from './select';
 export * from './badge';
 export * from './alert';
+export * from './empty';
 export * from './spinner';
 export * from './table';
 export * from './pagination';
 export * from './tabs';
+export * from './navigation-menu';
 export * from './dialog';
 export * from './sheet';
 export * from './alert-dialog';
@@ -21,6 +23,7 @@ export * from './accordion';
 export * from './collapsible';
 export * from './tooltip';
 export * from './dropdown-menu';
+export * from './context-menu';
 export * from './popover';
 export * from './switch';
 export * from './separator';
@@ -28,28 +31,24 @@ export * from './layout';
 export * from './code-block';
 export * from './markdown';
 export * from './mermaid';
-export { FeedbackProvider } from './feedback-provider';
-export {
-  FeedbackTarget,
-  FeedbackText,
-  FeedbackControls,
-  FeedbackSurface,
-  FeedbackSubmitButton,
-  FeedbackToolbar,
-  FeedbackSelectionControls,
-  FeedbackOverallAnnotationButton,
-} from './feedback';
-export { useFeedback } from './feedback-context';
+export * from './toast';
+export * from './toast-manager';
+export { AnnotationRoot } from './annotation-root';
+export { AnnotationText, AnnotationSubmitButton, AnnotationMenu } from './annotation';
+export { useAnnotations } from './annotation-context';
 export type {
-  TargetResolution,
-  FeedbackAdapter,
-  FeedbackProviderProps,
-  FeedbackTargetProps,
-  FeedbackTextProps,
-  TextRegistration,
-  FeedbackController,
-} from './feedback-types';
+  AnnotationTargetResolution,
+  AnnotationAdapter,
+  AnnotationRootProps,
+  AnnotationTextProps,
+  AnnotationTextRegistration,
+  AnnotationController,
+} from './annotation-types';
 
 export { UIProvider } from './ui-provider';
 export { useUI } from './use-ui';
 export type { UIPreferences, UITheme, UILanguage, UIMessage } from './use-ui';
+
+export { DiffView } from './diff';
+export { diffTargetRanges, locateDiffTarget } from './diff-annotation';
+export type { DiffViewProps } from './diff';

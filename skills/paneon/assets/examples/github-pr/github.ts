@@ -600,8 +600,8 @@ export class GitHubReview {
     const session = this.session(repository, sessionId),
       feedback = prFeedbackSchema.parse(value),
       sources: Record<string, PRSource> = {};
-    if (!feedback.annotations.length && !feedback.comment?.trim())
-      throw new Error('请选择内容或填写整体意见后再提交。');
+    if (!feedback.annotations.length)
+      throw new Error('Save at least one annotation before submitting.');
     const annotations = feedback.annotations.map((entry) => {
       const targets = entry.targets.map((target) => {
         const snapshot = session.snapshots.get(target.ref.sourceId);
@@ -631,7 +631,7 @@ export class GitHubReview {
       sources,
     });
     if (JSON.stringify(result).length > 65536)
-      throw new Error('Feedback exceeds the 65536-character event limit. Draft retained.');
+      throw new Error('Annotations exceed the 65536-character event limit. Draft retained.');
     return result;
   }
   reviewRequest(repository: string, sessionId: string, detailId: string) {

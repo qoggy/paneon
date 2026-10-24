@@ -1,4 +1,5 @@
 const en = {
+  'This file has no text diff.': 'This file has no text diff.',
   工作区: 'Working tree',
   暂存区: 'Index',
   调整差异两侧宽度: 'Resize diff columns',
@@ -82,8 +83,6 @@ const en = {
   批注: 'Annotation',
   'Annotation {number}': 'Annotation {number}',
   '批注 {number}': 'Annotation {number}',
-  'Overall annotation': 'Overall annotation',
-  整体批注: 'Overall annotation',
   'Edit annotation': 'Edit annotation',
   编辑批注: 'Edit annotation',
   'Add annotation': 'Add annotation',
@@ -94,8 +93,6 @@ const en = {
   '添加批注（可留空）': 'Add an annotation (optional)',
   'Selected {count} locations': 'Selected {count} locations',
   '已选 {count} 个位置': 'Selected {count} locations',
-  ' · Click objects to select more': ' · Click objects to select more',
-  ' · 点击对象可继续选择': ' · Click objects to select more',
   'Delete annotation': 'Delete annotation',
   删除批注: 'Delete annotation',
   Cancel: 'Cancel',
@@ -106,10 +103,6 @@ const en = {
   '提交中…': 'Submitting…',
   'Submit annotations': 'Submit annotations',
   提交批注: 'Submit annotations',
-  'Finish selecting': 'Finish selecting',
-  结束选择: 'Finish selecting',
-  'Select objects': 'Select objects',
-  选择对象: 'Select objects',
   Annotations: 'Annotations',
   'Annotation directory': 'Annotation directory',
   批注目录: 'Annotation directory',
@@ -124,13 +117,6 @@ const en = {
   '请先保存或取消正在编辑的批注。': 'Save or cancel the annotation being edited first.',
   'Select at least one location.': 'Select at least one location.',
   '请至少选择一个位置。': 'Select at least one location.',
-  'Save or cancel the overall annotation being edited first.':
-    'Save or cancel the overall annotation being edited first.',
-  '请先保存或取消正在编辑的整体批注。': 'Save or cancel the overall annotation being edited first.',
-  'Click Annotation first, then save or cancel the selected locations.':
-    'Click Annotation first, then save or cancel the selected locations.',
-  '请先点击“批注”，保存或取消所选位置。':
-    'Click Annotation first, then save or cancel the selected locations.',
   Description: 'Description',
   说明: 'Description',
   'Questionnaire description': 'Questionnaire description',
@@ -229,10 +215,6 @@ const en = {
   '包含…': 'Contains…',
   'Selection help': 'Selection help',
   选择帮助: 'Selection help',
-  'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.':
-    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.',
-  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「批注」保存到页面草稿。普通文字圈选无需开启选择对象。':
-    'Column selection covers the entire input column; the header checkbox selects rows on the current page. Select rows, columns or cells, then click Annotation to save to the page draft. Text selection works without enabling Select objects.',
   'Current view filters': 'Current view filters',
   当前视图条件: 'Current view filters',
   'Remove filter {label}': 'Remove filter {label}',
@@ -266,11 +248,6 @@ const en = {
   批注操作: 'Annotation actions',
   'Correct feedback': 'Correct feedback',
   修改反馈: 'Correct feedback',
-  'Select the entire document': 'Select the entire document',
-  选择整篇文档: 'Select the entire document',
-  'Select content or write an annotation before submitting.':
-    'Select content or write an annotation before submitting.',
-  '请选择内容或填写意见后再提交。': 'Select content or write an annotation before submitting.',
   'Diff actions': 'Diff actions',
   差异操作: 'Diff actions',
   'Locate current difference': 'Locate current difference',
@@ -296,8 +273,6 @@ const en = {
   'Select a valid continuous line range on this side.':
     'Select a valid continuous line range on this side.',
   '请选择该侧有效的连续行范围。': 'Select a valid continuous line range on this side.',
-  'Select {side} line {number}': 'Select {side} line {number}',
-  '选择{side}侧第 {number} 行': 'Select {side} line {number}',
   old: 'old',
   旧: 'Old',
   new: 'new',
@@ -318,8 +293,6 @@ const en = {
   起始行: 'Start line',
   'End line': 'End line',
   结束行: 'End line',
-  'Select continuous lines': 'Select continuous lines',
-  选择连续行: 'Select continuous lines',
   '(changed block)': '(changed block)',
   '（改动块）': '(changed block)',
   'The text is identical; expand to view context.':
@@ -327,6 +300,12 @@ const en = {
   '文本内容相同；可展开查看上下文。': 'The text is identical; expand to view context.',
   'Changed files': 'Changed files',
   改动文件: 'Changed files',
+  'Select revisions to compare': 'Select revisions to compare',
+  'Choose a base revision, then click Compare.': 'Choose a base revision, then click Compare.',
+  'Working tree clean': 'Working tree clean',
+  'There are no uncommitted file changes.': 'There are no uncommitted file changes.',
+  'No file differences between these revisions': 'No file differences between these revisions',
+  'No file changes in this commit': 'No file changes in this commit',
   'No file changes in this scope.': 'No file changes in this scope.',
   '该范围没有文件改动。': 'No file changes in this scope.',
   'Git review': 'Git review',
@@ -357,6 +336,7 @@ const en = {
   'Commit endpoint comparison': 'Commit endpoint comparison',
   提交端点比较: 'Commit endpoint comparison',
   Compare: 'Compare',
+  'Compare with current branch': 'Compare with current branch',
   比较: 'Compare',
   'Read failed': 'Read failed',
   读取失败: 'Read failed',
@@ -580,6 +560,8 @@ const en = {
   ' (merge commit; showing first-parent diff only)':
     ' (merge commit; showing first-parent diff only)',
   'Root commit {commit}; relative to empty tree': 'Root commit {commit}; relative to empty tree',
+  'Save at least one annotation before submitting.':
+    'Save at least one annotation before submitting.',
   'Pinned history tip {tip}': 'Pinned history tip {tip}',
   'Empty repository: no commit history': 'Empty repository: no commit history',
   'Three-dot comparison, merge base {old} → {head}':
@@ -595,8 +577,6 @@ const en = {
     'Binary or nonordinary object: file-level feedback only.',
   'Unmerged conflict: working file shown; index stages are not combined into a staged result.':
     'Unmerged conflict: working file shown; index stages are not combined into a staged result.',
-  '首次提交需要选择内容或填写整体意见。':
-    'First submission requires selected content or an overall annotation.',
   'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.':
     'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.',
   'Request not saved: {error}': 'Request not saved: {error}',
@@ -609,13 +589,9 @@ const en = {
     'Original PR snapshot is missing; it cannot be reassigned to new content.',
   'Original snapshot is missing; draft retained.': 'Original snapshot is missing; draft retained.',
   unavailable: 'Unavailable',
-  'First submission requires selected content or an overall annotation.':
-    'First submission requires selected content or an overall annotation.',
-  'Concurrency limit (1–4)': 'Concurrency limit (1–4)',
   Pause: 'Pause',
   Play: 'Play',
   Replay: 'Replay',
-  'Advance 1 second': 'Advance 1 second',
   'Exploring freely': 'Exploring freely',
   'Demo complete': 'Demo complete',
   'Next demo step {step}/{total}': 'Next demo step {step}/{total}',
@@ -625,8 +601,6 @@ const en = {
   'Next window boundary': 'Next window boundary',
   'Visit current window': 'Visit current window',
   'Record 1 PASS': 'Record 1 PASS',
-  'Please enter an integer from 1 to 4; the current schedule is unchanged.':
-    'Please enter an integer from 1 to 4; the current schedule is unchanged.',
   'Please enter an integer from -1000000 to 1000000 milliseconds.':
     'Please enter an integer from -1000000 to 1000000 milliseconds.',
   'Saved to the AI as event {id}. Resume the conversation to read it; this page does not wake the AI automatically.':
@@ -644,6 +618,13 @@ const en = {
     'Binary, invalid UTF-8, symbolic link or gitlink: file-level annotations only; links and submodules are not followed.',
   'Review:': 'Review:',
   'Merge:': 'Merge:',
+  'Revision type': 'Revision type',
+  'Choose a revision': 'Choose a revision',
+  'Choose {label}': 'Choose {label}',
+  'Use revision {revision}': 'Use revision {revision}',
+  'Use this revision': 'Use this revision',
+  'Branch, tag or commit ID': 'Branch, tag or commit ID',
+  Branches: 'Branches',
   Base: 'Base',
   Head: 'Head',
   'deleted user': 'deleted user',

@@ -4,7 +4,7 @@
 
 ## 当前采用方向（B39）
 
-用户在体验后明确要求先沿用成熟项目做法和文案，不足再增加。当前流程演示已对齐 Vercel Skills 固定实现：默认 Project，多目录推荐 Symlink，已有安装在汇总中提示覆盖并统一确认。此前“默认用户级、直接复制、冲突备份”仅是初步建议，已撤回；下文调研事实保持不变，“给 Paneon 的建议”保留为当时建议，不作为当前实施契约。最新方向见 design.md 和 [演示说明](../prototypes/skill-installation/README.md)。安装器尚未实现。
+用户在体验后明确要求先沿用成熟项目做法和文案，不足再增加。当前流程演示已对齐 Vercel Skills 固定实现：默认 Project，多目录推荐 Symlink，已有安装在汇总中提示覆盖并统一确认。此前“默认用户级、直接复制、冲突备份”仅是初步建议，已撤回；下文调研事实保持不变，“给 Paneon 的建议”保留为当时建议，不作为当前实施契约。早期交互演示已删除，安装器现已实现；当前方向及实施契约见 [设计](../design.md) 和 [init 实施契约](../init-implementation.md)。
 
 ## 结论
 
@@ -210,7 +210,7 @@ Paneon 可以复用成熟的终端选择组件。第一版常规多选用库自�
 
 用户继续询问是否需要保留 agent/安装方式/目标位置，以及更新是否应限定当前 cwd。已检查固定版本的 local-lock.ts、skill-lock.ts、update.ts 与 cli.ts：项目级通过 cwd 的 skills-lock.json 读取来源和内容摘要；普通 agent 没有逐 skill 完整记录原目标列表和方式，更新重新调用 add -y。用户级 lastSelectedAgents 仅是上次交互选择。该版本 check/update/upgrade 进入同一个 runUpdate，不能把 check 描述为纯只读检查。
 
-按用户后续 B41 修正，Paneon 安装/更新元数据统一存放 ~/.paneon。当前讨论稿采用集中保存各范围的安装配置，项目级按 cwd 与已登记的绝对路径精确匹配；撤回记录放项目内的建议。无匹配不自动查父级或切用户级，项目搬家后重新登记。未来 update 的 CLI 升级和该范围 skill 同步分开报告，即使程序已经最新也继续同步该范围。JSON 字段、文件位置和交互演示见 [更新演示说明](../prototypes/skill-update/README.md)。这不是 B40 已确认内容，不视为 update 已获开发授权，也不改变本期范围。
+按用户后续 B41 修正，Paneon 安装/更新元数据统一存放 ~/.paneon。当前讨论稿采用集中保存各范围的安装配置，项目级按 cwd 与已登记的绝对路径精确匹配；撤回记录放项目内的建议。无匹配不自动查父级或切用户级，项目搬家后重新登记。未来 update 的 CLI 升级和该范围 skill 同步分开报告，即使程序已经最新也继续同步该范围。这段按 cwd 默认筛选的讨论已由下节 B42 覆盖，旧交互演示已删除；未来更新范围以 [设计中的 B42](../design.md#后续-update-已确认行为b42本迭代不实现) 为准，现有安装记录格式见 [init 实施契约](../init-implementation.md#installation-and-records)。update 仍未获本轮开发授权，不改变本期范围。
 
 更新的目录动作另核对固定版 installer.ts：普通目录经 cleanAndCreateDirectory 清理重建后复制；createSymlink 对目标正确的现有链接直接返回成功。演示据此区分中央副本更新与保留链接，Copy 模式分别刷新目录；没有执行任何实际清理。
 

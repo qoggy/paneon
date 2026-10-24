@@ -604,7 +604,7 @@ export async function readGit(
     if (!request.base) throw new Error('Comparison base is required.');
     const baseCommit = await commitOID(root, request.base, signal),
       headCommit = await commitOID(root, request.head ?? 'HEAD', signal),
-      mode = request.mode ?? 'branch';
+      mode = request.mode ?? 'commits';
     let old = baseCommit,
       mergeBaseCommit: string | undefined;
     if (mode === 'branch') {
@@ -723,4 +723,58 @@ export async function readGitBranches(repositoryPath: string, signal?: AbortSign
     throw error;
   });
   return { refs: catalog.refs, ...(currentBranch === undefined ? {} : { currentBranch }) };
+}
+
+/** Branch activity is its tip commit time; tags use creation time (commit time for lightweight tags). */
+export type GitRevision = {
+  name: string;
+  ref: string;
+  kind: 'branch' | 'tag';
+  activity: number;
+  isDefault?: boolean;
+};
+export async function readGitRevisions(
+  params: GitReviewParams,
+  repositoryId: string,
+  signal?: AbortSignal,
+): Promise<GitRevision[]> {
+  const root = await repository(params, repositoryId, signal);
+  const output = await text(
+    root,
+    [
+      'for-each-ref',
+      '--format=%(refname)%00%(refname:short)%00%(creatordate:unix)%00%(symref)',
+      'refs/heads',
+      'refs/remotes',
+      'refs/tags',
+    ],
+    signal,
+  );
+  const records = output
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.split('\0'));
+  const defaults = new Map<string, string>();
+  for (const [ref, , , symbolic] of records) {
+    const remoteHead = /^refs\/remotes\/([^/]+)\/HEAD$/.exec(ref);
+    if (remoteHead && symbolic) defaults.set(remoteHead[1], symbolic);
+  }
+  // Prefer origin for the corresponding local default, as in the branch sidebar.
+  const preferred = defaults.get('origin') ?? defaults.values().next().value;
+  const localDefault = preferred?.replace(/^refs\/remotes\/[^/]+\//, 'refs/heads/');
+  const remoteDefaults = new Set(defaults.values());
+  return records
+    .map(([ref, name, activity]) => ({
+      ref,
+      name,
+      kind: ref.startsWith('refs/tags/') ? ('tag' as const) : ('branch' as const),
+      activity: Number(activity),
+      ...(ref === localDefault || remoteDefaults.has(ref) ? { isDefault: true } : {}),
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.kind === 'tag') - Number(b.kind === 'tag') ||
+        b.activity - a.activity ||
+        a.name.localeCompare(b.name),
+    );
 }

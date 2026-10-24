@@ -1,3 +1,4 @@
+import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -133,7 +134,7 @@ try {
     );
     assert.equal(await button('选择对象').count(), 0);
     assert.equal(await frame.getByRole('checkbox').count(), 0);
-    const headerLabel = frame.locator('[data-column-key="note"] [data-feedback-text]');
+    const headerLabel = frame.locator('[data-column-key="note"] [data-annotation-text]');
     await headerLabel.scrollIntoViewIfNeeded();
     const frameBox = await page.locator('iframe').boundingBox();
     const selectionPoints = await headerLabel.evaluate((node, iframe) => {
@@ -164,7 +165,7 @@ try {
       '3',
     );
     assert.equal(await comments.text(1), '列名说明');
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await frame.getByRole('status').waitFor();
     const first = (await fixture.events(fixture.normal)).at(-1);
     assert.deepEqual(first.payload.annotations[0].targets, [
@@ -174,7 +175,7 @@ try {
     await comments.edit(1);
     await frame.getByLabel('批注内容', { exact: true }).fill('列名更正');
     await comments.save();
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await frame.getByRole('status').waitFor();
     const correction = (await fixture.events(fixture.normal)).at(-1);
     assert.equal(correction.payload.replacesEventId, first.id);
@@ -186,7 +187,7 @@ try {
       await longHeader.evaluate((head) => head.scrollWidth <= head.clientWidth + 1),
       'long heading wraps within its column',
     );
-    const source = frame.locator('[data-cell-key="note"] [data-feedback-text]');
+    const source = frame.locator('[data-cell-key="note"] [data-annotation-text]');
     assert.equal(await source.textContent(), longNote);
     assert.equal(
       await source.evaluate((node) => node.childNodes.length),
@@ -219,7 +220,7 @@ try {
     const longComments = annotationTools(frame, page);
     await longComments.write('原文坐标');
     await longComments.save();
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await frame.getByRole('status').waitFor();
     const event = (await fixture.events(fixture.long)).at(-1);
     assert.deepEqual(event.payload.annotations[0].targets[0], {

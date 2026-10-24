@@ -67,7 +67,7 @@ try {
     [
       'panel',
       'run',
-      join(repositoryRoot, 'examples/decision-panel.tsx'),
+      join(repositoryRoot, 'tests/fixtures/panels/decision-panel.tsx'),
       '--cwd',
       repositoryRoot,
       '--params',

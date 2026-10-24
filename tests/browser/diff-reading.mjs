@@ -1,3 +1,4 @@
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,6 +20,8 @@ try {
     entry,
     await readFile(new URL('./diff-reading-fixture.txt', import.meta.url), 'utf8'),
   );
+  await mkdir(join(root, 'data'), { recursive: true });
+  await writeFile(join(root, 'data', 'config.json'), JSON.stringify({ server: { port: 0 } }));
   service = await startServer(join(root, 'data'));
   const prefs = async (theme, language) =>
     service.app.inject({
@@ -200,8 +203,8 @@ try {
   for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowLeft');
   await oldPane.evaluate((e) => (e.scrollLeft = 0));
   await button('定位当前差异').click();
-  await button('选择对象').click();
-  await button('选择新侧第 290 行').click();
+
+  await selectDiffLines(frame, 'new', 290);
   // Own the handful of real UI actions here so this regression is independently
   // runnable before or after the parallel annotation terminology migration.
   const input = frame.getByLabel(/^(?:批注|评论)内容$/);
@@ -242,7 +245,7 @@ try {
   await assertSeparatorGeometry();
   const marked = await annotations.text(1);
   assert.equal(marked, 'Exact line after resize');
-  await button('结束选择').click();
+
   const scrollBefore = await viewport.evaluate((e) => e.scrollTop),
     saved = await source.evaluate((e) => ((globalThis.diffIdentity = e), true));
   assert.equal(saved, true);
@@ -282,17 +285,19 @@ try {
   }
   await prefs('light', 'zh-CN');
   await page.waitForTimeout(100);
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(
-    await frame.locator('body').evaluate((e) => e.scrollWidth > window.innerWidth),
-    false,
-  );
-  assert.ok((await left()) > 80);
-  assert.ok((await newPane.evaluate((e) => e.clientWidth)) > 80);
-  await divider.focus();
-  await page.keyboard.press('Home');
-  await page.keyboard.press('ArrowRight');
-  await page.screenshot({ path: join(evidence, 'mobile.png') });
+  if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await frame.locator('body').evaluate((e) => e.scrollWidth > window.innerWidth),
+      false,
+    );
+    assert.ok((await left()) > 80);
+    assert.ok((await newPane.evaluate((e) => e.clientWidth)) > 80);
+    await divider.focus();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowRight');
+    await page.screenshot({ path: join(evidence, 'mobile.png') });
+  }
   for (const kind of ['added', 'deleted', 'same']) {
     await button(kind).click();
     await page.waitForTimeout(120);

@@ -63,7 +63,7 @@ try {
       await frame.locator(`html[lang="${language}"][data-theme="${theme}"]`).waitFor();
       await frame
         .getByRole('button', {
-          name: language === 'en' ? 'Submit annotations' : '提交批注',
+          name: language === 'en' ? /^Annotations \(\d+\)$/ : /^批注 \(\d+\)$/,
           exact: true,
         })
         .waitFor();

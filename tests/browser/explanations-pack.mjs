@@ -18,8 +18,8 @@ try {
   const files = new Set(metadata.files.map((file) => file.path));
   for (const file of [
     'references/examples.md',
-    'assets/examples/concurrency/panel.tsx',
-    'assets/examples/concurrency/model.ts',
+    'assets/examples/dining-philosophers/panel.tsx',
+    'assets/examples/dining-philosophers/model.ts',
     'assets/examples/sentinel-leap-array/panel.tsx',
     'assets/examples/sentinel-leap-array/model.ts',
   ])

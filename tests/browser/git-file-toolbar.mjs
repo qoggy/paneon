@@ -10,6 +10,7 @@ const f = await startGitReviewFixture();
 const execute = promisify(execFile);
 const artifacts = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-git-file-toolbar';
 let browser, page;
+const errors = [];
 try {
   await mkdir(artifacts, { recursive: true });
   const repository = join(f.root, 'toolbar-repo');
@@ -34,8 +35,7 @@ try {
   const params = { repositories: [{ id: 'toolbar', path: repository }] };
   browser = await chromium.launch({ headless: true, channel: 'chrome' });
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const errors = [],
-    calls = [];
+  const calls = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => {
     if (request.url().includes('/actions/')) calls.push(request.postDataJSON()?.input);
@@ -64,6 +64,41 @@ try {
   assert.equal(await files.first().locator('[data-file-parent]').textContent(), 'src/nested');
   assert.equal(await frame.locator('[data-git-diff-scroll]').count(), 0);
   const firstId = await files.first().getAttribute('data-file-id');
+  async function checkFileActivation() {
+    const target = files.last();
+    const id = await target.getAttribute('data-file-id');
+    const before = calls.length;
+    await target.click();
+    assert.equal(await target.getAttribute('aria-pressed'), 'true');
+    await page.waitForTimeout(200);
+    assert.equal(calls.length, before, 'Single-click only selects and does not read Git');
+    assert.equal(await frame.locator('[data-git-diff-scroll]').count(), 0);
+    await target.dblclick();
+    await frame.locator('[data-diff-source]').waitFor();
+    assert.equal(await target.getAttribute('aria-pressed'), 'true');
+    const openedSource = await frame.locator('[data-diff-source]').getAttribute('data-diff-source');
+    await files.first().click();
+    assert.equal(await files.first().getAttribute('aria-pressed'), 'true');
+    assert.equal(
+      await frame.locator('[data-diff-source]').getAttribute('data-diff-source'),
+      openedSource,
+      'Single-click preserves the open diff',
+    );
+    await openDiff.click();
+    await frame
+      .locator(`[data-diff-source]:not([data-diff-source=${JSON.stringify(openedSource)}])`)
+      .waitFor();
+    await button('收起文件差异').click();
+    await target.focus();
+    await target.press('Enter');
+    await frame.locator('[data-git-diff-scroll]').waitFor({ state: 'visible' });
+    assert.equal(await target.getAttribute('data-file-id'), id);
+    await button('收起文件差异').click();
+  }
+  await checkFileActivation();
+  // Restore no selection to exercise the toolbar's first-file fallback.
+  await page.goto(f.url(changes));
+  await waitForFiles(3);
   assert.equal(await openDiff.isEnabled(), true);
   assert.equal(await toolbar.getByRole('button').count(), 4);
   for (const label of ['查看文件差异', '按目录分组', '全部展开', '全部折叠']) {
@@ -71,10 +106,14 @@ try {
     assert.equal((await control.innerText()).trim(), '');
     const box = await control.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
-    await frame.getByRole('tooltip', { name: label, exact: true }).waitFor({ timeout: 5000 });
+    await frame
+      .locator('[data-slot=\"tooltip-content\"]')
+      .filter({ hasText: label })
+      .waitFor({ timeout: 5000 });
     await page.mouse.move(500, 500, { steps: 10 });
     await frame
-      .getByRole('tooltip', { name: label, exact: true })
+      .locator('[data-slot=\"tooltip-content\"]')
+      .filter({ hasText: label })
       .waitFor({ state: 'hidden', timeout: 5000 });
   }
   const boxes = await toolbar
@@ -161,6 +200,9 @@ try {
     await waitForFiles(3);
     assert.equal(await groupToggle.getAttribute('aria-pressed'), 'true');
     assert.equal(await frame.locator('[data-git-diff-scroll]').count(), 0);
+    await checkFileActivation();
+    await page.goto(f.url(panel));
+    await waitForFiles(3);
     await collapse.click();
     assert.equal(await files.count(), 1, 'Root files remain visible when directories collapse');
     await expand.click();
@@ -201,14 +243,28 @@ try {
   assert.equal(await openDiff.isDisabled(), true);
   assert.equal(await expand.isDisabled(), true);
   assert.equal(await collapse.isDisabled(), true);
+  await git('clean', '-fd');
+  const emptyChanges = await f.run({
+    ...params,
+    initialView: { repositoryId: 'toolbar', type: 'changes' },
+  });
+  await page.goto(f.url(emptyChanges));
+  const emptyMessage = frame.getByText('该范围没有文件改动。', { exact: true });
+  await emptyMessage.waitFor();
+  const toolbarBox = await toolbar.boundingBox();
+  const emptyBox = await emptyMessage.boundingBox();
+  assert.ok(emptyBox.y >= toolbarBox.y + toolbarBox.height, 'Empty state follows the toolbar');
+  assert.equal(await toolbar.getByRole('button').count(), 4);
+  assert.equal(await openDiff.isDisabled(), true);
   assert.deepEqual(errors, []);
   assert.equal((await f.events(changes)).length, 0);
   console.log(JSON.stringify({ status: 'passed', artifacts, errors }));
 } catch (error) {
+  console.error(error, { errors });
   await page?.screenshot({ path: join(artifacts, 'failure.png'), fullPage: true });
   for (const content of page?.frames() ?? []) {
     if (content.url().endsWith('/frame.html'))
-      console.error(await content.locator('[data-file-tree]').evaluate((el) => el.outerHTML));
+      console.error(await content.locator('body').innerText());
   }
   throw error;
 } finally {

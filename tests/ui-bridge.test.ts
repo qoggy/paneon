@@ -45,3 +45,28 @@ void test('host bridge accepts only its exact iframe source', () => {
   assert.equal(validSource({}, frame), false);
   assert.equal(validSource(null, null), false);
 });
+void test('diagram browser operations require the existing bridge identity and typed payload', () => {
+  const request = {
+    ...identity,
+    direction: 'request',
+    requestId: 'diagram-export',
+    method: 'browser',
+    payload: { kind: 'copy-text', text: 'flowchart LR\n A --> B' },
+  };
+  assert.equal(validRequest(request, identity), true);
+  assert.equal(validRequest({ ...request, revision: 'old' }, identity), false);
+  for (const kind of ['copy-image', 'download-image']) {
+    assert.equal(
+      validRequest({ ...request, payload: { kind, svg: '<svg/>', background: 'white' } }, identity),
+      true,
+    );
+    assert.equal(validRequest({ ...request, payload: { kind, svg: '<svg/>' } }, identity), false);
+  }
+  for (const payload of [
+    { kind: 'copy-text', text: 123 },
+    { kind: 'open-url', url: 'file:///tmp/private' },
+    { kind: 'download-image', svg: null, background: 'white' },
+    { kind: 'copy-image', svg: '<svg/>', background: 123 },
+  ])
+    assert.equal(validRequest({ ...request, payload }, identity), false);
+});

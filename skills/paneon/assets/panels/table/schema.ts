@@ -1,6 +1,6 @@
-import { feedbackSchema, z } from 'paneon/sdk';
-import type { FeedbackTarget } from 'paneon/sdk';
-import { validSourceRange } from '../../shared/markdown-feedback-schema.ts';
+import { annotationValueSchema, z } from 'paneon/sdk';
+import type { AnnotationTarget } from 'paneon/sdk';
+import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 const label = z.string().refine((value) => value.trim().length > 0, 'Must not be blank.');
 const cell = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
 // Preserve unrestricted own data keys, including __proto__, while keeping metadata serializable.
@@ -91,12 +91,12 @@ export const tableRefSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 export type TableRef = z.infer<typeof tableRefSchema>;
-export const tableSubmittedSchema = feedbackSchema(tableRefSchema).safeExtend({
+export const tableSubmittedSchema = annotationValueSchema(tableRefSchema).safeExtend({
   replacesEventId: z.number().int().positive().optional(),
 });
 export function tableTargetError(
   params: TableParams,
-  target: FeedbackTarget<TableRef>,
+  target: AnnotationTarget<TableRef>,
 ): string | null {
   const ref = tableRefSchema.safeParse(target.ref);
   if (!ref.success) return 'Invalid table reference.';
@@ -128,10 +128,10 @@ export function completeTableSchema(params: TableParams) {
           ctx.addIssue({ code: 'custom', path: ['annotations', index, 'targets', at], message });
       }),
     );
-    if (value.replacesEventId === undefined && !value.annotations.length && !value.comment?.trim())
+    if (value.replacesEventId === undefined && !value.annotations.length)
       ctx.addIssue({
         code: 'custom',
-        message: 'Select content or write feedback before submitting.',
+        message: 'Save at least one annotation before submitting.',
       });
   });
 }

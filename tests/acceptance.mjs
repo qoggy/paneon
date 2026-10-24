@@ -3,5 +3,5 @@ import { acceptance, repositoryRoot } from './acceptance-support.mjs';
 
 await acceptance({
   cliPath: join(repositoryRoot, 'dist/cli/index.js'),
-  examplesPath: join(repositoryRoot, 'examples'),
+  fixturesPath: join(repositoryRoot, 'tests/fixtures/panels'),
 });

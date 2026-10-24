@@ -2,7 +2,9 @@ import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-export async function startExplanationsFixture() {
+export async function startExplanationsFixture(
+  names = ['dining-philosophers', 'sentinel-leap-array'],
+) {
   const { startServer } = await import(
     process.env.PANEON_TEST_RUNTIME_ENTRY ??
       new URL('../../dist/runtime/server.js', import.meta.url).href
@@ -27,7 +29,7 @@ export async function startExplanationsFixture() {
       payload: { ui: { language: 'zh-CN' } },
     });
     const panels = {};
-    for (const name of ['concurrency', 'sentinel-leap-array'])
+    for (const name of names)
       panels[name] = await service.runtime.run(
         join(skill, `assets/examples/${name}/panel.tsx`),
         root,

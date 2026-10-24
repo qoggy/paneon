@@ -11,7 +11,7 @@ import {
   reviewParamsSchema,
   completeReviewSchema,
 } from '../skills/paneon/assets/panels/review/schema.ts';
-import { markdownOffsets } from '../skills/paneon/assets/shared/markdown-feedback-mapper.ts';
+import { markdownOffsets } from '../src/ui/markdown-annotation-mapper.ts';
 const table = () =>
   tableParamsSchema.parse({
     title: 'Table',
@@ -92,17 +92,24 @@ void test('table complete result validates mixed targets, independent entries, o
   const start = source.lastIndexOf('repeat');
   first.targets[2].text = { start, end: source.length, quote: 'repeat' };
   assert.equal(
-    schema.safeParse({ annotations: [first, { ...first, id: 'b', comment: 'Separate opinion' }] })
-      .success,
+    schema.safeParse({
+      annotations: [first, { ...first, id: 'b', comment: 'Separate opinion' }],
+    }).success,
     true,
   );
   assert.equal(schema.safeParse({ annotations: [] }).success, false);
   assert.equal(schema.safeParse({ annotations: [], replacesEventId: 1 }).success, true);
-  assert.equal(schema.safeParse({ annotations: [], comment: 'overall' }).success, true);
+  assert.equal(
+    schema.safeParse({ annotations: [], comment: 'removed page-level field' }).success,
+    false,
+  );
   for (const target of [
     { ref: { kind: 'row', rowIndex: 4 } },
     { ref: { kind: 'column', columnKey: 'unknown' } },
-    { ref: { kind: 'cell', rowIndex: 0, columnKey: 'n' }, text: { start: 0, end: 1, quote: '2' } },
+    {
+      ref: { kind: 'cell', rowIndex: 0, columnKey: 'n' },
+      text: { start: 0, end: 1, quote: '2' },
+    },
     {
       ref: { kind: 'cell', rowIndex: 0, columnKey: 'name' },
       text: { start: 9, end: 10, quote: source.slice(9, 10) },
@@ -200,8 +207,9 @@ void test('table header references distinguish labels from full columns and pres
   ];
   for (const target of valid) assert.equal(tableTargetError(params, target), null);
   assert.equal(
-    schema.safeParse({ annotations: [{ id: 'headers', targets: valid, comment: 'Header text' }] })
-      .success,
+    schema.safeParse({
+      annotations: [{ id: 'headers', targets: valid, comment: 'Header text' }],
+    }).success,
     true,
   );
   for (const target of [
@@ -246,4 +254,19 @@ void test('table header references distinguish labels from full columns and pres
       true,
     );
   assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
+});
+
+void test('table and review reject page-level comments even on corrections', () => {
+  const schemas = [
+    completeTableSchema(table()),
+    completeReviewSchema({ title: 'Review', markdown: 'Source' }),
+  ];
+  for (const schema of schemas) {
+    assert.equal(schema.safeParse({ annotations: [], comment: 'removed' }).success, false);
+    assert.equal(
+      schema.safeParse({ annotations: [], comment: '', replacesEventId: 1 }).success,
+      false,
+    );
+    assert.equal(schema.safeParse({ annotations: [], replacesEventId: 1 }).success, true);
+  }
 });

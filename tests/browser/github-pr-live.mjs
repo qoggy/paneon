@@ -35,11 +35,11 @@ try {
   await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`);
   const frame = page.frameLocator('iframe');
   await frame.locator('[data-pr-overview]').waitFor({ timeout: 60000 });
-  await frame.getByRole('button', { name: '文件改动', exact: true }).click();
+  await frame.getByRole('tab', { name: '文件改动', exact: true }).click();
   await frame.locator('[data-diff-source]').waitFor({ timeout: 60000 });
   const fixedSource = await frame.locator('[data-diff-source]').getAttribute('data-diff-source');
   assert.match(fixedSource, /^sha256:/);
-  await frame.getByRole('button', { name: '检查', exact: true }).click();
+  await frame.getByRole('tab', { name: '检查', exact: true }).click();
   await frame.locator('[data-pr-check]').first().waitFor({ timeout: 60000 });
   const checks = await frame.locator('[data-pr-check]').count();
   assert.equal(

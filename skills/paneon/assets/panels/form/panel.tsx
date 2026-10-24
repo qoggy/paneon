@@ -183,8 +183,9 @@ function FormPanel() {
                   {field.type === 'select' && (
                     <div className="flex max-w-72 min-w-0 items-center gap-1">
                       <Select
-                        value={String(value)}
-                        onValueChange={(selected) => update(field.name, selected)}
+                        items={field.options}
+                        value={String(value) || null}
+                        onValueChange={(selected) => update(field.name, selected ?? '')}
                         disabled={submission.pending}
                       >
                         <SelectTrigger {...props} className="min-w-0 flex-1">

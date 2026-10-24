@@ -189,13 +189,13 @@ radius, or control height. `Page`, `Section`, and `Stack` only supply layout.
 | Main component(s) | Companion exports |
 | --- | --- |
 | `Page`, `Section`, `Stack` | Page/section title and description; Stack direction, gap, and wrapping |
-| `Button` | Standard button props, variants, size, `asChild` |
+| `Button` | Standard button props, variants, size, `render` |
 | `Input`, `Label` | Standard input and label composition |
 | `Field` | `FieldContent`, `FieldLabel`, `FieldTitle`, `FieldDescription`, `FieldError`, `FieldGroup`, `FieldSet`, `FieldLegend`, `FieldSeparator` |
 | `Card` | `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter` |
 | `RadioGroup`, `Checkbox` | `RadioGroupItem`; controlled/uncontrolled values |
 | `Textarea` | Standard multiline input props |
-| `Select` | `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`, `SelectGroup`, `SelectLabel`, `SelectSeparator` |
+| `Select` | `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`, `SelectGroup`, `SelectLabel`, `SelectSeparator`; provide `items` for value-to-label display |
 | `Badge`, `StatusBadge` | Same badge variants; author supplies content |
 | `Alert`, `Spinner` | `AlertTitle`, `AlertDescription`; accessible loading label |
 | `Table` | `TableHeader`, `TableBody`, `TableFooter`, `TableRow`, `TableHead`, `TableCell`, `TableCaption` |
@@ -203,14 +203,14 @@ radius, or control height. `Page`, `Section`, and `Stack` only supply layout.
 | `Tabs` | `TabsList`, `TabsTrigger`, `TabsContent` |
 | `Dialog` | `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter`, `DialogClose` |
 | `AlertDialog` | `AlertDialogTrigger`, `AlertDialogContent`, `AlertDialogHeader`, `AlertDialogTitle`, `AlertDialogDescription`, `AlertDialogFooter`, `AlertDialogAction`, `AlertDialogCancel` |
-| `Accordion` | `AccordionItem`, `AccordionTrigger`, `AccordionContent` |
+| `Accordion` | `AccordionItem`, `AccordionTrigger`, `AccordionContent`; `multiple` and array values |
 | `Collapsible` | `CollapsibleTrigger`, `CollapsibleContent` |
 | `Tooltip` | `TooltipProvider`, `TooltipTrigger`, `TooltipContent`; provider is also installed in the panel root |
 | `DropdownMenu` | `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuGroup`, `DropdownMenuLabel`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuShortcut`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioGroup`, `DropdownMenuRadioItem`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent` |
-| `Popover` | `PopoverTrigger`, `PopoverContent`, `PopoverAnchor` |
+| `Popover` | `PopoverTrigger`, `PopoverContent`; virtual positioning uses the content’s `anchor` prop |
 | `Switch` | Controlled/uncontrolled boolean control |
 | `CodeBlock` | `code: string`, optional `language` |
-| `Markdown` | Markdown string as children, including fenced Mermaid diagrams |
+| `Markdown` | Markdown string as children, optional `annotationTarget` inside an `AnnotationRoot`, including fenced Mermaid diagrams |
 | `Mermaid` | `code: string`, optional `className` |
 
 Companion exports belong to their main component families. Slider is not included.
@@ -222,7 +222,7 @@ families for structure. Input values, validation, modal confirmation, and action
 remain explicit author code. Merely opening a dialog or changing a switch does
 not automatically send events or execute functions.
 
-Label controls and provide dialog titles and descriptions. For reusable selection and annotations, see [Feedback](feedback.md); no fixed header, sidebar or page layout is required.
+Label controls and provide dialog titles and descriptions. For reusable selection and annotations, see [Annotations](annotations.md); no fixed header, sidebar or page layout is required.
 
 CodeBlock uses bundled Shiki JavaScript highlighting for javascript/js,
 typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, and diff. Unknown or absent
@@ -231,7 +231,7 @@ languages are plain text. The content is read-only and never executed.
 Markdown uses `react-markdown` + `remark-gfm` and the community-maintained
 `github-markdown-css` light stylesheet in a scoped container. It renders GFM
 tables, strikethrough, read-only task lists, and automatic links. Raw HTML parsing
-is disabled by default. It is a read-only renderer. To collect exact document feedback, reuse the [Markdown adapter](feedback.md#complex-content-adapters). Styles are loaded inside the panel iframe.
+is disabled by default. It is a read-only renderer. To collect exact document annotations, pass `annotationTarget` inside an existing `AnnotationRoot`; see [annotations](annotations.md#complex-content-adapters). Styles are loaded inside the panel iframe.
 
 Trusted TSX can pass `components` overrides and `rehypePlugins`. They compose with the default renderers; replacing `pre` explicitly also replaces its Mermaid handling. For example:
 
@@ -323,6 +323,6 @@ copy selection and compatibility boundaries, see [interface preferences](prefere
 
 ## Reuse Git readers and a string Diff
 
-The skill's [Git component module](../assets/panels/git-review/components.tsx) exports `GitBranches`, `GitCommitGraph`, `GitChangedFiles` and their corresponding hooks. Supply a `repositoryPath`, semantic branch/fixed commit/view, controlled selection and callbacks; the module owns named server-action reads, fixed-tip paging and lazy file contents. See [Git review contracts](git-review.md#independent-git-readers) and the [minimal custom TSX](../assets/examples/git-components/panel.tsx). They are skill assets and do not require a new public package export.
+The skill's [Git component module](../assets/panels/git-review/components.tsx) exports `GitBranches`, `GitCommitGraph`, `GitChangedFiles` and their corresponding hooks. Supply a `repositoryPath`, semantic branch/fixed commit/view, controlled selection and callbacks; the module owns named server-action reads, fixed-tip paging and lazy file contents. See [Git review contracts](git-review.md#independent-git-readers). They are skill assets and do not require a new public package export.
 
-`<DiffView oldText="before\n" newText="after\n" />` from [diff.tsx](../assets/shared/diff.tsx) works without a repository, Git session, source ID or FeedbackProvider. Supply `sourceId` inside an author-owned Provider to opt into annotations. Keep original displayed versions in browser memory while drafts or corrections reference them; Git's evidence builder creates a complete explicit submission, and its validator needs only that request plus configured repository scope. Closing/reloading a page can discard unsubmitted drafts. Do not silently move an old annotation onto new file content.
+`<DiffView oldText="before\n" newText="after\n" />` from `paneon/ui` works without a repository, Git session, source ID or AnnotationRoot. Supply `sourceId` inside an author-owned Provider to opt into annotations. Keep original displayed versions in browser memory while drafts or corrections reference them; Git's evidence builder creates a complete explicit submission, and its validator needs only that request plus configured repository scope. Closing/reloading a page can discard unsubmitted drafts. Do not silently move an old annotation onto new file content.

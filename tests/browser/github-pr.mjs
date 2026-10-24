@@ -1,3 +1,5 @@
+import { submitAnnotations } from './annotation-tools.mjs';
+import { selectDiffLines, selectAnnotationText } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -24,36 +26,46 @@ async function completeAcceptance() {
       headless: true,
       channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
     });
-    page = await browser.newPage();
+    page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(f.url());
     const frame = page.frameLocator('iframe'),
       button = (name) => frame.getByRole('button', { name, exact: true });
     const comments = annotationTools(frame, page);
-    await frame
-      .getByRole('heading', { name: 'GitHub PR · example/project', exact: true })
-      .waitFor();
-    await frame.getByRole('heading', { name: '#101 Review cache behavior', exact: true }).waitFor();
-    await frame.locator('[data-markdown-feedback]').waitFor();
+    await frame.getByRole('heading', { name: 'example/project', exact: true }).waitFor();
+    await frame.getByRole('heading', { name: 'Review cache behavior #101', exact: true }).waitFor();
+    await frame.locator('[data-markdown-annotation]').waitFor();
+    if (process.env.PANEON_TEST_ARTIFACTS) {
+      await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });
+      await page.screenshot({
+        path: join(process.env.PANEON_TEST_ARTIFACTS, 'pr-overview.png'),
+        fullPage: true,
+      });
+    }
     const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
     const clear = () => content.evaluate(() => document.getSelection().removeAllRanges());
     const finish = () => comments.save();
     const comment = () => ({ fill: (value) => comments.write(value) });
     await comments.assertNoLegacySection();
     // gh --limit is a growing maximum, never a claimed cursor.
-    await button('加载更多（增加 30）').click();
-    await frame.getByText('已加载 31 条；', { exact: false }).waitFor();
+    await button('加载更多').click();
+    await frame.getByText('已加载 31 条', { exact: false }).waitFor();
     await frame.getByLabel('搜索 PR', { exact: true }).fill('第二个');
     await button('搜索').click();
-    await frame.getByText('已加载 1 条；', { exact: false }).waitFor();
+    await frame.getByText('已加载 1 条', { exact: false }).waitFor();
     await frame.getByLabel('搜索 PR', { exact: true }).fill('');
-    await frame.getByLabel('PR 状态', { exact: true }).selectOption('closed');
-    await frame.getByText('已加载 30 条；', { exact: false }).waitFor();
-    await frame.getByLabel('PR 状态', { exact: true }).selectOption('open');
-    await frame.getByText('读取 PR 列表…', { exact: true }).waitFor({ state: 'hidden' });
-    await button('提交批注').click();
-    await frame.getByRole('alert').filter({ hasText: '选择内容' }).waitFor();
+    await frame.getByRole('combobox', { name: 'PR 状态', exact: true }).click();
+    await frame.getByRole('option', { name: '已关闭', exact: true }).click();
+    await frame.getByText('已加载 30 条', { exact: false }).waitFor();
+    await frame.getByRole('combobox', { name: 'PR 状态', exact: true }).click();
+    await frame.getByRole('option', { name: '开放中', exact: true }).click();
+    await frame.getByText('正在加载 PR…', { exact: true }).waitFor({ state: 'hidden' });
+    await submitAnnotations(frame);
+    await frame
+      .getByRole('alert')
+      .filter({ hasText: 'Save at least one annotation before submitting.' })
+      .waitFor();
     assert.equal((await f.events()).length, 0);
     // Native mouse text selection/copy through rendered Markdown.
     const leaf = frame
@@ -118,7 +130,7 @@ async function completeAcceptance() {
     await page.keyboard.press('ControlOrMeta+C');
     assert.equal(await content.evaluate(() => window.copyPrevented), false);
     await clear();
-    await button('选择对象').click();
+
     await leaf.scrollIntoViewIfNeeded();
     await leaf.evaluate((el) => {
       document.activeElement?.blur();
@@ -136,7 +148,9 @@ async function completeAcceptance() {
     // Continuous rendered range crosses emphasis, link and entity; quote retains raw Markdown.
     await content.evaluate(() => {
       document.activeElement?.blur();
-      const leaves = [...document.querySelectorAll('[data-markdown-feedback] [data-source-leaf]')];
+      const leaves = [
+        ...document.querySelectorAll('[data-markdown-annotation] [data-source-leaf]'),
+      ];
       const first = leaves.find((el) => el.textContent.startsWith('重复 缓存'));
       const last = leaves.find((el) => el.textContent.includes('原文。'));
       const r = document.createRange();
@@ -152,32 +166,38 @@ async function completeAcceptance() {
     await clear();
     // Query failure remains distinct from a failed CI result.
     await f.state({ fail: 'checks' });
-    await button('检查').click();
+    await frame.getByRole('tab', { name: '检查', exact: true }).click();
     await frame.getByRole('alert').filter({ hasText: 'checks failure' }).waitFor();
     await f.state({});
-    await button('检查').click();
+    await frame.getByRole('tab', { name: '检查', exact: true }).click();
     await frame.locator('[data-pr-check="CR_NODE_1"]').waitFor();
-    assert.match(await frame.locator('[data-pr-check="CR_NODE_1"]').textContent(), /FAILURE/);
-    await frame.locator('[data-pr-check="CR_NODE_1"]').click();
-    await comment().fill('这次失败的检查');
-    await finish();
+    assert.match(await frame.locator('[data-pr-check="CR_NODE_1"]').textContent(), /未通过/);
+    if (process.env.PANEON_TEST_ARTIFACTS)
+      await page.screenshot({
+        path: join(process.env.PANEON_TEST_ARTIFACTS, 'pr-checks.png'),
+        fullPage: true,
+      });
     await f.state({ fail: 'blob' });
-    await button('文件改动').click();
+    await frame.getByRole('tab', { name: '文件改动', exact: true }).click();
     await frame.getByRole('alert').filter({ hasText: 'blob failure' }).waitFor();
     await f.state({});
-    await button('modified · src/a.ts').click();
+    await button('修改 · src/a.ts').click();
     await frame
       .locator('[data-code-side="new"][data-line="2"]')
       .filter({ hasText: 'n = 2' })
       .waitFor();
-    await button('选择新侧第 2 行').click();
-    await frame.locator('[data-feedback-target]').filter({ hasText: '@@ -' }).click();
+    if (process.env.PANEON_TEST_ARTIFACTS)
+      await page.screenshot({
+        path: join(process.env.PANEON_TEST_ARTIFACTS, 'pr-files.png'),
+        fullPage: true,
+      });
+    await selectDiffLines(frame, 'new', 2);
     await comment().fill('原 head 的代码');
     await finish();
     await button('单列对比').click();
     await button('展开全部上下文').click();
     await button('左右对比').click();
-    // Body and checks can change without a new head. Both old sources remain usable.
+    // A description can change without a new head; its saved text remains locatable.
     await f.state({ version: 1 });
     await button('刷新 PR').click();
     await frame.getByText('新的说明，缓存已经变化。', { exact: true }).waitFor();
@@ -186,7 +206,7 @@ async function completeAcceptance() {
       events: (await f.events()).length,
     };
     await comments.locate(1, 1);
-    await frame.getByText('回看保留快照', { exact: true }).waitFor();
+    await frame.getByText('正在查看先前版本', { exact: true }).waitFor();
     await until(
       async () => (await content.evaluate(() => document.getSelection().toString())) === '缓存',
       'old Markdown phrase was not located exactly',
@@ -204,13 +224,14 @@ async function completeAcceptance() {
     );
     assert.equal(
       await comments.count(),
-      4,
+      3,
       'Locating a phrase then clicking navigation must not create another annotation.',
     );
     await f.state({ version: 1, headVersion: 1 });
     await button('刷新 PR').click();
-    await frame.getByText(`当前版本 ${ids.newer}`, { exact: false }).waitFor();
-    await comments.locate(4, 1);
+    await button('提交版本').click();
+    await frame.locator(`code[title="${ids.newer}"]`).waitFor();
+    await comments.locate(3, 1);
     await frame
       .locator('[data-code-side="new"][data-line="2"]')
       .filter({ hasText: 'n = 2' })
@@ -228,13 +249,13 @@ async function completeAcceptance() {
     await button('返回当前 PR').click();
     await clear();
     await frame.getByRole('button', { name: '#202 第二个 PR', exact: true }).click();
-    await frame.getByRole('heading', { name: '#202 第二个 PR', exact: true }).waitFor();
-    await frame.locator('[data-pr-overview]').click();
+    await frame.getByRole('heading', { name: '第二个 PR #202', exact: true }).waitFor();
+    await selectAnnotationText(frame, '[data-markdown-annotation] p');
     await finish();
     assert.equal((await f.events()).length, 0);
-    assert.equal(await comments.count(), 5);
-    await button('请 AI 审阅此 PR').click();
-    await frame.getByRole('status').filter({ hasText: '已保存整份 PR 审阅请求' }).waitFor();
+    assert.equal(await comments.count(), 4);
+    await button('请 AI 审阅').click();
+    await frame.getByRole('status').filter({ hasText: '审阅请求已发送给当前 AI。' }).waitFor();
     const requested = (await f.events())[0];
     assert.equal(requested.type, 'review-requested');
     assert.deepEqual(requested.payload, {
@@ -244,17 +265,22 @@ async function completeAcceptance() {
       headCommit: ids.second,
     });
     assert.equal((await f.events()).length, 1);
+    const originalAnnotation = await comments.text(1);
     for (const [length, limit] of [
       [66000, '65536'],
       [100000, '262144'],
     ]) {
-      await comments.overall('中'.repeat(length));
-      await button('提交批注').click();
+      await comments.edit(1);
+      await comments.write('中'.repeat(length));
+      await comments.save();
+      await submitAnnotations(frame);
       await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
-      assert.equal(await comments.count(), 5);
+      assert.equal(await comments.count(), 4);
       assert.equal((await f.events()).length, 1);
     }
-    await comments.overall('');
+    await comments.edit(1);
+    await comments.write(originalAnnotation);
+    await comments.save();
     const eventURL = `**/api/panels/${f.panel.instanceId}/events`;
     await page.route(eventURL, (route) =>
       route.request().method() === 'POST'
@@ -268,16 +294,16 @@ async function completeAcceptance() {
           })
         : route.continue(),
     );
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await frame.getByRole('alert').filter({ hasText: 'Intentional PR save failure' }).waitFor();
-    assert.equal(await comments.count(), 5);
+    assert.equal(await comments.count(), 4);
     await page.unroute(eventURL);
-    await button('提交批注').click();
-    await frame.getByRole('status').filter({ hasText: '已保存当前完整意见' }).waitFor();
+    await submitAnnotations(frame);
+    await frame.getByRole('status').filter({ hasText: '批注已发送给当前 AI。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
-    assert.equal(first.payload.annotations.length, 5);
-    assert.equal(Object.keys(first.payload.sources).length, 4);
+    assert.equal(first.payload.annotations.length, 4);
+    assert.equal(Object.keys(first.payload.sources).length, 3);
     const phrase = first.payload.annotations[0].targets[0],
       start = body().indexOf('缓存', body().indexOf('缓存') + 1);
     assert.deepEqual(phrase.text, { start, end: start + 2, quote: '缓存' });
@@ -285,23 +311,20 @@ async function completeAcceptance() {
       first.payload.annotations[1].targets[0].text.quote,
       body().slice(body().indexOf('重复'), -1),
     );
-    const checkSource = first.payload.sources[first.payload.annotations[2].targets[0].ref.sourceId];
-    assert.equal(checkSource.key, 'CR_NODE_1');
-    assert.equal(checkSource.conclusion, 'FAILURE');
-    const diff = first.payload.annotations[3].targets[0];
+    const diff = first.payload.annotations[2].targets[0];
     assert.equal(diff.ref.startLine, 2);
     assert.equal(diff.ref.endLine, 2);
     assert.equal(diff.text.quote, 'const n = 2;\r\n');
     assert.equal(first.payload.sources[diff.ref.sourceId].headCommit, ids.head);
     assert.equal(
-      first.payload.sources[first.payload.annotations[4].targets[0].ref.sourceId].number,
+      first.payload.sources[first.payload.annotations[3].targets[0].ref.sourceId].number,
       202,
     );
     await comments.edit(1);
     await comment().fill('更正说明');
     await finish();
     assert.equal((await f.events()).length, 2);
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await until(async () => (await f.events()).length === 3, 'explicit corrected feedback missing');
     const corrected = (await f.events())[2];
     assert.equal(corrected.payload.annotations[0].id, first.payload.annotations[0].id);
@@ -344,21 +367,15 @@ async function completeAcceptance() {
     await page.goto(f.url(limited));
     await page
       .frameLocator('iframe')
-      .getByRole('heading', { name: '#101 Review cache behavior', exact: true })
+      .getByRole('heading', { name: 'Review cache behavior #101', exact: true })
       .waitFor();
-    await page
-      .frameLocator('iframe')
-      .getByRole('button', { name: '文件改动', exact: true })
-      .click();
-    await page
-      .frameLocator('iframe')
-      .getByText('文件覆盖范围不完整或无法证明完整；', { exact: false })
-      .waitFor();
+    await page.frameLocator('iframe').getByRole('tab', { name: '文件改动', exact: true }).click();
+    await page.frameLocator('iframe').getByText('文件列表可能不完整', { exact: false }).waitFor();
     const noInitial = await f.run({ repository: 'example/project' });
     await page.goto(f.url(noInitial));
     await page
       .frameLocator('iframe')
-      .getByText('从列表选择 PR，或通过 initialPullRequest 指定初始编号。', { exact: true })
+      .getByText('选择一个 PR 开始审阅。', { exact: true })
       .waitFor();
     assert.equal((await f.events(noInitial)).length, 0);
     const calls = await f.calls();
@@ -381,7 +398,7 @@ async function completeAcceptance() {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'PR Chrome fixture passed: copied skill, list limits/search/state, native selection/copy, Markdown/diff/check/PR targets, same-head body/check changes, fixed-head old snapshots, cross-PR feedback, independent review request, query/event failures, size limits, explicit corrections, coverage and CLI events/ack.',
+      'PR Chrome fixture passed: copied skill, list limits/search/state, native selection/copy, Markdown/diff text ranges and check display, same-head body/check changes, fixed-head old snapshots, cross-PR feedback, independent review request, query/event failures, size limits, explicit corrections, coverage and CLI events/ack.',
     );
   } catch (error) {
     console.error(
@@ -411,7 +428,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
       headless: true,
       channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
     });
-    page = await browser.newPage();
+    page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(f.url());
@@ -419,30 +436,29 @@ await test('independent PR delivery, old sources, transport limits and failures'
       button = (name) => frame.getByRole('button', { name, exact: true });
     const comments = annotationTools(frame, page);
     const finish = () => comments.save();
-    await frame.getByRole('heading', { name: '#101 Review cache behavior', exact: true }).waitFor();
-    await frame.locator('[data-markdown-feedback]').waitFor();
-    await button('选择对象').click();
-    await frame.getByRole('heading', { name: 'PR 说明（可选择整段说明）', exact: true }).click();
+    await frame.getByRole('heading', { name: 'Review cache behavior #101', exact: true }).waitFor();
+    await frame.locator('[data-markdown-annotation]').waitFor();
+
+    await selectAnnotationText(frame, '[data-markdown-annotation] p');
     await finish();
-    await button('文件改动').click();
+    await frame.getByRole('tab', { name: '文件改动', exact: true }).click();
     await frame
       .locator('[data-code-side="new"][data-line="2"]')
       .filter({ hasText: 'n = 2' })
       .waitFor();
-    await button('选择新侧第 2 行').click();
-    await frame.locator('[data-feedback-target]').filter({ hasText: '@@ -' }).click();
+    await selectDiffLines(frame, 'new', 2);
     await finish();
     await f.state({ version: 1, headVersion: 1 });
     await button('刷新 PR').click();
     await frame.getByText('新的说明，缓存已经变化。', { exact: true }).waitFor();
     await frame.getByRole('button', { name: '#202 第二个 PR', exact: true }).click();
-    await frame.getByRole('heading', { name: '#202 第二个 PR', exact: true }).waitFor();
-    await frame.locator('[data-pr-overview]').click();
+    await frame.getByRole('heading', { name: '第二个 PR #202', exact: true }).waitFor();
+    await selectAnnotationText(frame, '[data-markdown-annotation] p');
     await finish();
     assert.equal(await comments.count(), 3);
     assert.equal((await f.events()).length, 0);
-    await button('请 AI 审阅此 PR').click();
-    await frame.getByRole('status').filter({ hasText: '已保存整份 PR 审阅请求' }).waitFor();
+    await button('请 AI 审阅').click();
+    await frame.getByRole('status').filter({ hasText: '审阅请求已发送给当前 AI。' }).waitFor();
     const requested = (await f.events())[0];
     assert.equal(requested.type, 'review-requested');
     assert.deepEqual(requested.payload, {
@@ -451,17 +467,22 @@ await test('independent PR delivery, old sources, transport limits and failures'
       baseCommit: ids.base,
       headCommit: ids.second,
     });
+    const originalAnnotation = await comments.text(1);
     for (const [length, limit] of [
       [66000, '65536'],
       [100000, '262144'],
     ]) {
-      await comments.overall('中'.repeat(length));
-      await button('提交批注').click();
+      await comments.edit(1);
+      await comments.write('中'.repeat(length));
+      await comments.save();
+      await submitAnnotations(frame);
       await frame.getByRole('alert').filter({ hasText: limit }).waitFor();
       assert.equal(await comments.count(), 3);
       assert.equal((await f.events()).length, 1);
     }
-    await comments.overall('');
+    await comments.edit(1);
+    await comments.write(originalAnnotation);
+    await comments.save();
     const eventURL = `**/api/panels/${f.panel.instanceId}/events`;
     await page.route(eventURL, (route) =>
       route.request().method() === 'POST'
@@ -475,7 +496,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
           })
         : route.continue(),
     );
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await frame
       .getByRole('alert')
       .filter({ hasText: 'Intentional independent save failure' })
@@ -483,8 +504,8 @@ await test('independent PR delivery, old sources, transport limits and failures'
     assert.equal(await comments.count(), 3);
     assert.equal((await f.events()).length, 1);
     await page.unroute(eventURL);
-    await button('提交批注').click();
-    await frame.getByRole('status').filter({ hasText: '已保存当前完整意见' }).waitFor();
+    await submitAnnotations(frame);
+    await frame.getByRole('status').filter({ hasText: '批注已发送给当前 AI。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
     assert.equal(first.payload.annotations.length, 3);
@@ -505,7 +526,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
     await comments.write('明确更正');
     await finish();
     assert.equal((await f.events()).length, 2);
-    await button('提交批注').click();
+    await submitAnnotations(frame);
     await until(
       async () => (await f.events()).length === 3,
       'independent corrected feedback missing',
@@ -566,20 +587,18 @@ await test('independent 300-file API coverage and omitted initial PR', async () 
       headless: true,
       channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
     });
-    const page = await browser.newPage();
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     await page.goto(f.url());
     let frame = page.frameLocator('iframe');
-    await frame.getByRole('heading', { name: '#101 Review cache behavior', exact: true }).waitFor();
-    await frame.getByRole('button', { name: '文件改动', exact: true }).click();
-    await frame.getByText('文件覆盖范围不完整或无法证明完整；', { exact: false }).waitFor();
+    await frame.getByRole('heading', { name: 'Review cache behavior #101', exact: true }).waitFor();
+    await frame.getByRole('tab', { name: '文件改动', exact: true }).click();
+    await frame.getByText('文件列表可能不完整', { exact: false }).waitFor();
     assert.match(await frame.locator('main').last().textContent(), /300.*301/);
     assert.equal((await f.events()).length, 0);
     const noInitial = await f.run({ repository: 'example/project' });
     await page.goto(f.url(noInitial));
     frame = page.frameLocator('iframe');
-    await frame
-      .getByText('从列表选择 PR，或通过 initialPullRequest 指定初始编号。', { exact: true })
-      .waitFor();
+    await frame.getByText('选择一个 PR 开始审阅。', { exact: true }).waitFor();
     assert.equal((await f.events(noInitial)).length, 0);
     console.log('Independent PR coverage and no-initial-detail navigation passed.');
   } finally {

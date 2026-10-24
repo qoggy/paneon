@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
 import { definePanel, z } from 'paneon/sdk';
-import { Button, FeedbackProvider, FeedbackSurface, FeedbackToolbar } from 'paneon/ui';
+import { Button, AnnotationRoot, AnnotationMenu } from 'paneon/ui';
 import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
 import { diffTargetText } from './shared/diff-schema.ts';
@@ -46,7 +46,7 @@ function Panel() {
     return () => cancelAnimationFrame(frame);
   }, [target, model]);
   return (
-    <FeedbackProvider<GitRef>
+    <AnnotationRoot<GitRef>
       onSubmit={async () => {}}
       adapter={{
         resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
@@ -54,7 +54,6 @@ function Panel() {
         locate: (target) => locateDiffTarget(model, target),
       }}
     >
-      <FeedbackSurface />
       <div className="h-24 p-3">Diff reading acceptance</div>
       <div className="flex flex-wrap gap-1 p-2">
         {['changed', 'same', 'added', 'deleted', 'located'].map((value) => (
@@ -69,7 +68,7 @@ function Panel() {
           </Button>
         ))}
         <Button onClick={() => setCollapsed(false)}>Reopen</Button>
-        <FeedbackToolbar allowObjectSelection />
+        <AnnotationMenu />
       </div>
       <div
         data-reading-viewport
@@ -91,7 +90,7 @@ function Panel() {
         />
       </div>
       <div className="h-[60rem]" />
-    </FeedbackProvider>
+    </AnnotationRoot>
   );
 }
 export default definePanel({

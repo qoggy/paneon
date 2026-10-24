@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { z } from 'zod';
-import { feedbackSchema, feedbackKey } from '../src/sdk/feedback.ts';
+import { annotationValueSchema, annotationKey } from '../src/sdk/annotation.ts';
 
-const schema = feedbackSchema(z.object({ kind: z.literal('card'), id: z.string() }));
-const target = { ref: { kind: 'card' as const, id: 'a' } };
+const schema = annotationValueSchema(z.string());
+const target = { ref: 'card:a' };
 const selected = { annotations: [{ id: 'stable', targets: [target], comment: '' }] };
 
 void test('feedback schema preserves empty opinions, independent entries and page composition', () => {
@@ -15,7 +15,10 @@ void test('feedback schema preserves empty opinions, independent entries and pag
     }).success,
     true,
   );
-  assert.deepEqual(schema.parse({ ...selected, comment: '整体意见' }).comment, '整体意见');
+  assert.equal(
+    schema.safeParse({ ...selected, comment: 'removed page-level field' }).success,
+    false,
+  );
   assert.equal(schema.safeParse({ annotations: [] }).success, true);
   assert.equal(
     schema.safeParse({
@@ -36,12 +39,10 @@ void test('feedback schema rejects invalid structures, duplicates and UTF-16 ran
     { annotations: [{ ...selected.annotations[0], comment: undefined }] },
     { annotations: [{ ...selected.annotations[0], id: '' }] },
     {
-      annotations: [
-        { ...selected.annotations[0], targets: [target, { ref: { id: 'a', kind: 'card' } }] },
-      ],
+      annotations: [{ ...selected.annotations[0], targets: [target, { ref: 'card:a' }] }],
     },
     {
-      annotations: [{ ...selected.annotations[0], targets: [{ ref: { kind: 'other', id: 'a' } }] }],
+      annotations: [{ ...selected.annotations[0], targets: [{ ref: 42 }] }],
     },
   ];
   for (const text of [
@@ -67,7 +68,7 @@ void test('feedback schema rejects invalid structures, duplicates and UTF-16 ran
 });
 
 void test('JSON references reject lossy values before business-schema stripping or transforms', () => {
-  const anySchema = feedbackSchema(z.unknown());
+  const anySchema = annotationValueSchema(z.unknown());
   const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
   const sparse = Array(2) as unknown[];
@@ -97,17 +98,17 @@ void test('JSON references reject lossy values before business-schema stripping 
         .success,
       false,
     );
-    assert.throws(() => feedbackKey(ref));
+    assert.throws(() => annotationKey(ref));
   }
   assert.equal(
-    schema.safeParse({
+    annotationValueSchema(z.object({ source: z.string() })).safeParse({
       annotations: [
-        { id: 'one', targets: [{ ref: { ...target.ref, extra: undefined } }], comment: '' },
+        { id: 'one', targets: [{ ref: { source: 'card:a', extra: undefined } }], comment: '' },
       ],
     }).success,
     false,
   );
-  const invalidTransform = feedbackSchema(z.string().transform(() => new Date()));
+  const invalidTransform = annotationValueSchema(z.string().transform(() => new Date()));
   assert.equal(
     invalidTransform.safeParse({
       annotations: [{ id: 'one', targets: [{ ref: 'a' }], comment: '' }],
@@ -115,30 +116,30 @@ void test('JSON references reject lossy values before business-schema stripping 
     false,
   );
   const shared = { value: 1 };
-  assert.doesNotThrow(() => feedbackKey([shared, shared]));
-  assert.equal(feedbackKey({ b: 2, a: [1, 2] }), feedbackKey({ a: [1, 2], b: 2 }));
-  assert.notEqual(feedbackKey([1, 2]), feedbackKey([2, 1]));
+  assert.doesNotThrow(() => annotationKey([shared, shared]));
+  assert.equal(annotationKey({ b: 2, a: [1, 2] }), annotationKey({ a: [1, 2], b: 2 }));
+  assert.notEqual(annotationKey([1, 2]), annotationKey([2, 1]));
 });
 
 void test('default and browser SDK expose the same feedback helper without browser Node dependencies', async () => {
   const server = (await import('../dist/sdk/' + 'index.js')) as {
-    feedbackSchema: typeof feedbackSchema;
+    annotationValueSchema: typeof annotationValueSchema;
   };
   const browser = (await import('../dist/sdk/' + 'client.js')) as {
-    feedbackSchema: typeof feedbackSchema;
+    annotationValueSchema: typeof annotationValueSchema;
   };
-  assert.equal(typeof server.feedbackSchema, 'function');
-  assert.equal(typeof browser.feedbackSchema, 'function');
+  assert.equal(typeof server.annotationValueSchema, 'function');
+  assert.equal(typeof browser.annotationValueSchema, 'function');
   assert.deepEqual(
-    server.feedbackSchema(z.unknown()).parse(selected),
-    browser.feedbackSchema(z.unknown()).parse(selected),
+    server.annotationValueSchema(z.unknown()).parse(selected),
+    browser.annotationValueSchema(z.unknown()).parse(selected),
   );
 });
 
-void test('contextual editor buffers isolate Save, Cancel and multi-object targets', async () => {
+void test('contextual editor buffers isolate Save, Cancel and saved multi-target annotations', async () => {
   const { build } = await import('esbuild');
   const bundled = await build({
-    entryPoints: ['src/ui/feedback-store.ts'],
+    entryPoints: ['src/ui/annotation-store.ts'],
     bundle: true,
     platform: 'node',
     format: 'esm',
@@ -148,25 +149,22 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
   const module = (await import(
     `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`
   )) as {
-    FeedbackStore: new (options: {
+    AnnotationStore: new (options: {
       onSubmit(value: unknown): Promise<void>;
       adapter: { resolve(): { status: 'ready' }; locate(): void };
     }) => {
       mountSurface(): () => void;
-      toggleTarget(target: CardTarget): void;
-      chooseObject(target: CardTarget): void;
+      createAnnotation(targets: CardTarget[], comment?: string): string;
       changeEditor(comment: string): void;
       submit(): Promise<void>;
       cancelEditor(): void;
       saveEditor(): void;
       openAnnotation(id?: string): void;
       deleteEditor(): void;
-      openOverall(): void;
       numberFor(id: string): number;
       getSnapshot(): {
         value: {
           annotations: { id: string; targets: CardTarget[]; comment: string }[];
-          comment?: string;
         };
         selectionTargets: readonly CardTarget[];
         uiError: string | null;
@@ -174,7 +172,7 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
     };
   };
   const delivered: unknown[] = [];
-  const store = new module.FeedbackStore({
+  const store = new module.AnnotationStore({
     onSubmit: (value) => {
       delivered.push(value);
       return Promise.resolve();
@@ -182,27 +180,16 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
     adapter: { resolve: () => ({ status: 'ready' }), locate: () => {} },
   });
   const unmount = store.mountSurface();
-  store.toggleTarget(target);
-  store.toggleTarget({ ref: { kind: 'card', id: 'b' } });
-  await store.submit();
-  assert.equal(
-    delivered.length,
-    0,
-    'Pending object selections must not silently disappear on submit.',
-  );
-  store.openAnnotation();
+  const id = store.createAnnotation([target, { ref: 'card:b' }]);
+  store.openAnnotation(id);
   store.changeEditor('临时输入');
-  assert.equal(store.getSnapshot().value.annotations.length, 0);
+  assert.equal(store.getSnapshot().value.annotations[0].comment, '');
   assert.equal(store.getSnapshot().selectionTargets.length, 2);
   await store.submit();
   assert.match(store.getSnapshot().uiError ?? '', /请先保存或取消/);
   assert.equal(delivered.length, 0);
   store.cancelEditor();
-  assert.equal(store.getSnapshot().value.annotations.length, 0);
-  store.chooseObject(target);
-  store.chooseObject({ ref: { kind: 'card', id: 'b' } });
-  store.openAnnotation();
-  store.saveEditor();
+  assert.equal(store.getSnapshot().value.annotations[0].comment, '');
   const saved = store.getSnapshot().value.annotations[0];
   assert.equal(saved.targets.length, 2);
   assert.equal(saved.comment, '');
@@ -216,22 +203,12 @@ void test('contextual editor buffers isolate Save, Cancel and multi-object targe
   store.saveEditor();
   assert.equal(store.getSnapshot().value.annotations[0].id, saved.id);
   assert.equal(store.getSnapshot().value.annotations[0].comment, '保存修改');
-  store.chooseObject({ ref: { kind: 'card', id: 'c' } });
-  store.openAnnotation();
-  store.saveEditor();
+  store.createAnnotation([{ ref: 'card:c' }]);
   const secondId = store.getSnapshot().value.annotations[1].id;
   store.openAnnotation(saved.id);
   store.deleteEditor();
   assert.equal(store.numberFor(secondId), 2, 'Deletion must not renumber another annotation.');
   assert.equal(store.getSnapshot().value.annotations.length, 1);
-  store.openOverall();
-  store.changeEditor('整体草稿');
-  store.cancelEditor();
-  assert.equal(store.getSnapshot().value.comment, undefined);
-  store.openOverall();
-  store.changeEditor('整体保存');
-  store.saveEditor();
-  assert.equal(store.getSnapshot().value.comment, '整体保存');
   await store.submit();
   assert.equal(delivered.length, 1);
   assert.equal(Object.isFrozen(delivered[0]), true);

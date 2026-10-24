@@ -1,4 +1,4 @@
-import { feedbackSchema, z } from 'paneon/sdk';
+import { annotationValueSchema, z } from 'paneon/sdk';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export const repositorySchema = z
   .string()
@@ -70,7 +70,7 @@ export const prSourceSchema = z.discriminatedUnion('kind', [
     .refine((s) => s.old || s.new, 'Diff needs at least one side.'),
 ]);
 export type PRSource = z.infer<typeof prSourceSchema>;
-export const prFeedbackSchema = feedbackSchema(prRefSchema);
+export const prFeedbackSchema = annotationValueSchema(prRefSchema);
 export const prFeedbackSubmittedSchema = prFeedbackSchema.safeExtend({
   repository: repositorySchema,
   sources: z.record(z.string(), prSourceSchema),

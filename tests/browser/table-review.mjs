@@ -1,3 +1,4 @@
+import { submitAnnotations } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -22,7 +23,7 @@ try {
   const comments = annotationTools(frame, page);
   await frame.getByRole('heading', { name: 'Table review acceptance', exact: true }).waitFor();
   await comments.assertNoLegacySection();
-  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
+  await submitAnnotations(frame);
   await frame.getByRole('alert').waitFor();
   assert.equal((await fixture.events(fixture.table)).length, 0);
   assert.equal(await frame.getByRole('button', { name: '重置视图', exact: true }).count(), 0);
@@ -104,15 +105,15 @@ try {
     await page.mouse.up();
     assert.equal(await locator.evaluate(() => document.getSelection().toString()), expected);
   }
-  const header = frame.locator('[data-column-key="name"] [data-feedback-text]');
+  const header = frame.locator('[data-column-key="name"] [data-annotation-text]');
   assert.equal(await header.locator('xpath=ancestor::button').count(), 0);
   await selectText(header, 0, 2, '说明');
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C');
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '说明');
   assert.equal(await frame.locator('[data-column-key="name"]').getAttribute('aria-sort'), 'none');
   await comments.write('这个列名需要说明');
-  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
-  await frame.getByRole('alert').filter({ hasText: '请先保存' }).waitFor();
+  await submitAnnotations(frame);
+  await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
   assert.equal((await fixture.events(fixture.table)).length, 0, 'unsaved editor blocks submission');
   await comments.save();
   await frame.getByRole('button', { name: '排序 Number', exact: true }).click();
@@ -138,7 +139,7 @@ try {
   );
   await frame.getByRole('button', { name: '重置视图', exact: true }).click();
   const textCell = frame.locator(
-    '[data-row-index="0"] [data-cell-key="name"] [data-feedback-text]',
+    '[data-row-index="0"] [data-cell-key="name"] [data-annotation-text]',
   );
   await selectText(textCell, 7, 11, '中文🙂');
   await comments.write('中文🙂');
@@ -150,7 +151,6 @@ try {
   await selectText(textCell, 12, 18, 'repeat');
   await comments.write('第二个repeat');
   await comments.save();
-  await comments.overall('整体评审');
   await frame.getByRole('button', { name: '下一页', exact: true }).click();
   await comments.locate(2);
   await frame.locator('[data-row-index="0"]').waitFor();
@@ -167,7 +167,7 @@ try {
       }),
     }),
   );
-  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
+  await submitAnnotations(frame);
   await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
   assert.equal(await comments.count(), 3);
   assert.equal(await comments.text(2), '中文🙂');
@@ -187,9 +187,9 @@ try {
     await heldEvent;
     await route.continue();
   });
-  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
+  await submitAnnotations(frame);
   await requestedEvent;
-  const saving = frame.getByRole('button', { name: '提交中…', exact: true });
+  const saving = frame.getByRole('button', { name: /^批注 \(\d+\)$/ });
   assert.equal(await saving.isDisabled(), true);
   await saving.evaluate((button) => button.click());
   assert.equal(await frame.getByRole('status').count(), 0);
@@ -200,7 +200,7 @@ try {
   const first = (await fixture.events(fixture.table))[0];
   assert.equal(first.type, 'table-submitted');
   assert.equal(first.payload.annotations.length, 3);
-  assert.equal(first.payload.comment, '整体评审');
+  assert.equal('comment' in first.payload, false);
   assert.deepEqual(first.payload.annotations[0].targets, [
     { ref: { kind: 'header', columnKey: 'name' }, text: { start: 0, end: 2, quote: '说明' } },
   ]);
@@ -225,15 +225,13 @@ try {
     });
   }
   await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
-  await comments.overall('');
   for (let number = 3; number >= 1; number--) await comments.remove(number);
-  await frame.getByRole('button', { name: '提交批注', exact: true }).click();
+  await submitAnnotations(frame);
   await frame.getByRole('status').waitFor();
   const revisions = await fixture.events(fixture.table);
   assert.equal(revisions.length, 2);
   assert.deepEqual(revisions[1].payload, {
     annotations: [],
-    comment: '',
     replacesEventId: first.id,
   });
   const cli = await fixture.cli(
@@ -263,15 +261,15 @@ try {
     await comments.assertNoLegacySection();
     assert.equal(await frame.locator('script').filter({ hasText: 'unsafe()' }).count(), 0);
     // A registered Markdown link remains a native link in browse mode.
-    await frame.locator('[data-markdown-feedback] a').evaluate((link) => {
+    await frame.locator('[data-markdown-annotation] a').evaluate((link) => {
       link.addEventListener('click', (event) => {
         event.preventDefault();
         link.dataset.nativeClicks = String(Number(link.dataset.nativeClicks ?? 0) + 1);
       });
     });
-    await frame.locator('[data-markdown-feedback] a').click();
+    await frame.locator('[data-markdown-annotation] a').click();
     assert.equal(
-      await frame.locator('[data-markdown-feedback] a').getAttribute('data-native-clicks'),
+      await frame.locator('[data-markdown-annotation] a').getAttribute('data-native-clicks'),
       '1',
     );
     assert.equal(await comments.count(), 0);
@@ -297,7 +295,7 @@ try {
     await comments.write('second repeat');
     await comments.save();
     // One continuous selection crosses emphasis, a link, an entity and an escape.
-    await frame.locator('[data-markdown-feedback]').evaluate((root) => {
+    await frame.locator('[data-markdown-annotation]').evaluate((root) => {
       const leaves = [...root.querySelectorAll('[data-source-leaf]')];
       const start = leaves.find(
         (node) => node.textContent === 'repeat' && node.parentElement.tagName === 'STRONG',
@@ -337,12 +335,11 @@ try {
     await comments.write('fenced code');
     await comments.save();
     assert.equal(await frame.getByRole('button', { name: '选择对象', exact: true }).count(), 0);
-    await comments.overall('Whole-document review');
-    await frame.getByRole('button', { name: '提交批注', exact: true }).click();
+    await submitAnnotations(frame);
     await frame.getByRole('status').waitFor();
     const result = (await fixture.events(review))[0];
     assert.equal(result.payload.annotations.length, 4);
-    assert.equal(result.payload.comment, 'Whole-document review');
+    assert.equal('comment' in result.payload, false);
     const [second, cross, inline, fenced] = result.payload.annotations;
     const secondStart = markdown.indexOf('**repeat**') + 2;
     assert.deepEqual(second.targets[0].text, {
@@ -359,12 +356,12 @@ try {
     await comments.locate(1, 1);
     assert.equal(
       await frame
-        .locator('[data-markdown-feedback]')
+        .locator('[data-markdown-annotation]')
         .evaluate(() => document.getSelection().toString()),
       'repeat',
     );
     console.log(
-      'Review source assertions verified repeated-word mouse selection, raw quote consistency, inline/fenced code, overall feedback and exact-word locate; checking continuous link coverage next.',
+      'Review source assertions verified repeated-word mouse selection, raw quote consistency, inline/fenced code and exact-word locate; checking continuous link coverage next.',
     );
     assert.equal(
       cross.targets.length,
@@ -380,7 +377,7 @@ try {
     await comments.locate(2, 1);
     assert.equal(
       await frame
-        .locator('[data-markdown-feedback]')
+        .locator('[data-markdown-annotation]')
         .evaluate(() => document.getSelection().toString()),
       'repeat and linked 中文🙂 & * escaped.',
     );

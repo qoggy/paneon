@@ -44,14 +44,14 @@ The API behavior is documented in [Compare two commits](https://docs.github.com/
 
 These are observed example OIDs; a new run queries its own actual versions. Clicking this button does not send annotation drafts. It does not wake an ended agent automatically; the agent must be waiting or later resume and read events.
 
-Select text normally to show a nearby **批注** action, then save in its anchored editor. Select the registered text in descriptions and code directly, including complete paragraphs or continuous code ranges. Use independent annotations for separate selections; the default toolbar has no object-selection mode. Use **整体批注** for feedback on the PR as a whole. Annotations may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
+Select text normally to show a nearby **批注** action, then save in its anchored editor. Select the registered text in descriptions and code directly, including complete paragraphs or continuous code ranges. Use independent annotations for separate selections; the default toolbar has no object-selection mode. Annotations may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
 
-A numbered marker reopens a saved annotation for editing, cancellation or deletion. Saving only changes the page draft; pending edits must be saved or cancelled before submission. **整体批注** opens the optional overall editor.
+A numbered marker reopens a saved annotation for editing, cancellation or deletion. Saving only changes the page draft; pending edits must be saved or cancelled before submission.
 
 **提交批注** in the page toolbar validates the preserved snapshots and emits `pr-feedback-submitted`:
 
 - `repository` identifies the configured repository.
-- `annotations` is the common list of stable-ID entries, each with nonempty `targets` and string `comment`; optional overall `comment` may stand alone.
+- `annotations` is the common list of stable-ID entries, each with nonempty `targets` and string `comment`.
 - `sources` contains only actual referenced sources, deduplicated by PR, content kind and observed content/version. Targets reference it with `sourceId`.
 - Every source includes PR `number` and complete `baseCommit`/`headCommit`. PR overviews add title/update time; descriptions add the complete original body hash; checks add stable key/name/status/conclusion/details URL/observation time; code sources add the actual merge-base and side-specific path/type/byte hash.
 - Overview/check targets are whole objects without text. Description text uses complete original Markdown UTF-16 offsets and exact quotes, preserving formatting markers/entities when a selection crosses them. File/hunk/line coordinates reuse the shared Git contract: file/hunk omit `text`; hunk retains its exact selected patch; line offsets address the preserved selected lines, including original separators. Whole-side DOM selections are normalized to the actual selected line range before delivery.
@@ -68,6 +68,6 @@ Read the two event types using ordinary `paneon panel events <instanceId> --cons
 
 The example uses the public Provider/controls plus the existing shared Markdown and diff adapters, without another selection state machine.
 
-The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so annotations created with line/range controls have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
+The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so saved annotations with line-range references have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
 
 Text selection uses its nearby **批注** action directly. Only **保存** adds the page draft; cancelling discards the temporary edit.

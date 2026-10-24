@@ -24,6 +24,8 @@ import {
 import { useUI } from '../ui';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';
+import { isBrowserAction } from '../shared/browser-actions';
+import { performBrowserAction } from '../ui/browser-actions';
 
 type Credential = {
   ref: string;
@@ -212,6 +214,10 @@ function Frame({ panel }: { panel: PanelDetails }) {
     async function dispatch(message: BridgeRequest) {
       const panel = latestPanel.current;
       const payload = message.payload;
+      if (message.method === 'browser' && isBrowserAction(payload)) {
+        await performBrowserAction(payload);
+        return null;
+      }
       if (message.method === 'action') {
         const action = panel.manifest?.actions.find((item) => item.id === payload.actionId);
         if (!action) throw new ApiError('UNKNOWN_ACTION', 'The requested action does not exist.');
@@ -417,19 +423,12 @@ function Frame({ panel }: { panel: PanelDetails }) {
       )}
       <Dialog
         open={Boolean(prompt)}
-        onOpenChange={(open) => {
-          if (!open && !submitting) cancel();
+        onOpenChange={(open, details) => {
+          if (submitting) details.cancel();
+          else if (!open) cancel();
         }}
       >
-        <DialogContent
-          showCloseButton={!submitting}
-          onEscapeKeyDown={(event) => {
-            if (submitting) event.preventDefault();
-          }}
-          onInteractOutside={(event) => {
-            if (submitting) event.preventDefault();
-          }}
-        >
+        <DialogContent showCloseButton={!submitting}>
           <DialogHeader>
             <DialogTitle>{t('Provide a temporary credential')}</DialogTitle>
             <DialogDescription>

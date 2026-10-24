@@ -1,3 +1,5 @@
+import { submitAnnotations } from './annotation-tools.mjs';
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -118,21 +120,21 @@ try {
     'change centred in body viewport',
   );
   const comments = annotationTools(frame, page);
-  await button('选择对象').click();
-  await frame.locator('[data-diff-source-header="new"]').click();
-  await comments.write('Whole file through existing source header');
+
+  await selectDiffLines(frame, 'new', 289);
+  await comments.write('Context line before the bounded change');
   await comments.save();
   assert.equal(await comments.count(), 1);
-  await button('选择新侧第 290 行').click();
+  await selectDiffLines(frame, 'new', 290);
   await comments.write('Exact bounded line');
   await comments.save();
-  await button('结束选择').click();
+
   await button('收起上下文').click();
-  await button('选择对象').click();
-  await frame.locator('[data-diff-hunk="0"] > [data-feedback-target]').click();
-  await comments.write('Exact hunk');
+
+  await selectDiffLines(frame, 'new', 291);
+  await comments.write('Context line with unchanged surroundings collapsed');
   await comments.save();
-  await button('结束选择').click();
+
   await button('展开全部上下文').click();
   await comments.locate(2);
   const located = await frame.locator('[data-code-side="new"][data-line="290"]').boundingBox();
@@ -144,19 +146,23 @@ try {
   await page.keyboard.press('Shift');
   assert.equal(await comments.count(), 3);
   await content.evaluate(() => document.getSelection()?.removeAllRanges());
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   for (let i = 0; i < 100 && (await f.events(panel)).length === 0; i++)
     await page.waitForTimeout(50);
   const targets = (await f.events(panel))[0].payload.annotations.flatMap((x) => x.targets);
   assert.deepEqual(
     targets.map((x) => x.ref.kind),
-    ['file', 'lines', 'hunk'],
+    ['lines', 'lines', 'lines'],
   );
-  assert.equal(targets[1].ref.startLine, 290);
+  assert.deepEqual(
+    targets.map((target) => target.ref.startLine),
+    [289, 290, 291],
+  );
+  assert.ok(targets.every((target) => target.text && target.ref.side === 'new'));
   // Show balanced centre gutter / natural colour for screenshots.
   await button('定位当前差异').click();
   await mkdir(evidence, { recursive: true });
-  for (const width of [1920, 1280, 390]) {
+  for (const width of process.env.PANEON_TEST_DESKTOP_ONLY ? [1920, 1280] : [1920, 1280, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     for (const theme of ['light', 'dark'])
       for (const language of ['en', 'zh-CN']) {
@@ -176,7 +182,7 @@ try {
         });
       }
   }
-  // A plain string consumer has no FeedbackProvider and retains document scrolling.
+  // A plain string consumer has no AnnotationRoot and retains document scrolling.
   const plainEntry = join(
     f.root,
     'agent-skills/paneon/assets/panels/git-review/plain-diff-acceptance.tsx',
@@ -201,9 +207,9 @@ export default definePanel({id:'plain-diff',requires:{paneon:'0.0.0'},input:z.ob
   assert.equal(natural.height, natural.scrollHeight);
   assert.equal(natural.overflow, 'visible');
   assert.equal(
-    await frame.locator('[data-feedback-target]').count(),
+    await frame.locator('[data-annotation-surface]').count(),
     0,
-    'no provider or annotation target required',
+    'plain string Diff needs no AnnotationRoot or contextual annotation UI',
   );
   await page.screenshot({ path: join(evidence, 'plain-document.png') });
   assert.deepEqual(errors, []);
@@ -213,7 +219,7 @@ export default definePanel({id:'plain-diff',requires:{paneon:'0.0.0'},input:z.ob
     JSON.stringify({ pass: true, left, total, initial, after, geometry, errors, crashes }, null, 2),
   );
   console.log(
-    'PASS Git chrome: initial branch proportions, removed duplicate copy, accessible current branch, body-only vertical viewport, stable headers, centred changes, whole-file/line/hunk annotations, native Command+A, 12 screenshots; no page errors.',
+    'PASS Git chrome: initial branch proportions, removed duplicate copy, accessible current branch, body-only vertical viewport, stable headers, centred changes, registered text annotations, native Command+A, theme screenshots; no page errors.',
     evidence,
   );
 } catch (error) {

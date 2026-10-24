@@ -21,6 +21,9 @@ export class Preferences {
     }
     this.ui = { ...defaultUI, ...this.patch(this.config.ui ?? {}) };
   }
+  get port(): number {
+    return (this.config.server as { port?: number } | undefined)?.port ?? 49321;
+  }
   private patch(value: unknown): Partial<UIPreferences> {
     const ui = value as Partial<UIPreferences>;
     if (

@@ -1,5 +1,5 @@
 import { serverAction, z } from 'paneon/sdk';
-import { readGit, readGitFile, readGitBranches } from './git.ts';
+import { readGit, readGitFile, readGitBranches, readGitRevisions } from './git.ts';
 import { validateGitFeedback } from './feedback.ts';
 import {
   gitFileSchema,
@@ -53,4 +53,10 @@ export const checkFeedback = serverAction({
       };
     }
   },
+});
+
+export const queryGitRevisions = serverAction({
+  kind: 'query',
+  input: z.object({ params: gitReviewParamsSchema, repositoryId: z.string() }).strict(),
+  handler: (ctx, input) => readGitRevisions(input.params, input.repositoryId, ctx.signal),
 });

@@ -1,0 +1,515 @@
+import { z } from 'zod';
+import { annotationKey, annotationTargetKey, annotationValueSchema } from '../sdk/annotation.js';
+import type { AnnotationValue, AnnotationTarget } from '../sdk/annotation.js';
+import type {
+  AnnotationController,
+  AnnotationRootProps,
+  AnnotationTextRegistration,
+  AnnotationTargetResolution,
+  AnnotationUI,
+} from './annotation-types';
+import { selectedTextTargets, validTextRange } from './annotation-selection';
+import { createRectClipper } from './annotation-geometry';
+import type { ClippedRect } from './annotation-geometry';
+import { indexTextSegments, textSegmentsInRange } from './annotation-text-index';
+
+const schema = annotationValueSchema(z.unknown());
+function frozen<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach(frozen);
+    Object.freeze(value);
+  }
+  return value;
+}
+const copy = <T>(value: T): T => structuredClone(value);
+
+export class AnnotationStore<TRef> {
+  private listeners = new Set<() => void>();
+  private texts = new Map<
+    symbol,
+    AnnotationTextRegistration<TRef> & { index: ReturnType<typeof indexTextSegments> }
+  >();
+  private sources = new Map<string, string>();
+  private locating = 0;
+  private options: Omit<AnnotationRootProps<TRef>, 'children'>;
+  private state: AnnotationController<TRef> & AnnotationUI<TRef>;
+  private surfaceCount = 0;
+  private numbers = new Map<string, number>();
+  private nextNumber = 1;
+  private stagedSources = new Map<string, string>();
+  private editorSources = new Map<string, string>();
+  private registryListeners = new Set<() => void>();
+  private measurementRanges = new WeakMap<Document, Range>();
+
+  constructor(options: Omit<AnnotationRootProps<TRef>, 'children'>) {
+    this.options = options;
+    this.state = {
+      pending: [],
+      editor: null,
+      uiError: null,
+      value: frozen({ annotations: [] }),
+      activeAnnotationId: null,
+      selectionTargets: [],
+      submitting: false,
+      error: null,
+      createAnnotation: this.createAnnotation,
+      editAnnotation: this.editAnnotation,
+      updateAnnotation: this.updateAnnotation,
+      removeAnnotation: this.removeAnnotation,
+      locate: this.locate,
+      registerText: this.registerText,
+      submit: this.submit,
+    };
+  }
+  getSnapshot = () => this.state;
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+  setOptions = (options: Omit<AnnotationRootProps<TRef>, 'children'>) => {
+    this.options = options;
+  };
+  get disabled() {
+    return this.options.disabled === true || this.state.submitting;
+  }
+  private publish(patch: Partial<AnnotationController<TRef> & AnnotationUI<TRef>>) {
+    const next = { ...this.state, ...patch };
+    next.selectionTargets = next.editor
+      ? next.editor.targets
+      : next.pending.length
+        ? next.pending
+        : (next.value.annotations.find((entry) => entry.id === next.activeAnnotationId)?.targets ??
+          []);
+    this.state = next;
+    this.listeners.forEach((listener) => listener());
+  }
+  private assertEditable() {
+    if (this.disabled)
+      throw new Error('Annotations cannot be edited while disabled or submitting.');
+  }
+  private save(value: AnnotationValue<TRef>, activeAnnotationId = this.state.activeAnnotationId) {
+    schema.parse(value);
+    const retained = new Set(
+      value.annotations.flatMap((entry) => entry.targets.map(annotationTargetKey)),
+    );
+    for (const key of this.sources.keys()) if (!retained.has(key)) this.sources.delete(key);
+    for (const annotation of value.annotations)
+      if (!this.numbers.has(annotation.id)) this.numbers.set(annotation.id, this.nextNumber++);
+    this.publish({ value: frozen(copy(value)), activeAnnotationId, error: null });
+  }
+  private remember(targets: AnnotationTarget<TRef>[]) {
+    for (const target of targets) {
+      if (!target.text || this.sources.has(annotationTargetKey(target))) continue;
+      const registration = [...this.texts.values()].find(
+        (item) => annotationKey(item.ref) === annotationKey(target.ref),
+      );
+      if (registration) this.sources.set(annotationTargetKey(target), registration.source);
+    }
+  }
+  createAnnotation: AnnotationController<TRef>['createAnnotation'] = (targets, comment = '') => {
+    this.assertEditable();
+    const id = crypto.randomUUID();
+    const value = {
+      ...this.state.value,
+      annotations: [...this.state.value.annotations, { id, targets, comment }],
+    };
+    this.save(value, id);
+    this.remember(targets);
+    return id;
+  };
+  editAnnotation: AnnotationController<TRef>['editAnnotation'] = (id) => {
+    this.assertEditable();
+    if (id !== null && !this.state.value.annotations.some((entry) => entry.id === id))
+      throw new Error('Unknown annotation.');
+    this.publish({ activeAnnotationId: id, error: null });
+  };
+  updateAnnotation: AnnotationController<TRef>['updateAnnotation'] = (id, update) => {
+    this.assertEditable();
+    if (!this.state.value.annotations.some((entry) => entry.id === id))
+      throw new Error('Unknown annotation.');
+    this.save({
+      ...this.state.value,
+      annotations: this.state.value.annotations.map((entry) =>
+        entry.id === id ? { ...update, id } : entry,
+      ),
+    });
+    this.remember(update.targets);
+  };
+  removeAnnotation: AnnotationController<TRef>['removeAnnotation'] = (id) => {
+    this.assertEditable();
+    this.save(
+      {
+        ...this.state.value,
+        annotations: this.state.value.annotations.filter((entry) => entry.id !== id),
+      },
+      this.state.activeAnnotationId === id ? null : this.state.activeAnnotationId,
+    );
+  };
+  registerText: AnnotationController<TRef>['registerText'] = (registration) => {
+    annotationKey(registration.ref);
+    const nodes = new Set<Text>();
+    for (const { node, sourceOffsets } of registration.segments) {
+      if (node.nodeType !== 3 || nodes.has(node))
+        throw new Error('Text segments must contain unique DOM Text nodes.');
+      nodes.add(node);
+      if (sourceOffsets.length !== node.data.length + 1)
+        throw new Error('Text sourceOffsets must map every DOM UTF-16 boundary.');
+      let previous = -1;
+      for (const offset of sourceOffsets) {
+        if (offset === null) continue;
+        if (
+          !Number.isInteger(offset) ||
+          offset < 0 ||
+          offset > registration.source.length ||
+          offset < previous
+        )
+          throw new Error('Text sourceOffsets must be monotone source boundaries.');
+        previous = offset;
+      }
+    }
+    const id = Symbol();
+    const segments = registration.segments.map((segment) => ({
+      ...segment,
+      sourceOffsets: [...segment.sourceOffsets],
+    }));
+    this.texts.set(id, {
+      ref: copy(registration.ref),
+      source: registration.source,
+      segments,
+      index: indexTextSegments(segments),
+    });
+    this.registryChanged();
+    return () => {
+      this.texts.delete(id);
+      this.registryChanged();
+    };
+  };
+  /** Internal renderer bridge: keep the source being annotated until its drafts are removed. */
+  retainedSource(ref: TRef): string | undefined {
+    const key = annotationKey(ref);
+    const targets = [
+      ...this.state.value.annotations.flatMap((entry) => entry.targets),
+      ...(this.state.editor?.targets ?? []),
+      ...this.state.pending,
+    ];
+    for (const target of targets) {
+      if (!target.text || annotationKey(target.ref) !== key) continue;
+      const id = annotationTargetKey(target);
+      const source =
+        this.sources.get(id) ?? this.editorSources.get(id) ?? this.stagedSources.get(id);
+      if (source !== undefined) return source;
+    }
+    return undefined;
+  }
+  selectText = (selection: Selection) => {
+    if (this.disabled || !this.surfaceCount) return;
+    const targets = selectedTextTargets(selection, this.texts.values());
+    this.stageSources(targets);
+    this.publish({
+      pending: targets,
+      uiError: targets.length && this.state.editor ? '请先保存或取消正在编辑的批注。' : null,
+    });
+  };
+
+  mountSurface = () => {
+    this.surfaceCount++;
+    return () => {
+      this.surfaceCount--;
+    };
+  };
+  subscribeRegistry = (listener: () => void) => {
+    this.registryListeners.add(listener);
+    return () => {
+      this.registryListeners.delete(listener);
+    };
+  };
+  private registryChanged() {
+    this.registryListeners.forEach((listener) => listener());
+  }
+  registeredElements = () =>
+    [
+      ...new Set([
+        ...[...this.texts.values()].flatMap((item) =>
+          item.segments.flatMap((segment) =>
+            segment.node.parentElement ? [segment.node.parentElement] : [],
+          ),
+        ),
+      ]),
+    ].filter((element) => element?.isConnected);
+  numberFor = (id: string) => this.numbers.get(id) ?? 0;
+  private stageSources(targets: AnnotationTarget<TRef>[]) {
+    this.stagedSources.clear();
+    for (const target of targets) {
+      if (!target.text) continue;
+      const source = [...this.texts.values()].find(
+        (item) =>
+          annotationKey(item.ref) === annotationKey(target.ref) &&
+          item.segments.some((segment) => segment.node.isConnected),
+      )?.source;
+      if (source !== undefined) this.stagedSources.set(annotationTargetKey(target), source);
+    }
+  }
+  dismissSelection = () => {
+    if (this.state.pending.length) this.publish({ pending: [] });
+  };
+  openAnnotation = (id?: string) => {
+    if (this.disabled) return;
+    if (this.state.editor) {
+      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
+      return;
+    }
+    const annotation = id ? this.state.value.annotations.find((entry) => entry.id === id) : null;
+    const targets = annotation?.targets ?? this.state.pending;
+    if (!targets.length) return;
+    this.editorSources = new Map(id ? [] : this.stagedSources);
+    this.publish({
+      pending: [],
+      activeAnnotationId: id ?? null,
+      uiError: null,
+      editor: {
+        id,
+        targets: copy(targets),
+        comment: annotation?.comment ?? '',
+      },
+    });
+  };
+  changeEditor = (comment: string) => {
+    this.assertEditable();
+    if (this.state.editor)
+      this.publish({ editor: { ...this.state.editor, comment }, uiError: null });
+  };
+  cancelEditor = () => {
+    if (this.disabled) return;
+    this.stagedSources.clear();
+    this.editorSources.clear();
+    this.publish({ editor: null, pending: [], activeAnnotationId: null, uiError: null });
+  };
+  saveEditor = () => {
+    this.assertEditable();
+    const editor = this.state.editor;
+    if (!editor) return;
+    if (!editor.targets.length) {
+      this.publish({ uiError: '请至少选择一个位置。' });
+      return;
+    }
+    if (editor.id)
+      this.updateAnnotation(editor.id, { targets: editor.targets, comment: editor.comment });
+    else this.createAnnotation(editor.targets, editor.comment);
+    for (const target of editor.targets) {
+      const source = this.editorSources.get(annotationTargetKey(target));
+      if (source !== undefined) this.sources.set(annotationTargetKey(target), source);
+    }
+    this.cancelEditor();
+  };
+  deleteEditor = () => {
+    this.assertEditable();
+    const editor = this.state.editor;
+    if (editor?.id) this.removeAnnotation(editor.id);
+    this.cancelEditor();
+  };
+  /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
+  targetRects = (target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] => {
+    const key = annotationKey(target.ref);
+    const clipRect = createRectClipper();
+    if (!target.text) return this.adapterRects(target, firstOnly);
+    const text = target.text;
+    const original =
+      this.sources.get(annotationTargetKey(target)) ??
+      this.editorSources.get(annotationTargetKey(target)) ??
+      this.stagedSources.get(annotationTargetKey(target));
+    const registrations = [...this.texts.values()].filter(
+      (item) =>
+        annotationKey(item.ref) === key &&
+        (original === undefined || item.source === original) &&
+        validTextRange(item.source, target),
+    );
+    const rects: ClippedRect[] = [];
+    let mapped = false;
+    for (const registration of registrations) {
+      for (const segment of textSegmentsInRange(registration.index, text.start, text.end)) {
+        if (!segment.node.isConnected) continue;
+        const offsets = segment.sourceOffsets;
+        const start = offsets.findIndex((offset) => offset !== null && offset >= text.start);
+        let end = -1;
+        for (let index = offsets.length - 1; index >= 0; index--) {
+          const offset = offsets[index];
+          if (offset !== null && offset <= target.text.end) {
+            end = index;
+            break;
+          }
+        }
+        if (start < 0 || end <= start) continue;
+        mapped = true;
+        const document = segment.node.ownerDocument;
+        let range = this.measurementRanges.get(document);
+        if (!range) {
+          range = document.createRange();
+          this.measurementRanges.set(document, range);
+        }
+        range.setStart(segment.node, start);
+        range.setEnd(segment.node, end);
+        for (const rect of range.getClientRects()) {
+          const element = segment.node.parentElement;
+          const visible = element ? clipRect(rect, element) : null;
+          if (visible) {
+            rects.push(visible);
+            if (firstOnly) return rects;
+          }
+        }
+      }
+    }
+    return mapped ? rects : this.adapterRects(target, firstOnly);
+  };
+  private adapterRects(target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] {
+    const rects: ClippedRect[] = [];
+    const clipRect = createRectClipper();
+    for (const range of this.options.adapter?.targetRanges?.(target) ?? []) {
+      if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
+      const element =
+        range.startContainer.nodeType === 1
+          ? (range.startContainer as HTMLElement)
+          : range.startContainer.parentElement;
+      if (!element) continue;
+      for (const rect of range.getClientRects()) {
+        const visible = clipRect(rect, element);
+        if (visible) {
+          rects.push(visible);
+          if (firstOnly) return rects;
+        }
+      }
+    }
+    return rects;
+  }
+
+  private async resolve(target: AnnotationTarget<TRef>): Promise<AnnotationTargetResolution> {
+    if (this.options.adapter) return this.options.adapter.resolve(target);
+    const key = annotationKey(target.ref);
+    const texts = [...this.texts.values()].filter(
+      (item) =>
+        item.segments.some((segment) => segment.node.isConnected) &&
+        annotationKey(item.ref) === key,
+    );
+    if (target.text && texts.length > 0) {
+      const sources = new Set(texts.map((item) => item.source));
+      if (sources.size > 1)
+        return {
+          status: 'stale',
+          message: 'The target has conflicting registered source text.',
+        };
+      return { status: 'ready', text: texts[0].source };
+    }
+    if (!target.text && texts.length) return { status: 'ready' };
+    return {
+      status: 'missing',
+      message: 'The target is not mounted. Supply an adapter to validate and locate it.',
+    };
+  }
+  private checkResolution(target: AnnotationTarget<TRef>, resolution: AnnotationTargetResolution) {
+    if (resolution.status !== 'ready') throw new Error(resolution.message);
+    if (!target.text) return;
+    const original = this.sources.get(annotationTargetKey(target));
+    if (
+      resolution.text === undefined ||
+      (original !== undefined && original !== resolution.text) ||
+      !validTextRange(resolution.text, target)
+    )
+      throw new Error(
+        'The target text is stale or its range no longer matches the original source.',
+      );
+  }
+  locate: AnnotationController<TRef>['locate'] = async (target) => {
+    const request = ++this.locating;
+    try {
+      const resolution = await this.resolve(target);
+      this.checkResolution(target, resolution);
+      const source = resolution.status === 'ready' ? resolution.text : undefined;
+      if (request !== this.locating) return;
+      if (this.options.adapter) await this.options.adapter.locate(copy(target));
+      if (request !== this.locating) return;
+      const key = annotationKey(target.ref);
+      const registration = [...this.texts.values()].find(
+        (item) => annotationKey(item.ref) === key && (!target.text || item.source === source),
+      );
+      const segments =
+        registration && target.text
+          ? textSegmentsInRange(registration.index, target.text.start, target.text.end)
+          : registration?.segments;
+      const text = target.text;
+      const textElement = segments?.find(
+        (segment) =>
+          segment.node.isConnected &&
+          (!text ||
+            segment.sourceOffsets.some(
+              (offset) => offset !== null && offset > text.start && offset <= text.end,
+            )),
+      )?.node.parentElement;
+      const element = textElement;
+      element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      element?.animate?.(
+        [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],
+        1200,
+      );
+      if (target.text) this.highlightText(target, source);
+      this.publish({ error: null });
+    } catch (error) {
+      if (request === this.locating)
+        this.publish({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  };
+  private highlightText(target: AnnotationTarget<TRef>, source: string | undefined) {
+    if (!target.text) return;
+    const registrations = [...this.texts.values()].filter(
+      (item) => annotationKey(item.ref) === annotationKey(target.ref) && item.source === source,
+    );
+    const segments = registrations.flatMap((item) => item.segments);
+    const start = segments.find(
+      (segment) =>
+        segment.node.isConnected && segment.sourceOffsets.includes(target.text?.start ?? -1),
+    );
+    const end = [...segments]
+      .reverse()
+      .find(
+        (segment) =>
+          segment.node.isConnected && segment.sourceOffsets.includes(target.text?.end ?? -1),
+      );
+    if (!start || !end) return;
+    const range = start.node.ownerDocument.createRange();
+    range.setStart(start.node, start.sourceOffsets.indexOf(target.text.start));
+    range.setEnd(end.node, end.sourceOffsets.indexOf(target.text.end));
+    const selection = start.node.ownerDocument.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+  submit: AnnotationController<TRef>['submit'] = async () => {
+    if (this.disabled) return;
+    if (this.state.editor) {
+      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
+      return;
+    }
+    this.publish({ submitting: true, error: null, pending: [], uiError: null });
+    const value = frozen(copy(this.state.value));
+    try {
+      schema.parse(value);
+      for (const [annotationIndex, annotation] of value.annotations.entries())
+        for (const [targetIndex, target] of annotation.targets.entries()) {
+          try {
+            this.checkResolution(target, await this.resolve(target));
+          } catch (error) {
+            throw new Error(
+              `Annotation ${annotationIndex + 1}, target ${targetIndex + 1}: ${error instanceof Error ? error.message : String(error)}`,
+              { cause: error },
+            );
+          }
+        }
+      await this.options.onSubmit(value);
+    } catch (error) {
+      this.publish({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    } finally {
+      this.publish({ submitting: false });
+    }
+  };
+}

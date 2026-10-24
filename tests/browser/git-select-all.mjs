@@ -1,3 +1,4 @@
+import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -121,13 +122,13 @@ try {
   await selectAll('unified', 'unified');
   await clear();
   await button('展开全部上下文').click();
-  await button('选择对象').click();
+
   await selectAll('expanded-select', 'unified');
   await clear();
   // Oversized feedback is explicitly rejected by the existing event contract.
   // It must retain the complete draft, not truncate source or freeze the page.
   started = Date.now();
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await frame
     .getByRole('alert')
     .filter({ hasText: /65536|262144/ })
@@ -165,7 +166,7 @@ try {
   });
   await comments.write('Review the emoji');
   await comments.save();
-  await button('提交批注').click();
+  await submitAnnotations(frame);
   await frame
     .getByRole('status')
     .filter({ hasText: /已保存为事件/ })

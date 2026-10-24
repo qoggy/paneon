@@ -1,4 +1,4 @@
-import { feedbackSchema, z } from 'paneon/sdk';
+import { annotationValueSchema, z } from 'paneon/sdk';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export type { GitRef } from '../../shared/diff-schema.ts';
 const nonempty = z.string().refine((s) => s.trim().length > 0, 'Must not be blank.');
@@ -118,7 +118,7 @@ export const gitReviewSourceSchema = z
   .refine((v) => v.old || v.new, 'Source requires at least one side.');
 export type GitReviewSource = z.infer<typeof gitReviewSourceSchema>;
 export type GitSourceView = z.infer<typeof gitSourceViewSchema>;
-export const gitFeedbackSchema = feedbackSchema(gitRefSchema);
+export const gitFeedbackSchema = annotationValueSchema(gitRefSchema);
 export const gitReviewSubmittedSchema = gitFeedbackSchema.safeExtend({
   sources: z.record(z.string(), gitReviewSourceSchema),
   replacesEventId: z.number().int().positive().optional(),

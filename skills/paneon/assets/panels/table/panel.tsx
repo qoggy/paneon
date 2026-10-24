@@ -1,19 +1,18 @@
 import { useLocale } from '../../shared/i18n';
 import { useMemo, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import type { Feedback, FeedbackTarget as Target } from 'paneon/sdk';
+import type { AnnotationValue, AnnotationTarget as Target } from 'paneon/sdk';
 import {
   Button,
-  FeedbackSurface,
-  FeedbackSelectionControls,
-  FeedbackOverallAnnotationButton,
-  FeedbackSubmitButton,
-  FeedbackProvider,
-  FeedbackTarget,
-  FeedbackText,
+  AnnotationMenu,
+  AnnotationRoot,
+  AnnotationText,
   Input,
   Markdown,
   Page,
+  Pagination,
+  PaginationContent,
+  PaginationItem,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -103,16 +102,18 @@ function DataTable({
             )}
           </div>
           <Popover>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" aria-label={t('筛选列')}>
-                {t('筛选')}
-                {activeFilters.length > 0 && ` (${activeFilters.length})`}
-              </Button>
-            </PopoverTrigger>
+            <PopoverTrigger
+              render={
+                <Button type="button" variant="outline" aria-label={t('筛选列')}>
+                  {t('筛选')}
+                  {activeFilters.length > 0 && ` (${activeFilters.length})`}
+                </Button>
+              }
+            />
             <PopoverContent
               align="start"
               collisionPadding={16}
-              className="max-h-[min(28rem,var(--radix-popover-content-available-height))] w-80 max-w-[calc(100vw-2rem)] space-y-3 overflow-auto"
+              className="max-h-[min(28rem,var(--available-height))] w-80 max-w-[calc(100vw-2rem)] space-y-3 overflow-auto"
               aria-label={t('列筛选')}
             >
               {params.columns.map((column) => (
@@ -133,9 +134,6 @@ function DataTable({
               ))}
             </PopoverContent>
           </Popover>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <FeedbackSelectionControls allowObjectSelection={false} />
         </div>
       </div>
       {hasView && (
@@ -167,83 +165,76 @@ function DataTable({
             <TableRow>
               <TableHead className="h-10 w-10 px-3 text-center" />
               {params.columns.map((column) => (
-                <FeedbackTarget<TableRef>
+                <TableHead
                   key={column.key}
-                  target={{ kind: 'column', columnKey: column.key }}
-                  asChild
+                  data-column-key={column.key}
+                  aria-sort={
+                    view.sort?.key === column.key
+                      ? view.sort.descending
+                        ? 'descending'
+                        : 'ascending'
+                      : 'none'
+                  }
+                  className={`h-10 px-3 py-1 whitespace-normal ${column.type === 'number' ? 'w-px min-w-28 text-right' : column.type === 'boolean' ? 'w-px min-w-28' : 'min-w-40'}`}
                 >
-                  <TableHead
-                    data-column-key={column.key}
-                    aria-sort={
-                      view.sort?.key === column.key
-                        ? view.sort.descending
-                          ? 'descending'
-                          : 'ascending'
-                        : 'none'
-                    }
-                    className={`h-10 px-3 py-1 whitespace-normal ${column.type === 'number' ? 'w-px min-w-28 text-right' : column.type === 'boolean' ? 'w-px min-w-28' : 'min-w-40'}`}
+                  <div
+                    className={`flex items-center gap-1 ${column.type === 'number' ? 'justify-end' : ''}`}
                   >
-                    <div
-                      className={`flex items-center gap-1 ${column.type === 'number' ? 'justify-end' : ''}`}
+                    <AnnotationText<TableRef>
+                      target={{ kind: 'header', columnKey: column.key }}
+                      className="min-w-0 wrap-anywhere select-text"
                     >
-                      <FeedbackText<TableRef>
-                        target={{ kind: 'header', columnKey: column.key }}
-                        text={column.label}
-                        className="min-w-0 wrap-anywhere select-text"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 shrink-0 text-muted-foreground"
-                        aria-label={t('Sort {label}', { label: column.label })}
-                        onClick={() =>
-                          update({
-                            ...view,
-                            sort: {
-                              key: column.key,
-                              descending:
-                                view.sort?.key === column.key ? !view.sort.descending : false,
-                            },
-                          })
-                        }
-                      >
-                        <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
-                          {view.sort?.key === column.key ? (view.sort.descending ? '↓' : '↑') : '↕'}
-                        </span>
-                      </Button>
-                    </div>
-                  </TableHead>
-                </FeedbackTarget>
+                      {column.label}
+                    </AnnotationText>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-6 shrink-0 text-muted-foreground"
+                      aria-label={t('Sort {label}', { label: column.label })}
+                      onClick={() =>
+                        update({
+                          ...view,
+                          sort: {
+                            key: column.key,
+                            descending:
+                              view.sort?.key === column.key ? !view.sort.descending : false,
+                          },
+                        })
+                      }
+                    >
+                      <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
+                        {view.sort?.key === column.key ? (view.sort.descending ? '↓' : '↑') : '↕'}
+                      </span>
+                    </Button>
+                  </div>
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {shown.map(({ row, rowIndex }) => (
-              <FeedbackTarget<TableRef> key={rowIndex} target={{ kind: 'row', rowIndex }} asChild>
-                <TableRow data-row-index={rowIndex}>
-                  <TableCell className="h-10 w-10 px-3 py-2 text-center text-xs text-muted-foreground">
-                    {rowIndex + 1}
-                  </TableCell>
-                  {params.columns.map((column) => {
-                    const ref: TableRef = { kind: 'cell', rowIndex, columnKey: column.key };
-                    return (
-                      <FeedbackTarget key={column.key} target={ref} asChild>
-                        <TableCell
-                          data-cell-key={column.key}
-                          className={`h-10 px-3 py-2 ${column.type === 'number' ? 'w-px text-right tabular-nums' : column.type === 'boolean' ? 'w-px' : 'max-w-xl min-w-40 wrap-anywhere whitespace-normal'}`}
-                        >
-                          {typeof row[column.key] === 'string' ? (
-                            <FeedbackText target={ref} text={String(row[column.key])} />
-                          ) : (
-                            cellText(row[column.key])
-                          )}
-                        </TableCell>
-                      </FeedbackTarget>
-                    );
-                  })}
-                </TableRow>
-              </FeedbackTarget>
+              <TableRow key={rowIndex} data-row-index={rowIndex}>
+                <TableCell className="h-10 w-10 px-3 py-2 text-center text-xs text-muted-foreground">
+                  {rowIndex + 1}
+                </TableCell>
+                {params.columns.map((column) => {
+                  const ref: TableRef = { kind: 'cell', rowIndex, columnKey: column.key };
+                  return (
+                    <TableCell
+                      key={column.key}
+                      data-cell-key={column.key}
+                      className={`h-10 px-3 py-2 ${column.type === 'number' ? 'w-px text-right tabular-nums' : column.type === 'boolean' ? 'w-px' : 'max-w-xl min-w-40 wrap-anywhere whitespace-normal'}`}
+                    >
+                      {typeof row[column.key] === 'string' ? (
+                        <AnnotationText target={ref}>{String(row[column.key])}</AnnotationText>
+                      ) : (
+                        cellText(row[column.key])
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
             ))}
             {!shown.length && (
               <TableRow>
@@ -265,31 +256,39 @@ function DataTable({
           {rows.length !== params.rows.length &&
             t(' · {count} original rows', { count: params.rows.length })}
         </p>
-        <nav className="flex items-center gap-1" aria-label={t('表格分页')}>
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t('上一页')}
-            disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
-          >
-            <span aria-hidden="true">‹</span>
-          </Button>
-          <span className="px-1 tabular-nums">
-            {currentPage + 1} / {pageCount}
-          </span>
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t('下一页')}
-            disabled={currentPage + 1 >= pageCount}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            <span aria-hidden="true">›</span>
-          </Button>
-        </nav>
+        <Pagination className="mx-0 w-auto" aria-label={t('表格分页')}>
+          <PaginationContent>
+            <PaginationItem>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={t('上一页')}
+                disabled={currentPage === 0}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                <span aria-hidden="true">‹</span>
+              </Button>
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-1 tabular-nums">
+                {currentPage + 1} / {pageCount}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={t('下一页')}
+                disabled={currentPage + 1 >= pageCount}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                <span aria-hidden="true">›</span>
+              </Button>
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   );
@@ -301,7 +300,7 @@ function TablePanel() {
     [page, setPage] = useState(0),
     [locked, setLocked] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const submission = useSubmission<Feedback<TableRef>>(async (feedback) => {
+  const submission = useSubmission<AnnotationValue<TableRef>>(async (feedback) => {
     const validated = await validateTable({ snapshot: params, feedback });
     const receipt = await agent.emit('table-submitted', validated);
     setLocked(true);
@@ -356,38 +355,39 @@ function TablePanel() {
   );
   return (
     <Page className="min-w-0 space-y-4">
-      <FeedbackProvider<TableRef>
+      <AnnotationRoot<TableRef>
         adapter={adapter}
         disabled={locked}
         onSubmit={async (feedback) => {
-          if (!submission.hasReceipt && !feedback.annotations.length && !feedback.comment?.trim()) {
-            submission.reject('Select content or write an annotation before submitting.');
+          if (!submission.hasReceipt && !feedback.annotations.length) {
+            submission.reject('Save at least one annotation before submitting.');
             return;
           }
           await submission.submit(feedback);
         }}
       >
-        <FeedbackSurface />
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">{params.title}</h1>
             {params.description && (
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="link"
-                    className="px-0 text-muted-foreground"
-                    aria-label={t('表格说明')}
-                  >
-                    {t('说明')}
-                  </Button>
-                </PopoverTrigger>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="link"
+                      className="px-0 text-muted-foreground"
+                      aria-label={t('表格说明')}
+                    >
+                      {t('说明')}
+                    </Button>
+                  }
+                />
                 <PopoverContent
                   align="start"
                   collisionPadding={16}
-                  className="max-h-[min(28rem,var(--radix-popover-content-available-height))] w-96 max-w-[calc(100vw-2rem)] overflow-auto"
+                  className="max-h-[min(28rem,var(--available-height))] w-96 max-w-[calc(100vw-2rem)] overflow-auto"
                   aria-label={t('表格说明')}
                 >
                   <Markdown>{params.description}</Markdown>
@@ -396,8 +396,7 @@ function TablePanel() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2" aria-label={t('批注操作')}>
-            <FeedbackOverallAnnotationButton />
-            <FeedbackSubmitButton />
+            <AnnotationMenu />
             {locked && (
               <Button type="button" onClick={() => setLocked(false)}>
                 {t('修改反馈')}
@@ -416,7 +415,7 @@ function TablePanel() {
         {submission.message && (
           <p role={submission.failed ? 'alert' : 'status'}>{submission.message}</p>
         )}
-      </FeedbackProvider>
+      </AnnotationRoot>
     </Page>
   );
 }

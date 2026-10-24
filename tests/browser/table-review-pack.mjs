@@ -25,9 +25,9 @@ try {
     'assets/panels/table/schema.ts',
     'assets/panels/review/panel.tsx',
     'assets/panels/review/schema.ts',
-    'assets/shared/markdown-feedback.tsx',
-    'assets/shared/markdown-feedback-mapper.ts',
-    'assets/shared/markdown-feedback-schema.ts',
+    'assets/shared/markdown-annotation.tsx',
+    'assets/shared/markdown-annotation-mapper.ts',
+    'assets/shared/markdown-annotation-schema.ts',
     'assets/shared/submission.ts',
   ])
     assert.equal(files.has(`skills/paneon/${file}`), true, `Missing packaged resource: ${file}`);

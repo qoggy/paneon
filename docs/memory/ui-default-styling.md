@@ -1,16 +1,12 @@
 ---
 name: ui-default-styling
-description: The initial iteration uses shadcn default themes and component styles without a separate Paneon visual system
+description: Public components use shadcn defaults without a separate Paneon visual system
 type: tech
 ---
 
 # Default UI styling
 
-For the initial iteration, use shadcn's official default theme and component styles. Do not define a separate Paneon visual system or replace upstream defaults with custom global typography, colors, corner radii, control sizes, or spacing rules.
+Public components follow shadcn's default themes and component styles, without a separate Paneon visual system. Layout components provide necessary layout only; panel authors may customize their pages.
 
-Page, Section, and Stack provide necessary page layout using the same theme variables and spacing utilities. They do not introduce a competing visual style. Panel authors may explicitly customize their own content.
-
-The panel host does not add a permanent header, title, toolbar, content-width limit, outer padding, or iframe border. A running panel fills the viewport so its TSX controls the page layout. Connection and source updates work in the background; show framework notices only when intervention or an exceptional state needs attention. Panel management stays on the home page and in the CLI.
-
-**Why:** Existing community defaults are sufficient for the initial product, and maintaining another visual specification would add unnecessary work.
-**How to apply:** Keep the selected upstream source/configuration consistent and recorded. Load theme assets inside the panel iframe as well as the host. Treat the earlier discussion of custom pixel values as suggestions that were not adopted.
+**Why:** Reuse established component styling instead of maintaining another global visual specification.
+**How to apply:** Use upstream defaults for public components and keep page-specific customization in panel code.

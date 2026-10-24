@@ -236,10 +236,21 @@ void test('coverage, truncated objects, corrupt blobs, absent snapshots and limi
   );
   assert.throws(
     () =>
-      f.client.feedback(f.repository, f.session, { annotations: [], comment: '中'.repeat(66000) }),
+      f.client.feedback(f.repository, f.session, {
+        annotations: [
+          {
+            id: 'large',
+            comment: '中'.repeat(66000),
+            targets: [{ ref: { sourceId: first.detail.descriptionSourceId, kind: 'description' } }],
+          },
+        ],
+      }),
     /65536/,
   );
-  assert.throws(() => f.client.feedback(f.repository, f.session, { annotations: [] }), /选择/);
+  assert.throws(
+    () => f.client.feedback(f.repository, f.session, { annotations: [] }),
+    /at least one annotation/,
+  );
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(f.client.list(f.repository, {}, controller.signal), /aborted/);

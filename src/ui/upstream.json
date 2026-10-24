@@ -7,22 +7,37 @@
       "name": "button",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
       "sha256": "4b8d7d848742727973c1b088af8d15f0b628272a1316f2d2fa344e73ddff9e9c",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/button.json",
+        "sha256": "9ba7e870178813f0552b818a913a2792fb500c779e36395740b4973e3025d427"
+      }
     },
     {
       "name": "input",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/input.json",
       "sha256": "b1fffa12ba72ce30a291749012b47235eda110648b8106725ced22b5b31c8f1b",
-      "dependencies": ["cn"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/input.json",
+        "sha256": "bbad1bba130ac9750a61844eeb8f043e8a710846e07689fa85398b80a46c2741"
+      }
     },
     {
       "name": "label",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/label.json",
       "sha256": "b03d6bc91da205758df87c5403d74bae4d742f1f4ac5ae0b94ad7a29ab6350ea",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/label.json",
+        "sha256": "89b01e14fd39dceece9fa421e71e78ea83286bd43a2ca1c2f55d2e8d3958fff2"
+      }
     },
     {
       "name": "field",
@@ -42,15 +57,25 @@
       "name": "radio-group",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json",
       "sha256": "299fa36d5c5df3aefa40a59d8d3f92a1ccc9feae6b5187135851d9846348f1af",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/radio-group.json",
+        "sha256": "874b30662ba338d06362491b663cae9198281a4bc385b6be6425f2de442384d7"
+      }
     },
     {
       "name": "checkbox",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/checkbox.json",
       "sha256": "567b649e4cd68c05bfdc58ca00fa04aee38bca291cd6f16ed7776ec06ba3d6bd",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/checkbox.json",
+        "sha256": "e6df7b595f25a7ee97c3fb94e0ddc35998f74c98b990d3030e485905ec677178"
+      }
     },
     {
       "name": "textarea",
@@ -63,15 +88,25 @@
       "name": "select",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/select.json",
       "sha256": "ca3189ea8101a04f144b6d0f0e7330841639bfa5f4d57e7cca0894d39b30817b",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/select.json",
+        "sha256": "425e9b0a28b72617f18fabd75384050113295b88e7ba01c35bede2c72bd5d476"
+      }
     },
     {
       "name": "badge",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
       "sha256": "0f988b37cf1c56e7ecc83b1dcf24c9af4e73ce4341da5caf2c9d9b07a551319b",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/badge.json",
+        "sha256": "ccc20021cdcbf0fb23c0d4d28f1da4adde8e51ba59f4b11dd2722ed97a5ee3a4"
+      }
     },
     {
       "name": "alert",
@@ -105,79 +140,178 @@
       "name": "tabs",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/tabs.json",
       "sha256": "49320e6dcf56570753bb14ed3f5d66acf07d12e183c0e9024466995b25be5b1d",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/tabs.json",
+        "sha256": "b4552a0329dd9a6e2bfaf03405c133874df5a4930c7bb3dd84c9ab5c45b89402"
+      }
     },
     {
       "name": "dialog",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/dialog.json",
       "sha256": "0115e3a57aa55a978c5fed0d77f7e98edd694215aae3e569def3fff722ba9f26",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/dialog.json",
+        "sha256": "40fc321d25eb9590d07db54b00d9bc1a74274a549aa06d5915a34ba302ed8b94"
+      }
     },
     {
       "name": "alert-dialog",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json",
       "sha256": "03c0d4de131a9b049e9080724666045c8785074af7e07040a0a0f922a810e7c2",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": ["button"]
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": ["button"],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/alert-dialog.json",
+        "sha256": "974543244faee02eb4ea40264b7e0bbda2b01c3f2c369de965d2ac771c57a8af"
+      }
     },
     {
       "name": "accordion",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/accordion.json",
       "sha256": "93254d43d27259998b10c7bb5261f85bdc44509d46309a5c10a1e5d126a8d279",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/accordion.json",
+        "sha256": "01509cb2a91779ee74c2d4a1f75842c0a258bed1758be4f2567af9daabdc39ac"
+      }
     },
     {
       "name": "collapsible",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/collapsible.json",
       "sha256": "fdc6666e9c728d7e731b0e4d67e11db81020aff47408c259549fc1aefcc8e3e7",
-      "dependencies": ["radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/collapsible.json",
+        "sha256": "74f78cd88a30185243847968977cf1de9ffbf576547f2ec1f14b5ef55505b90d"
+      }
     },
     {
       "name": "tooltip",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
       "sha256": "1b7b452b34beab05b22bd653963abd1c88ebd8e9ebcc89dcaebf4ac4938c929e",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/tooltip.json",
+        "sha256": "2f55867faecee2d3616cfd8c6a80b538909a21e62fdfa2788b1ead56093e5395"
+      }
     },
     {
       "name": "dropdown-menu",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/dropdown-menu.json",
       "sha256": "235b1231cf71d94225eccd6c19117e7fa7b09cf256d23a199d63aee53265fd52",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/dropdown-menu.json",
+        "sha256": "335c59dba30145f434a9cc9ccb0438a3c5e2afe857fc11b029de1ecb415224d7"
+      }
     },
     {
       "name": "popover",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/popover.json",
       "sha256": "78793171b536e0c335ad51b1313619e533566b514d3503ef60c94dc9d3ccfbef",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/popover.json",
+        "sha256": "ba5fe84f353f6c0fd2133a2ab893f5e8861fc60dc4dea548a7ec875acaa37b2c"
+      }
     },
     {
       "name": "switch",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/switch.json",
       "sha256": "cc526c3a4827be315be746355a988e22dacc99d663ed31924fd30c2507cdc005",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/switch.json",
+        "sha256": "1f22350ccbf358a3aa198305c41d91e146abc0a7d5b18a9a23488b8d6b264ab4"
+      }
     },
     {
       "name": "separator",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/separator.json",
       "sha256": "4242a9fe839cae9083acff1280b7cccfda10e97bbc83283aed12d2d12bebdc6a",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/separator.json",
+        "sha256": "3ad65962485f464592201cb90017b3d52a5c9fe272ce41ee049485b4c42e0d76"
+      }
     },
     {
       "name": "sheet",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/sheet.json",
       "sha256": "bdf118300491675f05a9181af491217ba690929338aefd108437c2b07d25432f",
       "retrievedAt": "2026-10-24",
-      "dependencies": ["cn", "radix-ui"],
-      "registryDependencies": []
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/sheet.json",
+        "sha256": "72b36d92af7fcbc9bd2d1d4ef0cbc65f4fc8178f7bb2bedaf657460f15011cf4"
+      }
+    },
+    {
+      "name": "navigation-menu",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/navigation-menu.json",
+      "sha256": "43549da4f61ef6040c62c7ed9eede9bf0c304c7a6378a3e515c5a47d6421e50d",
+      "retrievedAt": "2026-10-24",
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "baseMigration": {
+        "retrievedAt": "2026-10-25",
+        "url": "https://ui.shadcn.com/r/styles/base-nova/navigation-menu.json",
+        "sha256": "1fdd735ea7449af8ebbd932b3e89b34a1efa8a3b193ac979d0d723660526c017"
+      }
+    },
+    {
+      "name": "toast",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/toast.json",
+      "sha256": "161ed77c409fe7345ee6308f7cf66f7bcf2717d8d5e1a8b36a7f8e8fa0df745e",
+      "retrievedAt": "2026-10-25",
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": ["button"],
+      "adaptations": [
+        "Use local imports, Lucide icons and the existing Close translation; keep the viewport above dialogs; separate manager exports for React Fast Refresh."
+      ]
+    },
+    {
+      "name": "context-menu",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/context-menu.json",
+      "sha256": "57bfdd236a7f4cb83625edf4c33265ce009738947666d00311034a88f6868756",
+      "retrievedAt": "2026-10-25",
+      "dependencies": ["cn", "@base-ui/react", "lucide-react"],
+      "registryDependencies": [],
+      "adaptations": [
+        "Use relative utils imports and Lucide icons in place of registry icon placeholders."
+      ]
+    },
+    {
+      "name": "empty",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/empty.json",
+      "sha256": "e89ffe0fc2969956f6e1d601bd3f00b068600ac08e31590f65344e79ff242230",
+      "retrievedAt": "2026-10-25",
+      "dependencies": ["cn", "class-variance-authority"],
+      "registryDependencies": [],
+      "adaptations": ["Use local utils import and project formatting."]
     }
   ],
   "theme": {
@@ -188,5 +322,13 @@
     "package": "shadcn@4.22.1",
     "path": "dist/tailwind.css",
     "sha256": "4c371f7a1ff5d219ae2f7ff28bd256b4346fd546fe46fbae22092e57db2f0fae"
-  }
+  },
+  "primitiveLibrary": {
+    "package": "@base-ui/react",
+    "version": "1.9.0"
+  },
+  "adaptations": [
+    "Base UI primitives and render composition replace the original Radix primitives; original Neutral tokens, component sizing and layout are retained.",
+    "Popup positioning, focus, checked/open/active states and callers use native Base UI APIs."
+  ]
 }

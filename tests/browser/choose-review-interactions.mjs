@@ -6,6 +6,7 @@ import { choices, startSkillPagesFixture } from './skill-pages-fixture.mjs';
 
 const artifacts = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-choose-review-interactions';
 await mkdir(artifacts, { recursive: true });
+const widths = process.env.PANEON_TEST_DESKTOP_ONLY === '1' ? [1280] : [1280, 390];
 const fixture = await startSkillPagesFixture();
 let browser;
 try {
@@ -17,7 +18,7 @@ try {
         options: [
           {
             ...choices.questions[0].options[0],
-            details: '## Details\n\n' + 'Long Markdown detail paragraph.\n\n'.repeat(80),
+            details: '## SQLite\n\n' + 'Long Markdown detail paragraph.\n\n'.repeat(80),
           },
           {
             ...choices.questions[0].options[1],
@@ -57,6 +58,13 @@ try {
       const { x, y, width } = element.getBoundingClientRect();
       return { x, y, width };
     });
+  const focusReturned = (locator) =>
+    locator.evaluate(async (element) => {
+      // Base UI restores focus after its closing transition, on an animation frame.
+      for (let i = 0; i < 120 && element !== document.activeElement; i++)
+        await new Promise(requestAnimationFrame);
+      return element === document.activeElement;
+    });
   async function checkDetails(width, language = 'en') {
     await page.setViewportSize({ width, height: 500 });
     const before = await mainGeometry();
@@ -72,6 +80,7 @@ try {
       const rect = element.getBoundingClientRect();
       body.scrollTop = 100;
       return {
+        width: rect.width,
         left: rect.left,
         right: rect.right,
         viewport: innerWidth,
@@ -81,6 +90,40 @@ try {
       };
     });
     assert.ok(metrics.left >= 0 && metrics.right <= metrics.viewport);
+    assert.ok(Math.abs(metrics.width - Math.min(1024, metrics.viewport * 0.85)) < 2);
+    assert.deepEqual(
+      await dialog('SQLite')
+        .locator('[data-slot="sheet-title"]')
+        .evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            width: rect.width,
+            height: rect.height,
+            clipPath: getComputedStyle(element).clipPath,
+            position: getComputedStyle(element).position,
+          };
+        }),
+      { width: 1, height: 1, clipPath: 'inset(50%)', position: 'absolute' },
+    );
+    assert.equal(
+      await dialog('SQLite')
+        .locator('.markdown-body')
+        .getByRole('heading', { name: 'SQLite', exact: true })
+        .count(),
+      1,
+    );
+    const close = dialog('SQLite').getByRole('button', {
+      name: language === 'en' ? 'Close' : '关闭',
+      exact: true,
+    });
+    assert.equal(await close.evaluate((element) => element === document.activeElement), false);
+    assert.equal(await close.evaluate((element) => getComputedStyle(element).boxShadow), 'none');
+    await dialog('SQLite')
+      .locator('.overflow-y-auto')
+      .evaluate((element) => {
+        element.scrollTop = 0;
+      });
+    await page.screenshot({ path: join(artifacts, `details-${language}-${width}.png`) });
     assert.equal(metrics.scrollable, true);
     assert.ok(metrics.scrollTop > 0);
     assert.equal(metrics.trapped, true);
@@ -89,23 +132,28 @@ try {
       await dialog('SQLite').evaluate((element) => element.contains(document.activeElement)),
       true,
     );
-    await page.screenshot({ path: join(artifacts, `details-${language}-${width}.png`) });
+    // Chrome also puts the scrollable details body in the keyboard tab order.
+    if (!(await close.evaluate((element) => element === document.activeElement))) {
+      await page.keyboard.press('Tab');
+    }
+    assert.equal(await close.evaluate((element) => element === document.activeElement), true);
+    assert.notEqual(await close.evaluate((element) => getComputedStyle(element).boxShadow), 'none');
     await page.keyboard.press('Escape');
     await dialog('SQLite').waitFor({ state: 'hidden' });
-    assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    assert.equal(await focusReturned(trigger), true);
     assert.deepEqual(await mainGeometry(), before);
     await trigger.click();
     await dialog('SQLite')
       .getByRole('button', { name: language === 'en' ? 'Close' : '关闭', exact: true })
       .click();
     await dialog('SQLite').waitFor({ state: 'hidden' });
-    assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    assert.equal(await focusReturned(trigger), true);
     if (width > 600) {
       await trigger.click();
       await dialog('SQLite').waitFor();
       await frame.locator('[data-slot="sheet-overlay"]').click({ position: { x: 10, y: 10 } });
       await dialog('SQLite').waitFor({ state: 'hidden' });
-      assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+      assert.equal(await focusReturned(trigger), true);
     }
     assert.equal(
       await frame
@@ -125,21 +173,15 @@ try {
       'Kept custom draft',
     );
   }
-  for (const width of [1280, 390]) await checkDetails(width);
+  for (const width of widths) await checkDetails(width);
   await button('View details: PostgreSQL').click();
   await dialog('PostgreSQL')
     .getByRole('heading', { name: 'PostgreSQL details', exact: true })
     .waitFor();
   await page.keyboard.press('Escape');
   await dialog('PostgreSQL').waitFor({ state: 'hidden' });
-  assert.equal(
-    await button('View details: PostgreSQL').evaluate(async (element) => {
-      await new Promise(requestAnimationFrame);
-      return element === document.activeElement;
-    }),
-    true,
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await focusReturned(button('View details: PostgreSQL')), true);
+  await page.setViewportSize({ width: 1280, height: 1000 });
   await button('Next').click();
   await frame.getByRole('checkbox', { name: 'Feature A', exact: true }).check();
   await note('Feature A').fill('Keep this explanation too');
@@ -147,6 +189,10 @@ try {
   await button('Next').click();
   await button('Next').click();
   const summary = frame.getByRole('region', { name: 'Answer summary', exact: true });
+  assert.equal(
+    await frame.locator('main header').getByText('Answer summary', { exact: true }).count(),
+    0,
+  );
   await summary.getByText('1 / 3 answered', { exact: true }).waitFor();
   await frame
     .getByLabel('Questionnaire description', { exact: true })
@@ -210,11 +256,11 @@ try {
     const editStorage = language === 'en' ? 'Edit answer: Storage' : '编辑答案：Storage';
     await button(editStorage).click();
     assert.equal(await frame.getByText(/^(Single choice|Multiple choice|单选|多选)/).count(), 0);
-    for (const width of [1280, 390]) await checkDetails(width, language);
-    await page.setViewportSize({ width: 390, height: 844 });
+    for (const width of widths) await checkDetails(width, language);
+    await page.setViewportSize({ width: 1280, height: 1000 });
     await button(language === 'en' ? 'Return to summary' : '返回汇总').click();
-    for (const width of [1280, 390]) {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 1000 });
       assert.equal(
         await frame
           .locator('html')
@@ -250,7 +296,7 @@ try {
     );
     if (title === 'Storage') {
       await page.screenshot({
-        path: join(artifacts, 'return-to-summary-en-390.png'),
+        path: join(artifacts, 'return-to-summary-en-1280.png'),
         fullPage: true,
       });
       assert.equal(await mine().inputValue(), 'Kept custom draft');
@@ -300,14 +346,14 @@ try {
       ok: true,
       artifacts,
       checks: [
-        'overlay Sheet preserves desktop/mobile geometry and drafts',
+        'overlay Sheet preserves desktop geometry and drafts',
         'Sheet focus trap, dismissal, return and long-content scrolling',
         'schema-derived invalid rows',
         'no invalid-submit navigation/event',
         'all-row keyboard navigation',
         'draft preservation',
         'direct return',
-        'theme/language/viewport matrix',
+        'desktop theme/language matrix',
         'complete explicit event',
       ],
     }),

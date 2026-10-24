@@ -1,4 +1,4 @@
-import { cp } from 'node:fs/promises';
+import { cp, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fixture } from '../git-review-fixture.ts';
 export async function startGitReviewFixture() {
@@ -15,7 +15,10 @@ export async function startGitReviewFixture() {
       skill,
       { recursive: true },
     );
-    service = await startServer(join(f.root, '.paneon'));
+    const home = join(f.root, '.paneon');
+    await mkdir(home, { recursive: true });
+    await writeFile(join(home, 'config.json'), JSON.stringify({ server: { port: 0 } }));
+    service = await startServer(home);
     await service.app.inject({
       method: 'POST',
       url: '/api/preferences',

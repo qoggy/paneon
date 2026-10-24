@@ -68,7 +68,7 @@ Write an ordinary TSX file anywhere under `/tmp`, with `definePanel`, components
 
 - [Interface preferences](references/preferences.md): user-level theme/language, inherited public UI, and original-content boundaries.
 - [Authoring](references/authoring.md): complete source, server actions, CLI/HTTP calls, queries, components, Markdown/Mermaid, temporary credentials.
-- [Feedback](references/feedback.md): selection and annotations on custom content, for pages that collect precise opinions.
-- [Explanation examples](references/examples.md): two one-off explanatory pages (concurrency queueing, Sentinel LeapArray) with fixed topic and data in source; use them as patterns for new explanations.
+- [Annotations](references/annotations.md): selection and annotations on custom content, for pages that collect precise opinions.
+- [Explanation examples](references/examples.md): two one-off explanatory pages (dining philosophers, Sentinel LeapArray) with fixed topic and data in source; use them as patterns for new explanations.
 
 To reuse shared modules from `assets/shared/` or adapt a built-in page, copy the complete skill directory so relative imports keep working, then edit the copy.

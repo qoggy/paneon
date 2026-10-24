@@ -1,3 +1,4 @@
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -117,7 +118,7 @@ try {
       `old 原名.ts → ${renamed}`,
     ),
   );
-  await button(`已暂存 · D ${deleted}`).click();
+  await button(`已暂存 · D ${deleted}`).dblclick();
   await frame
     .locator('[data-code-side="old"][data-line="2"]')
     .filter({ hasText: 'value = 1' })
@@ -129,21 +130,21 @@ try {
   assert.equal(await frame.getByRole('textbox', { name: '搜索文件', exact: true }).count(), 0);
   await stagedRoot.click();
   await staged.waitFor();
-  await button(`已暂存 · R100 ${renamed}`).click();
+  await button(`已暂存 · R100 ${renamed}`).dblclick();
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
-  await button(`已暂存 · M ${special}`).click();
+  await button(`已暂存 · M ${special}`).dblclick();
   assert.equal(
     await button(`已暂存 · M ${special}`).getAttribute('title'),
     `已暂存 · M ${special}`,
   );
-  await staged.click();
+  await staged.dblclick();
   const comments = annotationTools(frame, page);
-  await button('选择对象').click();
-  await button('选择新侧第 2 行').click();
+
+  await selectDiffLines(frame, 'new', 2);
   await comments.write('目录树切换保留批注');
   await comments.save();
   assert.equal(await comments.count(), 1);
-  await unstaged.click();
+  await unstaged.dblclick();
   await frame
     .locator('[data-code-side="new"][data-line="2"]')
     .filter({ hasText: 'value = 3' })
@@ -166,7 +167,7 @@ try {
   let geometry;
   if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
     await page.setViewportSize({ width: 390, height: 844 });
-    await button(`已暂存 · M ${long}`).click();
+    await button(`已暂存 · M ${long}`).dblclick();
     const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
     geometry = await content.evaluate(() => {
       const list = document.querySelector('[data-file-scroll]');
@@ -222,7 +223,7 @@ try {
     await frame.locator(`[data-file-directory=${JSON.stringify(prefix)}]`).waitFor();
     assert.equal(await files.count(), 7);
     assert.equal(await frame.locator('[data-file-group="staged"]').count(), 0);
-    await button(`D ${deleted}`).click();
+    await button(`D ${deleted}`).dblclick();
     await frame
       .locator('[data-code-side="old"][data-line="2"]')
       .filter({ hasText: 'value = 1' })

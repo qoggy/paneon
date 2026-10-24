@@ -44,12 +44,12 @@ try {
     `
 import {useState} from 'react';
 import {definePanel,serverAction,z} from 'paneon/sdk';
-import {Button,FeedbackProvider} from 'paneon/ui';
+import {Button,AnnotationRoot} from 'paneon/ui';
 import {LegacyRows} from '../../shared/legacy.tsx';
 import {DiffView} from '../../shared/diff.tsx';
 import {secret} from '../../shared/server.ts';
 export const serverOnly=serverAction({kind:'query',input:z.object({}),handler:()=>secret()});
-function Panel(){const [visible,setVisible]=useState(true);return <FeedbackProvider onSubmit={async()=>{}} adapter={{resolve:()=>({status:'ready',text:''}),locate:()=>{}}}><LegacyRows/><Button onClick={()=>setVisible(!visible)}>Toggle diff</Button>{visible&&<DiffView sourceId="fixture" oldPath="file.ts" newPath="file.ts" oldText={'const before = 1;\\n'} newText={'const after = 2;\\n'}/>}</FeedbackProvider>}
+function Panel(){const [visible,setVisible]=useState(true);return <AnnotationRoot onSubmit={async()=>{}} adapter={{resolve:()=>({status:'ready',text:''}),locate:()=>{}}}><LegacyRows/><Button onClick={()=>setVisible(!visible)}>Toggle diff</Button>{visible&&<DiffView sourceId="fixture" oldPath="file.ts" newPath="file.ts" oldText={'const before = 1;\\n'} newText={'const after = 2;\\n'}/>}</AnnotationRoot>}
 export default definePanel({id:'imported-tailwind',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
   );
   service = await startServer(join(root, 'data'));

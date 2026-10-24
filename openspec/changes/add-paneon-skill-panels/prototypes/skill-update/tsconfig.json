@@ -1,5 +1,0 @@
-{
-  "extends": "../../../../../tsconfig.examples.json",
-  "include": ["panel.tsx"],
-  "exclude": []
-}

@@ -21,7 +21,6 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "examples/",
     "skills/paneon/",
     "src/ui/UPSTREAM-LICENSE.md",
     "src/ui/upstream.json",
@@ -34,7 +33,7 @@
     "build:cli": "tsc -p tsconfig.cli.json",
     "build:web": "vite build",
     "prepack": "npm run build",
-    "test": "npm run build:cli && npm run build:ui && node --test tests/*.test.ts",
+    "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.examples.json",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -53,6 +52,7 @@
     "test:browser:mermaid": "node tests/browser/mermaid.mjs"
   },
   "dependencies": {
+    "@base-ui/react": "1.9.0",
     "@clack/prompts": "1.8.1",
     "@fastify/websocket": "^11.3.4",
     "@tailwindcss/vite": "^4.3.3",
@@ -70,7 +70,6 @@
     "lucide-react": "1.60.0",
     "mermaid": "12.2.0",
     "pino": "^10.4.0",
-    "radix-ui": "1.8.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "10.1.0",
@@ -98,6 +97,7 @@
     "playwright": "^1.64.1",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "rolldown": "~1.2.14",
     "typescript-eslint": "^8",
     "ws": "^8.22.0"
   },

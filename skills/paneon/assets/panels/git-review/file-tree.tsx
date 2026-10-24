@@ -1,11 +1,16 @@
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileDiff, FolderTree, ChevronsUpDown, ChevronsDownUp } from './file-icons.tsx';
+import type { ReactNode } from 'react';
+import { FileDiff, FolderTree, ChevronsUpDown, ChevronsDownUp, TreeIcon } from './file-icons.tsx';
 import {
   Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -24,53 +29,33 @@ import {
 } from './file-tree-model.ts';
 import type { TreeNode } from './file-tree-model.ts';
 
-function TreeIcon({ kind }: { kind: 'file' | 'folder' | 'open' | 'down' | 'right' }) {
-  const paths = {
-    file: 'M8 2H4v12h9V7L8 2Z M8 2v5h5',
-    folder: 'M2 4h5l2 2h5v7H2V4Z',
-    open: 'M2 6V4h5l2 2h5 M2 6h13l-2 7H2V6Z',
-    down: 'm4 6 4 4 4-4',
-    right: 'm6 4 4 4-4 4',
-  };
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5 shrink-0"
-      aria-hidden="true"
-    >
-      <path d={paths[kind]} />
-    </svg>
-  );
-}
-
 type Props = {
   viewType: 'changes' | 'history' | 'compare';
   groupByDirectory?: boolean;
   onGroupByDirectoryChange?: (grouped: boolean) => void;
   pending?: boolean;
+  emptyState?: ReactNode;
   snapshots: GitFile[];
   selectedId?: string;
   filter: string;
   scopeKey: string;
   revealKey: number;
   onSelect: (snapshot: GitFile) => void;
+  onOpen: (snapshot: GitFile) => void;
 };
 export function ChangedFileTree({
   viewType,
   groupByDirectory,
   onGroupByDirectoryChange,
   pending,
+  emptyState,
   snapshots,
   selectedId,
   filter,
   scopeKey,
   revealKey,
   onSelect,
+  onOpen,
 }: Props) {
   const { t, message } = useLocale();
   const [grouping, setGrouping] = useState<Record<string, boolean>>({});
@@ -160,6 +145,14 @@ export function ChangedFileTree({
             className={`h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(snapshot.status)}`}
             style={{ paddingLeft: 8 + depth * 12 }}
             onClick={() => onSelect(snapshot)}
+            onDoubleClick={() => onOpen(snapshot)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSelect(snapshot);
+                onOpen(snapshot);
+              }
+            }}
           >
             <TreeIcon kind="file" />
             <span className="min-w-0 truncate">{node.name}</span>
@@ -186,25 +179,27 @@ export function ChangedFileTree({
           onOpenChange={(value) => setOpen(key, value)}
           className="min-w-0"
         >
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              data-file-directory={node.path}
-              aria-label={t('Directory {path}', { path: node.path })}
-              title={t('{path} · {count} files', { path: node.path, count: node.count })}
-              className="h-7 w-full min-w-0 justify-start gap-1 px-2 text-left text-xs"
-              style={{ paddingLeft: 4 + depth * 12 }}
-            >
-              <TreeIcon kind={open ? 'down' : 'right'} />
-              <span className="flex text-muted-foreground">
-                <TreeIcon kind={open ? 'open' : 'folder'} />
-              </span>
-              <span className="min-w-0 truncate">{node.name}</span>
-              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                {node.count}
-              </span>
-            </Button>
-          </CollapsibleTrigger>
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                data-file-directory={node.path}
+                aria-label={t('Directory {path}', { path: node.path })}
+                title={t('{path} · {count} files', { path: node.path, count: node.count })}
+                className="h-7 w-full min-w-0 justify-start gap-1 px-2 text-left text-xs"
+                style={{ paddingLeft: 4 + depth * 12 }}
+              >
+                <TreeIcon kind={open ? 'down' : 'right'} />
+                <span className="flex text-muted-foreground">
+                  <TreeIcon kind={open ? 'open' : 'folder'} />
+                </span>
+                <span className="min-w-0 truncate">{node.name}</span>
+                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                  {node.count}
+                </span>
+              </Button>
+            }
+          />
           <CollapsibleContent>
             {open && renderNodes(node.children, area, depth + 1)}
           </CollapsibleContent>
@@ -218,79 +213,117 @@ export function ChangedFileTree({
       className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
       data-file-tree=""
     >
-      <div
-        className="flex shrink-0 items-center gap-0.5 border-b px-1 py-0.5 text-muted-foreground"
-        role="toolbar"
-        aria-label={t('文件操作')}
-      >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="size-7"
-              aria-label={t('查看文件差异')}
-              disabled={!diffFile}
-              onClick={() => diffFile && onSelect(diffFile)}
-            >
-              <FileDiff className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t('查看文件差异')}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant={byDirectory ? 'secondary' : 'ghost'}
-              className="size-7"
-              aria-label={t('按目录分组')}
-              aria-pressed={byDirectory}
-              onClick={() => {
-                setGrouping((previous) => ({ ...previous, [scopeKey]: !byDirectory }));
-                onGroupByDirectoryChange?.(!byDirectory);
-              }}
-            >
-              <FolderTree className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t('按目录分组')}</TooltipContent>
-        </Tooltip>
-        <div className="flex-1" />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="size-7"
-              aria-label={t('全部展开')}
-              disabled={!foldKeys.length}
-              onClick={() => setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set() }))}
-            >
-              <ChevronsUpDown className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t('全部展开')}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="size-7"
-              aria-label={t('全部折叠')}
-              disabled={!foldKeys.length || !!filter}
-              onClick={() =>
-                setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set(foldKeys) }))
+      {snapshots.length > 0 && (
+        <div
+          className="flex shrink-0 items-center gap-0.5 border-b px-1 py-0.5 text-muted-foreground"
+          role="toolbar"
+          aria-label={t('文件操作')}
+        >
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="size-7"
+                  aria-label={t('查看文件差异')}
+                  disabled={!diffFile}
+                  onClick={() => {
+                    if (!diffFile) return;
+                    onSelect(diffFile);
+                    onOpen(diffFile);
+                  }}
+                >
+                  <FileDiff className="size-4" aria-hidden="true" />
+                </Button>
               }
-            >
-              <ChevronsDownUp className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t('全部折叠')}</TooltipContent>
-        </Tooltip>
-      </div>
+            />
+            <TooltipContent>{t('查看文件差异')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant={byDirectory ? 'secondary' : 'ghost'}
+                  className="size-7"
+                  aria-label={t('按目录分组')}
+                  aria-pressed={byDirectory}
+                  onClick={() => {
+                    setGrouping((previous) => ({ ...previous, [scopeKey]: !byDirectory }));
+                    onGroupByDirectoryChange?.(!byDirectory);
+                  }}
+                >
+                  <FolderTree className="size-4" aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>{t('按目录分组')}</TooltipContent>
+          </Tooltip>
+          <div className="flex-1" />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="size-7"
+                  aria-label={t('全部展开')}
+                  disabled={!foldKeys.length}
+                  onClick={() =>
+                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set() }))
+                  }
+                >
+                  <ChevronsUpDown className="size-4" aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>{t('全部展开')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="size-7"
+                  aria-label={t('全部折叠')}
+                  disabled={!foldKeys.length || !!filter}
+                  onClick={() =>
+                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set(foldKeys) }))
+                  }
+                >
+                  <ChevronsDownUp className="size-4" aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>{t('全部折叠')}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
       <div className="min-h-0 overflow-auto p-1" data-file-scroll="" aria-busy={pending}>
+        {!pending &&
+          snapshots.length === 0 &&
+          (emptyState !== undefined ? (
+            emptyState
+          ) : (
+            <Empty className={`flex-none ${viewType === 'history' ? 'py-12' : 'py-20'}`}>
+              <EmptyHeader>
+                <EmptyTitle>
+                  {t(
+                    viewType === 'changes'
+                      ? 'Working tree clean'
+                      : viewType === 'compare'
+                        ? 'No file differences between these revisions'
+                        : 'No file changes in this commit',
+                  )}
+                </EmptyTitle>
+                {viewType === 'changes' && (
+                  <EmptyDescription>{t('There are no uncommitted file changes.')}</EmptyDescription>
+                )}
+              </EmptyHeader>
+            </Empty>
+          ))}
         {visibleGroups.map(({ area, nodes }) => {
           if (!nodes.length) return null;
           const open = !!filter || !collapsed[scopeKey]?.has(`group:${area}`);
@@ -303,19 +336,21 @@ export function ChangedFileTree({
               data-file-group={area}
             >
               {area && (
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-7 w-full justify-start gap-1 px-1 text-xs"
-                    data-file-area={area}
-                  >
-                    <TreeIcon kind={open ? 'down' : 'right'} />
-                    {t(areaNames[area as keyof typeof areaNames])}
-                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
-                      {leafCount(nodes)}
-                    </span>
-                  </Button>
-                </CollapsibleTrigger>
+                <CollapsibleTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      className="h-7 w-full justify-start gap-1 px-1 text-xs"
+                      data-file-area={area}
+                    >
+                      <TreeIcon kind={open ? 'down' : 'right'} />
+                      {t(areaNames[area as keyof typeof areaNames])}
+                      <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                        {leafCount(nodes)}
+                      </span>
+                    </Button>
+                  }
+                />
               )}
               <CollapsibleContent>
                 {(!area || open) && renderNodes(nodes, area, area ? 1 : 0)}

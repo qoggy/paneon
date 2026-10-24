@@ -1,63 +1,60 @@
 import { useMemo, useState } from 'react';
-import { agent, definePanel, feedbackSchema, z } from 'paneon/sdk';
-import type { Feedback } from 'paneon/sdk';
+import { agent, definePanel, annotationValueSchema, z } from 'paneon/sdk';
+import type { AnnotationValue } from 'paneon/sdk';
 import {
   Button,
-  FeedbackOverallAnnotationButton,
-  FeedbackProvider,
-  FeedbackSelectionControls,
-  FeedbackSubmitButton,
-  FeedbackSurface,
-  FeedbackToolbar,
-  FeedbackTarget,
-  FeedbackText,
-  useFeedback,
+  AnnotationRoot,
+  AnnotationMenu,
+  AnnotationSubmitButton,
+  AnnotationText,
+  useAnnotations,
 } from 'paneon/ui';
-import type { FeedbackAdapter } from 'paneon/ui';
+import type { AnnotationAdapter } from 'paneon/ui';
 
-type Ref = { id: string };
+type Ref = string;
 const text = 'Shared annotation target';
-function Contents({ objects }: { objects: boolean }) {
-  const feedback = useFeedback<Ref>();
+function Contents({ separate }: { separate: boolean }) {
+  const feedback = useAnnotations<Ref>();
+  const [extraMenu, setExtraMenu] = useState(false);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        {objects ? (
+        {separate ? (
           <>
-            <FeedbackSelectionControls allowObjectSelection>
-              <FeedbackOverallAnnotationButton />
-            </FeedbackSelectionControls>
-            <FeedbackSubmitButton />
+            <AnnotationMenu showSubmit={false} />
+            <AnnotationSubmitButton />
           </>
         ) : (
-          <FeedbackToolbar />
+          <AnnotationMenu />
         )}
         <Button variant="outline">Toolbar child</Button>
+        <Button variant="outline" onClick={() => setExtraMenu(!extraMenu)}>
+          Toggle extra menu
+        </Button>
+        {extraMenu && <AnnotationMenu showSubmit={false} />}
       </div>
-      <FeedbackSurface />
-      <FeedbackTarget target={{ id: 'shared' }} asChild>
-        <p data-testid="target" className="mt-6 rounded-md border p-4">
-          <FeedbackText target={{ id: 'shared' }} text={text} />
-        </p>
-      </FeedbackTarget>
+
+      <p data-testid="target" className="mt-6 rounded-md border p-4">
+        <AnnotationText target="shared">{text}</AnnotationText>
+      </p>
+
       <output hidden data-testid="draft">
         {JSON.stringify(feedback.value)}
-      </output>
-      <output hidden data-testid="mode">
-        {feedback.mode}
       </output>
     </>
   );
 }
 function Panel() {
-  const [objects, setObjects] = useState(false);
+  const [separate, setSeparate] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const [located, setLocated] = useState('');
-  const adapter = useMemo<FeedbackAdapter<Ref>>(
+  const [locateCount, setLocateCount] = useState(0);
+  const adapter = useMemo<AnnotationAdapter<Ref>>(
     () => ({
       resolve: () => ({ status: 'ready', text }),
       locate: (target) => {
-        setLocated(target.ref.id);
+        setLocated(target.ref);
+        setLocateCount((count) => count + 1);
       },
     }),
     [],
@@ -65,24 +62,26 @@ function Panel() {
   return (
     <main className="space-y-4 p-4">
       <h1 className="text-lg font-semibold">Annotation editor acceptance</h1>
-      <FeedbackProvider<Ref>
+      <AnnotationRoot<Ref>
         disabled={disabled}
         adapter={adapter}
-        onSubmit={async (value: Feedback<Ref>) => {
+        onSubmit={async (value: AnnotationValue<Ref>) => {
           await agent.emit('feedback', value);
         }}
       >
-        <Contents objects={objects} />
-      </FeedbackProvider>
-      <div className="flex flex-wrap gap-2" data-feedback-controls="">
-        <Button variant="outline" onClick={() => setObjects(!objects)}>
-          Object controls {objects ? 'on' : 'off'}
+        <Contents separate={separate} />
+      </AnnotationRoot>
+      <div className="flex flex-wrap gap-2" data-annotation-controls="">
+        <Button variant="outline" onClick={() => setSeparate(!separate)}>
+          Split toolbar {separate ? 'on' : 'off'}
         </Button>
         <Button variant="outline" onClick={() => setDisabled(!disabled)}>
           Disabled {disabled ? 'yes' : 'no'}
         </Button>
       </div>
-      <output data-testid="located">{located}</output>
+      <output data-testid="located" data-locate-count={locateCount}>
+        {located}
+      </output>
     </main>
   );
 }
@@ -90,6 +89,6 @@ export default definePanel({
   id: 'annotation-editor-acceptance',
   requires: { paneon: '0.0.0' },
   input: z.object({}),
-  events: { feedback: feedbackSchema(z.object({ id: z.string() })) },
+  events: { feedback: annotationValueSchema(z.string()) },
   render: Panel,
 });

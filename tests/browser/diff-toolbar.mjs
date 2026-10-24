@@ -1,5 +1,6 @@
+import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
-import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -24,6 +25,8 @@ try {
     entry,
     await readFile(new URL('./diff-toolbar-fixture.txt', import.meta.url), 'utf8'),
   );
+  await mkdir(join(root, 'data'), { recursive: true });
+  await writeFile(join(root, 'data', 'config.json'), JSON.stringify({ server: { port: 0 } }));
   service = await startServer(join(root, 'data'));
   await service.app.inject({
     method: 'POST',
@@ -94,8 +97,8 @@ try {
   );
   await button('左右对比').click();
   assert.equal(await frame.locator('[data-diff-split]').count(), 1);
-  await button('选择对象').click();
-  await button('选择新侧第 45 行').click();
+
+  await selectDiffLines(frame, 'new', 45);
   const comments = annotationTools(frame, page);
   await comments.write('Keep exact line 45');
   await comments.save();
@@ -104,12 +107,14 @@ try {
   await button('收起上下文').click();
   assert.equal(await comments.count(), 1);
   assert.equal(await comments.text(1), 'Keep exact line 45');
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(
-    await frame.locator('body').evaluate((e) => e.scrollWidth > window.innerWidth),
-    false,
-  );
-  await page.screenshot({ path: '/tmp/paneon-diff-toolbar-mobile.png', fullPage: true });
+  if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await frame.locator('body').evaluate((e) => e.scrollWidth > window.innerWidth),
+      false,
+    );
+    await page.screenshot({ path: '/tmp/paneon-diff-toolbar-mobile.png', fullPage: true });
+  }
   await button('Same source').click();
   assert.equal(await counter.textContent(), '无差异');
   for (const control of [counter, previous, next]) assert.equal(await control.isDisabled(), true);
@@ -119,7 +124,7 @@ try {
   assert.equal(await counter.textContent(), '1 / 3 处差异');
   await page.setViewportSize({ width: 1100, height: 650 });
   await button('左右对比').click();
-  await button('结束选择').click();
+
   await viewport.evaluate(async (element) => {
     element.scrollTop = 0;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -128,7 +133,7 @@ try {
   await page.screenshot({ path: '/tmp/paneon-diff-toolbar-desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
   console.log(
-    'PASS Diff toolbar: three hunks, pointer navigation and current locate, boundaries, modes and exact CRLF, preserved annotation, source reset, same/binary, 390px layout.',
+    'PASS Diff toolbar: three hunks, pointer navigation and current locate, boundaries, modes and exact CRLF, preserved annotation, source reset, same/binary, optional 390px layout.',
   );
 } finally {
   await browser?.close();

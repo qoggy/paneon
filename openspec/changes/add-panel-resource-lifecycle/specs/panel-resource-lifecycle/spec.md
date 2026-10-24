@@ -1,116 +1,64 @@
 ## ADDED Requirements
 
-### Requirement: Separate instance availability from resident execution
+### Requirement: Converge backend resources independently of historical panels
 
-Paneon SHALL distinguish instance status `open`, `closed`, or `unavailable` from transient execution state `sleeping`, `starting`, `ready`, or `suspending`. Open auto-mode instances SHALL NOT require a resident worker merely to remain stored or serve immutable client assets. Explicit closure SHALL prevent ordinary reads and wake requests from reopening the instance. Sleep SHALL NOT delete events, advance consumer acknowledgements, or change an unchanged source revision.
+For fixed panel totals and up to ten actively used panels, the runtime SHALL bound execution, cache and framework watch resources rather than allocate a persistent execution process per panel. It SHALL prioritize finite reuse and responsive return/reload rather than require immediate zero threads after every call. Historical identities and submitted events SHALL remain.
 
-#### Scenario: An unused instance remains accessible
+#### Scenario: Old panels remain unclosed
 
-- **WHEN** an open instance has no resident execution environment
-- **THEN** inspect and its immutable assets remain available and the instance reports sleeping rather than closed
+- **WHEN** many historical panels remain without active calls
+- **THEN** they SHALL NOT each retain an execution process, and a bounded warm pool MAY remain until its idle timeout
 
-#### Scenario: An explicitly closed instance is revisited
+### Requirement: Reuse one fixed revision per bounded worker
 
-- **WHEN** a browser revisits a closed instance or requests wake
-- **THEN** Paneon retains the closed state and does not start an execution worker
+Subject to B14 approval, at most two default workers SHALL exist globally across starting, busy, idle and retiring states. Each SHALL load only one fixed serverEntry/revision. Matching idle workers SHALL be reused; mismatched idle workers SHALL exit before replacement. Author modules and full schemas SHALL NOT execute on HTTP main.
 
-### Requirement: Create and restore auto-mode instances without eager resident workers
+#### Scenario: Three same-panel calls
 
-Initial run SHALL validate input and publish a complete immutable artifact before returning the URL. Auto mode SHALL be the default without requiring a CLI lifecycle parameter. Runtime startup SHALL NOT compile or start workers for all stored auto instances. Persistent instances SHALL restore subject to resource limits without blocking the control service on the whole list.
+- **WHEN** three calls for one revision arrive together in an empty default pool
+- **THEN** at most two threads SHALL start and the third call SHALL reuse a completed worker rather than create a third fresh worker
 
-#### Scenario: Runtime starts with many unused instances
+### Requirement: Retire warmed workers at finite boundaries
 
-- **WHEN** the database contains hundreds of open auto instances and no visible clients
-- **THEN** runtime startup does not compile or launch an execution worker for each one, while list and event reads remain usable
+Workers SHALL retire after60s idle,100 completed calls or5min age, with count/age retirement after the current task completes. Failed/cancelled/obsolete-revision workers SHALL not retain unknown background work for reuse. Per-job signal, context and secret references SHALL be released on completion. Cross-call mutable module state SHALL NOT be a supported business storage contract.
 
-### Requirement: Track visibility through expiring per-client leases
+#### Scenario: Idle and stale worker
 
-The host SHALL report visible or hidden state per browser client over a same-origin HTTP presence endpoint. Visible leases SHALL renew every 30 seconds and expire after 90 seconds without renewal. One valid visible client SHALL keep the instance visibly active even if other clients are hidden. Closing a tab SHALL NOT be a requirement for eventual expiry. Framework WebSocket state streams SHALL remain read-only.
+- **WHEN** a warmed worker remains idle until its deadline or changes revision
+- **THEN** it SHALL exit without discarding browser content or requiring user close
 
-#### Scenario: One of two tabs becomes hidden
+### Requirement: Separate queue waiting and execution deadlines
 
-- **WHEN** two tabs view the same instance and one remains visible
-- **THEN** the hidden tab does not override the visible lease or cause idle suspension
+The defaults SHALL be32 waiting tasks,10s waiting deadline and30s execution deadline. A not-yet-started request that expires SHALL fail without later execution or automatic replay. Termination SHALL retain worker capacity until actual exit; mutations with uncertain results SHALL not replay.
 
-#### Scenario: A browser disappears without a final message
+#### Scenario: Two long calls
 
-- **WHEN** a browser crashes or disconnects without sending an unload notification
-- **THEN** its lease expires and it cannot keep the instance active indefinitely
+- **WHEN** a third call waits10s without starting
+- **THEN** it SHALL leave the queue with an explicit busy result, distinct from an execution timeout
 
-### Requirement: Suspend only safe idle execution
+### Requirement: Reuse notification channels for visible source references
 
-After all visible leases disappear and protected operations finish, an auto instance SHALL become eligible for idle suspension after the configured interval, initially 300 seconds. During suspension Paneon SHALL stop dispatch, close source watchers, revoke instance credentials and stop the idle worker before releasing its slot. Builds, initialization, event validation/persistence, running actions and leased credential prompts SHALL prevent automatic termination. Client disconnection SHALL NOT imply an action completed. List, inspect, event reads/ack and notification heartbeats SHALL NOT count as interaction activity.
+Subject to B15 approval, effective visibility SHALL combine host display and document visibility. Panel/preference notification sockets SHALL close while hidden and reconnect with one state synchronization on return. Watch dependencies SHALL aggregate visible sockets. Existing15s WebSocket protocol ping/pong MAY detect broken connections; no new30s HTTP presence reports or90s leases SHALL be added.
 
-#### Scenario: A mutation continues after its browser disappears
+#### Scenario: Hidden page with optional timed query
 
-- **WHEN** the last browser disappears while an accepted mutation is still executing
-- **THEN** Paneon does not terminate that execution as idle and does not replay the mutation
+- **WHEN** a page becomes hidden
+- **THEN** its iframe/drafts SHALL remain, explicitly configured refreshMs timers and notification reconnects SHALL pause, and already-started business actions SHALL not be cancelled or replayed
 
-#### Scenario: An idle instance is collected
+### Requirement: Keep existing records and bound framework artifacts
 
-- **WHEN** an auto instance has no visible lease or protected operation for the configured interval
-- **THEN** its worker and source watcher are released while its identity, artifact reference and events remain
+Records SHALL use indexed/projection reads without historical params-wide decoding. Static files SHALL not require a live worker; manifest metadata SHALL be capped at32 entries/8MiB. Subject to C2 approval, generated revisions SHALL retain current/previous successful versions plus active references and reclaim others without deleting source or submitted events. No DB schema migration/reset SHALL occur.
 
-### Requirement: Wake with per-instance serialization and bounded resources
+#### Scenario: Fixed panel count with repeated reload
 
-Wake SHALL use one initialization promise per instance and reserve worker capacity before starting. The initial defaults SHALL allow at most eight resident executions and two concurrent builds. Persistent and busy executions SHALL NOT be evicted. Capacity pressure SHALL prefer unprotected hidden auto executions, then least-recently-used unprotected auto executions. Wake/build queues SHALL be bounded to 32 items with respective admission waits of 10 and 30 seconds. RESOURCE_BUSY SHALL describe failure before dispatch without replaying business operations. Starting processes SHALL count toward capacity; transient build/metadata processes SHALL be reported separately from resident execution.
+- **WHEN** C2 is approved and a panel repeatedly builds new versions
+- **THEN** unreferenced generated versions outside retention SHALL be reclaimed, while source and SQLite events remain; arbitrary reclaimed revision URLs need not replay
 
-#### Scenario: Several requests wake the same sleeping instance
+### Requirement: Preserve explicit context and accurate isolation claims
 
-- **WHEN** several eligible requests arrive concurrently for one sleeping instance
-- **THEN** only one execution is initialized, revision is rechecked after preparation, and each accepted operation is dispatched at most once
+Actions SHALL use explicit ctx.cwd and bounded timeoutMs, supported libraries and awaited work. Thread isolation SHALL not be presented as an OS malicious-code/native-crash sandbox. Standalone prototypes SHALL not be presented as product memory or browser performance proof.
 
-#### Scenario: Every execution slot is protected
+#### Scenario: Action exits
 
-- **WHEN** new work needs capacity and all resident slots are busy or persistent until the admission deadline
-- **THEN** Paneon returns RESOURCE_BUSY without killing protected work or executing the rejected operation
-
-### Requirement: Explicit persistent execution mode
-
-Panel definitions SHALL support `execution.mode` with `auto` as the default and `persistent` as an explicit exception. Persistent mode SHALL retain server module state during normal service operation and SHALL NOT be suspended due to hidden browsers. It SHALL consume the same execution quota. It SHALL NOT promise restart of interrupted external business work or survival of module memory across service failure or actual source reload.
-
-#### Scenario: A persistent monitoring panel has no browser
-
-- **WHEN** a persistent instance remains open with no visible clients
-- **THEN** idle collection does not terminate its execution and the resource summary identifies its quota use
-
-### Requirement: Pause hidden automatic browser queries without replaying writes
-
-The SDK SHALL pause useQuery refresh timers for hidden auto-mode pages and resume with one fresh query on visibility restoration. Inactive browser calls SHALL NOT repeatedly wake auto instances. The host SHALL validate bridge identity when forwarding visibility state. Explicit persistent-mode background calls SHALL remain supported. Pending accepted operations SHALL retain their existing completion semantics, and the framework SHALL NOT automatically retry mutations or event emission after reconnect or wake failure.
-
-#### Scenario: A hidden polling page remains in the background
-
-- **WHEN** an auto panel using useQuery with refreshMs is hidden
-- **THEN** its automatic refresh timer is paused rather than repeatedly reviving execution
-
-### Requirement: Preserve the mounted client across execution-only transitions
-
-Execution state changes SHALL NOT change iframe identity or discard browser-owned answer, annotation, view, or receipt state when source revision is unchanged. No cross-browser-close draft recovery SHALL be implied. Source changes detected while watch is enabled SHALL retain the existing source-reload semantics rather than pretending to be an execution-only wake. No-watch instances SHALL use their pinned artifact until explicit reload.
-
-#### Scenario: A sleeping page with unsaved annotations returns to foreground
-
-- **WHEN** its mounted iframe remains alive and the source revision is unchanged
-- **THEN** wake preserves the draft, displayed sources and view without silently submitting, reloading the frame, changing annotation targets or requiring recovery of backend business snapshots
-
-### Requirement: Use indexed storage and bounded artifact metadata
-
-Single-instance lookup SHALL select by primary key without decoding every stored input. Lists SHALL paginate in SQL. Manifest caches SHALL have both entry and encoded-size bounds. Code artifacts SHALL be shared by package-version and content-revision key while inputs and browser-owned display/draft data remain per instance. Unreferenced artifact candidates SHALL persist their first-unreferenced time; only candidates unreferenced for 24 hours and free of active build/serve/client references SHALL be deleted after a final synchronized check. Events, consumer positions, source files and author data SHALL NOT be automatically deleted by this collector.
-
-#### Scenario: A single panel is inspected among many historical instances
-
-- **WHEN** one instance is inspected from a database containing many closed and open instances
-- **THEN** the request reads the target record and its needed manifest without parsing all other inputs or launching a worker
-
-#### Scenario: An artifact is referenced again before cleanup
-
-- **WHEN** an artifact candidate acquires a new open-instance or in-flight reference
-- **THEN** its collection candidacy is removed and the collector does not delete it
-
-### Requirement: Report execution state without exposing author content
-
-HTTP, CLI and localized host UI SHALL expose availability, execution mode, execution state, resource counts and actionable wake failures. Resource diagnostics SHALL NOT include params, snapshot bodies or credentials. Resource configuration SHALL share atomic serialization with UI preferences so updates cannot discard each other's fields. Browser hints SHALL NOT replace existing Host/Origin or CLI authorization.
-
-#### Scenario: Theme changes after a resource configuration update
-
-- **WHEN** ui.theme is saved after resources.maxResidentExecutions changes
-- **THEN** both valid changes remain in the single persisted configuration
+- **WHEN** a module or handler calls process.exit or blocks synchronously
+- **THEN** the main server SHALL survive direct thread exit or enforce the deadline, while the task fails explicitly without automatic mutation replay

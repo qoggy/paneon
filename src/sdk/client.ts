@@ -16,6 +16,7 @@ export function usePanelInput<I>(): I {
   return useContext(PanelInputContext) as I;
 }
 import { defaultUI, type UIPreferences } from '../shared/preferences.js';
+import type { BrowserAction } from '../shared/browser-actions.js';
 let ui = defaultUI;
 const uiListeners = new Set<() => void>();
 export const getUI = () => ui;
@@ -110,6 +111,8 @@ export const credentials = {
   request: (action: { actionId?: string }) =>
     request<CredentialRef>('credential', { actionId: action.actionId }),
 };
+/** Used by UIProvider to keep browser operations outside the opaque-origin panel. */
+export const panelBrowserAction = (action: BrowserAction) => request<void>('browser', action);
 export function useQuery<I, O>(
   action: Action<I, O, 'query'>,
   input: I,
@@ -165,11 +168,14 @@ export function useQuery<I, O>(
   return { ...state, refetch };
 }
 
-export { feedbackSchema } from './feedback.js';
+export { annotationValueSchema } from './annotation.js';
 export type {
-  Feedback,
-  FeedbackTarget,
-  FeedbackAnnotation,
-  FeedbackTextRange,
+  AnnotationValue,
+  AnnotationTarget,
+  Annotation,
+  AnnotationTextRange,
   JsonValue,
-} from './feedback.js';
+} from './annotation.js';
+
+export { createDiffModel, sourceLines, diffChanges } from '../shared/diff-model.js';
+export type { DiffModel, DiffLine, DiffRow, DiffHunk, DiffRef } from '../shared/diff-model.js';

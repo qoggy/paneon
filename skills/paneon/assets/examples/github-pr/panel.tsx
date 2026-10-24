@@ -1,22 +1,50 @@
-import { useLocale } from '../../shared/i18n';
+import { Markdown } from 'paneon/ui';
+import { FileDiffNotice } from '../../shared/file-diff-notice';
+import { usePRCopy } from './copy';
+import {
+  Check,
+  CircleDot,
+  Clock3,
+  ExternalLink,
+  FileCode2,
+  GitPullRequest,
+  GitMerge,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  X,
+} from './icons';
 import { useEffect, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import type { FeedbackTarget as Target } from 'paneon/sdk';
+import type { AnnotationTarget as Target } from 'paneon/sdk';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
   Badge,
   Button,
-  FeedbackSurface,
-  FeedbackToolbar,
-  FeedbackProvider,
-  FeedbackTarget,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  AnnotationMenu,
+  AnnotationRoot,
   Input,
-  Page,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from 'paneon/ui';
 import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
-import { MarkdownFeedback, locateMarkdownFeedback } from '../../shared/markdown-feedback';
+import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import { githubReview } from './github.ts';
 import type { PRChecks, PRComparison, PRDetail, PRList, PRSnapshot } from './github.ts';
 import { resolvePRTarget, safeLink } from './model.ts';
@@ -32,7 +60,10 @@ async function readResult<T>(work: () => T | Promise<T>) {
   try {
     return { ok: true as const, data: await work() };
   } catch (error) {
-    return { ok: false as const, message: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false as const,
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 const sessionInput = z.object({ repository: repositorySchema, sessionId: z.string().min(1) });
@@ -100,7 +131,7 @@ export const checkReviewRequest = serverAction({
 type Tab = 'overview' | 'files' | 'checks';
 type ListQuery = { state: 'open' | 'closed' | 'merged' | 'all'; search: string; limit: number };
 function GithubPR() {
-  const { t, language, message } = useLocale();
+  const { t, language } = usePRCopy();
   const params = usePanelInput<GitHubPRParams>();
   const [sessionId] = useState(() => crypto.randomUUID()),
     session = { repository: params.repository, sessionId };
@@ -176,7 +207,10 @@ function GithubPR() {
       setFileFilter('');
     } catch (error) {
       if (serial === detailSerial.current)
-        setDetailError({ number, error: error instanceof Error ? error.message : String(error) });
+        setDetailError({
+          number,
+          error: error instanceof Error ? error.message : String(error),
+        });
     } finally {
       if (serial === detailSerial.current) setDetailLoading(false);
     }
@@ -199,7 +233,10 @@ function GithubPR() {
       setSelected(result.data);
     } catch (error) {
       if (serial === tabSerial.current)
-        setTabError({ filename, error: error instanceof Error ? error.message : String(error) });
+        setTabError({
+          filename,
+          error: error instanceof Error ? error.message : String(error),
+        });
     } finally {
       if (serial === tabSerial.current) setTabLoading(false);
     }
@@ -267,6 +304,86 @@ function GithubPR() {
       : (checks?.sourceIds ?? []).flatMap((id) =>
           snapshots.current.get(id) ? [snapshots.current.get(id) as PRSnapshot] : [],
         );
+  const checksObservedAt =
+    old?.source.kind === 'check' ? old.source.observedAt : checks?.observedAt;
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(value),
+    );
+  const filteredFiles = (comparison?.files ?? []).filter((item) =>
+    `${item.filename} ${item.previous_filename ?? ''}`
+      .toLowerCase()
+      .includes(fileFilter.toLowerCase()),
+  );
+  function stateLabel(value: string) {
+    return t(
+      (
+        {
+          OPEN: 'open',
+          CLOSED: 'closed',
+          MERGED: 'merged',
+          APPROVED: 'Approved',
+          CHANGES_REQUESTED: 'Changes requested',
+          REVIEW_REQUIRED: 'Review required',
+          MERGEABLE: 'No conflicts',
+          CONFLICTING: 'Has conflicts',
+          UNKNOWN: 'Unknown',
+          CLEAN: 'Ready to merge',
+          BLOCKED: 'Merge blocked',
+          BEHIND: 'Branch is behind',
+          DIRTY: 'Has conflicts',
+          DRAFT: 'Draft',
+          UNSTABLE: 'Checks need attention',
+          HAS_HOOKS: 'Merge requirements pending',
+          COMPLETED: 'Completed',
+          SUCCESS: 'Passed',
+          FAILURE: 'Failed',
+          ERROR: 'Failed',
+          TIMED_OUT: 'Timed out',
+          ACTION_REQUIRED: 'Action required',
+          CANCELLED: 'Cancelled',
+          SKIPPED: 'Skipped',
+          NEUTRAL: 'Neutral',
+          PENDING: 'Pending',
+          EXPECTED: 'Pending',
+          QUEUED: 'Queued',
+          IN_PROGRESS: 'In progress',
+          WAITING: 'Waiting',
+          REQUESTED: 'Pending',
+          STALE: 'Out of date',
+          STARTUP_FAILURE: 'Failed',
+          added: 'Added',
+          removed: 'Deleted',
+          modified: 'Modified',
+          renamed: 'Renamed',
+          copied: 'Copied',
+          changed: 'Modified',
+          unchanged: 'Unchanged',
+        } as const
+      )[value] ?? 'Not reported',
+    );
+  }
+  function checkIcon(value: string) {
+    if (value === 'SUCCESS')
+      return (
+        <Check
+          className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+          aria-hidden="true"
+        />
+      );
+    if (['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(value))
+      return <X className="size-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />;
+    return (
+      <Clock3 className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+    );
+  }
+  function fileTone(status: string) {
+    return status === 'added'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : status === 'removed'
+        ? 'text-muted-foreground line-through'
+        : 'text-blue-600 dark:text-blue-400';
+  }
   async function requestReview() {
     if (!shown || requestLoading) return;
     setRequestLoading(true);
@@ -283,7 +400,7 @@ function GithubPR() {
     }
   }
   return (
-    <FeedbackProvider<PRRef>
+    <AnnotationRoot<PRRef>
       onSubmit={async (feedback) => {
         setSaved(undefined);
         const result = await checkFeedback({ ...session, feedback });
@@ -295,7 +412,7 @@ function GithubPR() {
         resolve(target) {
           const snapshot = snapshots.current.get(target.ref.sourceId);
           if (!snapshot)
-            return { status: 'missing', message: '原始 PR 快照已丢失，不能改挂最新内容。' };
+            return { status: 'missing', message: t('Original content is unavailable.') };
           try {
             const text = resolvePRTarget(snapshot, target);
             return { status: 'ready', ...(text === undefined ? {} : { text }) };
@@ -335,7 +452,7 @@ function GithubPR() {
             const root = document.querySelector<HTMLElement>(
               `[data-pr-body-source="${CSS.escape(snapshot.id)}"]`,
             );
-            if (root) locateMarkdownFeedback(root, target.text);
+            if (root) locateMarkdownAnnotation(root, target.text);
           }
           if (
             snapshot.model &&
@@ -347,101 +464,179 @@ function GithubPR() {
         },
       }}
     >
-      <Page
-        title={`GitHub PR · ${params.repository}`}
-        description={t('真实 gh 只读查询；审阅请求和意见仅交给当前 AI。')}
-      >
-        <FeedbackSurface />
-        <FeedbackToolbar />
-        <div className="grid gap-4 md:grid-cols-[minmax(14rem,1fr)_minmax(0,3fr)]">
-          <aside className="space-y-3">
-            <label>
-              {t('状态')}{' '}
-              <select
-                aria-label={t('PR 状态')}
-                value={query.state}
-                onChange={(event) =>
-                  void loadList({
-                    state: event.target.value as ListQuery['state'],
-                    search,
-                    limit: 30,
-                  })
-                }
-              >
-                {(['open', 'closed', 'merged', 'all'] as const).map((state) => (
-                  <option key={state} value={state}>
-                    {t(state)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Input
-              aria-label={t('搜索 PR')}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t('搜索 PR')}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                disabled={listLoading}
-                onClick={() => void loadList({ ...query, search, limit: 30 })}
-              >
-                {t('搜索')}
-              </Button>
-              <Button variant="outline" disabled={listLoading} onClick={() => void loadList(query)}>
-                {t('刷新列表')}
-              </Button>
+      <div className="mx-auto w-full max-w-[1600px] p-6 text-sm" data-pr-page="">
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+            <GitPullRequest className="size-5 shrink-0" aria-hidden="true" />
+            <h1 className="truncate text-base font-semibold text-foreground">
+              {params.repository}
+            </h1>
+            <span className="shrink-0">/ {t('Pull requests')}</span>
+          </div>
+          <AnnotationMenu />
+        </header>
+        <div className="grid grid-cols-[260px_minmax(0,1fr)] gap-6">
+          <aside
+            aria-label={t('Pull requests')}
+            className="min-w-0 self-start overflow-hidden rounded-lg border bg-background"
+          >
+            <div role="search" className="space-y-2 border-b bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Select
+                  items={(['open', 'closed', 'merged', 'all'] as const).map((value) => ({
+                    value,
+                    label: t(value),
+                  }))}
+                  value={query.state}
+                  onValueChange={(value) =>
+                    void loadList({
+                      state: value as ListQuery['state'],
+                      search,
+                      limit: 30,
+                    })
+                  }
+                >
+                  <SelectTrigger size="sm" aria-label={t('PR state')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(['open', 'closed', 'merged', 'all'] as const).map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {t(state)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        type="button"
+                        aria-label={t('Refresh list')}
+                        disabled={listLoading}
+                        onClick={() => void loadList(query)}
+                      >
+                        <RefreshCw
+                          aria-hidden="true"
+                          className={listLoading ? 'animate-spin' : ''}
+                        />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>{t('Refresh list')}</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="relative">
+                <Input
+                  className="h-8 pr-9"
+                  aria-label={t('Search PRs')}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      void loadList({ ...query, search, limit: 30 });
+                    }
+                  }}
+                  placeholder={t('Search PRs')}
+                />
+                <Button
+                  type="button"
+                  onClick={() => void loadList({ ...query, search, limit: 30 })}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute top-0 right-0"
+                  aria-label={t('Search')}
+                  title={t('Search')}
+                  disabled={listLoading}
+                >
+                  <Search aria-hidden="true" />
+                </Button>
+              </div>
             </div>
-            {listLoading && <p role="status">{t('读取 PR 列表…')}</p>}
+            {listLoading && (
+              <p
+                role="status"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"
+              >
+                <Spinner aria-hidden="true" />
+                {t('Loading pull requests…')}
+              </p>
+            )}
             {listError && (
               <Alert variant="destructive">
-                <AlertTitle>{t('列表查询失败')}</AlertTitle>
+                <AlertTitle>{t('Could not load pull requests')}</AlertTitle>
                 <AlertDescription>{listError}</AlertDescription>
               </Alert>
             )}
-            <p className="text-sm text-muted-foreground">
-              {t('已加载')} {list?.items.length ?? 0} {t('条；gh 最大获取量')} {query.limit}
-              {t('，不代表完整仓库或固定分页快照。')}
-            </p>
-            {list?.items.length === 0 && <p>{t('该查询没有 PR。')}</p>}
-            <div className="max-h-96 space-y-2 overflow-y-auto" aria-label={t('PR 列表')}>
+            {list && (
+              <p className="border-b px-3 py-2 text-xs text-muted-foreground">
+                {t('{count} loaded', { count: list.items.length })}
+              </p>
+            )}
+            {list?.items.length === 0 && (
+              <p className="p-4 text-muted-foreground">{t('No pull requests found.')}</p>
+            )}
+            <div
+              className="max-h-[calc(100vh-270px)] min-h-24 overflow-y-auto"
+              aria-label={t('PR list')}
+            >
               {list?.items.map((pr) => (
-                <div key={pr.number} className="rounded-md border p-2">
-                  <Button
-                    variant={detail?.number === pr.number ? 'secondary' : 'ghost'}
-                    className="h-auto w-full justify-start text-left whitespace-normal"
-                    onClick={() => void open(pr.number)}
-                  >
-                    #{pr.number} {pr.title}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {pr.author?.login ?? t('deleted user')} · {pr.headRefName} → {pr.baseRefName} ·{' '}
-                    {pr.isDraft ? `${t('Draft')} · ` : ''}
-                    {pr.state} ·{' '}
-                    {new Intl.DateTimeFormat(language, {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    }).format(new Date(pr.updatedAt))}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  key={pr.number}
+                  aria-label={`#${pr.number} ${pr.title}`}
+                  aria-current={shown?.number === pr.number ? 'true' : undefined}
+                  onClick={() => void open(pr.number)}
+                  className={`group flex w-full items-start gap-2.5 border-b px-3 py-3 text-left last:border-b-0 hover:bg-muted/60 focus-visible:outline-ring ${shown?.number === pr.number ? 'bg-accent' : ''}`}
+                >
+                  {pr.state === 'MERGED' ? (
+                    <GitMerge
+                      className="mt-0.5 size-4 shrink-0 text-purple-600 dark:text-purple-400"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <GitPullRequest
+                      className={`mt-0.5 size-4 shrink-0 ${pr.isDraft ? 'text-muted-foreground' : pr.state === 'CLOSED' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span className="min-w-0 space-y-1">
+                    <span className="line-clamp-2 block leading-5 font-medium">{pr.title}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      #{pr.number} · {pr.author?.login ?? t('Deleted user')}
+                      {pr.isDraft ? ` · ${t('Draft')}` : ''}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {pr.headRefName} → {pr.baseRefName}
+                    </span>
+                  </span>
+                </button>
               ))}
             </div>
             {list?.hasMore && (
               <Button
-                variant="outline"
+                variant="ghost"
+                className="w-full rounded-none border-t"
                 disabled={listLoading}
                 onClick={() => void loadList({ ...query, limit: query.limit + 30 })}
               >
-                {t('加载更多（增加 30）')}
+                {t('Load more')}
               </Button>
             )}
           </aside>
-          <main className="min-w-0 space-y-4">
-            {detailLoading && <p role="status">{t('读取 PR 详情…')}</p>}
+          <main className="min-w-0 space-y-4" aria-busy={detailLoading}>
+            {detailLoading && (
+              <p role="status" className="flex items-center gap-2 text-muted-foreground">
+                <Spinner aria-hidden="true" />
+                {t('Loading pull request…')}
+              </p>
+            )}
             {detailError && (
               <Alert variant="destructive">
-                <AlertTitle>{t('详情查询失败')}</AlertTitle>
+                <AlertTitle>{t('Could not load pull request')}</AlertTitle>
                 <AlertDescription>
                   {typeof detailError === 'string'
                     ? detailError
@@ -450,312 +645,475 @@ function GithubPR() {
               </Alert>
             )}
             {!shown && !detailLoading && (
-              <p>{t('从列表选择 PR，或通过 initialPullRequest 指定初始编号。')}</p>
+              <div className="flex min-h-96 flex-col items-center justify-center gap-3 rounded-lg border border-dashed text-muted-foreground">
+                <GitPullRequest className="size-8" aria-hidden="true" />
+                <p>{t('Choose a pull request to review.')}</p>
+              </div>
             )}
             {old && (
               <Alert>
-                <AlertTitle>{t('回看保留快照')}</AlertTitle>
+                <AlertTitle>{t('Viewing an earlier version')}</AlertTitle>
                 <AlertDescription>
-                  PR #{old.source.number} · {old.source.kind} · head {old.source.headCommit}
-                  {t('。刷新后仍指向原始内容。')}
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setOld(undefined);
-                      setTab(current.current.tab);
-                    }}
-                  >
-                    {t('返回当前 PR')}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>
+                      #{old.source.number} · <code>{old.source.headCommit.slice(0, 7)}</code>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setOld(undefined);
+                        setTab(current.current.tab);
+                      }}
+                    >
+                      {t('Back to current PR')}
+                    </Button>
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
             {shown && (
-              <>
-                <FeedbackTarget<PRRef>
-                  target={{
-                    sourceId: old?.source.kind === 'pull-request' ? old.id : shown.overviewSourceId,
-                    kind: 'pull-request',
-                  }}
-                >
-                  <div className="space-y-2 rounded-md border p-3" data-pr-overview="">
-                    <h2 className="text-xl font-semibold">
-                      #{shown.number} {shown.title}
-                    </h2>
-                    <p>
-                      {shown.headRefName} → {shown.baseRefName} ·{' '}
-                      {shown.author?.login ?? t('deleted user')}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge>{shown.state}</Badge>
-                      {shown.isDraft && <Badge variant="secondary">{t('Draft')}</Badge>}
-                      <Badge variant="outline">
-                        {t('Review:')} {shown.reviewDecision || 'none'}
-                      </Badge>
-                      <Badge variant="outline">
-                        {t('Merge:')} {shown.mergeable} / {shown.mergeStateStatus}
-                      </Badge>
+              <Tabs
+                value={tab}
+                onValueChange={(value) => void navigate(value as Tab)}
+                className="gap-4"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div data-pr-overview="" className="space-y-3">
+                      <h2 className="text-2xl leading-tight font-semibold tracking-tight">
+                        {shown.title}{' '}
+                        <span className="font-normal text-muted-foreground">#{shown.number}</span>
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                        <Badge
+                          className={`gap-1 rounded-full border-0 px-2.5 py-1 ${shown.isDraft ? 'bg-muted text-muted-foreground' : shown.state === 'MERGED' ? 'bg-purple-600 text-white' : shown.state === 'CLOSED' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}
+                        >
+                          {shown.state === 'MERGED' ? (
+                            <GitMerge className="size-3.5" aria-hidden="true" />
+                          ) : (
+                            <GitPullRequest className="size-3.5" aria-hidden="true" />
+                          )}
+                          {shown.isDraft ? t('Draft') : stateLabel(shown.state)}
+                        </Badge>
+                        <span className="font-medium text-foreground">
+                          {shown.author?.login ?? t('Deleted user')}
+                        </span>
+                        <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                          {shown.baseRefName}
+                        </code>
+                        <span aria-hidden="true">←</span>
+                        <code
+                          className="max-w-72 truncate rounded-md bg-muted px-1.5 py-0.5 text-xs text-foreground"
+                          title={shown.headRefName}
+                        >
+                          {shown.headRefName}
+                        </code>
+                      </div>
                     </div>
-                    <p className="text-xs break-all text-muted-foreground">
-                      {t('Base')} {shown.baseRefOid}
-                      <br />
-                      {t('Head')} {shown.headRefOid}
-                      <br />
-                      {t('更新于')}{' '}
-                      {new Intl.DateTimeFormat(language, {
-                        dateStyle: 'short',
-                        timeStyle: 'short',
-                      }).format(new Date(shown.updatedAt))}
-                    </p>
-                    <span className="text-sm text-muted-foreground">{t('（可选择整份 PR）')}</span>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={t('Refresh PR')}
+                              disabled={detailLoading}
+                              onClick={() => void open(shown.number)}
+                            >
+                              <RefreshCw aria-hidden="true" />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>{t('Refresh PR')}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <a
+                              href={safeLink(shown.url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={t('Open on GitHub')}
+                              className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-ring"
+                            >
+                              <ExternalLink className="size-4" aria-hidden="true" />
+                            </a>
+                          }
+                        />
+                        <TooltipContent>{t('Open on GitHub')}</TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
-                </FeedbackTarget>
-                <div className="flex flex-wrap gap-2">
-                  <a
-                    href={safeLink(shown.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    {t('在 GitHub 打开 PR')}
-                  </a>
-                  <Button
-                    variant="outline"
-                    disabled={detailLoading}
-                    onClick={() => void open(shown.number)}
-                  >
-                    {t('刷新 PR')}
-                  </Button>
-                  <Button disabled={requestLoading} onClick={() => void requestReview()}>
-                    {requestLoading ? t('保存请求中…') : t('请 AI 审阅此 PR')}
-                  </Button>
-                </div>
-                {requestMessage && (
-                  <p role="status">
-                    {requestMessage.id !== undefined
-                      ? t(
-                          'Saved the complete PR review request as event {id}. Draft annotations were not sent; the AI must be waiting or resume later to read it.',
-                          { id: requestMessage.id },
-                        )
-                      : t('Request not saved: {error}', { error: requestMessage.error ?? '' })}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {(['overview', 'files', 'checks'] as const).map((value) => (
+                  <div className="flex flex-wrap items-end justify-between gap-3 border-b">
+                    <TabsList variant="line" aria-label={t('PR sections')}>
+                      {(
+                        [
+                          { key: 'overview', label: t('Overview'), icon: MessageSquare },
+                          { key: 'files', label: t('Files changed'), icon: FileCode2 },
+                          { key: 'checks', label: t('Checks'), icon: CircleDot },
+                        ] as const
+                      ).map(({ key, label, icon: Icon }) => (
+                        <TabsTrigger
+                          key={key}
+                          value={key}
+                          aria-label={label}
+                          onClick={() => {
+                            if (tab === key && tabError) void navigate(key);
+                          }}
+                        >
+                          <Icon className="size-4" aria-hidden="true" />
+                          {label}
+                          {key === 'files' && (
+                            <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">
+                              {shown.changedFiles}
+                            </span>
+                          )}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
                     <Button
-                      variant={tab === value ? 'default' : 'outline'}
-                      key={value}
-                      onClick={() => void navigate(value)}
+                      size="sm"
+                      variant="outline"
+                      className="mb-2"
+                      disabled={requestLoading}
+                      onClick={() => void requestReview()}
                     >
-                      {
-                        { overview: t('概览与说明'), files: t('文件改动'), checks: t('检查') }[
-                          value
-                        ]
-                      }
+                      {requestLoading ? t('Sending…') : t('Ask AI to review')}
                     </Button>
-                  ))}
-                </div>
-                {tabLoading && (
-                  <p role="status">
-                    {t('读取')} {tab === 'files' ? t('固定版本代码') : t('检查')}…
-                  </p>
-                )}
-                {tabError && (
-                  <Alert variant="destructive">
-                    <AlertTitle>{t('内容查询失败')}</AlertTitle>
-                    <AlertDescription>
-                      {typeof tabError === 'string'
-                        ? tabError
-                        : t('Could not completely read file {filename}: {error}', tabError)}{' '}
-                      <a
-                        href={safeLink(`${shown.url}/files`)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
-                        {t('查看 GitHub 原始页面')}
-                      </a>
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {tab === 'overview' && bodySnapshot && (
-                  <div data-pr-body-source={bodySnapshot.id} className="space-y-3">
-                    <FeedbackTarget<PRRef>
-                      target={{ sourceId: bodySnapshot.id, kind: 'description' }}
-                    >
-                      <h3 className="rounded-md border p-2 font-medium">
-                        {t('PR 说明（可选择整段说明）')}
-                      </h3>
-                    </FeedbackTarget>
-                    {bodySnapshot.body ? (
-                      <MarkdownFeedback<PRRef>
-                        source={bodySnapshot.body}
-                        target={{ sourceId: bodySnapshot.id, kind: 'description' }}
-                      />
-                    ) : (
-                      <p>{t('没有说明。')}</p>
-                    )}
                   </div>
-                )}
-                {tab === 'checks' && (
-                  <section aria-label={t('PR 检查')} className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      {t('按固定 head 读取 statusCheckRollup；检查失败是所见业务状态。')}
-                      {old?.source.kind === 'check'
-                        ? t('Observed at {date}', {
-                            date: new Intl.DateTimeFormat(language, {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            }).format(new Date(old.source.observedAt)),
-                          })
-                        : checks
-                          ? t('Observed at {date}', {
-                              date: new Intl.DateTimeFormat(language, {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              }).format(new Date(checks.observedAt)),
-                            })
-                          : ''}
+                </div>
+                <TabsContent value={tab} className="space-y-4">
+                  {requestMessage && (
+                    <p
+                      role="status"
+                      className={
+                        requestMessage.error ? 'text-destructive' : 'text-muted-foreground'
+                      }
+                    >
+                      {requestMessage.id !== undefined
+                        ? t('Review request sent to your AI.')
+                        : t('Request not sent: {error}', { error: requestMessage.error ?? '' })}
                     </p>
-                    {displayedChecks.length === 0 && !tabLoading && !tabError && (
-                      <p>{t('没有检查记录。')}</p>
-                    )}
-                    {displayedChecks.map(
-                      (snapshot) =>
-                        snapshot.source.kind === 'check' && (
-                          <FeedbackTarget<PRRef>
-                            key={snapshot.id}
-                            target={{ sourceId: snapshot.id, kind: 'check' }}
-                          >
+                  )}
+                  {tabError && (
+                    <Alert variant="destructive">
+                      <AlertTitle>{t('Could not load content')}</AlertTitle>
+                      <AlertDescription>
+                        {typeof tabError === 'string'
+                          ? tabError
+                          : t('Could not read {filename}: {error}', tabError)}{' '}
+                        <a
+                          href={safeLink(`${shown.url}/files`)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline"
+                        >
+                          {t('Open on GitHub')}
+                        </a>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {tabLoading && (
+                    <p role="status" className="flex items-center gap-2 text-muted-foreground">
+                      <Spinner aria-hidden="true" />
+                      {tab === 'files' ? t('Loading changes…') : t('Loading checks…')}
+                    </p>
+                  )}
+                  {tab === 'overview' && bodySnapshot && (
+                    <div className="grid grid-cols-[minmax(0,1fr)_210px] items-start gap-5">
+                      <article
+                        data-pr-body-source={bodySnapshot.id}
+                        className="min-w-0 overflow-hidden rounded-lg border"
+                      >
+                        <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3">
+                          <span className="font-medium">
+                            {shown.author?.login ?? t('Deleted user')}
+                          </span>
+                          <h3 className="text-xs text-muted-foreground">{t('Description')}</h3>
+                        </div>
+
+                        <div className="p-5">
+                          {bodySnapshot.body ? (
+                            <Markdown<PRRef>
+                              annotationTarget={{
+                                sourceId: bodySnapshot.id,
+                                kind: 'description',
+                              }}
+                            >
+                              {bodySnapshot.body}
+                            </Markdown>
+                          ) : (
+                            <p className="text-muted-foreground">{t('No description provided.')}</p>
+                          )}
+                        </div>
+                      </article>
+                      <aside className="min-w-0 divide-y text-sm" aria-label={t('PR details')}>
+                        <section className="space-y-2 pb-4">
+                          <h3 className="text-xs font-semibold text-muted-foreground">
+                            {t('Review')}
+                          </h3>
+                          <p>{stateLabel(shown.reviewDecision)}</p>
+                        </section>
+                        <section className="space-y-2 py-4">
+                          <h3 className="text-xs font-semibold text-muted-foreground">
+                            {t('Merge status')}
+                          </h3>
+                          <p>{stateLabel(shown.mergeable)}</p>
+                          {shown.mergeStateStatus && (
+                            <p className="text-xs text-muted-foreground">
+                              {stateLabel(shown.mergeStateStatus)}
+                            </p>
+                          )}
+                        </section>
+                        <section className="space-y-2 py-4">
+                          <h3 className="text-xs font-semibold text-muted-foreground">
+                            {t('Updated')}
+                          </h3>
+                          <time dateTime={shown.updatedAt}>{formatDate(shown.updatedAt)}</time>
+                        </section>
+                        <Collapsible className="py-4">
+                          <CollapsibleTrigger className="group flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              aria-hidden="true"
+                              className="transition-transform group-data-[panel-open]:rotate-90"
+                            >
+                              <path d="m4 2 4 4-4 4" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                            {t('Commits')}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <dl className="mt-3 space-y-2 text-xs">
+                              <div className="flex justify-between gap-2">
+                                <dt>{t('Base')}</dt>
+                                <dd>
+                                  <code title={shown.baseRefOid}>
+                                    {shown.baseRefOid.slice(0, 7)}
+                                  </code>
+                                </dd>
+                              </div>
+                              <div className="flex justify-between gap-2">
+                                <dt>{t('Head')}</dt>
+                                <dd>
+                                  <code title={shown.headRefOid}>
+                                    {shown.headRefOid.slice(0, 7)}
+                                  </code>
+                                </dd>
+                              </div>
+                            </dl>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </aside>
+                    </div>
+                  )}
+                  {tab === 'checks' && (
+                    <section
+                      aria-label={t('PR checks')}
+                      className="overflow-hidden rounded-lg border"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+                        <h3 className="font-medium">{t('Checks')}</h3>
+                        {checksObservedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(checksObservedAt)}
+                          </span>
+                        )}
+                      </div>
+                      {displayedChecks.length === 0 && !tabLoading && !tabError && (
+                        <p className="p-6 text-muted-foreground">{t('No checks reported.')}</p>
+                      )}
+                      {displayedChecks.map(
+                        (snapshot) =>
+                          snapshot.source.kind === 'check' && (
                             <div
-                              className="rounded-md border p-3"
+                              key={snapshot.id}
+                              className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
                               data-pr-check={snapshot.source.key}
                             >
-                              <strong>{snapshot.source.name}</strong> ·{' '}
-                              <Badge variant="outline">
-                                {snapshot.source.status} / {snapshot.source.conclusion ?? 'pending'}
-                              </Badge>
-                              <p className="text-xs break-all text-muted-foreground">
-                                {snapshot.source.key} · {snapshot.source.observedAt}
-                              </p>
+                              {checkIcon(snapshot.source.conclusion ?? snapshot.source.status)}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium">{snapshot.source.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {stateLabel(snapshot.source.conclusion ?? snapshot.source.status)}
+                                </p>
+                              </div>
                               {safeLink(snapshot.source.detailsUrl) && (
                                 <a
                                   href={safeLink(snapshot.source.detailsUrl)}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="underline"
+                                  className="shrink-0 text-xs text-muted-foreground underline-offset-4 hover:underline"
                                 >
-                                  {t('检查详情')}
+                                  {t('Details')}{' '}
+                                  <ExternalLink className="inline size-3" aria-hidden="true" />
                                 </a>
                               )}
                             </div>
-                          </FeedbackTarget>
-                        ),
-                    )}
-                  </section>
-                )}
-                {tab === 'files' && (
-                  <section className="space-y-3">
-                    {comparison && !old && (
-                      <>
-                        <p className="text-xs break-all text-muted-foreground">
-                          {t('固定比较：merge-base')} {comparison.mergeBaseCommit} → head{' '}
-                          {comparison.headCommit}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {t(
-                            'GitHub compare API returns at most 300 files; listed {listed}, PR reports {reported}.',
-                            { listed: comparison.files.length, reported: comparison.reportedFiles },
-                          )}
-                        </p>
-                        {comparison.notes.slice(1).map((note) => (
-                          <p
-                            key={message(note)}
-                            className={`text-sm ${comparison.complete ? 'text-muted-foreground' : 'text-destructive'}`}
+                          ),
+                      )}
+                    </section>
+                  )}
+                  {tab === 'files' && (
+                    <section className="space-y-3">
+                      {comparison && !old && !comparison.complete && (
+                        <Alert>
+                          <AlertTitle>{t('File list may be incomplete')}</AlertTitle>
+                          <AlertDescription>
+                            {t('Showing {listed} of {reported} files.', {
+                              listed: comparison.files.length,
+                              reported: comparison.reportedFiles,
+                            })}{' '}
+                            <a
+                              href={safeLink(comparison.url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline"
+                            >
+                              {t('Open on GitHub')}
+                            </a>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <div
+                        className={`grid items-start gap-4 ${comparison && !old ? 'grid-cols-[220px_minmax(0,1fr)]' : 'grid-cols-1'}`}
+                      >
+                        {comparison && !old && (
+                          <aside
+                            className="sticky top-3 min-w-0 overflow-hidden rounded-lg border"
+                            aria-label={t('Changed files')}
                           >
-                            {message(note)}
-                          </p>
-                        ))}
-                        <a
-                          href={safeLink(comparison.url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline"
-                        >
-                          {t('GitHub 原始文件改动')}
-                        </a>
-                        <Input
-                          aria-label={t('搜索文件')}
-                          value={fileFilter}
-                          onChange={(event) => setFileFilter(event.target.value)}
-                          placeholder={t('搜索文件路径')}
-                        />
-                        <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
-                          {comparison.files
-                            .filter((item) =>
-                              `${item.filename} ${item.previous_filename ?? ''}`
-                                .toLowerCase()
-                                .includes(fileFilter.toLowerCase()),
-                            )
-                            .map((item) => (
-                              <Button
-                                key={item.filename}
-                                variant="outline"
-                                className="h-auto text-left whitespace-pre-wrap"
-                                onClick={() => void file(comparison, item.filename)}
-                              >
-                                {item.status} · {item.filename}
-                              </Button>
-                            ))}
+                            <div className="space-y-2 border-b bg-muted/30 p-3">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium">{t('Changed files')}</span>
+                                <span className="text-muted-foreground">
+                                  {comparison.files.length}
+                                </span>
+                              </div>
+                              <Input
+                                className="h-8"
+                                aria-label={t('Search files')}
+                                placeholder={t('Filter files…')}
+                                value={fileFilter}
+                                onChange={(event) => setFileFilter(event.target.value)}
+                              />
+                            </div>
+                            <div className="max-h-[calc(100vh-350px)] overflow-y-auto">
+                              {filteredFiles.map((item) => (
+                                <button
+                                  type="button"
+                                  key={item.filename}
+                                  aria-label={`${stateLabel(item.status)} · ${item.filename}`}
+                                  title={
+                                    item.previous_filename
+                                      ? `${item.previous_filename} → ${item.filename}`
+                                      : item.filename
+                                  }
+                                  aria-current={
+                                    displayedDiff?.source.kind === 'diff' &&
+                                    (displayedDiff.source.new?.path ??
+                                      displayedDiff.source.old?.path) === item.filename
+                                      ? 'true'
+                                      : undefined
+                                  }
+                                  onClick={() => void file(comparison, item.filename)}
+                                  className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-muted/60 focus-visible:outline-ring aria-[current=true]:bg-accent"
+                                >
+                                  <FileCode2
+                                    className={`mt-0.5 size-4 shrink-0 ${fileTone(item.status)}`}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="min-w-0 flex-1">
+                                    <span
+                                      className={`block truncate text-xs font-medium ${fileTone(item.status)}`}
+                                    >
+                                      {item.filename.split('/').at(-1)}
+                                    </span>
+                                    {item.filename.includes('/') && (
+                                      <span className="block truncate text-[11px] text-muted-foreground">
+                                        {item.filename.slice(0, item.filename.lastIndexOf('/'))}
+                                      </span>
+                                    )}
+                                  </span>
+                                </button>
+                              ))}
+                              {!filteredFiles.length && (
+                                <p className="p-3 text-xs text-muted-foreground">
+                                  {comparison.files.length
+                                    ? t('No matching files.')
+                                    : t('No file changes.')}
+                                </p>
+                              )}
+                            </div>
+                            <a
+                              className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+                              href={safeLink(comparison.url)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {t('Open on GitHub')}
+                              <ExternalLink className="size-3" aria-hidden="true" />
+                            </a>
+                          </aside>
+                        )}
+                        <div className="min-w-0 space-y-3">
+                          {displayedDiff?.source.kind === 'diff' && displayedDiff.model && (
+                            <>
+                              {displayedDiff.notesUI
+                                ?.filter((note) => note.key === 'Mode: {old} → {next}')
+                                .map((note) => (
+                                  <p key={note.key} className="text-xs text-muted-foreground">
+                                    {t('File mode: {old} → {next}', note.params)}
+                                  </p>
+                                ))}
+                              {displayedDiff.source.old?.type === 'binary' ||
+                              displayedDiff.source.new?.type === 'binary' ? (
+                                <FileDiffNotice
+                                  oldPath={displayedDiff.source.old?.path}
+                                  newPath={displayedDiff.source.new?.path}
+                                />
+                              ) : (
+                                <DiffView
+                                  key={displayedDiff.id}
+                                  sourceId={displayedDiff.id}
+                                  model={displayedDiff.model}
+                                  oldPath={displayedDiff.source.old?.path}
+                                  newPath={displayedDiff.source.new?.path}
+
+                                  locateTarget={
+                                    locateTarget &&
+                                    (locateTarget.ref.kind === 'file' ||
+                                      locateTarget.ref.kind === 'hunk' ||
+                                      locateTarget.ref.kind === 'lines') &&
+                                    locateTarget.ref.sourceId === displayedDiff.id
+                                      ? { ...locateTarget, ref: locateTarget.ref }
+                                      : undefined
+                                  }
+                                />
+                              )}
+                            </>
+                          )}
                         </div>
-                        {comparison.files.length === 0 && <p>{t('该固定比较没有文件改动。')}</p>}
-                      </>
-                    )}
-                    {displayedDiff?.source.kind === 'diff' && displayedDiff.model && (
-                      <>
-                        {displayedDiff.notesUI?.map((note) => (
-                          <p key={note.key} className="text-sm text-muted-foreground">
-                            {message(note.key, note.params)}
-                          </p>
-                        ))}
-                        <DiffView
-                          key={displayedDiff.id}
-                          sourceId={displayedDiff.id}
-                          model={displayedDiff.model}
-                          oldPath={displayedDiff.source.old?.path}
-                          newPath={displayedDiff.source.new?.path}
-                          fileOnly={
-                            displayedDiff.source.old?.type === 'binary' ||
-                            displayedDiff.source.new?.type === 'binary'
-                          }
-                          locateTarget={
-                            locateTarget &&
-                            (locateTarget.ref.kind === 'file' ||
-                              locateTarget.ref.kind === 'hunk' ||
-                              locateTarget.ref.kind === 'lines') &&
-                            locateTarget.ref.sourceId === displayedDiff.id
-                              ? { ...locateTarget, ref: locateTarget.ref }
-                              : undefined
-                          }
-                        />
-                      </>
-                    )}
-                  </section>
-                )}
-              </>
+                      </div>
+                    </section>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </main>
         </div>
         {saved && (
-          <p role="status">
-            {t(
-              'Saved complete annotations as event {id}. Annotations go only to the current AI and were not published to GitHub.',
-              { id: saved },
-            )}
+          <p role="status" className="mt-4 text-sm text-muted-foreground">
+            {t('Annotations sent to your AI.')}
           </p>
         )}
-      </Page>
-    </FeedbackProvider>
+      </div>
+    </AnnotationRoot>
   );
 }
 export default definePanel({

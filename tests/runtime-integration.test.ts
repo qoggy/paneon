@@ -10,12 +10,12 @@ import { WebSocket } from 'ws';
 const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
 )) as typeof import('../src/runtime/lifecycle.js');
-void test('the shipped GitHub panel compiles its type-only server model imports', async () => {
+void test('the GitHub fixture panel compiles its type-only server model imports', async () => {
   const root = mkdtempSync(join(tmpdir(), 'paneon-gh-panel-'));
   const runtime = new Runtime(join(root, 'data'));
   try {
     const panel = await runtime.run(
-      join(import.meta.dirname, '../examples/gh-panel.tsx'),
+      join(import.meta.dirname, './fixtures/panels/gh-panel.tsx'),
       root,
       { repository: 'cli/cli' },
       false,

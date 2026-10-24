@@ -10,7 +10,7 @@ import {
   bodyTooLargeDiagnostic,
 } from '../shared/limits.js';
 import { PROTOCOL_VERSION, PaneonError } from '../shared/types.js';
-import type { RuntimeDescriptor, JsonValue } from '../shared/types.js';
+import type { RuntimeDescriptor, JsonValue, Diagnostic } from '../shared/types.js';
 function readDescriptor(): RuntimeDescriptor | null {
   let text: string;
   try {
@@ -143,19 +143,27 @@ export async function ensureRuntime() {
     logLevel();
     const child = spawn(process.execPath, [join(PACKAGE_ROOT, 'dist/runtime/index.js')], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
       env: process.env,
     });
     let failed: Error | undefined;
     child.once('error', (err) => {
       failed = err;
     });
+    child.once('message', (detail: Diagnostic) => {
+      failed = new PaneonError(detail.code, detail.message, detail.details);
+    });
     child.unref();
-    for (let attempt = 0; attempt < 900; attempt++) {
-      if (failed || child.exitCode !== null) break;
-      await delay(100);
-      const ready = await discover();
-      if (ready) return ready;
+    try {
+      for (let attempt = 0; attempt < 900; attempt++) {
+        if (failed || child.exitCode !== null) break;
+        await delay(100);
+        const ready = await discover();
+        if (ready) return ready;
+      }
+      if (failed) throw failed;
+    } finally {
+      if (child.connected) child.disconnect();
     }
     throw Object.assign(
       new PaneonError(
