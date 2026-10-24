@@ -85,6 +85,7 @@ export type TableParams = z.infer<typeof tableParamsSchema>;
 export const tableRefSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('row'), rowIndex: z.number().int().nonnegative() }).strict(),
   z.object({ kind: z.literal('column'), columnKey: label }).strict(),
+  z.object({ kind: z.literal('header'), columnKey: label }).strict(),
   z
     .object({ kind: z.literal('cell'), rowIndex: z.number().int().nonnegative(), columnKey: label })
     .strict(),
@@ -105,10 +106,16 @@ export function tableTargetError(
   if ('columnKey' in value && !params.columns.some((column) => column.key === value.columnKey))
     return 'Unknown column key.';
   if (target.text) {
-    if (value.kind !== 'cell') return 'Only string cells support text ranges.';
-    const source = params.rows[value.rowIndex][value.columnKey];
+    if (value.kind !== 'cell' && value.kind !== 'header')
+      return 'Only header labels and string cells support text ranges.';
+    const source =
+      value.kind === 'header'
+        ? params.columns.find((column) => column.key === value.columnKey)?.label
+        : params.rows[value.rowIndex][value.columnKey];
     if (typeof source !== 'string' || !validSourceRange(source, target))
-      return 'Text range does not match the original string cell.';
+      return value.kind === 'header'
+        ? 'Text range does not match the original header label.'
+        : 'Text range does not match the original string cell.';
   }
   return null;
 }

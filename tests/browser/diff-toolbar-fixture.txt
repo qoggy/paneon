@@ -21,7 +21,7 @@ function Panel() {
       <Button onClick={() => setKind('changed')}>Changed source</Button>
       <Button onClick={() => setKind('same')}>Same source</Button>
       <Button onClick={() => setKind('binary')}>Binary source</Button>
-      <FeedbackToolbar />
+      <FeedbackToolbar allowObjectSelection />
     </div>
     <div data-toolbar-viewport className="h-[32rem] min-w-0 overflow-y-auto border">
       <DiffView sourceId={kind} oldPath="file.ts" newPath="file.ts" oldText={original} newText={kind === 'same' ? original : modified} fileOnly={kind === 'binary'} />

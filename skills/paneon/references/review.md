@@ -11,7 +11,7 @@ Run `assets/panels/review/panel.tsx` using ordinary `paneon panel run` with `--p
 
 Both fields are required strings; the title must not be blank. Supply one complete raw Markdown document. Do not split it into sections or assign paragraph IDs. New document content uses a new instance; the existing instance retains its creation-time snapshot.
 
-Read and copy text or follow links normally. Select a word or phrase to reveal the nearby **批注** action; click it to open an anchored editor. **保存** stores the annotation in this page only. Click its numbered marker to edit; Cancel discards the temporary edit and Delete removes the annotation. Use **选择对象** for the whole document or paragraphs and to combine disconnected positions into one annotation. Empty annotations mean selection without a written opinion. **整体批注** opens an optional overall-annotation editor. **提交批注** in the page toolbar sends the complete result to AI; unsaved edits must first be saved or cancelled.
+Read and copy text or follow links normally. Select a word or phrase to reveal the nearby **批注** action; click it to open an anchored editor. **保存** stores the annotation in this page only. Click its numbered marker to edit; Cancel discards the temporary edit and Delete removes the annotation. Select a complete paragraph in the same way; the default toolbar has no object-selection mode. Empty annotations mean selection without a written opinion. **整体批注** opens an optional overall-annotation editor. **提交批注** in the page toolbar sends the complete result to AI; unsaved edits must first be saved or cancelled.
 
 `review-submitted` carries a complete feedback result:
 
@@ -42,4 +42,4 @@ Submission requires an explicit action. First empty feedback emits nothing. Succ
 
 Read and acknowledge events with `paneon panel events <instanceId> --consumer <name>` and `paneon panel ack <instanceId> --consumer <name> --through <eventId>`. Drafts and the current page's previous receipt are browser-local; page reload does not promise draft recovery.
 
-Object annotations: use **选择对象** to collect targets, then click toolbar **批注** to open the editor. Only **保存** adds the page draft; cancelling discards the temporary selection. Text selection uses its nearby action directly.
+Select text, including complete paragraphs, and use its nearby **批注** action. Only **保存** adds the page draft; cancelling discards the temporary edit.

@@ -15,7 +15,7 @@ try {
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
   });
   if (artifacts) await mkdir(artifacts, { recursive: true });
-  for (const width of [1440, 390]) {
+  for (const width of process.env.PANEON_TEST_DESKTOP_ONLY === '1' ? [1440] : [1440, 390]) {
     const context = await browser.newContext({
       viewport: { width, height: width === 390 ? 844 : 1000 },
       hasTouch: width === 390,
@@ -131,17 +131,29 @@ try {
       await frame.locator('[data-row-index]').first().getAttribute('data-row-index'),
       '0',
     );
-    await button('选择对象').click();
-    await button('选择帮助').click();
-    await frame
-      .getByRole('dialog', { name: '选择帮助', exact: true })
-      .getByText('列选择覆盖输入整列', { exact: false })
-      .waitFor();
-    await page.keyboard.press('Escape');
-    await frame.getByRole('checkbox', { name: '选择当前页的行', exact: true }).check();
+    assert.equal(await button('选择对象').count(), 0);
+    assert.equal(await frame.getByRole('checkbox').count(), 0);
+    const headerLabel = frame.locator('[data-column-key="note"] [data-feedback-text]');
+    await headerLabel.scrollIntoViewIfNeeded();
+    const frameBox = await page.locator('iframe').boundingBox();
+    const selectionPoints = await headerLabel.evaluate((node, iframe) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const box = range.getBoundingClientRect();
+      return {
+        x1: iframe.x + box.left + 0.5,
+        x2: iframe.x + box.right - 0.5,
+        y: iframe.y + box.top + box.height / 2,
+      };
+    }, frameBox);
+    await page.mouse.move(selectionPoints.x1, selectionPoints.y);
+    await page.mouse.down();
+    await page.mouse.move(selectionPoints.x2, selectionPoints.y, { steps: 12 });
+    await page.mouse.up();
+    assert.equal(await headerLabel.evaluate(() => document.getSelection().toString()), '说明');
     await screenshot('selected');
     const comments = annotationTools(frame, page);
-    await comments.write('本页三行');
+    await comments.write('列名说明');
     await comments.save();
     await measure('saved-comment');
     await screenshot('comment');
@@ -149,25 +161,24 @@ try {
     await comments.locate(1, 1);
     assert.equal(
       await frame.locator('[data-row-index]').first().getAttribute('data-row-index'),
-      '0',
+      '3',
     );
-    assert.equal(await comments.text(1), '本页三行');
+    assert.equal(await comments.text(1), '列名说明');
     await button('提交批注').click();
     await frame.getByRole('status').waitFor();
     const first = (await fixture.events(fixture.normal)).at(-1);
-    assert.deepEqual(
-      first.payload.annotations[0].targets.map((target) => target.ref.rowIndex),
-      [0, 1, 2],
-    );
+    assert.deepEqual(first.payload.annotations[0].targets, [
+      { ref: { kind: 'header', columnKey: 'note' }, text: { start: 0, end: 2, quote: '说明' } },
+    ]);
     await button('修改反馈').click();
     await comments.edit(1);
-    await frame.getByLabel('批注内容', { exact: true }).fill('本页三行更正');
+    await frame.getByLabel('批注内容', { exact: true }).fill('列名更正');
     await comments.save();
     await button('提交批注').click();
     await frame.getByRole('status').waitFor();
     const correction = (await fixture.events(fixture.normal)).at(-1);
     assert.equal(correction.payload.replacesEventId, first.id);
-    assert.equal(correction.payload.annotations[0].comment, '本页三行更正');
+    assert.equal(correction.payload.annotations[0].comment, '列名更正');
     await open(fixture.long, '长列名与原文评审');
     await measure('long-content');
     const longHeader = frame.locator('[data-column-key="note"]');
@@ -238,7 +249,7 @@ try {
     await writeFile(join(artifacts, 'table-layout-metrics.json'), JSON.stringify(metrics, null, 2));
   console.log(JSON.stringify(metrics, null, 2));
   console.log(
-    'Table layout Chrome: desktop/390px, keyboard/touch Popovers, compact density, raw types, filters/removal/reset, sorting/pagination, page-row annotations, cross-page locate/correction, long source UTF-16, many-column scrolling, empty/no-match all passed.',
+    `Table layout Chrome: ${process.env.PANEON_TEST_DESKTOP_ONLY === '1' ? 'desktop' : 'desktop/390px'}, compact density, raw types, filters/removal/reset, sorting/pagination, header text annotations, cross-page locate/correction, long source UTF-16, many-column scrolling, empty/no-match all passed.`,
   );
 } finally {
   await browser?.close();

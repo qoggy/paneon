@@ -7,7 +7,8 @@ import {
   FeedbackProvider,
   FeedbackTarget,
   FeedbackText,
-  FeedbackControls,
+  FeedbackSurface,
+  FeedbackToolbar,
   Input,
   Page,
   useFeedback,
@@ -119,7 +120,8 @@ function Contents({
   const [hookError, setHookError] = useState('');
   return (
     <>
-      <FeedbackControls />
+      <FeedbackSurface />
+      <FeedbackToolbar allowObjectSelection />
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => { const target = feedback.value.annotations[0]?.targets[0]; if (target) void feedback.locate(target).catch(() => {}); }}>Locate first</Button>
         <Button onClick={() => { const target = feedback.value.annotations[0]?.targets[1]; if (target) void feedback.locate(target).catch(() => {}); }}>Locate second target</Button>

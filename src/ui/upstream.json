@@ -170,6 +170,14 @@
       "sha256": "4242a9fe839cae9083acff1280b7cccfda10e97bbc83283aed12d2d12bebdc6a",
       "dependencies": ["cn", "radix-ui"],
       "registryDependencies": []
+    },
+    {
+      "name": "sheet",
+      "url": "https://ui.shadcn.com/r/styles/new-york-v4/sheet.json",
+      "sha256": "bdf118300491675f05a9181af491217ba690929338aefd108437c2b07d25432f",
+      "retrievedAt": "2026-10-24",
+      "dependencies": ["cn", "radix-ui"],
+      "registryDependencies": []
     }
   ],
   "theme": {

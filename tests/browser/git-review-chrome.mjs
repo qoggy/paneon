@@ -1,0 +1,226 @@
+import assert from 'node:assert/strict';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { chromium } from 'playwright';
+import { startGitReviewFixture } from './git-review-fixture.mjs';
+import { git } from '../git-review-fixture.ts';
+import { annotationTools } from './annotation-tools.mjs';
+const f = await startGitReviewFixture();
+const evidence = '/tmp/paneon-git-review-chrome-evidence';
+let browser, page;
+const errors = [],
+  crashes = [],
+  geometry = [];
+try {
+  const text = Array.from(
+    { length: 340 },
+    (_, i) =>
+      `export const line${i + 1} = "old ${i + 1} ${'wide_source_'.repeat(i === 249 ? 120 : 1)}";\n`,
+  ).join('');
+  await writeFile(join(f.repo, 'reading.ts'), text);
+  await git(f.repo, 'add', 'reading.ts');
+  await git(f.repo, 'commit', '-qm', 'Create reading baseline');
+  await git(f.repo, 'checkout', '-qb', 'feature/20261024-readable-branch-column');
+  await writeFile(
+    join(f.repo, 'reading.ts'),
+    text.replace('old 250', 'new 250').replace('old 290', 'new 290'),
+  );
+  await git(f.repo, 'commit', '-qam', 'Review bounded diff viewport');
+  const tip = await git(f.repo, 'rev-parse', 'HEAD');
+  const panel = await f.run({
+    ...f.params,
+    initialView: { repositoryId: 'web', type: 'history', commit: tip, file: 'reading.ts' },
+  });
+  const prefs = async (theme, language) =>
+    f.service.app.inject({
+      method: 'POST',
+      url: '/api/preferences',
+      headers: {
+        host: `127.0.0.1:${f.service.descriptor.port}`,
+        authorization: `Bearer ${f.service.descriptor.controlToken}`,
+      },
+      payload: { ui: { theme, language } },
+    });
+  await prefs('light', 'zh-CN');
+  browser = await chromium.launch({
+    headless: true,
+    channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
+  });
+  page = await browser.newPage({ viewport: { width: 1920, height: 1000 } });
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('crash', () => crashes.push('crash'));
+  await page.goto(f.url(panel));
+  const frame = page.frameLocator('iframe');
+  const button = (name) => frame.getByRole('button', { name, exact: true });
+  await frame.locator('[data-code-side="new"][data-line="250"]').waitFor();
+  const content = page.frames().find((x) => x.url().endsWith('/frame.html'));
+  const viewport = frame.locator('[data-diff-viewport]');
+  const header = frame.locator('[data-diff-header]');
+  const column = frame.getByRole('complementary', { name: '历史分支', exact: true });
+  const workspace = frame.locator('[data-history-workspace]');
+  const left = (await column.boundingBox()).width,
+    total = (await workspace.boundingBox()).width;
+  assert.ok(left / total >= 0.2 && left / total <= 0.23, `default branch width ${left}/${total}`);
+  const current = frame.locator('[data-current-branch=true]');
+  assert.equal((await current.textContent()).trim(), '20261024-readable-branch-column');
+  assert.match(await current.getAttribute('aria-description'), /当前分支/);
+  assert.ok(await current.locator('svg').count());
+  assert.equal(await frame.getByText('只读审阅 · 批注提交给当前 AI', { exact: true }).count(), 0);
+  assert.equal(await header.getByText('（整文件）', { exact: true }).count(), 0);
+  assert.equal(await header.locator('[title="reading.ts → reading.ts"]').count(), 0);
+  assert.equal(await frame.locator('[data-diff-source-header]').count(), 2);
+  // The code owns vertical scrolling. Its headers are sibling chrome, not overlaid inside it.
+  const measure = () =>
+    content.evaluate(() => {
+      const vp = document.querySelector('[data-diff-viewport]'),
+        h = document.querySelector('[data-diff-header]'),
+        s = document.querySelector('[data-diff-source-headers]'),
+        outer = document.querySelector('[data-git-diff-scroll]');
+      const rect = (e) => {
+        const r = e.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, height: r.height, left: r.left, right: r.right };
+      };
+      return {
+        viewport: rect(vp),
+        header: rect(h),
+        sources: rect(s),
+        scrollTop: vp.scrollTop,
+        scrollHeight: vp.scrollHeight,
+        clientHeight: vp.clientHeight,
+        overflow: getComputedStyle(vp).overflowY,
+        outerOverflow: getComputedStyle(outer).overflowY,
+        outerScroll: outer.scrollTop,
+        windowScroll: scrollY,
+      };
+    });
+  await page.waitForTimeout(120);
+  const initial = await measure();
+  assert.equal(initial.overflow, 'auto');
+  assert.equal(initial.outerOverflow, 'hidden');
+  assert.ok(
+    Math.abs(initial.viewport.top - initial.sources.bottom) <= 1,
+    'scrollbar starts at code body, below both headers',
+  );
+  assert.ok(initial.scrollTop > 1000, 'first opening locates the late first actual change');
+  const change = await frame.locator('[data-code-side="new"][data-line="250"]').boundingBox();
+  assert.ok(change.y >= initial.viewport.top && change.y < initial.viewport.bottom);
+  await viewport.evaluate((el) => (el.scrollTop += 120));
+  const after = await measure();
+  assert.deepEqual(after.header, initial.header);
+  assert.deepEqual(after.sources, initial.sources);
+  assert.equal(after.outerScroll, 0);
+  assert.equal(after.windowScroll, initial.windowScroll);
+  // Explicit locate must use the real body viewport with no extra header inset.
+  await button('下一个差异').click();
+  const next = await frame.locator('[data-code-side="new"][data-line="290"]').boundingBox();
+  assert.ok(
+    Math.abs(next.y + next.height / 2 - (initial.viewport.top + initial.viewport.height / 2)) < 3,
+    'change centred in body viewport',
+  );
+  const comments = annotationTools(frame, page);
+  await button('选择对象').click();
+  await frame.locator('[data-diff-source-header="new"]').click();
+  await comments.write('Whole file through existing source header');
+  await comments.save();
+  assert.equal(await comments.count(), 1);
+  await button('选择新侧第 290 行').click();
+  await comments.write('Exact bounded line');
+  await comments.save();
+  await button('结束选择').click();
+  await button('收起上下文').click();
+  await button('选择对象').click();
+  await frame.locator('[data-diff-hunk="0"] > [data-feedback-target]').click();
+  await comments.write('Exact hunk');
+  await comments.save();
+  await button('结束选择').click();
+  await button('展开全部上下文').click();
+  await comments.locate(2);
+  const located = await frame.locator('[data-code-side="new"][data-line="290"]').boundingBox();
+  assert.ok(located.y >= initial.viewport.top && located.y < initial.viewport.bottom);
+  const markers = await frame.getByRole('button', { name: '批注 2', exact: true }).boundingBox();
+  assert.ok(markers.y >= initial.viewport.top, 'line marker stays in code viewport');
+  await frame.locator('[data-diff-scroll="new"]').focus();
+  await page.keyboard.press('Meta+a');
+  await page.keyboard.press('Shift');
+  assert.equal(await comments.count(), 3);
+  await content.evaluate(() => document.getSelection()?.removeAllRanges());
+  await button('提交批注').click();
+  for (let i = 0; i < 100 && (await f.events(panel)).length === 0; i++)
+    await page.waitForTimeout(50);
+  const targets = (await f.events(panel))[0].payload.annotations.flatMap((x) => x.targets);
+  assert.deepEqual(
+    targets.map((x) => x.ref.kind),
+    ['file', 'lines', 'hunk'],
+  );
+  assert.equal(targets[1].ref.startLine, 290);
+  // Show balanced centre gutter / natural colour for screenshots.
+  await button('定位当前差异').click();
+  await mkdir(evidence, { recursive: true });
+  for (const width of [1920, 1280, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const theme of ['light', 'dark'])
+      for (const language of ['en', 'zh-CN']) {
+        await prefs(theme, language);
+        await page.waitForTimeout(100);
+        if (width < 768) await viewport.scrollIntoViewIfNeeded();
+        const g = await measure();
+        geometry.push({ width, theme, language, ...g });
+        assert.ok(Math.abs(g.viewport.top - g.sources.bottom) <= 1);
+        assert.equal(
+          await content.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+          false,
+        );
+        await page.screenshot({
+          path: join(evidence, `${width}-${theme}-${language}.png`),
+          fullPage: width < 768,
+        });
+      }
+  }
+  // A plain string consumer has no FeedbackProvider and retains document scrolling.
+  const plainEntry = join(
+    f.root,
+    'agent-skills/paneon/assets/panels/git-review/plain-diff-acceptance.tsx',
+  );
+  await writeFile(
+    plainEntry,
+    `import {definePanel,z} from 'paneon/sdk';
+import {DiffView} from '../../shared/diff.tsx';
+const oldText=Array.from({length:340},(_,i)=>'line '+(i+1)+'\\n').join('');
+export default definePanel({id:'plain-diff',requires:{paneon:'0.0.0'},input:z.object({}),render:()=> <main><h1>Plain document consumer</h1><DiffView oldText={oldText} newText={oldText.replace('line 250','updated 250')} oldPath="old.txt" newPath="new.txt" defaultExpanded /></main>});`,
+  );
+  const plainPanel = await f.service.runtime.run(plainEntry, f.root, {}, false);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(f.url(plainPanel));
+  await frame.locator('[data-diff-layout="document"]').waitFor();
+  const natural = await frame.locator('[data-diff-viewport]').evaluate((el) => ({
+    height: el.clientHeight,
+    scrollHeight: el.scrollHeight,
+    overflow: getComputedStyle(el).overflowY,
+  }));
+  assert.ok(natural.height > 6000, 'plain string component uses natural document height');
+  assert.equal(natural.height, natural.scrollHeight);
+  assert.equal(natural.overflow, 'visible');
+  assert.equal(
+    await frame.locator('[data-feedback-target]').count(),
+    0,
+    'no provider or annotation target required',
+  );
+  await page.screenshot({ path: join(evidence, 'plain-document.png') });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(crashes, []);
+  await writeFile(
+    join(evidence, 'result.json'),
+    JSON.stringify({ pass: true, left, total, initial, after, geometry, errors, crashes }, null, 2),
+  );
+  console.log(
+    'PASS Git chrome: initial branch proportions, removed duplicate copy, accessible current branch, body-only vertical viewport, stable headers, centred changes, whole-file/line/hunk annotations, native Command+A, 12 screenshots; no page errors.',
+    evidence,
+  );
+} catch (error) {
+  await mkdir(evidence, { recursive: true });
+  await page?.screenshot({ path: join(evidence, 'failure.png'), fullPage: true }).catch(() => {});
+  throw error;
+} finally {
+  await browser?.close();
+  await f.stop();
+}

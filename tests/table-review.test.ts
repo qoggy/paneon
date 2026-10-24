@@ -176,3 +176,74 @@ void test('special own keys survive schema metadata and Markdown containers pres
   );
   assert.deepEqual(markdownOffsets('```\nx', 0, 5, 'x\n', 'code'), [4, 5, 5]);
 });
+
+void test('table header references distinguish labels from full columns and preserve exact Unicode sources', () => {
+  const params = tableParamsSchema.parse({
+    title: 'Headers',
+    columns: [
+      { key: 'left', label: '说明 🙂 e\u0301' },
+      { key: 'right', label: '说明 🙂 e\u0301' },
+      { key: 'number', label: '123', type: 'number' },
+    ],
+    rows: [{ left: 'not the label', right: 'different source', number: 123 }],
+  });
+  const schema = completeTableSchema(params);
+  const header = (columnKey: string, start: number, end: number, quote: string) => ({
+    ref: { kind: 'header' as const, columnKey },
+    text: { start, end, quote },
+  });
+  const valid = [
+    header('left', 0, 2, '说明'),
+    header('right', 3, 5, '🙂'),
+    header('left', 6, 8, 'e\u0301'),
+    header('number', 0, 3, '123'),
+  ];
+  for (const target of valid) assert.equal(tableTargetError(params, target), null);
+  assert.equal(
+    schema.safeParse({ annotations: [{ id: 'headers', targets: valid, comment: 'Header text' }] })
+      .success,
+    true,
+  );
+  for (const target of [
+    header('unknown', 0, 2, '说明'),
+    header('left', -1, 2, '说明'),
+    header('left', 0, 100, '说明'),
+    header('left', 0, 2, '错误'),
+    header('left', 3, 4, '\ud83d'),
+    header('left', 6, 7, 'e'),
+    header('left', 0.5, 2, '说明'),
+    header('left', 2, 2, ''),
+    header('left', 0, 13, 'not the label'),
+  ])
+    assert.notEqual(tableTargetError(params, target), null);
+  for (const ref of [
+    { kind: 'header', columnKey: 'left', rowIndex: 0 },
+    { kind: 'header', label: '说明' },
+    { kind: 'header', columnKey: '__proto__' },
+    { kind: 'column', columnKey: 'left' },
+    { kind: 'row', rowIndex: 0 },
+  ]) {
+    const result = schema.safeParse({
+      annotations: [
+        {
+          id: 'forged',
+          targets: [{ ref, text: { start: 0, end: 2, quote: '说明' } }],
+          comment: '',
+        },
+      ],
+    });
+    assert.equal(result.success, false);
+  }
+  for (const ref of [
+    { kind: 'row', rowIndex: 0 },
+    { kind: 'column', columnKey: 'left' },
+    { kind: 'cell', rowIndex: 0, columnKey: 'number' },
+    { kind: 'header', columnKey: 'right' },
+  ])
+    assert.equal(
+      schema.safeParse({ annotations: [{ id: 'object', targets: [{ ref }], comment: '' }] })
+        .success,
+      true,
+    );
+  assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
+});

@@ -71,14 +71,15 @@ try {
   const split = await separator.getAttribute('aria-valuenow');
   const upper = frame.locator('[data-history-workspace]');
   const upperBefore = (await upper.boundingBox()).height;
-  await frame.locator('[data-git-diff-scroll]').evaluate((el) => {
+  await frame.locator('[data-diff-viewport]').evaluate((el) => {
     el.scrollTop = 300;
   });
   await frame.locator('[data-diff-scroll="unified"]').evaluate((el) => {
     el.scrollLeft = 140;
   });
+  assert.equal(await frame.locator('[data-diff-viewport]').evaluate((el) => el.scrollTop), 300);
   const scroll = await content.evaluate(() => ({
-    y: document.querySelector('[data-git-diff-scroll]').scrollTop,
+    y: document.querySelector('[data-diff-viewport]').scrollTop,
     x: document.querySelector('[data-diff-scroll="unified"]').scrollLeft,
   }));
   const comments = annotationTools(frame, page);
@@ -104,7 +105,7 @@ try {
   assert.equal(await separator.getAttribute('aria-valuenow'), split);
   assert.deepEqual(
     await content.evaluate(() => ({
-      y: document.querySelector('[data-git-diff-scroll]').scrollTop,
+      y: document.querySelector('[data-diff-viewport]').scrollTop,
       x: document.querySelector('[data-diff-scroll="unified"]').scrollLeft,
     })),
     scroll,

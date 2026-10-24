@@ -1,5 +1,5 @@
 import { useLocale } from '../../shared/i18n';
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { agent, definePanel, usePanelInput } from 'paneon/sdk';
 import {
@@ -10,10 +10,10 @@ import {
   Button,
   Card,
   Checkbox,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   Markdown,
   RadioGroup,
   RadioGroupItem,
@@ -27,16 +27,6 @@ import {
   completeAnswersSchema,
 } from './schema';
 import type { ChoiceAnswer, ChooseParams } from './schema';
-
-const detailMediaQuery = '(min-width: 1024px)';
-function subscribeDetailViewport(onChange: () => void) {
-  const media = window.matchMedia(detailMediaQuery);
-  media.addEventListener('change', onChange);
-  return () => media.removeEventListener('change', onChange);
-}
-function isWideViewport() {
-  return window.matchMedia(detailMediaQuery).matches;
-}
 
 type Draft = {
   selectedIds: string[];
@@ -58,7 +48,6 @@ function ChoosePanel() {
   const [reviewing, setReviewing] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailTrigger = useRef<HTMLButtonElement | null>(null);
-  const wide = useSyncExternalStore(subscribeDetailViewport, isWideViewport, () => false);
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     params.questions.map((question) => ({
       selectedIds: question.selectedIds ?? [],
@@ -78,10 +67,6 @@ function ChoosePanel() {
     setShowReviewError(false);
     setDetailId(null);
     setIndex(at);
-  }
-  function closeDetails() {
-    setDetailId(null);
-    detailTrigger.current?.focus();
   }
   const multiple = question.mode === 'multiple';
   const ChoiceGroup = multiple ? MultipleChoiceGroup : RadioGroup;
@@ -149,19 +134,7 @@ function ChoosePanel() {
     </div>
   );
   return (
-    <div
-      className={
-        detail && wide
-          ? 'mx-auto grid w-full max-w-6xl items-start gap-8 px-4 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]'
-          : undefined
-      }
-      onKeyDown={(event) => {
-        if (wide && detail && event.key === 'Escape' && !event.defaultPrevented) {
-          event.preventDefault();
-          closeDetails();
-        }
-      }}
-    >
+    <div>
       <main className="mx-auto w-full max-w-xl space-y-6 px-4 py-8 sm:py-12">
         <fieldset disabled={submission.pending} className="min-w-0 space-y-5">
           <header className="space-y-2">
@@ -170,9 +143,7 @@ function ChoosePanel() {
                 <h1 className="max-w-full font-medium break-words">{params.title}</h1>
               </div>
               <p aria-live="polite" className="ml-auto shrink-0 whitespace-nowrap tabular-nums">
-                {reviewing
-                  ? t('Answer summary')
-                  : `${multiple ? t('Multiple choice') : t('Single choice')} · ${index + 1} / ${params.questions.length}`}
+                {reviewing ? t('Answer summary') : `${index + 1} / ${params.questions.length}`}
               </p>
             </div>
             {params.description && (
@@ -189,16 +160,10 @@ function ChoosePanel() {
             >
               {reviewing ? t('Review all answers') : question.title}
             </h2>
-            {reviewing ? (
-              <p className="text-sm text-muted-foreground">
-                {t('Check your answers before submitting.')}
-              </p>
-            ) : (
-              question.description && (
-                <Markdown className="space-y-2 text-sm! break-words text-muted-foreground! [&_p]:my-0!">
-                  {question.description}
-                </Markdown>
-              )
+            {!reviewing && question.description && (
+              <Markdown className="space-y-2 text-sm! break-words text-muted-foreground! [&_p]:my-0!">
+                {question.description}
+              </Markdown>
             )}
           </header>
           {!reviewing && (
@@ -301,7 +266,7 @@ function ChoosePanel() {
                             )}
                             aria-expanded={detailId === option.id}
                             aria-controls={detailId === option.id ? 'option-details' : undefined}
-                            aria-haspopup={wide ? undefined : 'dialog'}
+                            aria-haspopup="dialog"
                             onClick={(event) => {
                               detailTrigger.current = event.currentTarget;
                               setDetailId((current) => (current === option.id ? null : option.id));
@@ -418,6 +383,9 @@ function ChoosePanel() {
                 {params.questions.map((item, at) => {
                   const result = answers[at];
                   const invalid = !complete[at];
+                  const visibleSelections = result.selections.filter(
+                    (selection) => selection.kind !== 'custom' || selection.text.trim(),
+                  );
                   const statusId = `answer-status-${at}`;
                   return (
                     <li key={item.id}>
@@ -453,12 +421,18 @@ function ChoosePanel() {
                               >
                                 !
                               </span>
-                              <span>{t('Incomplete answer')}</span>
+                              <span>
+                                {t(
+                                  result.selections.length
+                                    ? 'Enter your own answer'
+                                    : 'Not answered',
+                                )}
+                              </span>
                             </span>
                           )}
-                          {result.selections.length ? (
+                          {visibleSelections.length > 0 && (
                             <span className="block space-y-2">
-                              {result.selections.map((selection) => (
+                              {visibleSelections.map((selection) => (
                                 <span
                                   key={
                                     selection.kind === 'custom'
@@ -472,7 +446,7 @@ function ChoosePanel() {
                                       <span className="text-xs font-normal text-muted-foreground">
                                         {t('Other:')}
                                       </span>{' '}
-                                      {selection.text.trim() ? selection.text : t('No answer')}
+                                      {selection.text}
                                     </span>
                                   ) : (
                                     <>
@@ -493,8 +467,6 @@ function ChoosePanel() {
                                 </span>
                               ))}
                             </span>
-                          ) : (
-                            <span className="block text-sm">{t('No answer')}</span>
                           )}
                         </span>
                         <span aria-hidden="true" className="self-center text-muted-foreground">
@@ -544,47 +516,28 @@ function ChoosePanel() {
           </Alert>
         )}
       </main>
-      {detail && wide && (
-        <aside
-          id="option-details"
-          aria-labelledby="option-details-title"
-          className="sticky top-6 my-12 flex max-h-[calc(100dvh-6rem)] min-w-0 flex-col overflow-hidden rounded-xl border bg-background"
-        >
-          <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
-            <h2
-              id="option-details-title"
-              className="min-w-0 pt-1 text-base font-semibold break-words"
-            >
-              {detail.label}
-            </h2>
-            <Button variant="ghost" size="sm" onClick={closeDetails}>
-              {t('Close details')}
-            </Button>
-          </div>
-          {detailBody}
-        </aside>
-      )}
-      <Dialog
-        open={!!detail && !wide}
+      <Sheet
+        open={!!detail}
         onOpenChange={(open) => {
           if (!open) setDetailId(null);
         }}
       >
-        <DialogContent
+        <SheetContent
           id="option-details"
           aria-describedby={undefined}
-          className="inset-y-0 right-0 left-auto flex h-dvh w-full max-w-full translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 sm:max-w-lg"
+          side="right"
+          className="w-full gap-0 overflow-hidden sm:max-w-lg"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             detailTrigger.current?.focus();
           }}
         >
-          <DialogHeader className="shrink-0 border-b p-5 pr-12 text-left">
-            <DialogTitle className="text-base leading-6 break-words">{detail?.label}</DialogTitle>
-          </DialogHeader>
+          <SheetHeader className="shrink-0 border-b p-5 pr-12 text-left">
+            <SheetTitle className="text-base leading-6 break-words">{detail?.label}</SheetTitle>
+          </SheetHeader>
           {detailBody}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

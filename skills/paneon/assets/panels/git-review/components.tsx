@@ -246,6 +246,8 @@ export function GitChangedFiles({
     <>
       {(data.error || error) && <p role="alert">{data.error || error}</p>}
       <ChangedFileTree
+        viewType={props.view.type}
+        pending={data.pending}
         snapshots={data.files}
         selectedId={selected}
         filter=""

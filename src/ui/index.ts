@@ -15,6 +15,7 @@ export * from './table';
 export * from './pagination';
 export * from './tabs';
 export * from './dialog';
+export * from './sheet';
 export * from './alert-dialog';
 export * from './accordion';
 export * from './collapsible';

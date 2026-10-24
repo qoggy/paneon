@@ -4,7 +4,6 @@ import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
 import type { Feedback, FeedbackTarget as Target } from 'paneon/sdk';
 import {
   Button,
-  Checkbox,
   FeedbackSurface,
   FeedbackSelectionControls,
   FeedbackOverallAnnotationButton,
@@ -24,7 +23,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  useFeedback,
 } from 'paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import {
@@ -43,7 +41,6 @@ export const validateTable = serverAction({
 const initialView: TableView = { search: '', filters: {}, sort: null };
 function DataTable({
   params,
-  disabled,
   view,
   setView,
   page,
@@ -51,7 +48,6 @@ function DataTable({
   root,
 }: {
   params: TableParams;
-  disabled: boolean;
   view: TableView;
   setView: (view: TableView) => void;
   page: number;
@@ -59,25 +55,14 @@ function DataTable({
   root: React.RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useLocale();
-  const feedback = useFeedback<TableRef>();
   const rows = visibleRows(params, view),
     pageSize = params.pageSize ?? 20;
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
   const shown = rows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const selecting = feedback.mode === 'select';
-  const selected = (ref: TableRef) =>
-    feedback.selectionTargets.some(
-      (target) => !target.text && JSON.stringify(target.ref) === JSON.stringify(ref),
-    );
   function update(next: TableView) {
     setView(next);
     setPage(0);
-  }
-  function togglePage() {
-    const refs = shown.map(({ rowIndex }) => ({ kind: 'row' as const, rowIndex }));
-    const all = refs.every(selected);
-    for (const ref of refs) if (selected(ref) === all) feedback.toggleTarget({ ref });
   }
   const activeFilters = params.columns.filter(
     (column) => Object.hasOwn(view.filters, column.key) && view.filters[column.key].length > 0,
@@ -150,26 +135,7 @@ function DataTable({
           </Popover>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <FeedbackSelectionControls />
-          {selecting && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button type="button" size="icon-sm" variant="ghost" aria-label={t('选择帮助')}>
-                  <span aria-hidden="true">?</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                collisionPadding={16}
-                className="max-w-[calc(100vw-2rem)] text-sm"
-                aria-label={t('选择帮助')}
-              >
-                {t(
-                  '列选择覆盖输入整列；表头行勾选只作用当前页。选择行、列或单元格后，点击「批注」保存到页面草稿。普通文字圈选无需开启选择对象。',
-                )}
-              </PopoverContent>
-            </Popover>
-          )}
+          <FeedbackSelectionControls allowObjectSelection={false} />
         </div>
       </div>
       {hasView && (
@@ -199,19 +165,7 @@ function DataTable({
         <Table aria-label={params.title}>
           <TableHeader>
             <TableRow>
-              <TableHead className="h-10 w-10 px-3 text-center">
-                {selecting && (
-                  <Checkbox
-                    aria-label={t('选择当前页的行')}
-                    disabled={disabled || feedback.submitting || !shown.length}
-                    checked={
-                      shown.length > 0 &&
-                      shown.every(({ rowIndex }) => selected({ kind: 'row', rowIndex }))
-                    }
-                    onCheckedChange={togglePage}
-                  />
-                )}
-              </TableHead>
+              <TableHead className="h-10 w-10 px-3 text-center" />
               {params.columns.map((column) => (
                 <FeedbackTarget<TableRef>
                   key={column.key}
@@ -227,16 +181,21 @@ function DataTable({
                           : 'ascending'
                         : 'none'
                     }
-                    className={`h-10 px-3 py-1 whitespace-normal ${column.type === 'number' ? 'w-px min-w-24 text-right' : column.type === 'boolean' ? 'w-px min-w-20' : 'min-w-40'}`}
+                    className={`h-10 px-3 py-1 whitespace-normal ${column.type === 'number' ? 'w-px min-w-28 text-right' : column.type === 'boolean' ? 'w-px min-w-28' : 'min-w-40'}`}
                   >
                     <div
-                      className={`flex items-center gap-2 ${column.type === 'number' ? 'justify-end' : ''}`}
+                      className={`flex items-center gap-1 ${column.type === 'number' ? 'justify-end' : ''}`}
                     >
+                      <FeedbackText<TableRef>
+                        target={{ kind: 'header', columnKey: column.key }}
+                        text={column.label}
+                        className="min-w-0 wrap-anywhere select-text"
+                      />
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className={`h-auto min-h-8 min-w-0 shrink gap-1 px-0 whitespace-normal ${column.type === 'number' ? 'text-right' : 'text-left'}`}
+                        size="icon-sm"
+                        className="size-6 shrink-0 text-muted-foreground"
                         aria-label={t('Sort {label}', { label: column.label })}
                         onClick={() =>
                           update({
@@ -249,23 +208,10 @@ function DataTable({
                           })
                         }
                       >
-                        <span className="wrap-anywhere">{column.label}</span>
                         <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
                           {view.sort?.key === column.key ? (view.sort.descending ? '↓' : '↑') : '↕'}
                         </span>
                       </Button>
-                      {selecting && (
-                        <Checkbox
-                          aria-label={t('Select entire column {label}', { label: column.label })}
-                          disabled={disabled || feedback.submitting}
-                          checked={selected({ kind: 'column', columnKey: column.key })}
-                          onCheckedChange={() =>
-                            feedback.toggleTarget({
-                              ref: { kind: 'column', columnKey: column.key },
-                            })
-                          }
-                        />
-                      )}
                     </div>
                   </TableHead>
                 </FeedbackTarget>
@@ -277,18 +223,7 @@ function DataTable({
               <FeedbackTarget<TableRef> key={rowIndex} target={{ kind: 'row', rowIndex }} asChild>
                 <TableRow data-row-index={rowIndex}>
                   <TableCell className="h-10 w-10 px-3 py-2 text-center text-xs text-muted-foreground">
-                    {selecting ? (
-                      <Checkbox
-                        aria-label={t('Select original row {index}', { index: rowIndex })}
-                        disabled={disabled || feedback.submitting}
-                        checked={selected({ kind: 'row', rowIndex })}
-                        onCheckedChange={() =>
-                          feedback.toggleTarget({ ref: { kind: 'row', rowIndex } })
-                        }
-                      />
-                    ) : (
-                      rowIndex + 1
-                    )}
+                    {rowIndex + 1}
                   </TableCell>
                   {params.columns.map((column) => {
                     const ref: TableRef = { kind: 'cell', rowIndex, columnKey: column.key };
@@ -378,16 +313,20 @@ function TablePanel() {
         const message = tableTargetError(params, target);
         if (message) return { status: 'stale' as const, message };
         const ref = target.ref;
+        const source =
+          ref.kind === 'header'
+            ? params.columns.find((column) => column.key === ref.columnKey)?.label
+            : ref.kind === 'cell'
+              ? params.rows[ref.rowIndex][ref.columnKey]
+              : undefined;
         return {
           status: 'ready' as const,
-          ...(ref.kind === 'cell' && typeof params.rows[ref.rowIndex][ref.columnKey] === 'string'
-            ? { text: params.rows[ref.rowIndex][ref.columnKey] as string }
-            : {}),
+          ...(typeof source === 'string' ? { text: source } : {}),
         };
       },
       async locate(target: Target<TableRef>) {
-        setView(initialView);
         const ref = target.ref;
+        if (ref.kind !== 'header') setView(initialView);
         if ('rowIndex' in ref) setPage(Math.floor(ref.rowIndex / (params.pageSize ?? 20)));
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
@@ -397,7 +336,7 @@ function TablePanel() {
             ? root.current?.querySelector<HTMLElement>(`[data-row-index="${ref.rowIndex}"]`)
             : null;
         const element =
-          ref.kind === 'column'
+          ref.kind === 'column' || ref.kind === 'header'
             ? [...(root.current?.querySelectorAll<HTMLElement>('[data-column-key]') ?? [])].find(
                 (node) => node.dataset.columnKey === ref.columnKey,
               )
@@ -468,7 +407,6 @@ function TablePanel() {
         </header>
         <DataTable
           params={params}
-          disabled={locked}
           view={view}
           setView={setView}
           page={page}

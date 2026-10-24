@@ -81,7 +81,7 @@ try {
   const contextBox = await frame
     .getByRole('heading', { name: choices.title, exact: true })
     .boundingBox();
-  const progressBox = await frame.getByText('Single choice · 1 / 3', { exact: true }).boundingBox();
+  const progressBox = await frame.getByText('1 / 3', { exact: true }).boundingBox();
   const headingBox = await frame
     .getByRole('heading', { name: 'Storage', exact: true })
     .boundingBox();
@@ -125,7 +125,7 @@ try {
   await screenshot('choose-desktop.png');
   await next();
   await frame.getByRole('heading', { name: 'Features', exact: true }).waitFor();
-  await frame.getByText('Multiple choice · 2 / 3', { exact: true }).waitFor();
+  await frame.getByText('2 / 3', { exact: true }).waitFor();
   assert.equal(await frame.getByRole('alert').count(), 0, 'Unanswered questions allow browsing.');
   await next();
   await frame.getByRole('heading', { name: 'Delivery', exact: true }).waitFor();
@@ -135,7 +135,7 @@ try {
   assert.equal(await frame.getByText(/4 \/ 3/).count(), 0);
   const emptySummary = frame.getByRole('region', { name: 'Answer summary' });
   await emptySummary.getByText('0 / 3 answered', { exact: true }).waitFor();
-  assert.equal(await emptySummary.getByText('No answer', { exact: true }).count(), 3);
+  assert.equal(await emptySummary.getByText('Not answered', { exact: true }).count(), 3);
   await screenshot('choose-unanswered-review-desktop.png');
   await page.setViewportSize({ width: 390, height: 844 });
   await screenshot('choose-unanswered-review-mobile.png');
@@ -150,7 +150,7 @@ try {
     () => frame.getByRole('alert').evaluate((element) => element === document.activeElement),
     'Invalid submission focuses the inline summary error.',
   );
-  assert.equal(await emptySummary.getByText('Incomplete answer', { exact: true }).count(), 3);
+  assert.equal(await emptySummary.getByText('Not answered', { exact: true }).count(), 3);
   await emptySummary.getByRole('button', { name: 'Edit answer: Storage', exact: true }).click();
   assert.equal((await fixture.events(fixture.choose)).length, 0);
   await next();
@@ -162,15 +162,10 @@ try {
   await previous();
   assert.equal(await frame.getByRole('alert').count(), 0);
   await frame.getByRole('button', { name: 'View details: SQLite', exact: true }).click();
-  const details = frame.getByRole('complementary', { name: 'SQLite', exact: true });
+  const details = frame.getByRole('dialog', { name: 'SQLite', exact: true });
   await details.getByRole('heading', { name: 'Details', exact: true }).waitFor();
-  assert.equal(await frame.getByRole('radio', { checked: true }).count(), 0);
-  const columns = await frame.locator('main').evaluate((element) => {
-    const main = element.getBoundingClientRect();
-    const aside = document.querySelector('aside').getBoundingClientRect();
-    return { separated: aside.left >= main.right, fits: aside.right <= innerWidth };
-  });
-  assert.deepEqual(columns, { separated: true, fits: true });
+  assert.equal(await frame.locator('[role=radio][aria-checked=true]').count(), 0);
+  assert.equal(await frame.getByRole('complementary').count(), 0);
   assert.equal(await frame.locator('[data-choice-option] .markdown-body').count(), 0);
   assert.equal(
     await details
@@ -185,6 +180,8 @@ try {
     background: getComputedStyle(element).backgroundColor,
     border: getComputedStyle(element).borderColor,
   }));
+  await page.keyboard.press('Escape');
+  await details.waitFor({ state: 'hidden' });
   const sqliteRow = sqlite.locator(':scope > label');
   const rowBounds = await sqliteRow.boundingBox();
   assert.ok(rowBounds);
@@ -204,6 +201,7 @@ try {
   await note('SQLite').fill('  Keep backups 中文🙂  ');
   assert.equal(await radio('SQLite').isChecked(), true, 'Typing a note preserves its selection.');
   await page.setViewportSize({ width: 390, height: 844 });
+  await frame.getByRole('button', { name: 'View details: SQLite', exact: true }).click();
   const detailDialog = frame.getByRole('dialog', { name: 'SQLite', exact: true });
   await detailDialog.waitFor();
   await detailDialog.getByRole('heading', { name: 'Details', exact: true }).waitFor();
@@ -228,6 +226,8 @@ try {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await detailButton.click();
   await details.waitFor();
+  await page.keyboard.press('Escape');
+  await details.waitFor({ state: 'hidden' });
   assert.equal((await fixture.events(fixture.choose)).length, 0);
 
   await radio('PostgreSQL').check();
@@ -253,7 +253,7 @@ try {
   assert.equal(nestedComment, true, 'Explanation stays inside its selected option card.');
   await next();
   assert.equal(
-    await frame.getByRole('complementary').count(),
+    await frame.getByRole('dialog').count(),
     0,
     'Changing questions closes the previous details.',
   );
@@ -365,7 +365,7 @@ try {
   await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
   await frame
     .getByRole('region', { name: 'Answer summary' })
-    .getByText('Other: No answer', { exact: true })
+    .getByText('Enter your own answer', { exact: true })
     .waitFor();
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   assert.equal(
@@ -1093,6 +1093,9 @@ try {
     .click();
   const longDialog = choiceLayoutFrame.getByRole('dialog');
   await longDialog.waitFor();
+  await longDialog.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
   const paneMetrics = await longDialog.evaluate((element) => {
     const body = element.querySelector('.overflow-y-auto');
     const rect = element.getBoundingClientRect();
@@ -1111,12 +1114,14 @@ try {
   assert.equal(paneMetrics.scrollable, true);
   assert.equal(paneMetrics.documentFits, true);
   await choiceLayoutPage.setViewportSize({ width: 1280, height: 900 });
-  const longPane = choiceLayoutFrame.getByRole('complementary');
+  const longPane = choiceLayoutFrame.getByRole('dialog');
   await longPane.waitFor();
+  await choiceLayoutPage.keyboard.press('Escape');
+  await longPane.waitFor({ state: 'hidden' });
   await choiceLayoutFrame
     .getByRole('button', { name: 'View details: Keep the change focused', exact: true })
     .click();
-  assert.equal(await choiceLayoutFrame.getByRole('complementary').count(), 1);
+  assert.equal(await choiceLayoutFrame.getByRole('dialog').count(), 1);
   await longPane.getByRole('heading', { name: 'Focused change', exact: true }).waitFor();
   assert.equal(await narrowNote.inputValue(), '说明仍属于这个选项');
   await choiceLayoutPage.keyboard.press('Escape');

@@ -75,6 +75,8 @@ try {
   assert.equal(await group('staged').locator('[data-file-id]').count(), 7);
   assert.equal(await group('unstaged').locator('[data-file-id]').count(), 1);
   assert.equal(await group('untracked').locator('[data-file-id]').count(), 1);
+  assert.equal(await button('按目录分组').getAttribute('aria-pressed'), 'false');
+  await button('按目录分组').click();
   const stagedRoot = directory('staged', prefix);
   await stagedRoot.waitFor();
   assert.ok((await stagedRoot.textContent()).includes(`${prefix}4`));
@@ -161,52 +163,55 @@ try {
   await staged.waitFor({ timeout: 3000 });
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
   await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-desktop.png', fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await button(`已暂存 · M ${long}`).click();
-  const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
-  const geometry = await content.evaluate(() => {
-    const list = document.querySelector('[data-file-scroll]');
-    const tree = document.querySelector('[data-file-tree]');
-    return {
-      viewport: innerWidth,
-      document: document.documentElement.scrollWidth,
-      list: list.getBoundingClientRect().toJSON(),
-      tree: tree.getBoundingClientRect().toJSON(),
-      listClient: list.clientWidth,
-      listScroll: list.scrollWidth,
-      leaves: [...tree.querySelectorAll('[data-file-id]')].map((el) => ({
-        width: el.getBoundingClientRect().width,
-        scroll: el.scrollWidth,
-        client: el.clientWidth,
-      })),
-    };
-  });
-  assert.ok(geometry.document <= geometry.viewport + 1, JSON.stringify(geometry));
-  assert.ok(geometry.list.right <= geometry.viewport + 1, JSON.stringify(geometry));
-  assert.ok(geometry.tree.width <= geometry.list.width, JSON.stringify(geometry));
-  assert.ok(geometry.listScroll <= geometry.listClient + 1, JSON.stringify(geometry));
-  assert.ok(
-    geometry.leaves.every((leaf) => leaf.scroll <= leaf.client + 1),
-    JSON.stringify(geometry),
-  );
-  await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-mobile.png', fullPage: true });
-  // Folding a different directory must preserve the user's scroll position.
-  const unrelated = directory('untracked', 'untracked');
-  await unrelated.scrollIntoViewIfNeeded();
-  const scrollBefore = await frame.locator('[data-file-scroll]').evaluate((el) => el.scrollTop);
-  assert.ok(scrollBefore > 100);
-  await unrelated.click();
-  await content.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  const scrollAfter = await frame.locator('[data-file-scroll]').evaluate((el) => ({
-    top: el.scrollTop,
-    max: el.scrollHeight - el.clientHeight,
-  }));
-  assert.ok(
-    scrollAfter.top >= Math.min(scrollBefore, scrollAfter.max) - 1,
-    `Folding an unrelated folder stole scroll: ${JSON.stringify({ scrollBefore, scrollAfter })}`,
-  );
+  let geometry;
+  if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await button(`已暂存 · M ${long}`).click();
+    const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
+    geometry = await content.evaluate(() => {
+      const list = document.querySelector('[data-file-scroll]');
+      const tree = document.querySelector('[data-file-tree]');
+      return {
+        viewport: innerWidth,
+        document: document.documentElement.scrollWidth,
+        list: list.getBoundingClientRect().toJSON(),
+        tree: tree.getBoundingClientRect().toJSON(),
+        listClient: list.clientWidth,
+        listScroll: list.scrollWidth,
+        leaves: [...tree.querySelectorAll('[data-file-id]')].map((el) => ({
+          width: el.getBoundingClientRect().width,
+          scroll: el.scrollWidth,
+          client: el.clientWidth,
+        })),
+      };
+    });
+    assert.ok(geometry.document <= geometry.viewport + 1, JSON.stringify(geometry));
+    assert.ok(geometry.list.right <= geometry.viewport + 1, JSON.stringify(geometry));
+    assert.ok(geometry.tree.width <= geometry.list.width, JSON.stringify(geometry));
+    assert.ok(geometry.listScroll <= geometry.listClient + 1, JSON.stringify(geometry));
+    assert.ok(
+      geometry.leaves.every((leaf) => leaf.scroll <= leaf.client + 1),
+      JSON.stringify(geometry),
+    );
+    await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-mobile.png', fullPage: true });
+    // Folding a different directory must preserve the user's scroll position.
+    const unrelated = directory('untracked', 'untracked');
+    await unrelated.scrollIntoViewIfNeeded();
+    const scrollBefore = await frame.locator('[data-file-scroll]').evaluate((el) => el.scrollTop);
+    assert.ok(scrollBefore > 100);
+    await unrelated.click();
+    await content.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    const scrollAfter = await frame.locator('[data-file-scroll]').evaluate((el) => ({
+      top: el.scrollTop,
+      max: el.scrollHeight - el.clientHeight,
+    }));
+    assert.ok(
+      scrollAfter.top >= Math.min(scrollBefore, scrollAfter.max) - 1,
+      `Folding an unrelated folder stole scroll: ${JSON.stringify({ scrollBefore, scrollAfter })}`,
+    );
+  }
   // Same component in history and compare; these views have no working-area groups.
   for (const initialView of [
     { repositoryId: 'tree', type: 'history', commit: tip },
@@ -231,7 +236,9 @@ try {
       geometry,
       screenshots: [
         '/private/tmp/paneon-git-file-tree-desktop.png',
-        '/private/tmp/paneon-git-file-tree-mobile.png',
+        ...(process.env.PANEON_TEST_DESKTOP_ONLY === '1'
+          ? []
+          : ['/private/tmp/paneon-git-file-tree-mobile.png']),
       ],
     }),
   );

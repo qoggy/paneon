@@ -17,7 +17,7 @@ function Panel() {
   }}>
     <FeedbackSurface />
     <div className="h-32 p-4">History outside the diff viewport</div>
-    <FeedbackToolbar />
+    <FeedbackToolbar allowObjectSelection />
     <div data-boundary-viewport className="h-[28rem] overflow-auto border">
       <DiffView sourceId="merged-context" model={model} oldPath="file.md" newPath="file.md" defaultExpanded />
     </div>

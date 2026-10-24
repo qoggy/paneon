@@ -109,7 +109,7 @@ export function selectedAncestors<T extends TreeSnapshot>(
   }
   return find(nodes) ?? [];
 }
-export function groupFileTrees<T extends TreeSnapshot>(snapshots: T[]) {
+export function groupFileTrees<T extends TreeSnapshot>(snapshots: T[], byDirectory = true) {
   const groups = new Map<string, T[]>();
   for (const snapshot of snapshots) {
     const area = snapshot.source.view.type === 'changes' ? (snapshot.source.view.area ?? '') : '';
@@ -119,7 +119,21 @@ export function groupFileTrees<T extends TreeSnapshot>(snapshots: T[]) {
   }
   return ['', 'staged', 'unstaged', 'untracked'].flatMap((area) => {
     const files = groups.get(area);
-    return files ? [{ area, nodes: buildFileTree(files) }] : [];
+    if (!files) return [];
+    const nodes: TreeNode<T>[] = byDirectory
+      ? buildFileTree(files)
+      : files
+          .map((snapshot): FileNode<T> => ({
+            kind: 'file',
+            name: snapshotPath(snapshot).split('/').pop() ?? '',
+            snapshot,
+          }))
+          .sort(
+            (a, b) =>
+              compare(a.name, b.name) ||
+              compare(snapshotPath(a.snapshot), snapshotPath(b.snapshot)),
+          );
+    return [{ area, nodes }];
   });
 }
 export function statusClass(status: string) {

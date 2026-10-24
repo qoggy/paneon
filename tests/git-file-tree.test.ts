@@ -82,6 +82,32 @@ void test('rename uses destination, retains old path and searches both paths cas
   assert.equal(filterFileTree(tree, 'missing').length, 0);
   assert.equal(filterFileTree(tree, ''), tree);
 });
+void test('flat lists sort by basename then exact path, preserving Git areas and source identities', () => {
+  const snapshots = [
+    file('z/same.ts', 'work', 'M', 'unstaged'),
+    file('b/same.ts', 'index-b', 'M', 'staged'),
+    file('a/same.ts', 'index-a', 'M', 'staged'),
+    file('root.ts', 'root', 'A', 'staged'),
+    file('new/first.ts', 'new', '?', 'untracked'),
+  ];
+  const groups = groupFileTrees(snapshots, false);
+  assert.deepEqual(
+    groups.map((group) => group.area),
+    ['staged', 'unstaged', 'untracked'],
+  );
+  assert.ok(groups.every((group) => group.nodes.every((node) => node.kind === 'file')));
+  assert.deepEqual(
+    groups[0].nodes.map((node) => node.name),
+    ['root.ts', 'same.ts', 'same.ts'],
+  );
+  assert.deepEqual(
+    groups[0].nodes.map((node) => node.kind === 'file' && node.snapshot.id),
+    ['root', 'index-a', 'index-b'],
+  );
+  assert.equal(groups[0].nodes[1].kind === 'file' && groups[0].nodes[1].snapshot, snapshots[2]);
+  assert.equal(leafCount(filterFileTree(groups[0].nodes, 'b/same')), 1);
+  assert.deepEqual(groupFileTrees([], false), []);
+});
 void test('spaces, newlines, Unicode, duplicate basenames and deletions preserve exact paths', () => {
   const special = ' space /中文\n目录/ file \n.ts ';
   const deleted: TreeSnapshot = {

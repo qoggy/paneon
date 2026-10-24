@@ -69,7 +69,7 @@ function Panel() {
           </Button>
         ))}
         <Button onClick={() => setCollapsed(false)}>Reopen</Button>
-        <FeedbackToolbar />
+        <FeedbackToolbar allowObjectSelection />
       </div>
       <div
         data-reading-viewport

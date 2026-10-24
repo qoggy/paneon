@@ -60,7 +60,11 @@ export function useHistoryColumns(enabled: boolean) {
     minRight = 12 * size.rem,
     minMiddle = 16 * size.rem;
   const left = clamp(
-    ratios ? ratios[0] * size.available : (size.wide ? 13 : 10) * size.rem,
+    ratios
+      ? ratios[0] * size.available
+      : size.wide
+        ? Math.min(27 * size.rem, size.available * 0.22)
+        : 14 * size.rem,
     minLeft,
     Math.max(minLeft, size.available - minMiddle - minRight),
   );
@@ -90,7 +94,7 @@ export function useHistoryColumns(enabled: boolean) {
       columnGap: 0,
       '--history-columns': size.available
         ? `${left}px 1px minmax(0,1fr) 1px ${right}px`
-        : '10rem 1px minmax(0,1fr) 1px 14rem',
+        : '14rem 1px minmax(0,1fr) 1px 14rem',
     } as CSSProperties,
     dividerProps: ([0, 1] as const).map((index) => ({
       role: 'separator',

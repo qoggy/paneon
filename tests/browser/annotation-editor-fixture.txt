@@ -1,0 +1,95 @@
+import { useMemo, useState } from 'react';
+import { agent, definePanel, feedbackSchema, z } from 'paneon/sdk';
+import type { Feedback } from 'paneon/sdk';
+import {
+  Button,
+  FeedbackOverallAnnotationButton,
+  FeedbackProvider,
+  FeedbackSelectionControls,
+  FeedbackSubmitButton,
+  FeedbackSurface,
+  FeedbackToolbar,
+  FeedbackTarget,
+  FeedbackText,
+  useFeedback,
+} from 'paneon/ui';
+import type { FeedbackAdapter } from 'paneon/ui';
+
+type Ref = { id: string };
+const text = 'Shared annotation target';
+function Contents({ objects }: { objects: boolean }) {
+  const feedback = useFeedback<Ref>();
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        {objects ? (
+          <>
+            <FeedbackSelectionControls allowObjectSelection>
+              <FeedbackOverallAnnotationButton />
+            </FeedbackSelectionControls>
+            <FeedbackSubmitButton />
+          </>
+        ) : (
+          <FeedbackToolbar />
+        )}
+        <Button variant="outline">Toolbar child</Button>
+      </div>
+      <FeedbackSurface />
+      <FeedbackTarget target={{ id: 'shared' }} asChild>
+        <p data-testid="target" className="mt-6 rounded-md border p-4">
+          <FeedbackText target={{ id: 'shared' }} text={text} />
+        </p>
+      </FeedbackTarget>
+      <output hidden data-testid="draft">
+        {JSON.stringify(feedback.value)}
+      </output>
+      <output hidden data-testid="mode">
+        {feedback.mode}
+      </output>
+    </>
+  );
+}
+function Panel() {
+  const [objects, setObjects] = useState(false);
+  const [disabled, setDisabled] = useState(false);
+  const [located, setLocated] = useState('');
+  const adapter = useMemo<FeedbackAdapter<Ref>>(
+    () => ({
+      resolve: () => ({ status: 'ready', text }),
+      locate: (target) => {
+        setLocated(target.ref.id);
+      },
+    }),
+    [],
+  );
+  return (
+    <main className="space-y-4 p-4">
+      <h1 className="text-lg font-semibold">Annotation editor acceptance</h1>
+      <FeedbackProvider<Ref>
+        disabled={disabled}
+        adapter={adapter}
+        onSubmit={async (value: Feedback<Ref>) => {
+          await agent.emit('feedback', value);
+        }}
+      >
+        <Contents objects={objects} />
+      </FeedbackProvider>
+      <div className="flex flex-wrap gap-2" data-feedback-controls="">
+        <Button variant="outline" onClick={() => setObjects(!objects)}>
+          Object controls {objects ? 'on' : 'off'}
+        </Button>
+        <Button variant="outline" onClick={() => setDisabled(!disabled)}>
+          Disabled {disabled ? 'yes' : 'no'}
+        </Button>
+      </div>
+      <output data-testid="located">{located}</output>
+    </main>
+  );
+}
+export default definePanel({
+  id: 'annotation-editor-acceptance',
+  requires: { paneon: '0.0.0' },
+  input: z.object({}),
+  events: { feedback: feedbackSchema(z.object({ id: z.string() })) },
+  render: Panel,
+});

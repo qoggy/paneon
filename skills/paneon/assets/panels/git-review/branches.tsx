@@ -102,7 +102,6 @@ export function Branches({
             >
               <RefIcon tag={kind === 'tag'} mainline={entry.mainline} current={current} />
               <span className="min-w-0 truncate">{node.name}</span>
-              {current && <span className="ml-auto text-muted-foreground">{t('当前')}</span>}
             </Button>
           );
         }

@@ -56,6 +56,7 @@ function Review() {
   const [oldSnapshot, setOldSnapshot] = useState<GitSnapshot>();
   const [locateTarget, setLocateTarget] = useState<Target<GitRef>>();
   const [fileReveal, setFileReveal] = useState(0);
+  const [fileGrouping, setFileGrouping] = useState<Record<string, boolean>>({});
   const submission = useSubmission<Feedback<GitRef>>(async ({ replacesEventId, ...feedback }) => {
     if (
       replacesEventId === undefined &&
@@ -251,7 +252,7 @@ function Review() {
       className={`flex max-h-64 min-h-0 min-w-0 flex-col ${request.type === 'history' ? 'md:max-h-1/2' : 'md:max-h-none'}`}
       aria-label={t('改动文件')}
     >
-      <div className="min-h-0 overflow-auto p-1" data-file-scroll="" aria-busy={pending}>
+      <div className="flex min-h-0 flex-1 flex-col" aria-busy={pending}>
         {pending && !listing?.files.length && (
           <p role="status" className="p-2 text-xs text-muted-foreground">
             {t('读取 Git…')}
@@ -261,6 +262,12 @@ function Review() {
           <p className="p-2 text-sm">{t('该范围没有文件改动。')}</p>
         )}
         <ChangedFileTree
+          viewType={request.type}
+          pending={pending}
+          groupByDirectory={fileGrouping[keyOf(request)] ?? request.type !== 'changes'}
+          onGroupByDirectoryChange={(grouped) =>
+            setFileGrouping((previous) => ({ ...previous, [keyOf(request)]: grouped }))
+          }
           snapshots={listing?.files ?? []}
           selectedId={oldSnapshot?.fileId ?? view.selectedFile}
           filter=""
@@ -320,7 +327,6 @@ function Review() {
           >
             {params.title ?? t('Git 审阅')}
           </h1>
-          <span className="text-xs text-muted-foreground">{t('只读审阅 · 批注提交给当前 AI')}</span>
         </header>
         <div
           className="flex flex-wrap items-center gap-2 border-b pb-3"
@@ -594,7 +600,7 @@ function Review() {
           {selected && (
             <section
               aria-label={t('文件差异')}
-              className="max-h-[70dvh] min-h-0 min-w-0 overflow-auto rounded-md border md:max-h-none"
+              className="flex h-[70dvh] min-h-0 min-w-0 flex-col overflow-hidden rounded-md border md:h-auto"
               data-git-diff-scroll=""
               hidden={collapsed}
               inert={collapsed}
@@ -641,6 +647,8 @@ function Review() {
                     sourceId={selected.id}
                     model={selected.model}
                     defaultExpanded
+                    layout="bounded"
+                    showFileHeading={false}
                     onCollapse={collapseDiff}
                     locateTarget={
                       locateTarget?.ref.sourceId === selected.id ? locateTarget : undefined

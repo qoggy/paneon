@@ -31,7 +31,7 @@ paneon panel events <instance-id> --consumer explanation-agent --wait-ms 0 --jso
 paneon panel ack <instance-id> --consumer explanation-agent --through <event-id> --json
 ```
 
-Annotation flow: select text normally and click the nearby 「批注」, or click 「选择对象」 in the compact toolbar to pick tasks or the batch total. 「保存」 only keeps a page draft; a numbered marker reopens it to cancel the edit, save or delete. 「提交批注」 sends the complete result; unsaved edits must first be saved or cancelled.
+Annotation flow: select registered text normally and click the nearby 「批注」. Use 「整体批注」 for feedback on the example as a whole; the default toolbar has no object-selection mode. 「保存」 only keeps a page draft; a numbered marker reopens it to cancel the edit, save or delete. 「提交批注」 sends the complete result; unsaved edits must first be saved or cancelled.
 
 ## Sentinel LeapArray
 

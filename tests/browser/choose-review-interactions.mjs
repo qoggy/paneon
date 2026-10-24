@@ -15,7 +15,10 @@ try {
       {
         ...choices.questions[0],
         options: [
-          choices.questions[0].options[0],
+          {
+            ...choices.questions[0].options[0],
+            details: '## Details\n\n' + 'Long Markdown detail paragraph.\n\n'.repeat(80),
+          },
           {
             ...choices.questions[0].options[1],
             details: '## PostgreSQL details\n\nSeparate details.',
@@ -48,42 +51,95 @@ try {
   await note('SQLite').fill('Independent explanation 中文🙂');
   await mine().fill('Kept custom draft');
   await frame.getByRole('radio', { name: 'SQLite', exact: true }).check();
-  await button('View details: SQLite').click();
-  const aside = (name) => frame.getByRole('complementary', { name, exact: true });
-  await aside('SQLite').waitFor();
-  assert.equal(await button('Close details: SQLite').getAttribute('aria-expanded'), 'true');
-  assert.equal(
-    await button('Close details: SQLite').getAttribute('aria-controls'),
-    'option-details',
-  );
-  await button('Close details: SQLite').click();
-  await aside('SQLite').waitFor({ state: 'hidden' });
-  assert.equal(await button('View details: SQLite').getAttribute('aria-expanded'), 'false');
-  assert.equal(await button('View details: SQLite').getAttribute('aria-controls'), null);
-  await button('View details: SQLite').click();
+  const dialog = (name) => frame.getByRole('dialog', { name, exact: true });
+  const mainGeometry = () =>
+    frame.locator('main').evaluate((element) => {
+      const { x, y, width } = element.getBoundingClientRect();
+      return { x, y, width };
+    });
+  async function checkDetails(width, language = 'en') {
+    await page.setViewportSize({ width, height: 500 });
+    const before = await mainGeometry();
+    const trigger = button(language === 'en' ? 'View details: SQLite' : '查看详情：SQLite');
+    await trigger.click();
+    await dialog('SQLite').waitFor();
+    await dialog('SQLite').evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    assert.deepEqual(await mainGeometry(), before, 'Opening details preserves question geometry.');
+    const metrics = await dialog('SQLite').evaluate((element) => {
+      const body = element.querySelector('.overflow-y-auto');
+      const rect = element.getBoundingClientRect();
+      body.scrollTop = 100;
+      return {
+        left: rect.left,
+        right: rect.right,
+        viewport: innerWidth,
+        scrollable: body.scrollHeight > body.clientHeight,
+        scrollTop: body.scrollTop,
+        trapped: element.contains(document.activeElement),
+      };
+    });
+    assert.ok(metrics.left >= 0 && metrics.right <= metrics.viewport);
+    assert.equal(metrics.scrollable, true);
+    assert.ok(metrics.scrollTop > 0);
+    assert.equal(metrics.trapped, true);
+    await page.keyboard.press('Tab');
+    assert.equal(
+      await dialog('SQLite').evaluate((element) => element.contains(document.activeElement)),
+      true,
+    );
+    await page.screenshot({ path: join(artifacts, `details-${language}-${width}.png`) });
+    await page.keyboard.press('Escape');
+    await dialog('SQLite').waitFor({ state: 'hidden' });
+    assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    assert.deepEqual(await mainGeometry(), before);
+    await trigger.click();
+    await dialog('SQLite')
+      .getByRole('button', { name: language === 'en' ? 'Close' : '关闭', exact: true })
+      .click();
+    await dialog('SQLite').waitFor({ state: 'hidden' });
+    assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    if (width > 600) {
+      await trigger.click();
+      await dialog('SQLite').waitFor();
+      await frame.locator('[data-slot="sheet-overlay"]').click({ position: { x: 10, y: 10 } });
+      await dialog('SQLite').waitFor({ state: 'hidden' });
+      assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    }
+    assert.equal(
+      await frame
+        .getByLabel(
+          language === 'en'
+            ? 'Additional explanation for SQLite (optional)'
+            : '补充说明： SQLite （可选）',
+          { exact: true },
+        )
+        .inputValue(),
+      'Independent explanation 中文🙂',
+    );
+    assert.equal(
+      await frame
+        .getByLabel(language === 'en' ? 'My answer' : '我的答案', { exact: true })
+        .inputValue(),
+      'Kept custom draft',
+    );
+  }
+  for (const width of [1280, 390]) await checkDetails(width);
   await button('View details: PostgreSQL').click();
-  await aside('PostgreSQL')
+  await dialog('PostgreSQL')
     .getByRole('heading', { name: 'PostgreSQL details', exact: true })
     .waitFor();
-  assert.equal(await button('View details: SQLite').getAttribute('aria-expanded'), 'false');
-  await button('Close details').click();
-  await aside('PostgreSQL').waitFor({ state: 'hidden' });
-  await button('View details: SQLite').click();
   await page.keyboard.press('Escape');
-  await aside('SQLite').waitFor({ state: 'hidden' });
-  assert.equal(await note('SQLite').inputValue(), 'Independent explanation 中文🙂');
-  assert.equal(await mine().inputValue(), 'Kept custom draft');
+  await dialog('PostgreSQL').waitFor({ state: 'hidden' });
+  assert.equal(
+    await button('View details: PostgreSQL').evaluate(async (element) => {
+      await new Promise(requestAnimationFrame);
+      return element === document.activeElement;
+    }),
+    true,
+  );
   await page.setViewportSize({ width: 390, height: 844 });
-  await button('View details: SQLite').click();
-  const dialog = frame.getByRole('dialog', { name: 'SQLite', exact: true });
-  await dialog.waitFor();
-  await page.keyboard.press('Escape');
-  await dialog.waitFor({ state: 'hidden' });
-  await button('View details: SQLite').click();
-  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await dialog.waitFor({ state: 'hidden' });
-  assert.equal(await note('SQLite').inputValue(), 'Independent explanation 中文🙂');
-  assert.equal(await mine().inputValue(), 'Kept custom draft');
   await button('Next').click();
   await frame.getByRole('checkbox', { name: 'Feature A', exact: true }).check();
   await note('Feature A').fill('Keep this explanation too');
@@ -99,6 +155,15 @@ try {
   assert.equal(await summary.locator('[data-answer-incomplete="true"]').count(), 2);
   await summary.getByText('Feature A', { exact: true }).waitFor();
   await summary.getByText('Keep this explanation too', { exact: true }).waitFor();
+  assert.equal(await summary.getByText('Not answered', { exact: true }).count(), 1);
+  assert.equal(await summary.getByText('Enter your own answer', { exact: true }).count(), 1);
+  assert.equal(await summary.getByText('No answer', { exact: true }).count(), 0);
+  assert.equal(await summary.getByText('Incomplete answer', { exact: true }).count(), 0);
+  assert.equal(
+    await frame.getByText('Check your answers before submitting.', { exact: true }).count(),
+    0,
+  );
+
   await button('Submit all answers').click();
   await frame
     .getByRole('alert')
@@ -133,11 +198,21 @@ try {
       })
       .waitFor();
     assert.equal(
-      await frame
-        .getByText(language === 'en' ? 'Incomplete answer' : '待完善', { exact: true })
-        .count(),
-      2,
+      await frame.getByText(language === 'en' ? 'Not answered' : '未回答', { exact: true }).count(),
+      1,
     );
+    assert.equal(
+      await frame
+        .getByText(language === 'en' ? 'Enter your own answer' : '请填写自填答案', { exact: true })
+        .count(),
+      1,
+    );
+    const editStorage = language === 'en' ? 'Edit answer: Storage' : '编辑答案：Storage';
+    await button(editStorage).click();
+    assert.equal(await frame.getByText(/^(Single choice|Multiple choice|单选|多选)/).count(), 0);
+    for (const width of [1280, 390]) await checkDetails(width, language);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await button(language === 'en' ? 'Return to summary' : '返回汇总').click();
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
       assert.equal(
@@ -225,8 +300,8 @@ try {
       ok: true,
       artifacts,
       checks: [
-        'detail toggle/switch/close/Escape',
-        'responsive dialog',
+        'overlay Sheet preserves desktop/mobile geometry and drafts',
+        'Sheet focus trap, dismissal, return and long-content scrolling',
         'schema-derived invalid rows',
         'no invalid-submit navigation/event',
         'all-row keyboard navigation',

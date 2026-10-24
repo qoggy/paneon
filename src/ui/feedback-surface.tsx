@@ -2,6 +2,7 @@ import { useUI } from './use-ui';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Trash2 } from 'lucide-react';
 import { feedbackTargetKey } from '../sdk/feedback.js';
 import { useFeedback, useFeedbackContext } from './feedback-context';
 import { floatingPosition, markerPosition } from './feedback-geometry';
@@ -229,13 +230,6 @@ export function FeedbackSurface({ className }: { className?: string }) {
             }
           }}
         >
-          <div className="text-sm font-medium">
-            {state.editor.kind === 'overall'
-              ? t('整体批注')
-              : state.editor.id
-                ? t('Annotation {number}', { number: store.numberFor(state.editor.id) })
-                : t('添加批注')}
-          </div>
           <Textarea
             ref={input}
             aria-label={t('批注内容')}
@@ -244,12 +238,6 @@ export function FeedbackSurface({ className }: { className?: string }) {
             value={state.editor.comment}
             onChange={(event) => store.changeEditor(event.target.value)}
           />
-          {state.editor.kind === 'annotation' && (
-            <p className="text-xs text-muted-foreground">
-              {t('Selected {count} locations', { count: state.editor.targets.length })}
-              {state.mode === 'select' ? t(' · 点击对象可继续选择') : ''}
-            </p>
-          )}
           {state.uiError && (
             <p role="alert" className="text-sm text-destructive">
               {message(state.uiError)}
@@ -259,13 +247,15 @@ export function FeedbackSurface({ className }: { className?: string }) {
             {(state.editor.id || state.editor.kind === 'overall') && (
               <Button
                 type="button"
-                size="sm"
+                size="icon-sm"
                 variant="ghost"
-                className="mr-auto"
+                className="mr-auto text-muted-foreground"
+                aria-label={t('删除批注')}
+                title={t('删除批注')}
                 disabled={blocked}
                 onClick={() => store.deleteEditor()}
               >
-                {t('删除批注')}
+                <Trash2 aria-hidden="true" />
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" disabled={blocked} onClick={close}>
@@ -322,13 +312,15 @@ export function FeedbackOverallAnnotationButton() {
   );
 }
 
-/** Registers the page toolbar once; children may add an action after the selection toggle. */
+/** Registers the page toolbar once; whole-object selection is an explicit opt-in. */
 export function FeedbackSelectionControls({
   className,
   children,
+  allowObjectSelection = false,
 }: {
   className?: string;
   children?: ReactNode;
+  allowObjectSelection?: boolean;
 }) {
   const { t } = useUI();
   const { store, disabled } = useFeedbackContext();
@@ -338,26 +330,30 @@ export function FeedbackSelectionControls({
   useLayoutEffect(() => store.mountToolbar(), [store]);
   return (
     <div data-feedback-controls="" className={cn('flex flex-wrap items-center gap-2', className)}>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={blocked}
-        aria-pressed={feedback.mode === 'select'}
-        onClick={() => feedback.setMode(feedback.mode === 'browse' ? 'select' : 'browse')}
-      >
-        {feedback.mode === 'select' ? t('结束选择') : t('选择对象')}
-      </Button>
-      {children}
-      {store.getSnapshot().pendingKind === 'objects' && store.getSnapshot().pending.length > 0 && (
+      {allowObjectSelection && (
         <Button
           type="button"
           variant="outline"
           disabled={blocked}
-          onClick={() => store.openAnnotation()}
+          aria-pressed={feedback.mode === 'select'}
+          onClick={() => feedback.setMode(feedback.mode === 'browse' ? 'select' : 'browse')}
         >
-          {t('批注')}
+          {feedback.mode === 'select' ? t('结束选择') : t('选择对象')}
         </Button>
       )}
+      {children}
+      {allowObjectSelection &&
+        store.getSnapshot().pendingKind === 'objects' &&
+        store.getSnapshot().pending.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={blocked}
+            onClick={() => store.openAnnotation()}
+          >
+            {t('批注')}
+          </Button>
+        )}
       {feedback.value.annotations.length > 0 && (
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
@@ -419,10 +415,16 @@ export function FeedbackSelectionControls({
   );
 }
 
-export function FeedbackToolbar({ className }: { className?: string }) {
+export function FeedbackToolbar({
+  className,
+  allowObjectSelection,
+}: {
+  className?: string;
+  allowObjectSelection?: boolean;
+}) {
   return (
     <div data-feedback-controls="" className={cn('flex flex-wrap items-center gap-2', className)}>
-      <FeedbackSelectionControls className="contents">
+      <FeedbackSelectionControls className="contents" allowObjectSelection={allowObjectSelection}>
         <FeedbackOverallAnnotationButton />
       </FeedbackSelectionControls>
       <FeedbackSubmitButton />

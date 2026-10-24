@@ -44,7 +44,7 @@ The API behavior is documented in [Compare two commits](https://docs.github.com/
 
 These are observed example OIDs; a new run queries its own actual versions. Clicking this button does not send annotation drafts. It does not wake an ended agent automatically; the agent must be waiting or later resume and read events.
 
-Select text normally to show a nearby **批注** action, then save in its anchored editor. Use **选择对象** for the whole PR overview, description/paragraph, individual check, file, hunk or side-specific code line/range. Use multiple targets for disconnected locations or different sides, and independent annotations for independent opinions. Annotations may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
+Select text normally to show a nearby **批注** action, then save in its anchored editor. Select the registered text in descriptions and code directly, including complete paragraphs or continuous code ranges. Use independent annotations for separate selections; the default toolbar has no object-selection mode. Use **整体批注** for feedback on the PR as a whole. Annotations may be empty. Plain browsing, text copying, links, tabs and inputs keep their usual meaning. Browsing and draft edits emit no events.
 
 A numbered marker reopens a saved annotation for editing, cancellation or deletion. Saving only changes the page draft; pending edits must be saved or cancelled before submission. **整体批注** opens the optional overall editor.
 
@@ -70,4 +70,4 @@ The example uses the public Provider/controls plus the existing shared Markdown 
 
 The shared diff adapter supplies `targetRanges` through `diffTargetRanges(snapshot.model, target)` so annotations created with line/range controls have numbered markers beside the exact preserved old/new source. Keep this geometry bridge when reusing the example; it does not alter event references or GitHub data.
 
-Object annotations: use **选择对象** to collect targets, then click toolbar **批注** to open the editor. Only **保存** adds the page draft; cancelling discards the temporary selection. Text selection uses its nearby action directly.
+Text selection uses its nearby **批注** action directly. Only **保存** adds the page draft; cancelling discards the temporary edit.

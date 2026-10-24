@@ -40,6 +40,9 @@ type DiffViewProps = {
   defaultExpanded?: boolean;
   locateTarget?: Target<GitRef>;
   onCollapse?: () => void;
+  /** Opt into a bounded code viewport; ordinary document consumers retain natural flow. */
+  layout?: 'document' | 'bounded';
+  showFileHeading?: boolean;
 };
 /** String diff needs no provider; supplying sourceId opts into the existing annotation adapter. */
 export function DiffView(props: DiffViewProps) {
@@ -59,7 +62,9 @@ function OptionalTarget({
   children: ReactNode;
 }) {
   return enabled ? (
-    <FeedbackTarget<GitRef> target={target}>{children}</FeedbackTarget>
+    <FeedbackTarget<GitRef> target={target} asChild>
+      {children}
+    </FeedbackTarget>
   ) : (
     <>{children}</>
   );
@@ -78,6 +83,8 @@ function StringDiffView({
   defaultExpanded = false,
   locateTarget,
   onCollapse,
+  layout = 'document',
+  showFileHeading = true,
   feedback,
 }: DiffViewProps & { feedback?: ReturnType<typeof useFeedback<GitRef>> }) {
   const localSourceId = useId();
@@ -358,24 +365,33 @@ function StringDiffView({
         splitLayout.root.current = element;
       }}
       data-diff-source={sourceId}
-      className="min-w-0"
+      className={
+        layout === 'bounded' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'min-w-0'
+      }
+      data-diff-layout={layout}
     >
       <style>
         {'::highlight(paneon-diff-location) { background-color: Highlight; color: HighlightText; }'}
       </style>
-      <div id={headerId} data-diff-header="" className="sticky top-0 z-10 border-b bg-background">
-        <div className="flex min-w-0 flex-wrap items-center gap-1 px-1 py-1">
-          <div className="min-w-0 flex-1">
-            <OptionalTarget enabled={!!feedback} target={{ sourceId, kind: 'file' }}>
-              <div
-                className="truncate rounded-md px-2 py-1 font-mono text-sm"
-                title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
-              >
-                {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
-                <span className="text-muted-foreground">{t('（整文件）')}</span>
-              </div>
-            </OptionalTarget>
-          </div>
+      <div
+        id={headerId}
+        data-diff-header=""
+        className={`${layout === 'bounded' ? 'shrink-0' : 'sticky top-0'} z-10 border-b bg-background`}
+      >
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 px-1 py-1">
+          {showFileHeading && (
+            <div className="min-w-0 flex-1">
+              <OptionalTarget enabled={!!feedback} target={{ sourceId, kind: 'file' }}>
+                <div
+                  className="truncate rounded-md px-2 py-1 font-mono text-sm"
+                  title={`${oldPath ?? '∅'} → ${newPath ?? '∅'}`}
+                >
+                  {oldPath ?? '∅'} → {newPath ?? '∅'}{' '}
+                  <span className="text-muted-foreground">{t('（整文件）')}</span>
+                </div>
+              </OptionalTarget>
+            </div>
+          )}
           {!fileOnly && (
             <DiffToolbar
               unified={unified}
@@ -420,7 +436,7 @@ function StringDiffView({
             </Button>
           )}
         </div>
-        {!fileOnly && (
+        {(!fileOnly || !showFileHeading) && (
           <div
             data-diff-source-headers=""
             className="grid min-w-0 border-t bg-muted/30 text-xs"
@@ -429,102 +445,122 @@ function StringDiffView({
             }}
           >
             {(['old', 'new'] as const).map((side) => (
-              <div
+              <OptionalTarget
                 key={side}
-                data-diff-source-header={side}
-                className="flex min-w-0 items-center gap-2 px-3 py-1.5 first:border-r"
-                title={`${side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))} · ${side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}`}
+                enabled={!!feedback && !showFileHeading}
+                target={{ sourceId, kind: 'file' }}
               >
-                <span className="shrink-0 font-mono text-muted-foreground">
-                  {side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))}
-                </span>
-                <span className="truncate">
-                  {side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}
-                </span>
-              </div>
+                <div
+                  data-diff-source-header={side}
+                  className="flex min-w-0 items-center gap-2 px-3 py-1.5 first:border-r"
+                  title={`${side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))} · ${side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}`}
+                >
+                  <span className="shrink-0 font-mono text-muted-foreground">
+                    {side === 'old' ? (oldRevision ?? t('旧')) : (newRevision ?? t('新'))}
+                  </span>
+                  <span className="truncate">
+                    {side === 'old' ? (oldPath ?? '∅') : (newPath ?? '∅')}
+                  </span>
+                </div>
+              </OptionalTarget>
             ))}
           </div>
         )}
       </div>
       {!fileOnly && (
-        <div className="relative min-w-0" data-diff-body="" data-feedback-clip-top={headerId}>
-          {!unified && (
-            <div
-              {...splitLayout.separatorProps}
-              data-diff-divider=""
-              className="absolute inset-y-0 z-[5] w-2 -translate-x-1/2 cursor-col-resize touch-none outline-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-border hover:bg-muted-foreground/10 focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground/15"
-              style={{ left: 'var(--diff-left, 50%)' }}
-            />
-          )}
-          {feedback?.mode === 'select' && (
-            <div className="relative z-[6] flex flex-wrap items-center gap-2 bg-background">
-              <label>
-                {t('侧')}{' '}
-                <select
-                  aria-label={t('侧')}
-                  value={rangeSide}
-                  onChange={(e) => setRangeSide(e.target.value as 'old' | 'new')}
+        <div
+          data-diff-viewport=""
+          className={
+            layout === 'bounded'
+              ? 'min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain'
+              : undefined
+          }
+        >
+          <div
+            className="relative min-h-full min-w-0"
+            data-diff-body=""
+            data-feedback-clip-top={headerId}
+          >
+            {!unified && (
+              <div
+                {...splitLayout.separatorProps}
+                data-diff-divider=""
+                className="absolute inset-y-0 z-[5] w-2 -translate-x-1/2 cursor-col-resize touch-none outline-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-border hover:bg-muted-foreground/10 focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground/15"
+                style={{ left: 'var(--diff-left, 50%)' }}
+              />
+            )}
+            {feedback?.mode === 'select' && (
+              <div className="relative z-[6] flex flex-wrap items-center gap-2 bg-background">
+                <label>
+                  {t('侧')}{' '}
+                  <select
+                    aria-label={t('侧')}
+                    value={rangeSide}
+                    onChange={(e) => setRangeSide(e.target.value as 'old' | 'new')}
+                  >
+                    <option value={'old'}>{t('旧')}</option>
+                    <option value={'new'}>{t('新')}</option>
+                  </select>
+                </label>
+                <label>
+                  {t('起始行')}
+                  <Input
+                    aria-label={t('起始行')}
+                    type="number"
+                    value={start}
+                    onChange={(e) => setStart(e.target.value)}
+                    className="w-24"
+                  />
+                </label>
+                <label>
+                  {t('结束行')}
+                  <Input
+                    aria-label={t('结束行')}
+                    type="number"
+                    value={end}
+                    onChange={(e) => setEnd(e.target.value)}
+                    className="w-24"
+                  />
+                </label>
+                <Button
+                  variant="outline"
+                  onClick={() => chooseLine(rangeSide, Number(start), Number(end))}
                 >
-                  <option value={'old'}>{t('旧')}</option>
-                  <option value={'new'}>{t('新')}</option>
-                </select>
-              </label>
-              <label>
-                {t('起始行')}
-                <Input
-                  aria-label={t('起始行')}
-                  type="number"
-                  value={start}
-                  onChange={(e) => setStart(e.target.value)}
-                  className="w-24"
-                />
-              </label>
-              <label>
-                {t('结束行')}
-                <Input
-                  aria-label={t('结束行')}
-                  type="number"
-                  value={end}
-                  onChange={(e) => setEnd(e.target.value)}
-                  className="w-24"
-                />
-              </label>
-              <Button
-                variant="outline"
-                onClick={() => chooseLine(rangeSide, Number(start), Number(end))}
-              >
-                {t('选择连续行')}
-              </Button>
-            </div>
-          )}
-          {error && <p role="alert">{message(error)}</p>}
-          {expanded ? (
-            <div className="min-w-0 border-b">{display(model.rows)}</div>
-          ) : (
-            model.hunks.map((hunk, index) => (
-              <section key={index} data-diff-hunk={index} className="min-w-0 border-b">
-                <OptionalTarget
-                  enabled={!!feedback}
-                  target={{
-                    sourceId,
-                    kind: 'hunk',
-                    oldStart: hunk.oldStart,
-                    oldLines: hunk.oldLines,
-                    newStart: hunk.newStart,
-                    newLines: hunk.newLines,
-                    patch: hunk.patch,
-                  }}
-                >
-                  <div className="relative z-[6] bg-muted p-2 font-mono text-sm">
-                    @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                    {t('(changed block)')}
-                  </div>
-                </OptionalTarget>
-                {display(hunk.rows)}
-              </section>
-            ))
-          )}
-          {model.hunks.length === 0 && !expanded && <p>{t('文本内容相同；可展开查看上下文。')}</p>}
+                  {t('选择连续行')}
+                </Button>
+              </div>
+            )}
+            {error && <p role="alert">{message(error)}</p>}
+            {expanded ? (
+              <div className="min-w-0 border-b">{display(model.rows)}</div>
+            ) : (
+              model.hunks.map((hunk, index) => (
+                <section key={index} data-diff-hunk={index} className="min-w-0 border-b">
+                  <OptionalTarget
+                    enabled={!!feedback}
+                    target={{
+                      sourceId,
+                      kind: 'hunk',
+                      oldStart: hunk.oldStart,
+                      oldLines: hunk.oldLines,
+                      newStart: hunk.newStart,
+                      newLines: hunk.newLines,
+                      patch: hunk.patch,
+                    }}
+                  >
+                    <div className="relative z-[6] bg-muted p-2 font-mono text-sm">
+                      @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                      {t('(changed block)')}
+                    </div>
+                  </OptionalTarget>
+                  {display(hunk.rows)}
+                </section>
+              ))
+            )}
+            {model.hunks.length === 0 && !expanded && (
+              <p>{t('文本内容相同；可展开查看上下文。')}</p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -582,7 +618,9 @@ function revealDiffElement(element: HTMLElement) {
   const clip =
     viewport === document.scrollingElement ? { top: 0 } : viewport.getBoundingClientRect();
   const header = element.closest('[data-diff-source]')?.querySelector('[data-diff-header]');
-  const inset = header?.getBoundingClientRect().height ?? 0;
+  // Only a header inside this viewport overlays its scroll content. Bounded
+  // layouts keep headers outside the code viewport, so there is no inset.
+  const inset = header && viewport.contains(header) ? header.getBoundingClientRect().height : 0;
   const bounds = element.getBoundingClientRect();
   viewport.scrollTop +=
     bounds.top -

@@ -10,7 +10,7 @@ export const tableInput = {
   title: 'Table review acceptance',
   pageSize: 2,
   columns: [
-    { key: 'name', label: 'Name' },
+    { key: 'name', label: '说明' },
     { key: 'n', label: 'Number', type: 'number' },
     { key: 'b', label: 'Boolean', type: 'boolean' },
   ],
