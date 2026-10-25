@@ -1,4 +1,14 @@
-# Current design entry
+# 资源生命周期评估的后续结论
+
+2026-10-25 后续决定已经覆盖下面的批准前评估：
+
+- B13 目标保留；B12 按次销毁继续撤回；B14 全局两个线程方案已明确废弃。已批准并实施的方案为懒恢复、默认十个每面板子进程驻留位置及空闲 LRU，见 [design.md](design.md)、[tasks.md](tasks.md) 和 [verification.md](verification.md)。
+- B15 可见性/可选刷新策略仍未纳入实施，不能从资源回收推导出隐藏页面会自动暂停查询。
+- C2 已由用户随后单独批准，并在 [reclaim-generated-artifacts](../reclaim-generated-artifacts/design.md) 实施生成目录回收；不是整个运行目录或历史事件删除。
+
+## 批准前评估原文
+
+以下保留当时建议及实验局限，不是当前待实施清单。其中“均未获批准”和“只改设计”仅描述当时状态。
 
 唯一完整推荐见[design.md](design.md)。事件38明确目标为固定panel总量、最多10个活跃使用下后台资源收敛，并优先改善响应/reload/保活。B13为已确认目标。
 

@@ -14,12 +14,12 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import semver from 'semver';
-import { build, createServer } from 'vite';
+import { build } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { SourceSnapshot } from './source-snapshot.js';
 import { buildEnvironment, buildReuse, captureBuildEnvironment } from './build-inputs.js';
 import type { Graph } from './action-transform.js';
-import type { Plugin, ViteDevServer } from 'vite';
+import type { Plugin } from 'vite';
 import { PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
 import { PaneonError } from '../shared/types.js';
 import type { Manifest, JsonValue, WatchInputs } from '../shared/types.js';
@@ -423,29 +423,6 @@ async function inspectServer(
     });
     worker.send({ kind: 'init', serverFile, actions, inspect: true });
   });
-}
-export async function watchPanel(
-  entry: string,
-  dependencies: string[],
-  onChange: () => Promise<void>,
-): Promise<ViteDevServer> {
-  const server = await createServer({
-    configFile: false,
-    root: dirname(entry),
-    logLevel: 'silent',
-    server: { middlewareMode: true, watch: { ignored: ['**/node_modules/**', '**/.paneon/**'] } },
-    plugins: [
-      {
-        name: 'paneon-source-updates',
-        handleHotUpdate: async (context) => {
-          if (dependencies.includes(resolve(context.file))) await onChange();
-          return [];
-        },
-      },
-    ],
-  });
-  server.watcher.add(dependencies);
-  return server;
 }
 export function serverUrl(path: string) {
   return pathToFileURL(path).href;

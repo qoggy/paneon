@@ -5,8 +5,9 @@ import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
-import type { ViteDevServer } from 'vite';
-import { watchPanel } from '../compiler/index.js';
+import { watchInputsFor } from '../compiler/watch-inputs.js';
+import { SourceWatcher } from './source-watcher.js';
+import type { SourceSubscription } from './source-watcher.js';
 import { CompilerProcess } from '../compiler/process.js';
 import type { CompiledPanel } from '../compiler/index.js';
 import { PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
@@ -14,6 +15,9 @@ import { EVENT_PAYLOAD_LIMIT_CHARACTERS, EVENT_TYPE_LIMIT_CHARACTERS } from '../
 import { PaneonError, diagnostic, jsonValue } from '../shared/types.js';
 import type { StoredPanel, JsonValue, Manifest } from '../shared/types.js';
 import { Store } from './store.js';
+import { ResourcePool } from './resource-pool.js';
+import type { ResourceLease } from './resource-pool.js';
+import { Artifacts } from './artifacts.js';
 class Execution {
   child: ChildProcess;
   private requests = new Map<
@@ -21,6 +25,9 @@ class Execution {
     { resolve: (v: JsonValue) => void; reject: (e: Error) => void }
   >();
   ready: Promise<void>;
+  get alive() {
+    return this.child.exitCode === null && this.child.signalCode === null && this.child.connected;
+  }
   constructor(compiled: CompiledPanel, panel: StoredPanel) {
     this.child = fork(join(PACKAGE_ROOT, 'dist/runtime/worker.js'), [], {
       cwd: panel.cwd,
@@ -117,7 +124,8 @@ class Execution {
     });
   }
 }
-type Live = { compiled: CompiledPanel; execution: Execution; watcher?: ViteDevServer };
+type Live = { compiled: CompiledPanel; execution?: Execution; watcher?: SourceSubscription };
+export type RuntimeResourceOptions = { maxPanels?: number; maxWaiting?: number; waitMs?: number };
 export class Runtime extends EventEmitter {
   store: Store;
   live = new Map<string, Live>();
@@ -126,136 +134,254 @@ export class Runtime extends EventEmitter {
   private logger: Logger;
   private compilers = new Map<string, CompilerProcess>();
   private initializing = new Map<string, Execution>();
+  private residents: ResourcePool;
+  private compilation: ResourcePool;
+  private artifacts: Artifacts;
+  private sources: SourceWatcher;
   home: string;
-  constructor(home: string, logger: Logger = pino({}, process.stderr)) {
+  constructor(
+    home: string,
+    logger: Logger = pino({}, process.stderr),
+    options: RuntimeResourceOptions = {},
+  ) {
     super();
     this.logger = logger;
     this.home = home;
     this.store = new Store(home);
+    this.artifacts = new Artifacts(home);
+    this.sources = new SourceWatcher((err) => this.logger.error({ err }, 'Source watcher failed'));
+    const onError = (err: unknown) =>
+      this.logger.error({ err }, 'Runtime resource retirement failed');
+    this.residents = new ResourcePool(
+      options.maxPanels ?? 10,
+      (id) => this.dispose(id),
+      onError,
+      options.maxWaiting ?? 32,
+      options.waitMs ?? 10000,
+    );
+    this.compilation = new ResourcePool(
+      1,
+      async (id) => {
+        await this.compilers.get(id)?.stop();
+      },
+      onError,
+      options.maxWaiting ?? 32,
+      options.waitMs ?? 10000,
+      false,
+    );
+  }
+  get resourceUsage() {
+    const executions = new Set(this.initializing.values());
+    for (const live of this.live.values()) if (live.execution) executions.add(live.execution);
+    return {
+      residentPanels: this.residents.size,
+      workers: [...executions].filter((execution) => execution.alive).length,
+      watchers: [...this.live.values()].filter((value) => value.watcher).length,
+      queued: this.residents.queued,
+      compiling: this.compilers.size,
+      queuedBuilds: this.compilation.queued,
+    };
   }
   async restore() {
-    for (const panel of this.store.all())
-      if (panel.status !== 'closed') {
-        try {
-          await this.load(panel);
-        } catch (e) {
-          this.logger.error({ err: e, instanceId: panel.instanceId }, 'Panel restore failed');
-          panel.status = 'unavailable';
-          panel.diagnostic = diagnostic(e);
-          this.store.save(panel);
-        }
-      }
+    // Persisted running means logically open, not resident. History and static
+    // artifacts are usable without evaluating historical author modules.
   }
   inspect(id: string) {
     const panel = this.store.get(id);
-    const live = this.live.get(id);
-    return { ...panel, ...(live ? { manifest: live.compiled.manifest } : {}) };
+    const manifest = this.manifest(id);
+    return { ...panel, ...(manifest ? { manifest } : {}) };
   }
-  private load(panel: StoredPanel): Promise<StoredPanel> {
-    if (this.stopping)
-      return Promise.reject(new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.'));
-    const previous = this.builds.get(panel.instanceId);
-    const promise = (previous ?? Promise.resolve()).then(() => this.buildPanel(panel));
-    const settled = () => {
-      if (this.builds.get(panel.instanceId) === tail) this.builds.delete(panel.instanceId);
-    };
-    const tail = promise.then(settled, (err: unknown) => {
-      settled();
-      // The original promise still rejects to its caller. This queue tail is settled
-      // so that a failed build does not prevent a subsequent explicit reload.
-      this.logger.debug(
-        { err, instanceId: panel.instanceId },
-        'Panel build queue settled after failure',
-      );
-    });
-    this.builds.set(panel.instanceId, tail);
-    return promise;
+  artifact(id: string, revision: string) {
+    const panel = this.store.get(id);
+    if (panel.status === 'closed' || panel.revision !== revision) return;
+    return this.live.get(id)?.compiled ?? this.artifacts.read(id, revision);
   }
-  private async buildPanel(panel: StoredPanel) {
+  private assertOpen(panel: StoredPanel, signal?: AbortSignal) {
     if (this.stopping) throw new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.');
-    const stored = this.store.all().find((p) => p.instanceId === panel.instanceId);
+    signal?.throwIfAborted();
+    const stored = this.store.find(panel.instanceId);
     if (stored?.status === 'closed')
       throw new PaneonError('PANEL_CLOSED', 'The panel instance is closed.');
-
-    const compiler = new CompilerProcess(
-      panel.entryPath,
-      join(this.home, 'panels', panel.instanceId),
-    );
-    this.compilers.set(panel.instanceId, compiler);
-    let compiled: CompiledPanel;
-    try {
-      compiled = await compiler.result;
-    } finally {
-      if (this.compilers.get(panel.instanceId) === compiler)
-        this.compilers.delete(panel.instanceId);
-    }
-    if (
-      this.stopping ||
-      this.store.all().find((p) => p.instanceId === panel.instanceId)?.status === 'closed'
-    )
-      throw new PaneonError('PANEL_CLOSED', 'The panel execution environment was closed.');
-    const next: StoredPanel = {
-      ...panel,
-      status: 'running',
-      definitionId: compiled.manifest.definitionId,
-      revision: compiled.manifest.revision,
-      requires: compiled.manifest.requires,
-      paneonVersion: PACKAGE_VERSION,
-      updatedAt: new Date().toISOString(),
-    };
-    delete next.diagnostic;
-    const execution = new Execution(compiled, next);
-    this.initializing.set(panel.instanceId, execution);
-    let live: Live | undefined;
-    let published = false;
-    try {
-      await execution.ready;
-      live = { compiled, execution };
-      if (next.watch)
-        live.watcher = await watchPanel(
-          next.entryPath,
-          compiled.manifest.dependencies,
-          async () => {
+    return stored ?? panel;
+  }
+  private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const promise = (this.builds.get(id) ?? Promise.resolve()).then(task);
+    const tail = promise
+      .then(
+        () => {},
+        (err: unknown) => {
+          this.logger.debug({ err, instanceId: id }, 'Panel build queue settled after failure');
+        },
+      )
+      .finally(() => {
+        if (this.builds.get(id) === tail) this.builds.delete(id);
+      });
+    this.builds.set(id, tail);
+    return promise;
+  }
+  private prepare(
+    panel: StoredPanel,
+    signal: AbortSignal,
+    execute: boolean,
+    refresh: 'cold' | 'watch' | 'force' = 'cold',
+  ): Promise<StoredPanel> {
+    return this.enqueue(
+      panel.instanceId,
+      async () => {
+        const current = this.assertOpen(panel, signal);
+        let previous = this.live.get(current.instanceId);
+        if (previous?.execution && !previous.execution.alive) previous.execution = undefined;
+        let compiled = previous?.compiled;
+        if (!compiled) {
+          try {
+            compiled = this.artifacts.read(current.instanceId, current.revision);
+          } catch (err) {
+            if (refresh !== 'force') throw err;
+            this.logger.debug(
+              { err, instanceId: current.instanceId },
+              'Explicit reload will regenerate an unreadable manifest',
+            );
+          }
+        }
+        const reattachWatch = current.watch && !previous?.watcher;
+        if (compiled && reattachWatch) {
+          // Watch the last successful graph before evaluating sleeping edits, so
+          // a broken edit still leaves a way to observe its eventual correction.
+          const watcher = await this.watch(current, compiled, signal);
+          try {
+            this.assertOpen(current, signal);
+          } catch (error) {
+            await watcher.close();
+            throw error;
+          }
+          previous = { compiled, execution: previous?.execution, watcher };
+          this.live.set(current.instanceId, previous);
+        }
+        const rebuild =
+          refresh === 'force' ||
+          !compiled ||
+          compiled.manifest.paneonVersion !== PACKAGE_VERSION ||
+          ((refresh === 'watch' || reattachWatch) && !(await this.artifacts.unchanged(compiled)));
+        if (rebuild) {
+          const permit = await this.compilation.acquire(current.instanceId, signal);
+          try {
+            this.assertOpen(current, signal);
+            const compiler = new CompilerProcess(
+              current.entryPath,
+              join(this.home, 'panels', current.instanceId),
+            );
+            this.compilers.set(current.instanceId, compiler);
             try {
-              await this.reload(next.instanceId);
-            } catch (err) {
-              this.logger.error(
-                { err, instanceId: next.instanceId },
-                'Watched panel reload failed',
-              );
+              compiled = await compiler.result;
+              this.artifacts.forget(compiled.directory);
+            } catch (error) {
+              if (previous?.watcher && compiler.watchInputs && !signal.aborted && !this.stopping) {
+                const good = watchInputsFor(current.entryPath, previous.compiled.manifest);
+                const failed = compiler.watchInputs;
+                await previous.watcher.update(
+                  {
+                    files: { ...good.files, ...failed.files },
+                    paths: { ...good.paths, ...failed.paths },
+                  },
+                  failed,
+                );
+              }
+              throw error;
+            } finally {
+              this.compilers.delete(current.instanceId);
             }
-          },
+          } finally {
+            permit.release();
+          }
+        }
+        this.assertOpen(current, signal);
+        if (!compiled)
+          throw new PaneonError('BUILD_FAILED', 'The panel has no compiled artifacts.');
+        const recovered = Boolean(current.diagnostic && (refresh === 'watch' || reattachWatch));
+        const next: StoredPanel = rebuild
+          ? {
+              ...current,
+              status: 'running',
+              definitionId: compiled.manifest.definitionId,
+              revision: compiled.manifest.revision,
+              requires: compiled.manifest.requires,
+              paneonVersion: PACKAGE_VERSION,
+              updatedAt: new Date().toISOString(),
+            }
+          : recovered
+            ? { ...current, updatedAt: new Date().toISOString() }
+            : current;
+        if (rebuild || recovered) delete next.diagnostic;
+        // Compilation failure leaves the previous working revision intact. Once
+        // built, retire its resources before starting a replacement to respect K.
+        if (rebuild && previous) {
+          await previous.execution?.stop();
+          previous.execution = undefined;
+        }
+        const live: Live = { compiled, execution: previous?.execution, watcher: previous?.watcher };
+        let createdExecution: Execution | undefined;
+        let createdWatcher: SourceSubscription | undefined;
+        let published = false;
+        try {
+          if (next.watch && !live.watcher) {
+            createdWatcher = await this.watch(next, compiled, signal);
+            live.watcher = createdWatcher;
+          }
+          if (execute && !live.execution) {
+            createdExecution = new Execution(compiled, next);
+            this.initializing.set(current.instanceId, createdExecution);
+            await createdExecution.ready;
+            this.assertOpen(next, signal);
+            live.execution = createdExecution;
+          }
+          this.assertOpen(next, signal);
+          if (live.watcher)
+            await live.watcher.update(watchInputsFor(next.entryPath, compiled.manifest));
+          this.assertOpen(next, signal);
+          this.live.set(current.instanceId, live);
+          if (rebuild || recovered) this.store.save(next);
+          published = true;
+          if (rebuild || recovered || refresh === 'watch') this.state(current.instanceId);
+          return next;
+        } finally {
+          this.initializing.delete(current.instanceId);
+          if (!published) {
+            await createdWatcher?.close();
+            await createdExecution?.stop();
+          }
+        }
+      },
+    );
+  }
+  private watch(panel: StoredPanel, compiled: CompiledPanel, signal: AbortSignal) {
+    return this.sources.subscribe(watchInputsFor(panel.entryPath, compiled.manifest), async () => {
+      // Invalidation can arrive while the first publication is still pending.
+      // Wait outside the build queue before looking up its persisted identity.
+      await this.builds.get(panel.instanceId);
+      if (signal.aborted || this.stopping) return;
+      try {
+        await this.rebuild(
+          panel.instanceId,
+          Boolean(this.live.get(panel.instanceId)?.execution),
+          'watch',
         );
-      if (
-        this.stopping ||
-        this.store.all().find((p) => p.instanceId === panel.instanceId)?.status === 'closed'
-      )
-        throw new PaneonError('PANEL_CLOSED', 'The panel execution environment was closed.');
-      const previous = this.live.get(panel.instanceId);
-      if (previous) {
-        await previous.watcher?.close();
-        await previous.execution.stop();
+      } catch (err) {
+        this.logger.error({ err, instanceId: panel.instanceId }, 'Watched panel reload failed');
       }
-      if (
-        this.stopping ||
-        this.store.all().find((p) => p.instanceId === panel.instanceId)?.status === 'closed'
-      )
-        throw new PaneonError('PANEL_CLOSED', 'The panel execution environment was closed.');
-      this.live.set(panel.instanceId, live);
-      this.store.save(next);
-      published = true;
-      this.state(panel.instanceId);
-      return next;
+    });
+  }
+  private async dispose(id: string) {
+    await this.compilers.get(id)?.stop();
+    await this.initializing.get(id)?.stop();
+    await this.builds.get(id);
+    const live = this.live.get(id);
+    try {
+      await live?.watcher?.close();
     } finally {
-      if (this.initializing.get(panel.instanceId) === execution)
-        this.initializing.delete(panel.instanceId);
-      if (!published) {
-        await live?.watcher?.close();
-        await execution.stop();
-      }
+      await live?.execution?.stop();
+      this.live.delete(id);
     }
   }
-
   state(id: string, building = false) {
     const panel = this.store.get(id);
     this.emit('state', id, {
@@ -282,71 +408,125 @@ export class Runtime extends EventEmitter {
       requires: { paneon: '' },
       paneonVersion: PACKAGE_VERSION,
     };
-    return this.load(panel);
+    const lease = await this.residents.acquire(panel.instanceId);
+    try {
+      return await this.prepare(panel, lease.signal, true, 'force');
+    } finally {
+      await this.release(panel.instanceId, lease);
+    }
+  }
+  private failure(id: string, error: unknown) {
+    if (this.stopping) return;
+    const current = this.store.get(id);
+    if (current.status === 'closed') return;
+    if (current.paneonVersion !== PACKAGE_VERSION) current.status = 'unavailable';
+    current.diagnostic = diagnostic(error);
+    current.updatedAt = new Date().toISOString();
+    this.store.save(current);
+    this.state(id);
+  }
+  async observe(id: string) {
+    const panel = this.store.get(id);
+    if (panel.status === 'closed' || !panel.watch) return;
+    const lease = await this.residents.acquire(id);
+    try {
+      await this.prepare(panel, lease.signal, false);
+    } catch (error) {
+      this.failure(id, error);
+      throw error;
+    } finally {
+      await this.release(id, lease);
+    }
   }
   async reload(id: string) {
-    const p = this.store.get(id);
-    if (p.status === 'closed')
+    return this.rebuild(id, true);
+  }
+  private async rebuild(id: string, execute: boolean, refresh: 'watch' | 'force' = 'force') {
+    const panel = this.store.get(id);
+    if (panel.status === 'closed')
       throw new PaneonError('PANEL_CLOSED', 'The panel instance is closed.');
-    const previousRevision = p.revision;
+    const lease = await this.residents.acquire(id);
     this.state(id, true);
     try {
-      const next = await this.load(p);
+      const next = await this.prepare(panel, lease.signal, execute, refresh);
       return {
-        previousRevision,
+        previousRevision: panel.revision,
         revision: next.revision,
-        changed: next.revision !== previousRevision,
+        changed: next.revision !== panel.revision,
         watch: next.watch,
       };
-    } catch (e) {
-      const current = this.store.get(id);
-      if (this.stopping || current.status === 'closed') throw e;
-      current.diagnostic = diagnostic(e);
-      current.updatedAt = new Date().toISOString();
-      this.store.save(current);
-      this.state(id);
-      throw e;
+    } catch (error) {
+      this.failure(id, error);
+      throw error;
+    } finally {
+      await this.release(id, lease);
     }
   }
   async closePanel(id: string) {
-    const p = this.store.get(id);
-    const alreadyClosed = p.status === 'closed';
-    p.status = 'closed';
-    p.updatedAt = new Date().toISOString();
-    this.store.save(p);
-    await this.compilers.get(id)?.stop();
-    await this.initializing.get(id)?.stop();
-    const live = this.live.get(id);
-    if (live) {
-      this.live.delete(id);
-      await live.watcher?.close();
-      await live.execution.stop();
-    }
+    const panel = this.store.get(id);
+    const alreadyClosed = panel.status === 'closed';
+    panel.status = 'closed';
+    panel.updatedAt = new Date().toISOString();
+    this.store.save(panel);
+    await this.residents.remove(
+      id,
+      new PaneonError('PANEL_CLOSED', 'The panel instance is closed.'),
+    );
     this.state(id);
     return { status: 'closed' as const, alreadyClosed };
   }
-  private active(id: string, revision: string) {
-    const p = this.store.get(id);
-    if (p.status !== 'running')
+  private current(id: string, revision: string) {
+    if (this.stopping) throw new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.');
+    const panel = this.store.get(id);
+    if (panel.status !== 'running')
       throw new PaneonError(
-        p.status === 'closed' ? 'PANEL_CLOSED' : 'PANEL_UNAVAILABLE',
+        panel.status === 'closed' ? 'PANEL_CLOSED' : 'PANEL_UNAVAILABLE',
         'The panel is not running.',
       );
-    if (p.revision !== revision)
+    if (panel.revision !== revision)
       throw new PaneonError(
         'PANEL_REVISION_MISMATCH',
         'The panel source changed. Refresh before choosing an action.',
       );
-    const live = this.live.get(id);
-    if (!live)
-      throw new PaneonError('PANEL_UNAVAILABLE', 'The panel execution environment is unavailable.');
-    return live;
+    return panel;
+  }
+  private async withExecution<T>(
+    id: string,
+    revision: string,
+    operation: (live: Live & { execution: Execution }) => Promise<T>,
+  ): Promise<T> {
+    const panel = this.current(id, revision);
+    const lease = await this.residents.acquire(id);
+    try {
+      try {
+        await this.prepare(panel, lease.signal, true);
+      } catch (error) {
+        this.failure(id, error);
+        throw error;
+      }
+      this.current(id, revision);
+      lease.signal.throwIfAborted();
+      const live = this.live.get(id);
+      if (!live?.execution)
+        throw new PaneonError(
+          'PANEL_UNAVAILABLE',
+          'The panel execution environment is unavailable.',
+        );
+      return await operation({ ...live, execution: live.execution });
+    } finally {
+      await this.release(id, lease);
+    }
+  }
+  private async release(id: string, lease: ResourceLease) {
+    lease.release();
+    if (!this.live.has(id)) await this.residents.discardIdle(id);
   }
   async invoke(id: string, revision: string, actionId: string, input: unknown) {
-    const live = this.active(id, revision);
-    if (!live.compiled.manifest.actions.some((a) => a.id === actionId))
-      throw new PaneonError('ACTION_NOT_FOUND', 'The action is not declared.');
-    return live.execution.request('invoke', { actionId, input });
+    return this.withExecution(id, revision, async (live) => {
+      if (!live.compiled.manifest.actions.some((action) => action.id === actionId))
+        throw new PaneonError('ACTION_NOT_FOUND', 'The action is not declared.');
+      return live.execution.request('invoke', { actionId, input });
+    });
   }
   async append(id: string, revision: string, type: string, payload: unknown) {
     if (typeof type !== 'string' || type.length > EVENT_TYPE_LIMIT_CHARACTERS)
@@ -359,12 +539,14 @@ export class Runtime extends EventEmitter {
         'INVALID_EVENT',
         `The serialized event payload exceeds the ${EVENT_PAYLOAD_LIMIT_CHARACTERS}-character UTF-16 limit.`,
       );
-    const live = this.active(id, revision);
-    const parsed = await live.execution.request('validate-event', { type, payload });
-    const result = this.store.append(id, revision, type, jsonValue(parsed));
-    this.emit('event', id);
-    this.state(id);
-    return result;
+    return this.withExecution(id, revision, async (live) => {
+      const parsed = await live.execution.request('validate-event', { type, payload });
+      this.current(id, revision);
+      const result = this.store.appendCurrent(id, revision, type, jsonValue(parsed));
+      this.emit('event', id);
+      this.state(id);
+      return result;
+    });
   }
   async events(id: string, consumer: string, limit: number, waitMs: number) {
     let result = this.store.read(id, consumer, limit);
@@ -396,19 +578,17 @@ export class Runtime extends EventEmitter {
     return { ...result, timedOut: result.events.length === 0 };
   }
   manifest(id: string): Manifest | undefined {
-    return this.live.get(id)?.compiled.manifest;
+    const panel = this.store.get(id);
+    return (this.live.get(id)?.compiled ?? this.artifacts.read(id, panel.revision))?.manifest;
   }
   async stop() {
     this.stopping = true;
     this.emit('stop');
-    await Promise.all([...this.compilers.values()].map((compiler) => compiler.stop()));
-    await Promise.all([...this.initializing.values()].map((execution) => execution.stop()));
-    await Promise.allSettled([...this.builds.values()]);
-    for (const live of this.live.values()) {
-      await live.watcher?.close();
-      await live.execution.stop();
-    }
+    await Promise.all([this.residents.stop(), this.compilation.stop()]);
+    await Promise.all([...this.builds.values()]);
+    await this.sources.stop();
     this.live.clear();
+    this.artifacts.clear();
     this.store.close();
   }
 }

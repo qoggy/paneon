@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Manifest, RuntimeDescriptor } from '../src/shared/types.js';
+import { prepareRuntimeHome } from './runtime-fixture.ts';
 const { compilePanel, validateRequirement } = (await import(
   '../dist/compiler/' + 'index.js'
 )) as typeof import('../src/compiler/index.js');
@@ -241,6 +242,7 @@ void test(
     const entry = join(root, 'panel.tsx');
     writeFileSync(entry, source('concurrent', packageVersion));
     mkdirSync(join(root, '.paneon'));
+    prepareRuntimeHome(join(root, '.paneon'));
     const gone = spawnSync(process.execPath, ['-e', ''], { encoding: 'utf8' });
     assert.equal(gone.status, 0);
     assert.ok(gone.pid);
@@ -393,6 +395,7 @@ void test('all panel/server command help remains English, does not start a daemo
 
 void test('debug stderr contains only fixed framework steps and elapsed time, never credentials or business values', async () => {
   const root = directory('paneon-debug-');
+  prepareRuntimeHome(join(root, '.paneon'));
   const entry = join(root, 'panel.tsx');
   const business = 'DUMMY_BUSINESS_中文_body';
   const cookie = 'DUMMY_COOKIE_cookie-value';
@@ -452,12 +455,13 @@ void test('debug stderr contains only fixed framework steps and elapsed time, ne
 });
 
 void test(
-  'a copied upgraded package rebuilds compatible instances and preserves incompatible instance history',
+  'a copied upgraded package rebuilds on first use and preserves incompatible instance history',
   { timeout: 120000 },
   async () => {
     const root = directory('paneon-upgrade-');
     const home = join(root, 'home');
     mkdirSync(home);
+    prepareRuntimeHome(join(home, '.paneon'));
     const exact = join(root, 'exact.tsx');
     const broad = join(root, 'broad.tsx');
     const exactLoaded = join(root, 'exact-loaded');
@@ -526,6 +530,19 @@ void test(
         45000,
       );
       assert.equal(descriptor(home).paneonVersion, '0.0.1');
+      const coldExact = await cli(home, ['panel', 'inspect', exactId], upgradedCli);
+      const coldBroad = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
+      assert.equal(coldExact.result.data?.paneonVersion, '0.0.0');
+      assert.equal(coldBroad.result.data?.paneonVersion, '0.0.0');
+      assert.equal(readFileSync(exactLoaded, 'utf8'), exactEvaluations);
+      assert.equal(readFileSync(broadLoaded, 'utf8'), broadEvaluations);
+      const upgradedDescriptor = descriptor(home);
+      const incompatibleUse = await request(
+        upgradedDescriptor,
+        `/api/panels/${exactId}/actions/${encodeURIComponent('exact.tsx#invoke')}`,
+        { revision: created[0]?.revision, input: {} },
+      );
+      assert.equal(incompatibleUse.error?.code, 'PANEON_VERSION_UNSUPPORTED');
       const incompatible = await cli(home, ['panel', 'inspect', exactId], upgradedCli);
       assert.equal(incompatible.result.ok, true, incompatible.stdout);
       assert.equal(incompatible.result.data?.status, 'unavailable');
@@ -542,6 +559,16 @@ void test(
         upgradedCli,
       );
       assert.equal((events.result.data?.events as unknown[]).length, 1);
+      const compatibleUse = await request(
+        upgradedDescriptor,
+        `/api/panels/${broadId}/actions/${encodeURIComponent('broad.tsx#invoke')}`,
+        { revision: created[1]?.revision, input: {} },
+      );
+      assert.equal(
+        compatibleUse.error?.code,
+        'PANEL_REVISION_MISMATCH',
+        'an old request must not run a newly rebuilt handler',
+      );
       const compatible = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
       assert.equal(compatible.result.data?.status, 'running');
       assert.equal(compatible.result.data?.paneonVersion, '0.0.1');
@@ -772,9 +799,8 @@ void test(
     const home = join(root, '.paneon');
     const entry = join(root, 'panel.tsx');
     writeFileSync(entry, source('health', packageVersion));
-    const { startServer } = (await import(
-      '../dist/runtime/' + 'server.js'
-    )) as typeof import('../src/runtime/server.js');
+    const { startServer } =
+      (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
     const service = await startServer(home);
     let stopped = false;
     try {

@@ -45,7 +45,13 @@ import {
 } from 'paneon/ui';
 import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
-import { githubReview } from './github.ts';
+import {
+  GitHubReview,
+  reviewFromEvidence,
+  prDetailInputSchema,
+  prComparisonInputSchema,
+  prSnapshotInputSchema,
+} from './github.ts';
 import type { PRChecks, PRComparison, PRDetail, PRList, PRSnapshot } from './github.ts';
 import { resolvePRTarget, safeLink } from './model.ts';
 import {
@@ -75,57 +81,88 @@ export const listPRs = serverAction({
     search: z.string(),
     limit: z.number().int().positive(),
   }),
-  handler: (ctx, input) => readResult(() => githubReview.list(input.repository, input, ctx.signal)),
+  handler: (ctx, input) =>
+    readResult(() => new GitHubReview().list(input.repository, input, ctx.signal)),
 });
 export const readPR = serverAction({
   kind: 'query',
   input: sessionInput.extend({ number: z.number().int().positive() }),
   handler: (ctx, input) =>
     readResult(() =>
-      githubReview.detail(input.repository, input.sessionId, input.number, ctx.signal),
-    ),
-});
-export const readChecks = serverAction({
-  kind: 'query',
-  input: sessionInput.extend({ detailId: z.string() }),
-  handler: (ctx, input) =>
-    readResult(() =>
-      githubReview.checks(input.repository, input.sessionId, input.detailId, ctx.signal),
-    ),
-});
-export const readComparison = serverAction({
-  kind: 'query',
-  input: sessionInput.extend({ detailId: z.string() }),
-  handler: (ctx, input) =>
-    readResult(() =>
-      githubReview.comparison(input.repository, input.sessionId, input.detailId, ctx.signal),
-    ),
-});
-export const readFile = serverAction({
-  kind: 'query',
-  input: sessionInput.extend({ comparisonId: z.string(), filename: z.string() }),
-  handler: (ctx, input) =>
-    readResult(() =>
-      githubReview.diff(
+      reviewFromEvidence(input.repository, input.sessionId).detail(
         input.repository,
         input.sessionId,
-        input.comparisonId,
-        input.filename,
+        input.number,
         ctx.signal,
       ),
     ),
 });
+export const readChecks = serverAction({
+  kind: 'query',
+  input: sessionInput.extend({ detailId: z.string(), detail: prDetailInputSchema }),
+  handler: (ctx, input) =>
+    readResult(() =>
+      reviewFromEvidence(input.repository, input.sessionId, { detail: input.detail }).checks(
+        input.repository,
+        input.sessionId,
+        input.detailId,
+        ctx.signal,
+      ),
+    ),
+});
+export const readComparison = serverAction({
+  kind: 'query',
+  input: sessionInput.extend({ detailId: z.string(), detail: prDetailInputSchema }),
+  handler: (ctx, input) =>
+    readResult(() =>
+      reviewFromEvidence(input.repository, input.sessionId, { detail: input.detail }).comparison(
+        input.repository,
+        input.sessionId,
+        input.detailId,
+        ctx.signal,
+      ),
+    ),
+});
+export const readFile = serverAction({
+  kind: 'query',
+  input: sessionInput.extend({
+    comparisonId: z.string(),
+    filename: z.string(),
+    comparison: prComparisonInputSchema,
+    detail: prDetailInputSchema,
+  }),
+  handler: (ctx, input) =>
+    readResult(() =>
+      reviewFromEvidence(input.repository, input.sessionId, {
+        comparison: input.comparison,
+        detail: input.detail,
+      }).diff(input.repository, input.sessionId, input.comparisonId, input.filename, ctx.signal),
+    ),
+});
 export const checkFeedback = serverAction({
   kind: 'query',
-  input: sessionInput.extend({ feedback: prFeedbackSchema }),
+  input: sessionInput.extend({
+    feedback: prFeedbackSchema,
+    snapshots: z.array(prSnapshotInputSchema),
+  }),
   handler: (_ctx, input) =>
-    readResult(() => githubReview.feedback(input.repository, input.sessionId, input.feedback)),
+    readResult(() =>
+      reviewFromEvidence(input.repository, input.sessionId, {
+        snapshots: input.snapshots,
+      }).feedback(input.repository, input.sessionId, input.feedback),
+    ),
 });
 export const checkReviewRequest = serverAction({
   kind: 'query',
-  input: sessionInput.extend({ detailId: z.string() }),
+  input: sessionInput.extend({ detailId: z.string(), detail: prDetailInputSchema }),
   handler: (_ctx, input) =>
-    readResult(() => githubReview.reviewRequest(input.repository, input.sessionId, input.detailId)),
+    readResult(() =>
+      reviewFromEvidence(input.repository, input.sessionId, { detail: input.detail }).reviewRequest(
+        input.repository,
+        input.sessionId,
+        input.detailId,
+      ),
+    ),
 });
 
 type Tab = 'overview' | 'files' | 'checks';
@@ -221,7 +258,15 @@ function GithubPR() {
     setTabError('');
     setOld(undefined);
     try {
-      const result = await readFile({ ...session, comparisonId: view.id, filename });
+      const preservedDetail = details.current.get(view.detailId);
+      if (!preservedDetail) throw new Error('Original PR detail is missing.');
+      const result = await readFile({
+        ...session,
+        comparisonId: view.id,
+        comparison: view,
+        detail: preservedDetail,
+        filename,
+      });
       if (
         serial !== tabSerial.current ||
         current.current.detailId !== view.detailId ||
@@ -262,7 +307,7 @@ function GithubPR() {
     setTabLoading(true);
     try {
       if (next === 'files') {
-        const result = await readComparison({ ...session, detailId: detail.id });
+        const result = await readComparison({ ...session, detailId: detail.id, detail });
         if (serial !== tabSerial.current || current.current.detailId !== detail.id) return;
         if (!result.ok) throw new Error(result.message);
         comparisons.current.set(detail.id, result.data);
@@ -272,7 +317,7 @@ function GithubPR() {
           await file(result.data, result.data.files[0].filename);
         }
       } else {
-        const result = await readChecks({ ...session, detailId: detail.id });
+        const result = await readChecks({ ...session, detailId: detail.id, detail });
         if (serial !== tabSerial.current || current.current.detailId !== detail.id) return;
         if (!result.ok) throw new Error(result.message);
         remember(result.data.snapshots);
@@ -389,7 +434,7 @@ function GithubPR() {
     setRequestLoading(true);
     setRequestMessage(undefined);
     try {
-      const result = await checkReviewRequest({ ...session, detailId: shown.id });
+      const result = await checkReviewRequest({ ...session, detailId: shown.id, detail: shown });
       if (!result.ok) throw new Error(result.message);
       const receipt = await agent.emit('review-requested', result.data);
       setRequestMessage({ id: receipt.id });
@@ -403,7 +448,35 @@ function GithubPR() {
     <AnnotationRoot<PRRef>
       onSubmit={async (feedback) => {
         setSaved(undefined);
-        const result = await checkFeedback({ ...session, feedback });
+        const ids = new Set(
+          feedback.annotations.flatMap((annotation) =>
+            annotation.targets.map((target) => target.ref.sourceId),
+          ),
+        );
+        const evidence = [...ids].map((id) => {
+          const snapshot = snapshots.current.get(id);
+          if (!snapshot) throw new Error('Original PR source is missing. Draft retained.');
+          return {
+            id: snapshot.id,
+            source: snapshot.source,
+            detailId: snapshot.detailId,
+            ...(snapshot.identity ? { identity: snapshot.identity } : {}),
+            ...(snapshot.body === undefined ? {} : { body: snapshot.body }),
+            ...(snapshot.model
+              ? {
+                  model: {
+                    ...(snapshot.model.oldText === undefined
+                      ? {}
+                      : { oldText: snapshot.model.oldText }),
+                    ...(snapshot.model.newText === undefined
+                      ? {}
+                      : { newText: snapshot.model.newText }),
+                  },
+                }
+              : {}),
+          };
+        });
+        const result = await checkFeedback({ ...session, feedback, snapshots: evidence });
         if (!result.ok) throw new Error(result.message);
         const receipt = await agent.emit('pr-feedback-submitted', result.data);
         setSaved(receipt.id);

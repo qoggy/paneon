@@ -1,31 +1,20 @@
-## Design acceptance
+## Accepted scope
 
-- [ ] 1.1 Confirm B14 finite worker reuse, B15 visibility/connection behavior and C2 generated-artifact reclamation; do not treat event38 as approval. B13 is the confirmed objective; B12 is withdrawn.
-- [ ] 1.2 Verify implementation baseline and preserve unrelated changes. No source, SQLite-event deletion, DB migration or runtime-home reset.
+- [x] 1.1 Record the user's adoption of lazy recovery and bounded per-panel processes; retire B14. Keep B15/C2 out of this implementation.
+- [x] 1.2 Inspect the current implementation and preserve unrelated workspace changes, source, database and submitted events.
 
-## Bounded executor
+## Resource lifecycle
 
-- [ ] 2.1 Implement global FIFO admission, default2 workers and32 queued tasks; separate10s waiting deadline from30s execution deadline, including module startup.
-- [ ] 2.2 Pin each thread to one serverEntry/revision, prefer matching idle workers, retire mismatched idle workers before replacement and never exceed the cap during termination. Never import panel code on HTTP main.
-- [ ] 2.3 Reuse success paths with per-job signal/credential cleanup; reclaim after60s idle,100 calls or5min age at a safe task boundary. Do not promise automatic cleanup of arbitrary detached work.
-- [ ] 2.4 Retire failed/cancelled/old-revision workers; handle exit/error/timeout with one settled outcome and mutation RESULT_UNKNOWN without replay.
-- [ ] 2.5 Add ctx.cwd/timeoutMs and bounded config, preserve secrets and full Zod semantics across reuse, and keep compilation bounded separately.
+- [x] 2.1 Implement ten resident panel slots with idle-only LRU, bounded FIFO admission (32/10s), actual-exit accounting and shared same-panel leases.
+- [x] 2.2 Bound compilation independently to one active build and cancel waiting/initializing work on close/stop.
+- [x] 2.3 Split cold activation from explicit rebuild; reuse valid artifacts, retain cwd and same-panel asynchronous concurrency.
+- [x] 2.4 Restore no historical processes/watchers; serve current static artifacts and bounded manifests without live execution; use indexed target record reads.
+- [x] 2.5 Reattach bounded watch on page connection without pinning residency or starting execution; detect changes after eviction, preserve no-watch and existing reload failure semantics.
+- [x] 2.6 Recheck revision/closed state after activation and immediately before event persistence; keep full schemas.
 
-## Storage and page activity
+## Acceptance
 
-- [ ] 3.1 Use indexed target reads and SQL list projection without parsing all params; serve existing static artifacts independent of resident executors; cap manifest cache32/8MiB.
-- [ ] 3.2 Remove eager historical module evaluation/build and per-panel persistent execution environments. Preserve explicit run/reload/close and no-watch.
-- [ ] 3.3 Subject to C2, retain current/previous successful generated versions plus live browser/job references, reclaim released versions and failed temporary builds without deleting source or events.
-- [ ] 3.4 Subject to B15, derive source-watch references from visible existing state sockets, close panel/preference notifications while hidden, and reconnect/read current state on visible return. Reuse existing15s protocol liveness; no additional HTTP presence polling.
-- [ ] 3.5 Pause only explicitly configured refreshMs timers while hidden, restore at most one query without overlap, and never cancel or replay started business operations merely on visibility changes.
-- [ ] 3.6 Remove PR-required business Maps, use explicit cwd/fixed versions, preserve browser-held original content and all Git/PR UI/props. Do not add or remove the separate Git checkFeedback action as part of this task.
-
-## Acceptance and guidance
-
-- [ ] 4.1 With fixed historical counts, exercise1/5/10 active panels and prove worker/cache/watch bounds and stable RSS/FD after repeated workload, not immediate zero after every call.
-- [ ] 4.2 Verify three parallel same-panel calls create at most two workers and reuse the third; repeatedly switch ten revisions and prove one-version-per-worker and correct replacement.
-- [ ] 4.3 Verify module/handler exit and sync loops while real HTTP responds, bounded cancellation and credentials/context isolation across reused jobs.
-- [ ] 4.4 Verify hidden/visible/multi-window/disconnect/reload state, absence of new presence polling, optional query behavior and browser draft retention.
-- [ ] 4.5 Subject to C2, verify compiled-version retention/reference safety, failures and stale build cleanup, while historical events remain readable.
-- [ ] 4.6 Validate built-in bundles/Zod/native dependencies/cwd/Git/gh cancellation, actual cold/warm and commit-click end-to-end latency, and browser UI invariance. Distinguish prototype results from product acceptance.
-- [ ] 4.7 Update authoring/CLI/examples and themed bilingual diagnostics to the accepted contract.
+- [x] 3.1 Verify LRU/busy/queue limits, timeout without later execution, retirement, compiler serialization and close/stop races.
+- [x] 3.2 Verify cold history/assets, no recompilation on unchanged wake, source/version freshness, no-watch and same-panel concurrency.
+- [x] 3.3 Exercise bounded resources with 1/5/10 active panels and repeated reuse/reload; report actual RSS/FD evidence and its limits.
+- [x] 3.4 Run appropriate type/lint/format/OpenSpec and real browser regressions; update authoring and durable project guidance to the accepted contract.

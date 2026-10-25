@@ -12,6 +12,7 @@ import {
   prFeedbackSchema,
   prFeedbackSubmittedSchema,
   prReviewRequestedSchema,
+  prSourceSchema,
 } from './schema.ts';
 import type { PRFeedbackSubmitted, PRSource } from './schema.ts';
 
@@ -74,6 +75,11 @@ export type PRDetail = z.infer<typeof detailSchema> & {
   overviewSourceId: string;
   descriptionSourceId: string;
 };
+export const prDetailInputSchema = detailSchema.extend({
+  id: z.string().min(1),
+  overviewSourceId: z.string().min(1),
+  descriptionSourceId: z.string().min(1),
+});
 const fileSchema = z.object({
   filename: pathSchema,
   previous_filename: pathSchema.optional(),
@@ -96,6 +102,16 @@ export type PRComparison = {
   url: string;
 };
 export type PRChecks = { detailId: string; sourceIds: string[]; observedAt: string };
+const overviewIdentitySchema = z.object({
+  state: z.string(),
+  mergeable: z.string(),
+  mergeStateStatus: z.string(),
+  reviewDecision: z.string(),
+  author: user,
+  isDraft: z.boolean(),
+  baseRefName: z.string(),
+  headRefName: z.string(),
+});
 export type PRSnapshot = {
   id: string;
   source: PRSource;
@@ -104,6 +120,37 @@ export type PRSnapshot = {
   notes?: string[];
   notesUI?: { key: string; params?: Record<string, string> }[];
   detailId: string;
+  identity?: z.infer<typeof overviewIdentitySchema>;
+};
+
+// Requests carry only the source evidence needed for this call. These schemas
+// deliberately describe JSON data, not a live renderer or a backend session.
+export const prComparisonInputSchema = z.object({
+  id: z.string().min(1),
+  detailId: z.string().min(1),
+  number: z.number().int().positive(),
+  baseCommit: oidSchema,
+  headCommit: oidSchema,
+  mergeBaseCommit: oidSchema,
+  files: z.array(fileSchema.omit({ patch: true }).extend({ patchAvailable: z.boolean() })),
+  reportedFiles: z.number().int().nonnegative(),
+  complete: z.boolean(),
+  notes: z.array(z.string()),
+  url: z.string(),
+});
+export const prSnapshotInputSchema = z.object({
+  id: z.string().min(1),
+  source: prSourceSchema,
+  detailId: z.string().min(1),
+  body: z.string().optional(),
+  identity: overviewIdentitySchema.optional(),
+  model: z.object({ oldText: z.string().optional(), newText: z.string().optional() }).optional(),
+});
+export type PRSnapshotInput = z.infer<typeof prSnapshotInputSchema>;
+type ReviewEvidence = {
+  detail?: PRDetail;
+  comparison?: PRComparison;
+  snapshots?: PRSnapshotInput[];
 };
 
 /** Fixed-head check observations use GraphQL node IDs, not potentially duplicated names. */
@@ -194,6 +241,84 @@ export class GitHubReview {
     this.sessions.set(sessionId, created);
     return created;
   }
+  withEvidence(repository: string, sessionId: string, evidence: ReviewEvidence) {
+    const session = this.session(repository, sessionId);
+    if (evidence.detail) {
+      const detail = prDetailInputSchema.parse(evidence.detail);
+      const { id, overviewSourceId, descriptionSourceId, ...raw } = detail;
+      if (id !== digest(JSON.stringify({ repository, raw })))
+        throw new Error('PR detail evidence does not match its identity.');
+      session.details.set(id, { ...raw, id, overviewSourceId, descriptionSourceId });
+    }
+    if (evidence.comparison) {
+      const comparison = prComparisonInputSchema.parse(evidence.comparison);
+      const detail = session.details.get(comparison.detailId);
+      if (
+        !detail ||
+        comparison.number !== detail.number ||
+        comparison.baseCommit !== detail.baseRefOid ||
+        comparison.headCommit !== detail.headRefOid
+      )
+        throw new Error('PR comparison does not match its preserved detail.');
+      if (
+        comparison.id !==
+        digest(
+          JSON.stringify({
+            repository,
+            detailId: comparison.detailId,
+            mergeBase: comparison.mergeBaseCommit,
+            files: comparison.files,
+          }),
+        )
+      )
+        throw new Error('PR comparison evidence does not match its identity.');
+      session.comparisons.set(comparison.id, comparison);
+    }
+    for (const value of evidence.snapshots ?? []) {
+      const snapshot = prSnapshotInputSchema.parse(value),
+        source = snapshot.source;
+      if (
+        (source.kind === 'pull-request' && !snapshot.identity) ||
+        snapshot.id !==
+          digest(
+            JSON.stringify({
+              repository,
+              source,
+              ...(snapshot.identity ? { identity: snapshot.identity } : {}),
+            }),
+          )
+      )
+        throw new Error('PR source evidence does not match its identity.');
+      if (
+        source.kind === 'description' &&
+        (snapshot.body === undefined || digest(snapshot.body) !== source.contentHash)
+      )
+        throw new Error('PR description evidence does not match its content hash.');
+      if (source.kind === 'diff') {
+        const binary = source.old?.type === 'binary' || source.new?.type === 'binary';
+        if (!binary)
+          for (const side of ['old', 'new'] as const) {
+            const text = side === 'old' ? snapshot.model?.oldText : snapshot.model?.newText;
+            if (source[side] && (text === undefined || digest(text) !== source[side].contentHash))
+              throw new Error('PR diff evidence does not match its content hash.');
+          }
+        session.snapshots.set(snapshot.id, {
+          ...snapshot,
+          model: binary
+            ? createDiffModel()
+            : createDiffModel(snapshot.model?.oldText, snapshot.model?.newText),
+        });
+      } else
+        session.snapshots.set(snapshot.id, {
+          id: snapshot.id,
+          detailId: snapshot.detailId,
+          source,
+          ...(snapshot.identity ? { identity: snapshot.identity } : {}),
+          ...(snapshot.body === undefined ? {} : { body: snapshot.body }),
+        });
+    }
+    return this;
+  }
   private async api(repository: string, endpoint: string, signal?: AbortSignal) {
     repositorySchema.parse(repository);
     return this.read(
@@ -215,14 +340,24 @@ export class GitHubReview {
     extra: Pick<PRSnapshot, 'body' | 'model' | 'notes' | 'notesUI'> = {},
     identity?: unknown,
   ) {
+    // Use the schema's field order both when issuing an ID and when parsing
+    // browser evidence; JSON object insertion order is not an identity contract.
+    source = prSourceSchema.parse(source);
+    const provenance = identity === undefined ? undefined : overviewIdentitySchema.parse(identity);
     const id = digest(
       JSON.stringify({
         repository: session.repository,
         source,
-        ...(identity === undefined ? {} : { identity }),
+        ...(provenance === undefined ? {} : { identity: provenance }),
       }),
     );
-    const value: PRSnapshot = { id, source, detailId, ...extra };
+    const value: PRSnapshot = {
+      id,
+      source,
+      detailId,
+      ...extra,
+      ...(provenance ? { identity: provenance } : {}),
+    };
     if (!session.snapshots.has(id)) session.snapshots.set(id, value);
     return session.snapshots.get(id) as PRSnapshot;
   }
@@ -644,4 +779,10 @@ export class GitHubReview {
     });
   }
 }
-export const githubReview = new GitHubReview();
+export function reviewFromEvidence(
+  repository: string,
+  sessionId: string,
+  evidence: ReviewEvidence = {},
+) {
+  return new GitHubReview().withEvidence(repository, sessionId, evidence);
+}

@@ -47,13 +47,8 @@ export class Store {
         p.diagnostic ? JSON.stringify(p.diagnostic) : null,
       );
   }
-  all(): StoredPanel[] {
-    return (
-      this.db.prepare('SELECT * FROM panels ORDER BY created_at,id').all() as Record<
-        string,
-        unknown
-      >[]
-    ).map((r) => ({
+  private decode(r: Record<string, unknown>): StoredPanel {
+    return {
       instanceId: r.id as string,
       definitionId: r.definition_id as string,
       entryPath: r.entry_path as string,
@@ -69,7 +64,20 @@ export class Store {
       ...(r.diagnostic_json
         ? { diagnostic: JSON.parse(r.diagnostic_json as string) as StoredPanel['diagnostic'] }
         : {}),
-    }));
+    };
+  }
+  all(): StoredPanel[] {
+    return (
+      this.db.prepare('SELECT * FROM panels ORDER BY created_at,id').all() as Record<
+        string,
+        unknown
+      >[]
+    ).map((row) => this.decode(row));
+  }
+  find(id: string): StoredPanel | undefined {
+    const row = this.db.prepare('SELECT * FROM panels WHERE id = ?').get(id) as
+      Record<string, unknown> | undefined;
+    return row ? this.decode(row) : undefined;
   }
   list(): PanelInstance[] {
     return this.all().map(
@@ -112,7 +120,7 @@ export class Store {
     };
   }
   get(id: string) {
-    const p = this.all().find((p) => p.instanceId === id);
+    const p = this.find(id);
     if (!p)
       throw new PaneonError('PANEL_NOT_FOUND', 'Panel instance not found.', { instanceId: id });
     return p;
@@ -125,6 +133,25 @@ export class Store {
       )
       .run(instanceId, revision, type, JSON.stringify(payload), createdAt);
     return { id: Number(result.lastInsertRowid), revision, type, payload, createdAt };
+  }
+  appendCurrent(instanceId: string, revision: string, type: string, payload: JsonValue) {
+    return this.db.transaction(() => {
+      const row = this.db
+        .prepare('SELECT status, revision FROM panels WHERE id = ?')
+        .get(instanceId) as { status: StoredPanel['status']; revision: string } | undefined;
+      if (!row) throw new PaneonError('PANEL_NOT_FOUND', 'Panel instance not found.');
+      if (row.status !== 'running')
+        throw new PaneonError(
+          row.status === 'closed' ? 'PANEL_CLOSED' : 'PANEL_UNAVAILABLE',
+          'The panel is not running.',
+        );
+      if (row.revision !== revision)
+        throw new PaneonError(
+          'PANEL_REVISION_MISMATCH',
+          'The panel source changed. Refresh before submitting an event.',
+        );
+      return this.append(instanceId, revision, type, payload);
+    })();
   }
   read(instanceId: string, consumer: string, limit: number) {
     this.get(instanceId);

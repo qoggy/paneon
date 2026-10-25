@@ -327,6 +327,11 @@ async function bootServer(
           ...(panel.diagnostic ? { diagnostic: panel.diagnostic } : {}),
         }),
       );
+      // Notifications and static content do not need an execution process.
+      // Reattach bounded source watching without pinning the panel to this socket.
+      void runtime.observe(instanceId).catch((err: unknown) => {
+        logging.logger.warn({ err, instanceId }, 'Panel source observation failed');
+      });
     },
   );
   let shuttingDown = false;
@@ -364,13 +369,9 @@ async function bootServer(
   app.get('/panels/:instanceId/:revision/*', async (request, reply) => {
     const p = params(request);
     runtime.store.get(p.instanceId);
-    const live = runtime.live.get(p.instanceId);
+    const compiled = runtime.artifact(p.instanceId, p.revision);
     const asset = p['*'];
-    if (
-      !live ||
-      live.compiled.manifest.revision !== p.revision ||
-      !live.compiled.manifest.assets.includes(asset)
-    )
+    if (!compiled || !compiled.manifest.assets.includes(asset))
       return reply.code(404).send({
         ok: false,
         error: { code: 'ASSET_NOT_FOUND', message: 'The browser asset does not exist.' },
@@ -382,7 +383,7 @@ async function bootServer(
     );
     return reply
       .type(mime[extname(asset)] ?? 'application/octet-stream')
-      .send(readFileSync(join(live.compiled.directory, 'client', asset)));
+      .send(readFileSync(join(compiled.directory, 'client', asset)));
   });
   app.get('/assets/*', async (request, reply) => {
     const asset = (request.params as { '*': string })['*'];

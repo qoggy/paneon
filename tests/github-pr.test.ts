@@ -267,3 +267,77 @@ void test('checks page through statusCheckRollup with stable IDs; query failure 
   f.set({ fail: 'checks' });
   await assert.rejects(f.client.checks(f.repository, f.session, d.detail.id), /checks failure/);
 });
+
+void test('fresh PR readers use browser evidence for checks, fixed diffs, review requests and old feedback', async () => {
+  const repository = 'example/project';
+  const session = randomUUID();
+  const read = (args: string[]) => Promise.resolve(routeGh(args, {}));
+  const first = await new GitHubReview(read).detail(repository, session, 101);
+  const comparison = await new GitHubReview(read)
+    .withEvidence(repository, session, { detail: first.detail })
+    .comparison(repository, session, first.detail.id);
+  const checks = await new GitHubReview(read)
+    .withEvidence(repository, session, { detail: first.detail })
+    .checks(repository, session, first.detail.id);
+  const snapshot = await new GitHubReview(read)
+    .withEvidence(repository, session, { detail: first.detail, comparison })
+    .diff(repository, session, comparison.id, 'src/a.ts');
+  assert.equal(snapshot.model?.newText, code(2));
+  const oldBody = first.snapshots.find((value) => value.source.kind === 'description');
+  assert.ok(oldBody);
+  const overview = first.snapshots.find((value) => value.source.kind === 'pull-request');
+  assert.ok(overview);
+  const evidence = [oldBody, overview, checks.snapshots[0], snapshot];
+  const reader = new GitHubReview(() =>
+    Promise.reject(new Error('Feedback must not read current GitHub content.')),
+  ).withEvidence(repository, session, { snapshots: evidence });
+  const result = reader.feedback(repository, session, {
+    annotations: [
+      {
+        id: 'old',
+        comment: '',
+        targets: [
+          {
+            ref: { sourceId: oldBody.id, kind: 'description' },
+            text: { start: 0, end: 1, quote: oldBody.body?.slice(0, 1) },
+          },
+          { ref: { sourceId: checks.snapshots[0].id, kind: 'check' } },
+          { ref: { sourceId: overview.id, kind: 'pull-request' } },
+          { ref: { sourceId: snapshot.id, kind: 'file' } },
+        ],
+      },
+    ],
+  });
+  assert.equal(Object.keys(result.sources).length, 4);
+  assert.throws(
+    () =>
+      new GitHubReview(read).withEvidence('another/project', session, { snapshots: [overview] }),
+    /identity/,
+  );
+  assert.deepEqual(
+    new GitHubReview(read)
+      .withEvidence(repository, session, { detail: first.detail })
+      .reviewRequest(repository, session, first.detail.id),
+    {
+      repository,
+      number: 101,
+      baseCommit: ids.base,
+      headCommit: ids.head,
+    },
+  );
+  assert.throws(
+    () =>
+      new GitHubReview(read).withEvidence(repository, session, {
+        snapshots: [{ ...oldBody, body: 'tampered' }],
+      }),
+    /content hash/,
+  );
+  assert.throws(
+    () =>
+      new GitHubReview(read).withEvidence(repository, session, {
+        detail: first.detail,
+        comparison: { ...comparison, headCommit: ids.base },
+      }),
+    /preserved detail/,
+  );
+});

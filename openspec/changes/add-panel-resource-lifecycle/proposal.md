@@ -1,26 +1,27 @@
 ## Why
 
-旧panel即使没有close，也不应各保留一个常驻进程。用户同时活跃使用不超过10个的前提下，固定panel总量时后台资源应收敛，并优先优化reload、响应与保活体验。事件38纠正了此前“每次调用结束立即归零”的错误优先级。
+很多未关闭的历史面板当前会在服务启动时逐一编译、启动 worker 和 watcher，拖慢就绪并使常驻资源随历史增长。用户已确认 B13：固定总量、最多十个活跃面板时后台资源有界，兼顾响应与保温体验。
 
 ## What Changes
 
-- B14待评审：全局最多2条、每条固定一个panel版本的有限复用线程；空闲60秒、100次调用或5分钟寿命后在任务边界回收。serverAction模块不进HTTP主线程，不在同一线程无限import不同panel。
-- B15待评审：复用现有可见页面WebSocket及15秒ping/pong，隐藏关闭通知、回来补一次状态。不新增30秒HTTP presence/90秒租约。隐藏useQuery仅暂停作者明确配置的refreshMs，不把所有页面自动变成轮询。
-- 沿用SQLite和manifest文件清单，主键读取与有界缓存，不预加载所有历史模块。C2待确认后有限回收生成版本目录；不删源码或SQLite事件。
-- 明确ctx.cwd、按任务signal/凭据、有限任务契约；复用线程不是跨请求业务状态存储。Git/PR原文由浏览器持有，PR去必需后台Map，UI不变；checkFeedback去留不纳入本次批准。
-- **BREAKING**：作者不能依赖每panel独立process.cwd或常驻模块变量；库需支持worker_threads。无旧专属进程回退。
+- 按 2026-10-25 用户确认，废弃 B14 的全局两个执行位置/线程方案，保留每面板 Node 子进程、cwd 和驻留期间的异步调用方式。
+- restore 不恢复历史执行/监听；静态产物、manifest、历史事件不依赖执行进程。
+- 默认十个驻留位置，LRU 只回收空闲位置；容量全忙时最多 32 项等待十秒，过期不执行。退出完成前仍计入容量。
+- 编译独立限一项；目标数据库读取与序列化清单缓存有界。
+- 冷唤醒检查有效产物与源码/版本，执行前重新检查身份；明确模块内存和后台工作可被淘汰。
+- B15 页面可见性策略不纳入本次实现。C2 当时未批准，随后用户于 2026-10-25 单独批准并由 `reclaim-generated-artifacts` 实施。
 
 ## Capabilities
 
 ### New Capabilities
 
-- panel-resource-lifecycle：全局有限复用、排队/超时/空闲回收、按需历史访问、可见连接源码引用、可选生成目录回收。
-- browser-owned-review-annotations：旧原文在浏览器，完整事件独立于先前线程，不重读最新文件解释旧批注。
+- panel-resource-lifecycle：懒恢复、独立产物访问、有界面板驻留与容量等待。
+- browser-owned-review-annotations：沿用页面持有原文和独立完整事件；不扩展 Git/PR UI 或业务来源校验。
 
 ### Modified Capabilities
 
-无。该在途change的旧B12按次销毁设计已撤回，未实施。
+无。不会新增 ctx.cwd、worker_threads 依赖或默认单 action 执行期限。
 
 ## Impact
 
-仓库paneon，分支0.0.x，复核基线5a04d9f0c2a45b2979e1d226387e3e9ef46023b7；有无关并行工作区修改。本轮只改设计与/tmp说明页，未开发产品或执行数据清理。B13目标已确认，B14/B15/C2待评审，接受设计不等于开发授权。
+涉及 runtime 生命周期、容量管理、产物读取、Store 主键查询和相关回归。用户已授权实施本次方案；不提交并行修改，不删除历史数据，不改变 Git/PR 交互与布局。

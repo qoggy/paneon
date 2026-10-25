@@ -1,64 +1,64 @@
 ## ADDED Requirements
 
-### Requirement: Converge backend resources independently of historical panels
+### Requirement: Restore identities without historical execution
 
-For fixed panel totals and up to ten actively used panels, the runtime SHALL bound execution, cache and framework watch resources rather than allocate a persistent execution process per panel. It SHALL prioritize finite reuse and responsive return/reload rather than require immediate zero threads after every call. Historical identities and submitted events SHALL remain.
+Service startup SHALL NOT compile or evaluate historical author modules or restore their execution processes/watchers. Logical open status SHALL remain independent of residency. Identities, submitted events and consumer positions SHALL remain unchanged.
 
-#### Scenario: Old panels remain unclosed
+#### Scenario: Many old panels remain open
 
-- **WHEN** many historical panels remain without active calls
-- **THEN** they SHALL NOT each retain an execution process, and a bounded warm pool MAY remain until its idle timeout
+- **WHEN** the service restarts with historical open panels
+- **THEN** it SHALL become available without starting their compilers, workers or watchers
 
-### Requirement: Reuse one fixed revision per bounded worker
+### Requirement: Bound per-panel residency with idle LRU
 
-Subject to B14 approval, at most two default workers SHALL exist globally across starting, busy, idle and retiring states. Each SHALL load only one fixed serverEntry/revision. Matching idle workers SHALL be reused; mismatched idle workers SHALL exit before replacement. Author modules and full schemas SHALL NOT execute on HTTP main.
+The default SHALL be at most ten resident panel positions, including initializing and retiring positions. A position MAY hold a watcher and at most one Node execution child with that panel's cwd and revision. Only positions without active initialization, builds, calls or event validation SHALL be ordinary LRU victims. Same-panel asynchronous calls SHALL retain their existing overlap behavior. B14's two-thread executor is withdrawn.
 
-#### Scenario: Three same-panel calls
+#### Scenario: Reach capacity
 
-- **WHEN** three calls for one revision arrive together in an empty default pool
-- **THEN** at most two threads SHALL start and the third call SHALL reuse a completed worker rather than create a third fresh worker
+- **WHEN** another panel needs a position at capacity and an idle position exists
+- **THEN** the least recently used idle position SHALL fully close its watcher and execution child before replacement starts
 
-### Requirement: Retire warmed workers at finite boundaries
+### Requirement: Bound capacity waiting independently of action execution
 
-Workers SHALL retire after60s idle,100 completed calls or5min age, with count/age retirement after the current task completes. Failed/cancelled/obsolete-revision workers SHALL not retain unknown background work for reuse. Per-job signal, context and secret references SHALL be released on completion. Cross-call mutable module state SHALL NOT be a supported business storage contract.
+When all positions are busy, new panel admissions SHALL wait in FIFO order with default 32 waiting admissions and 10 seconds waiting time. A full queue or expired admission SHALL fail explicitly without later execution or mutation replay. No default action execution timeout, thread migration or ctx.cwd API SHALL be introduced. Compilation SHALL have an independent single active position and bounded admission.
 
-#### Scenario: Idle and stale worker
+#### Scenario: Admission expires
 
-- **WHEN** a warmed worker remains idle until its deadline or changes revision
-- **THEN** it SHALL exit without discarding browser content or requiring user close
+- **WHEN** a cold panel cannot obtain capacity before its waiting deadline
+- **THEN** it SHALL return RUNTIME_BUSY and SHALL NOT execute when capacity later becomes available
 
-### Requirement: Separate queue waiting and execution deadlines
+### Requirement: Serve persisted content without execution
 
-The defaults SHALL be32 waiting tasks,10s waiting deadline and30s execution deadline. A not-yet-started request that expires SHALL fail without later execution or automatic replay. Termination SHALL retain worker capacity until actual exit; mutations with uncertain results SHALL not replay.
+Static assets and current manifests SHALL be read from existing compiled artifacts independently of live execution. Historical events/acks and manifest lookup SHALL NOT activate author code. Target records SHALL use indexed reads. Manifest cache SHALL be capped at 32 entries and 8MiB serialized bytes; oversized entries SHALL NOT stay cached.
 
-#### Scenario: Two long calls
+#### Scenario: Execution is cold and source is absent
 
-- **WHEN** a third call waits10s without starting
-- **THEN** it SHALL leave the queue with an explicit busy result, distinct from an execution timeout
+- **WHEN** existing static artifacts and submitted events are requested
+- **THEN** they SHALL remain readable without compiling missing source or starting execution
 
-### Requirement: Reuse notification channels for visible source references
+### Requirement: Activate valid revisions without implicit reload
 
-Subject to B15 approval, effective visibility SHALL combine host display and document visibility. Panel/preference notification sockets SHALL close while hidden and reconnect with one state synchronization on return. Watch dependencies SHALL aggregate visible sockets. Existing15s WebSocket protocol ping/pong MAY detect broken connections; no new30s HTTP presence reports or90s leases SHALL be added.
+Cold execution SHALL reuse valid compiled artifacts. Watch reactivation SHALL check source changes while unobserved; no-watch SHALL retain explicit source reload behavior. Paneon version changes SHALL be handled on use. Explicit reload or revision changes SHALL NOT add old-call preservation. Calls SHALL recheck revision and closed state after activation; event commits SHALL recheck immediately before persistence.
 
-#### Scenario: Hidden page with optional timed query
+#### Scenario: Wake an unchanged panel
 
-- **WHEN** a page becomes hidden
-- **THEN** its iframe/drafts SHALL remain, explicitly configured refreshMs timers and notification reconnects SHALL pause, and already-started business actions SHALL not be cancelled or replayed
+- **WHEN** an evicted panel receives a valid action for an unchanged revision
+- **THEN** the runtime SHALL load its bundle without recompilation
 
-### Requirement: Keep existing records and bound framework artifacts
+### Requirement: Bound source watching without coupling it to execution
 
-Records SHALL use indexed/projection reads without historical params-wide decoding. Static files SHALL not require a live worker; manifest metadata SHALL be capped at32 entries/8MiB. Subject to C2 approval, generated revisions SHALL retain current/previous successful versions plus active references and reclaim others without deleting source or submitted events. No DB schema migration/reset SHALL occur.
+Existing state WebSocket connections MAY activate a bounded source watcher and check freshness, but SHALL NOT pin residency or require an execution child merely for notifications. Source updates for watcher-only panels SHALL NOT create persistent execution children. This change SHALL NOT implement pending B15 visibility behavior or C2 generated-file deletion.
 
-#### Scenario: Fixed panel count with repeated reload
+#### Scenario: Open a static watch panel after restart
 
-- **WHEN** C2 is approved and a panel repeatedly builds new versions
-- **THEN** unreferenced generated versions outside retention SHALL be reclaimed, while source and SQLite events remain; arbitrary reclaimed revision URLs need not replay
+- **WHEN** its state connection is established
+- **THEN** its existing content SHALL remain available, its watching SHALL obey residency capacity, and no execution child SHALL be needed until actual execution
 
-### Requirement: Preserve explicit context and accurate isolation claims
+### Requirement: Preserve isolation and disclose eviction boundaries
 
-Actions SHALL use explicit ctx.cwd and bounded timeoutMs, supported libraries and awaited work. Thread isolation SHALL not be presented as an OS malicious-code/native-crash sandbox. Standalone prototypes SHALL not be presented as product memory or browser performance proof.
+Author schemas and handlers SHALL remain outside the HTTP main process. LRU MAY discard module memory and unmanaged background work; these SHALL NOT be durable storage/job contracts. Close and stop SHALL cancel admission, initialization and execution, wait for actual exit, retain history and never automatically replay mutations.
 
-#### Scenario: Action exits
+#### Scenario: Close during initialization
 
-- **WHEN** a module or handler calls process.exit or blocks synchronously
-- **THEN** the main server SHALL survive direct thread exit or enforce the deadline, while the task fails explicitly without automatic mutation replay
+- **WHEN** close arrives during queued or initializing execution
+- **THEN** unpublished work SHALL stop, its capacity SHALL remain accounted until disposal, and no execution SHALL be published afterward
