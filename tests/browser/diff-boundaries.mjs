@@ -9,7 +9,7 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-diff-boundaries-'));
 const evidence = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-diff-boundaries';
 let service, browser;
 try {
-  const { startServer } = await import(new URL('../../dist/runtime/server.js', import.meta.url));
+  const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url));
   await cp(new URL('../../skills/paneon/assets/shared/', import.meta.url), join(root, 'shared'), {
     recursive: true,
   });

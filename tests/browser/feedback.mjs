@@ -36,6 +36,37 @@ try {
   const editor = frame.locator('[data-annotation-editor]');
   const input = frame.getByRole('textbox', { name: '批注内容', exact: true });
   const marker = (number) => button(`批注 ${number}`);
+  const clickFloating = async (locator) => {
+    await locator.waitFor();
+    await locator.evaluate(async (element) => {
+      const editor = element.closest('[data-annotation-editor]');
+      if (editor) await Promise.all(editor.getAnimations({ subtree: true }).map((a) => a.finished));
+      if (!element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
+        throw new Error('The floating control must be painted before clicking.');
+    });
+    const bounds = await locator.boundingBox();
+    assert.ok(bounds);
+    const viewport = page.viewportSize();
+    assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= viewport.height);
+    assert.equal(
+      await locator.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.contains(
+          element.ownerDocument.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+        );
+      }),
+      true,
+      'The floating control is actually exposed to a physical pointer.',
+    );
+    // CDP scroll-into-view can scroll the document for a positioned portal. Use the visible hit target.
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  };
+  const fillEditor = async (text) => {
+    // Exercise the native keyboard selection/caret path in the contextual textarea.
+    await input.press('ControlOrMeta+A');
+    await input.press('Backspace');
+    if (text) await input.pressSequentially(text);
+  };
   const cli = async (...args) => {
     const output = await execute(
       process.execPath,
@@ -78,8 +109,8 @@ try {
   };
   const clearSelection = () => content.evaluate(() => document.getSelection().removeAllRanges());
   const save = async (comment = '') => {
-    await input.fill(comment);
-    await button('保存').click();
+    await fillEditor(comment);
+    await clickFloating(button('保存'));
     await editor.waitFor({ state: 'hidden' });
   };
   const annotate = async (selector, start, end, comment = '', endSelector = selector) => {
@@ -111,12 +142,12 @@ try {
   assert.equal(await content.evaluate(() => window.copyPrevented), false);
   assert.equal((await read()).events.length, 0);
   await button('批注').click();
-  await input.fill('暂不保存');
+  await fillEditor('暂不保存');
   await submitAnnotations(frame);
   await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
   assert.equal((await draft()).annotations.length, 0);
   assert.equal((await read()).events.length, 0);
-  await button('取消').click();
+  await clickFloating(button('取消'));
   assert.equal((await draft()).annotations.length, 0);
   assert.equal(await frame.locator('[data-annotation-marker]').count(), 0);
   // A physical mouse drag opens the action in normal browse mode.
@@ -136,28 +167,28 @@ try {
   assert.equal(value.annotations.length, 1);
   assert.equal(value.annotations[0].comment, '');
   const firstId = value.annotations[0].id;
-  await marker(1).click();
-  await input.fill('中文批注');
-  await button('取消').click();
+  await clickFloating(marker(1));
+  await fillEditor('中文批注');
+  await clickFloating(button('取消'));
   assert.equal((await draft()).annotations[0].comment, '');
-  await marker(1).click();
+  await clickFloating(marker(1));
   await save('中文批注');
   assert.equal((await draft()).annotations[0].id, firstId);
-  await marker(1).click();
-  await input.fill('Escape丢弃');
+  await clickFloating(marker(1));
+  await fillEditor('Escape丢弃');
   await page.keyboard.press('Escape');
   assert.equal((await draft()).annotations[0].comment, '中文批注');
 
   // Selecting another range is a new comment request, never an implicit merge into this edit.
-  await marker(1).click();
-  await input.fill('尚未保存的原批注');
+  await clickFloating(marker(1));
+  await fillEditor('尚未保存的原批注');
   await select(plain, 20, 24);
-  await button('批注').click();
+  // Selection itself raises the unsaved-editor guard; no second action is required.
   await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
   assert.equal(await input.inputValue(), '尚未保存的原批注');
   assert.equal((await draft()).annotations.length, 1);
   assert.equal((await draft()).annotations[0].targets.length, 1);
-  await button('取消').click();
+  await clickFloating(button('取消'));
   assert.equal((await draft()).annotations[0].comment, '中文批注');
 
   // locate() leaves native selection; ordinary controls cannot recapture it.
@@ -171,8 +202,8 @@ try {
   assert.deepEqual(await draft(), locatedDraft);
   assert.equal(await button('批注').count(), 0);
   await frame.locator(plain).scrollIntoViewIfNeeded();
-  await marker(1).click();
-  await button('删除批注').click();
+  await clickFloating(marker(1));
+  await clickFloating(button('删除批注'));
   assert.equal((await draft()).annotations.length, 0);
   await marker(1).waitFor({ state: 'hidden' });
 
@@ -191,8 +222,8 @@ try {
       { start: 3, end: 4, quote: '乙' },
     ],
   );
-  await marker(2).first().click();
-  await button('删除批注').click();
+  await clickFloating(marker(2).first());
+  await clickFloating(button('删除批注'));
   await annotate(
     '[data-testid="split"] span:first-child',
     0,
@@ -204,8 +235,8 @@ try {
     (await draft()).annotations[0].targets.map((target) => target.text),
     [{ start: 0, end: 2, quote: 'é' }],
   );
-  await marker(3).click();
-  await button('删除批注').click();
+  await clickFloating(marker(3));
+  await clickFloating(button('删除批注'));
 
   // Native selection across two registered sources creates one multi-target annotation.
   await clearSelection();
@@ -240,8 +271,8 @@ try {
   assert.equal(await marker(4).count(), 2);
   await annotate('[data-testid="card-b"] [data-annotation-text]', 0, 6, '独立批注');
   assert.equal((await draft()).annotations.length, 2);
-  await marker(5).click();
-  await button('删除批注').click();
+  await clickFloating(marker(5));
+  await clickFloating(button('删除批注'));
   assert.equal((await draft()).annotations[0].id, value.annotations[0].id);
 
   await annotate(plain, 5, 6, '家庭 emoji');
@@ -259,8 +290,8 @@ try {
 
   await annotate(plain, 16, 17);
   assert.equal((await draft()).annotations[2].targets[0].text.quote, 'é');
-  await marker(7).click();
-  await button('删除批注').click();
+  await clickFloating(marker(7));
+  await clickFloating(button('删除批注'));
   await annotate(plain, 22, 24, '同词不同位置');
   assert.equal((await draft()).annotations[2].targets[0].text.quote, '中文');
   await annotate(plain, 20, 24, '重叠范围');
@@ -275,10 +306,14 @@ try {
     new Set(overlapPositions.map(({ x, y }) => `${x}:${y}`)).size,
     overlapPositions.length,
   );
-  await marker(9).click();
-  await button('删除批注').click();
-  await marker(8).click();
-  await button('删除批注').click();
+  const beforeOverlapDelete = await draft();
+  const scrollBeforeOverlapDelete = await content.evaluate(() => scrollY);
+  await clickFloating(marker(9));
+  await clickFloating(button('删除批注'));
+  assert.deepEqual((await draft()).annotations, beforeOverlapDelete.annotations.slice(0, -1));
+  assert.equal(await content.evaluate(() => scrollY), scrollBeforeOverlapDelete);
+  await clickFloating(marker(8));
+  await clickFloating(button('删除批注'));
 
   await annotate(
     '[data-testid="mapped"] strong',
@@ -372,22 +407,22 @@ try {
     await input.waitFor();
     const dialogRect = await editor.boundingBox();
     assert.ok(dialogRect.x >= 0 && dialogRect.x + dialogRect.width <= 391);
-    await button('取消').click();
+    await clickFloating(button('取消'));
   }
   await page.setViewportSize({ width: 1100, height: 900 });
   await nestedMarker.click();
-  await button('删除批注').click();
+  await clickFloating(button('删除批注'));
 
   // Keyboard text selection produces the same action and a new independent comment.
   await select(plain, 0, 2, plain, true);
   await button('批注').focus();
   await page.keyboard.press('Enter');
-  await input.fill('键盘批注');
+  await fillEditor('键盘批注');
   await page.keyboard.press('ControlOrMeta+Enter');
   await editor.waitFor({ state: 'hidden' });
   const keyboardId = (await draft()).annotations.at(-1).id;
   await frame.locator(`[data-annotation-marker="${keyboardId}"]`).click();
-  await button('删除批注').click();
+  await clickFloating(button('删除批注'));
   assert.equal((await read()).events.length, 0, 'Saving and navigation never emit events.');
 
   // A narrower semantic reference maps through adapter source offsets, not quote searches.
@@ -403,7 +438,7 @@ try {
   await clickFixtureButton('Toggle bridge');
   await frame.getByTestId('bridge').scrollIntoViewIfNeeded();
   await bridgeMarker.click();
-  await button('删除批注').click();
+  await clickFloating(button('删除批注'));
 
   // Invalid programmatic ranges still fail, without destroying already saved comments.
   const beforeInvalid = (await draft()).annotations.length;
@@ -450,8 +485,7 @@ try {
   assert.equal((await read()).events.length, 0);
   await clearSelection();
   assert.deepEqual(errors, []);
-  if (process.env.PANEON_TEST_SCREENSHOTS) {
-    await mkdir(process.env.PANEON_TEST_SCREENSHOTS, { recursive: true });
+  {
     // A visible source can still sit at the iframe edge; center it before the native marker click.
     await frame.locator(plain).evaluate((element) => element.scrollIntoView({ block: 'center' }));
     await content.waitForFunction(() => {
@@ -464,17 +498,36 @@ try {
         number.top >= 0 && number.bottom <= innerHeight && Math.abs(number.top - text.top) < 40
       );
     });
-    await marker(6).click();
-    const anchored = await editor.boundingBox();
-    const number = await marker(6).boundingBox();
+    // Start before opening so a wrongly positioned first visible frame cannot be missed.
+    await content.evaluate(() => {
+      window.annotationFirstPaint = null;
+      const measure = () => {
+        const editor = document.querySelector('[data-annotation-editor]');
+        if (!editor?.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) {
+          requestAnimationFrame(measure);
+          return;
+        }
+        const marker = document.querySelector('[data-annotation-number="6"]');
+        window.annotationFirstPaint = {
+          anchored: editor.getBoundingClientRect().toJSON(),
+          number: marker.getBoundingClientRect().toJSON(),
+        };
+      };
+      requestAnimationFrame(measure);
+    });
+    await clickFloating(marker(6));
+    await content.waitForFunction(() => window.annotationFirstPaint !== null);
+    const { anchored, number } = await content.evaluate(() => window.annotationFirstPaint);
     assert.ok(anchored.x <= number.x && anchored.x + anchored.width > number.x);
     assert.ok(
       Math.abs(anchored.y + anchored.height - number.y) < 48,
       'Editor must be anchored on its first painted frame.',
     );
-    await page.screenshot({ path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-editor.png` });
-    await button('取消').click();
-    await page.screenshot({ path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-markers.png` });
+    if (process.env.PANEON_TEST_SCREENSHOTS)
+      await page.screenshot({ path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-editor.png` });
+    await clickFloating(button('取消'));
+    if (process.env.PANEON_TEST_SCREENSHOTS)
+      await page.screenshot({ path: `${process.env.PANEON_TEST_SCREENSHOTS}/comment-markers.png` });
   }
   console.log(
     'Contextual annotations: native/keyboard selection, empty Save, temporary edits/Cancel/Delete, stable numbered markers, multi-source text ranges, repeated/emoji/mapped ranges, nested scrolling, stale snapshots, locate races, frozen explicit submit/failure and CLI events/ack pass.',

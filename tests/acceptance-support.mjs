@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { prepareRuntimeHome } from './runtime-fixture.ts';
 
 export const execute = promisify(execFile);
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -94,6 +95,7 @@ export async function acceptance({ cliPath, fixturesPath, label = 'repository' }
   let failure;
   try {
     assert.equal((await command('server', 'status')).running, false);
+    prepareRuntimeHome(join(home, '.paneon'));
     browser = await chromium.launch({
       headless: true,
       ...(process.env.PANEON_TEST_BROWSER

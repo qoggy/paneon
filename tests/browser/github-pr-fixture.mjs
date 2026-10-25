@@ -17,10 +17,7 @@ export async function startGithubPRFixture() {
     await writeFile(join(bin, 'gh'), runner);
     await chmod(join(bin, 'gh'), 0o755);
     process.env.PATH = `${bin}:${previousPath}`;
-    const { startServer } = await import(
-      process.env.PANEON_TEST_RUNTIME_ENTRY ??
-        new URL('../../dist/runtime/server.js', import.meta.url).href
-    );
+    const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
     const skill = join(root, 'agent-skills/paneon');
     await cp(
       process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),

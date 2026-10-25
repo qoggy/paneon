@@ -5,10 +5,7 @@ import { join } from 'node:path';
 export async function startExplanationsFixture(
   names = ['dining-philosophers', 'sentinel-leap-array'],
 ) {
-  const { startServer } = await import(
-    process.env.PANEON_TEST_RUNTIME_ENTRY ??
-      new URL('../../dist/runtime/server.js', import.meta.url).href
-  );
+  const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
   const root = await mkdtemp(join(tmpdir(), 'paneon-explanations-'));
   let service;
   try {

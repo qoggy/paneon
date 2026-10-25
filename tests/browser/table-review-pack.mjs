@@ -17,6 +17,8 @@ try {
   );
   const [metadata] = JSON.parse(packed.stdout);
   const files = new Set(metadata.files.map((entry) => entry.path));
+  for (const file of ['dist/ui/index.js', 'dist/ui/index.d.ts'])
+    assert.ok(files.has(file), `Missing packaged public UI entry: ${file}`);
   for (const file of [
     'SKILL.md',
     'references/table.md',
@@ -26,7 +28,6 @@ try {
     'assets/panels/review/panel.tsx',
     'assets/panels/review/schema.ts',
     'assets/shared/markdown-annotation.tsx',
-    'assets/shared/markdown-annotation-mapper.ts',
     'assets/shared/markdown-annotation-schema.ts',
     'assets/shared/submission.ts',
   ])

@@ -90,10 +90,7 @@ export const formInput = {
 
 // Share this fixture with browser-driven acceptance; run a complete skill copy outside the repo.
 export async function startSkillPagesFixture() {
-  const { startServer } = await import(
-    process.env.PANEON_TEST_RUNTIME_ENTRY ??
-      new URL('../../dist/runtime/server.js', import.meta.url).href
-  );
+  const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
   const root = await mkdtemp(join(tmpdir(), 'paneon-skill-pages-'));
   let service;
   try {

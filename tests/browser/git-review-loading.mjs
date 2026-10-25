@@ -54,7 +54,7 @@ try {
   page.on('request', (request) => {
     if (request.url().includes('/actions/')) calls.push(request.postDataJSON()?.input);
   });
-  await frame.getByRole('button', { name: 'M long.ts', exact: true }).click();
+  await frame.getByRole('button', { name: 'M long.ts', exact: true }).dblclick();
   await frame.locator('[data-diff-source]').waitFor();
   const source = await frame.locator('[data-diff-source]').getAttribute('data-diff-source');
   const retained = await frame.locator('[data-diff-source]').elementHandle();
@@ -191,7 +191,7 @@ try {
   assert.equal(await frame.getByRole('button', { name: 'M long.ts', exact: true }).count(), 1);
   assert.equal(await frame.locator('[data-diff-source]').count(), 0);
   // Label/style follow preferences without accent callouts; binary diffs also collapse.
-  await frame.getByRole('button', { name: 'M long.ts', exact: true }).click();
+  await frame.getByRole('button', { name: 'M long.ts', exact: true }).dblclick();
   await button('收起文件差异').waitFor();
   const style = await button('收起文件差异').evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
@@ -231,7 +231,7 @@ try {
       `${type} omits default diff`,
     );
     if (type === 'changes') {
-      await frame.getByRole('button', { name: '未跟踪 · ? binary.bin', exact: true }).click();
+      await frame.getByRole('button', { name: '未跟踪 · ? binary.bin', exact: true }).dblclick();
       await button('收起文件差异').click();
       assert.equal(await frame.locator('[data-git-diff-scroll]').isVisible(), false);
     }

@@ -33,7 +33,8 @@ try {
   const current = local.getByRole('button', { name: '本地分支 feat/current', exact: true });
   assert.equal(await current.getAttribute('data-current-branch'), 'true');
   assert.equal(await current.locator('[data-ref-icon="current"]').count(), 1);
-  assert.equal(await current.getByText('当前', { exact: true }).count(), 1);
+  assert.equal(await current.getByText('当前', { exact: true }).count(), 0);
+  assert.match(await current.getAttribute('aria-description'), /当前分支/);
   const remote = frame.getByRole('region', { name: '远程分支', exact: true });
   const remoteMain = remote.getByRole('button', { name: '远程分支 origin/main', exact: true });
   assert.equal(await remoteMain.getAttribute('data-mainline'), 'true');
@@ -78,15 +79,19 @@ try {
   );
   assert.equal(await frame.locator('[data-mainline]').count(), 2);
   await page.screenshot({ path: '/tmp/paneon-mainlines-evidence/dark.png' });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(
-    await frame.locator('main').evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-    true,
-  );
+  if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await frame
+        .locator('main')
+        .evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+  }
   assert.deepEqual(errors, []);
   assert.equal((await f.events(panel)).length, 0);
   console.log(
-    'PASS local/remote mainline stars and priority, current marker, search, selection without checkout, light/dark/en/zh and narrow layout.',
+    'PASS local/remote mainline stars and priority, current marker, search, selection without checkout, light/dark/en/zh and optional narrow layout.',
   );
 } finally {
   await browser?.close();

@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acceptance, execute, repositoryRoot } from './acceptance-support.mjs';
 
+const installTimeout = Number(process.env.PANEON_TEST_INSTALL_TIMEOUT_MS ?? 600_000);
+assert.ok(Number.isSafeInteger(installTimeout) && installTimeout > 0);
 const scratch = await mkdtemp(join(tmpdir(), 'paneon-package-'));
 // Keep the source checkout's selected registry when npm changes working directory.
 const { stdout: registry } = await execute('npm', ['config', 'get', 'registry'], {
@@ -26,7 +28,7 @@ try {
     ['install', '--omit=dev', '--no-audit', '--no-fund', '--registry', registry.trim(), tarball],
     {
       cwd: install,
-      timeout: 180_000,
+      timeout: installTimeout,
       maxBuffer: 16 * 1024 * 1024,
     },
   );

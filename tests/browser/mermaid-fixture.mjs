@@ -4,10 +4,7 @@ import { join } from 'node:path';
 
 // This entry point does not drive a browser. CUA and the regression runner share it.
 export async function startMermaidFixture() {
-  const { startServer } = await import(
-    process.env.PANEON_TEST_RUNTIME_ENTRY ??
-      new URL('../../dist/runtime/server.js', import.meta.url).href
-  );
+  const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
   const root = await mkdtemp(join(tmpdir(), 'paneon-mermaid-'));
   let service;
   try {

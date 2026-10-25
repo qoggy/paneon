@@ -26,7 +26,7 @@ void test(
         '--input-type=module',
         '-e',
         `
-    import {startServer} from ${JSON.stringify(new URL('../dist/runtime/server.js', import.meta.url).href)};
+    import {startServer} from ${JSON.stringify(new URL('./runtime-fixture.ts', import.meta.url).href)};
     await startServer();
     console.log('ready');
   `,

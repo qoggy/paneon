@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 import { selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-annotation-api-'));

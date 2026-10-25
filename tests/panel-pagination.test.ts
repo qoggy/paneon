@@ -10,9 +10,8 @@ import type { PanelInstance } from '../src/shared/types.js';
 const { Store } = (await import(
   '../dist/runtime/' + 'store.js'
 )) as typeof import('../src/runtime/store.js');
-const { startServer } = (await import(
-  '../dist/runtime/' + 'server.js'
-)) as typeof import('../src/runtime/server.js');
+const { startServer } =
+  (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 const execute = promisify(execFile);
 
 void test(

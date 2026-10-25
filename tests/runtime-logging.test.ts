@@ -32,7 +32,7 @@ async function nextRecord(iterator: AsyncGenerator<LogEvent, void, unknown>) {
 const { createRuntimeLogging, logFiles, LOG_FILE_BYTES, LOG_RECORD_BYTES, logLevel } =
   await import('../dist/runtime/logging.js');
 const { readLogs, followLogs, formatRecord } = await import('../dist/cli/logs.js');
-const { startServer } = await import('../dist/runtime/server.js');
+const { startServer } = await import('./runtime-fixture.ts');
 function temporary(t: import('node:test').TestContext) {
   const home = mkdtempSync(join(tmpdir(), 'paneon-logging-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));

@@ -154,7 +154,7 @@ try {
   assert.match(copied, /"method": "copy"/);
   assert.ok(!lstatSync(join(home, '.claude/skills/paneon')).isSymbolicLink());
   assert.ok(existsSync(join(home, '.agents/skills/paneon/SKILL.md')));
-  assert.ok(existsSync(join(home, '.claude/skills/paneon/references/cli.md')));
+  assert.ok(existsSync(join(home, '.claude/skills/paneon/references/authoring.md')));
   const records = JSON.parse(readFileSync(join(home, '.paneon/skill-installations.json'), 'utf8'));
   assert.equal(records.installations.length, 2);
   assert.ok(!existsSync(join(project, '.paneon')));

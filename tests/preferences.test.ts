@@ -4,7 +4,8 @@ import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Preferences } from '../dist/runtime/preferences.js';
-import { startServer } from '../dist/runtime/server.js';
+import { startServer } from './runtime-fixture.ts';
+import { prepareRuntimeHome } from './runtime-fixture.ts';
 import WebSocket from 'ws';
 
 void test('UI config merges atomically, preserves unrelated keys, and retains state after a failed save', async () => {
@@ -105,6 +106,7 @@ void test('source and installed-style CLI config commands share the runtime and 
   const { fileURLToPath } = await import('node:url');
   const execute = promisify(execFile);
   const home = await mkdtemp(join(tmpdir(), 'paneon-preferences-cli-'));
+  prepareRuntimeHome(join(home, '.paneon'));
   const cli = fileURLToPath(new URL('../dist/cli/index.js', import.meta.url));
   const source = fileURLToPath(new URL('../src/cli/index.ts', import.meta.url));
   const run = async (entry: string, ...args: string[]) =>
@@ -125,6 +127,7 @@ void test('source and installed-style CLI config commands share the runtime and 
       ui: { theme: 'dark', language: 'zh-CN' },
     });
     assert.deepEqual(JSON.parse(await readFile(join(home, '.paneon/config.json'), 'utf8')), {
+      server: { port: 0 },
       ui: { theme: 'dark', language: 'zh-CN' },
     });
     await assert.rejects(

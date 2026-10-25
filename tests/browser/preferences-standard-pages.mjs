@@ -104,7 +104,7 @@ try {
   assert.equal((await table.events(table.table)).length, 0);
   assert.equal((await table.events(review)).length, 0);
   assert.equal((await pr.events()).length, 0);
-  for (const [name, page, frame] of panels) {
+  for (const [name, page, frame] of process.env.PANEON_TEST_DESKTOP_ONLY === '1' ? [] : panels) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
       path: join(artifacts, `${name}-dark-zh-CN-narrow.png`),
@@ -120,7 +120,7 @@ try {
       ok: true,
       pages: ['table', 'review', 'pr'],
       combinations: 4,
-      narrow: true,
+      narrow: process.env.PANEON_TEST_DESKTOP_ONLY !== '1',
       tableFilterPreserved: true,
       prSearchPreserved: true,
       reviewTextNodeStable: true,

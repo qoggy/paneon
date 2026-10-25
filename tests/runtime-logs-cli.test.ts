@@ -191,7 +191,7 @@ void test(
   async (t) => {
     const { home, env } = fixture(t);
     const loggingUrl = new URL('../dist/runtime/logging.js', import.meta.url).href;
-    const serverUrl = new URL('../dist/runtime/server.js', import.meta.url).href;
+    const serverUrl = new URL('./runtime-fixture.ts', import.meta.url).href;
     const child = spawn(
       process.execPath,
       [

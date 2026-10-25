@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-annotation-editor-'));
 const evidence = process.env.PANEON_TEST_SCREENSHOTS ?? '/tmp/paneon-annotation-editor-evidence';
@@ -188,6 +188,10 @@ try {
       assert.equal((await icon.textContent()).trim(), '');
       assert.equal(await icon.getAttribute('title'), null);
       await icon.focus();
+      // Exercise keyboard focus; programmatic focus after a pointer click is not focus-visible.
+      await icon.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      assert.equal(await icon.evaluate((element) => element.matches(':focus-visible')), true);
       await frame.locator('[data-slot=\"tooltip-content\"]').filter({ hasText: action }).waitFor();
       await icon.press('Escape');
       await frame

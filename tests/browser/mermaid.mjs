@@ -79,7 +79,10 @@ try {
       () =>
         contentFrame.evaluate(() =>
           [...document.body.children].every(
-            (element) => element.id === 'root' || element.tagName === 'SCRIPT',
+            (element) =>
+              element.id === 'root' ||
+              element.tagName === 'SCRIPT' ||
+              element.matches('[data-base-ui-portal][data-slot="toast-portal"]'),
           ),
         ),
       'Temporary rendering containers must eventually be removed.',
@@ -89,7 +92,12 @@ try {
       return {
         duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
         outsideRoot: [...document.body.children]
-          .filter((element) => element.id !== 'root' && element.tagName !== 'SCRIPT')
+          .filter(
+            (element) =>
+              element.id !== 'root' &&
+              element.tagName !== 'SCRIPT' &&
+              !element.matches('[data-base-ui-portal][data-slot="toast-portal"]'),
+          )
           .map((element) => element.outerHTML),
         markdownExecuted: window.__markdownExecuted === true,
       };

@@ -16,9 +16,8 @@ const { jsonValue } = (await import(
   '../dist/' + 'shared/types.js'
 )) as typeof import('../src/shared/types.js');
 import type { StoredPanel } from '../src/shared/types.js';
-const { startServer } = (await import(
-  '../dist/' + 'runtime/server.js'
-)) as typeof import('../src/runtime/server.js');
+const { startServer } =
+  (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 function temporary(fn: (root: string) => void) {
   const root = mkdtempSync(join(tmpdir(), 'paneon-test-'));
   try {

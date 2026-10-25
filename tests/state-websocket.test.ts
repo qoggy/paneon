@@ -6,9 +6,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WebSocket } from 'ws';
 
-const { startServer } = (await import(
-  '../dist/runtime/' + 'server.js'
-)) as typeof import('../src/runtime/server.js');
+const { startServer } =
+  (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 const { Store } = (await import(
   '../dist/runtime/' + 'store.js'
 )) as typeof import('../src/runtime/store.js');

@@ -655,12 +655,12 @@ export async function verifyGitLayout(f, page) {
       'true',
     'Selected commit did not update.',
   );
-  await frame.getByText('该范围没有文件改动。', { exact: true }).waitFor();
+  await frame.getByText('此提交没有文件改动', { exact: true }).waitFor();
   await page.unroute(queryUrl);
   await frame.locator('[data-commit-id]').first().click();
   await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).waitFor();
   // Returning from an empty commit still requires an explicit file selection.
-  await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).click();
+  await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).dblclick();
   await frame.locator('[data-code-side="new"][data-line="1"]').waitFor();
   const beforeFailure = await frame.locator('[data-diff-source]').elementHandle();
   await page.route(queryUrl, (route) =>
@@ -718,7 +718,7 @@ export async function verifyGitLayout(f, page) {
     'Appending history retains graph geometry.',
   );
   await frame.locator('[data-commit-id]').first().click();
-  await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).click();
+  await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).dblclick();
   await frame.locator('[data-diff-source]').waitFor();
   await verifyHistoryColumns(frame, page, layoutFrame, until);
   await verifyHistorySplit(frame, page, layoutFrame, until);
@@ -932,7 +932,7 @@ export async function verifyGitLayout(f, page) {
       (await frame.locator('[data-commit-id]').nth(1).getAttribute('aria-pressed')) === 'true',
     'Commit selection did not complete.',
   );
-  await frame.getByText('该范围没有文件改动。', { exact: true }).waitFor();
+  await frame.getByText('此提交没有文件改动', { exact: true }).waitFor();
   await frame.locator('[data-commit-id]').first().click();
   await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).waitFor();
   assert.equal(await frame.locator('[data-diff-source]').count(), 0);
@@ -980,8 +980,9 @@ export async function verifyGitLayout(f, page) {
     'Commit message follows the file list with only a small gap.',
   );
   assert.ok(
-    compactGeometry.files.height < 100,
-    'A one-file list does not reserve half the workbench.',
+    compactGeometry.files.height <= 130 &&
+      compactGeometry.files.height < compactGeometry.upper.height / 2,
+    'A one-file list respects the 8rem minimum without reserving half the workbench.',
   );
   assert.ok(
     compactGeometry.upper.bottom >= 980,

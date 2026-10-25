@@ -18,7 +18,7 @@ import {Page,Input,Markdown,CodeBlock,Mermaid,AnnotationRoot,AnnotationMenu,Anno
 import {DiffView} from './agent-skills/paneon/assets/shared/diff';
 import {appendFileSync} from 'node:fs';
 export const query=serverAction({kind:'query',input:z.object({}),handler:()=>{appendFileSync('preference-query-count','query\\n');return 'queried';}});
-function Body(){const [draft,setDraft]=useState('');const data=useQuery(query,{});const feedback=useAnnotations();const {theme,language}=useUI();return <Page title="Author title 原文"><output data-feedback className="sr-only">{JSON.stringify(feedback.value)}</output><output data-ui>{theme}/{language}</output><output data-query>{data.data}</output><Input aria-label="Author input" value={draft} onChange={e=>setDraft(e.target.value)}/><AnnotationMenu/><AnnotationText target="source">Source 原文 🙂 unchanged</AnnotationText><Markdown>{'# Author Markdown 原文\\n\\n**Strong** and [link](https://example.com)\\n\\n| A | B |\\n| - | - |\\n| 1 | 2 |'}</Markdown><CodeBlock code={'const greeting = "原文 🙂";\\n'} language="ts"/><Mermaid code={'flowchart LR\\n A[Original] --> B[源文]'}/><DiffView sourceId="fixed-source" oldPath="a.ts" newPath="a.ts" oldText={'const before = 1;\\n'} newText={'const after = 2;\\n'}/></Page>}
+function Body(){const [draft,setDraft]=useState('');const data=useQuery(query,{});const feedback=useAnnotations();const {theme,language}=useUI();return <Page title="Author title 原文"><output data-feedback className="sr-only">{JSON.stringify(feedback.value)}</output><output data-ui>{theme}/{language}</output><output data-query>{data.data}</output><Input aria-label="Author input" value={draft} onChange={e=>setDraft(e.target.value)}/><AnnotationMenu/><AnnotationText target="source">Source 原文 🙂 unchanged</AnnotationText><Markdown>{'# Author Markdown 原文\\n\\n**Strong** and [link](https://example.com)\\n\\n| A | B |\\n| - | - |\\n| 1 | 2 |'}</Markdown><CodeBlock code={'const greeting = "原文 🙂";\\n'} language="ts"/><Mermaid code={'flowchart LR\\n A[Original] --> B[源文]'}/><DiffView annotationTargets={{old:"fixed-source-old",new:"fixed-source-new"}} oldPath="a.ts" newPath="a.ts" oldText={'const before = 1;\\n'} newText={'const after = 2;\\n'}/></Page>}
 function Panel(){return <AnnotationRoot onSubmit={value=>agent.emit('feedback-submitted',value)}><Body/></AnnotationRoot>};export default definePanel({id:'preferences-probe',requires:{paneon:'0.0.0'},input:z.object({}),events:{'feedback-submitted':annotationValueSchema(z.string())},render:Panel});`,
   );
   const custom = await f.service.runtime.run(entry, f.root, {}, false);
@@ -63,7 +63,7 @@ function Panel(){return <AnnotationRoot onSubmit={value=>agent.emit('feedback-su
   await probe.goto(f.url(custom));
   const pf = probe.frameLocator('iframe');
   await pf.locator('[data-query]').getByText('queried', { exact: true }).waitFor();
-  await pf.locator('[data-slot="mermaid"] svg').waitFor();
+  await pf.locator('[data-slot="mermaid-diagram"] > [role="button"] > svg').waitFor();
   await pf.locator('[data-shiki-token]').first().waitFor();
   await pf.getByLabel('Author input', { exact: true }).fill('Draft 输入 🙂');
   await pf.locator('[data-annotation-text]').evaluate((element) => {
@@ -142,7 +142,7 @@ function Panel(){return <AnnotationRoot onSubmit={value=>agent.emit('feedback-su
       await token.evaluate((element) => element.firstChild === window.__originalToken),
       true,
     );
-    await pf.locator('[data-slot="mermaid"] svg').waitFor();
+    await pf.locator('[data-slot="mermaid-diagram"] > [role="button"] > svg').waitFor();
     const markdown = await pf.locator('.markdown-body').evaluate((element) => ({
       color: getComputedStyle(element).color,
       background: getComputedStyle(element).backgroundColor,

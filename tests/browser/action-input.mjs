@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-action-input-'));
 const value = 'dummy-"key\\line\t中文';

@@ -17,9 +17,11 @@ try {
   );
   const [metadata] = JSON.parse(packed.stdout),
     files = new Set(metadata.files.map((file) => file.path));
+  for (const file of ['dist/ui/index.js', 'dist/ui/index.d.ts'])
+    assert.ok(files.has(file), `Missing packaged public UI entry: ${file}`);
   for (const file of [
     'SKILL.md',
-    'references/github-pr.md',
+    'references/examples.md',
     'assets/examples/github-pr/panel.tsx',
     'assets/examples/github-pr/github.ts',
     'assets/examples/github-pr/model.ts',
@@ -28,7 +30,6 @@ try {
     'assets/shared/diff-model.ts',
     'assets/shared/diff-schema.ts',
     'assets/shared/markdown-annotation.tsx',
-    'assets/shared/markdown-annotation-mapper.ts',
   ])
     assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
   const installation = join(root, 'installation');

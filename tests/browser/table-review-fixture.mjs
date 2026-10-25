@@ -22,10 +22,7 @@ export const tableInput = {
   ],
 };
 export async function startTableReviewFixture() {
-  const { startServer } = await import(
-    process.env.PANEON_TEST_RUNTIME_ENTRY ??
-      new URL('../../dist/runtime/server.js', import.meta.url).href
-  );
+  const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
   const root = await mkdtemp(join(tmpdir(), 'paneon-table-review-'));
   let service;
   try {

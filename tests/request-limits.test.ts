@@ -11,9 +11,8 @@ import {
   requestBodyBytes,
 } from '../src/shared/limits.ts';
 
-const { startServer } = (await import(
-  '../dist/runtime/' + 'server.js'
-)) as typeof import('../src/runtime/server.js');
+const { startServer } =
+  (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 
 type Envelope = {
   ok: boolean;

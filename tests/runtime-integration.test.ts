@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { prepareRuntimeHome } from './runtime-fixture.ts';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -143,9 +144,8 @@ void test('real CLI watch choices, compact command results, English debug, and e
     entry,
     `import{definePanel,z}from'paneon/sdk';function Panel(){return <div>CLI</div>}export default definePanel({id:'cli',requires:{paneon:'0.0.0'},input:z.object({topic:z.string()}),events:{feedback:z.object({text:z.string()})},render:Panel});`,
   );
-  const { startServer } = (await import(
-    '../dist/runtime/' + 'server.js'
-  )) as typeof import('../src/runtime/server.js');
+  const { startServer } =
+    (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
   const service = await startServer(join(root, '.paneon'));
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
@@ -268,6 +268,7 @@ void test('actual SVG imports are handled by Vite and resource changes update th
 void test('a real daemon and CLI stop complete while a framework WebSocket stays open', async () => {
   const root = mkdtempSync(join(tmpdir(), 'paneon-stop-websocket-'));
   const home = join(root, '.paneon');
+  prepareRuntimeHome(home);
   const { Store } = (await import(
     '../dist/runtime/' + 'store.js'
   )) as typeof import('../src/runtime/store.js');

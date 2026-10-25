@@ -21,7 +21,7 @@ try {
   await frame.locator('[data-commit-id]').first().waitFor();
   await frame.locator('[data-commit-id]').first().click();
   await frame.locator('[data-file-id]').first().waitFor();
-  await frame.locator('[data-file-id]').first().click();
+  await frame.locator('[data-file-id]').first().dblclick();
   await frame.locator('[data-diff-source]').waitFor();
   const selectedFile = await frame
     .locator('[data-file-id][aria-pressed=true]')

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-management-navigation-'));
 const artifacts = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-management-navigation-evidence';

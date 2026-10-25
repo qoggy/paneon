@@ -49,13 +49,13 @@ try {
   await frame.locator('[data-file-scroll][aria-busy=true]').waitFor();
   await tab('分支/版本对比').click();
   await tab('未提交改动').click();
-  await frame.getByText('该范围没有文件改动。', { exact: true }).waitFor();
+  await frame.getByText('工作区干净', { exact: true }).waitFor();
   assert.equal(calls.length, 2, 'An interrupted listing must be loaded again on return.');
   release();
   await frame.getByRole('button', { name: '刷新', exact: true }).waitFor();
   await tab('提交记录').click();
   await tab('未提交改动').click();
-  await frame.getByText('该范围没有文件改动。', { exact: true }).waitFor();
+  await frame.getByText('工作区干净', { exact: true }).waitFor();
   assert.equal(calls.length, 2, 'A completed empty listing is reusable.');
   assert.deepEqual(errors, []);
   assert.equal((await fixture.events(panel)).length, 0);

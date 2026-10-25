@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const root = await mkdtemp(join(tmpdir(), 'paneon-query-lifecycle-'));

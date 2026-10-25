@@ -32,7 +32,7 @@ void test('host bridge binds a request to channel, instance, revision and a safe
       { ...request, method: 'credential', payload: { actionId: 'entry#read' } },
       identity,
     ),
-    true,
+    false,
   );
   assert.equal(
     validRequest({ ...request, method: 'credential', payload: { value: 'plaintext' } }, identity),

@@ -63,7 +63,6 @@ try {
   assert.equal(await frame.locator('[data-file-directory]').count(), 0);
   assert.equal(await files.first().locator('[data-file-parent]').textContent(), 'src/nested');
   assert.equal(await frame.locator('[data-git-diff-scroll]').count(), 0);
-  const firstId = await files.first().getAttribute('data-file-id');
   async function checkFileActivation() {
     const target = files.last();
     const id = await target.getAttribute('data-file-id');
@@ -99,6 +98,8 @@ try {
   // Restore no selection to exercise the toolbar's first-file fallback.
   await page.goto(f.url(changes));
   await waitForFiles(3);
+  // Working-change descriptors belong to this fresh listing, not the earlier page load.
+  const firstId = await files.first().getAttribute('data-file-id');
   assert.equal(await openDiff.isEnabled(), true);
   assert.equal(await toolbar.getByRole('button').count(), 4);
   for (const label of ['查看文件差异', '按目录分组', '全部展开', '全部折叠']) {
@@ -124,6 +125,7 @@ try {
     'Toolbar has two left and two right actions',
   );
   const beforePresentation = calls.length;
+  assert.equal(await frame.locator('[data-file-id][aria-pressed=true]').count(), 0);
   async function keyboardFold(trigger) {
     const id = await trigger.getAttribute('aria-controls');
     assert.ok(id, 'The fold trigger identifies its controlled content');
@@ -154,6 +156,7 @@ try {
   assert.equal(calls.length, beforePresentation, 'Grouping and folding do not query Git');
   await openDiff.click();
   await frame.locator('[data-diff-source]').waitFor();
+  assert.equal(await files.first().getAttribute('data-file-id'), firstId);
   assert.equal(
     await frame.locator('[data-file-id][aria-pressed=true]').getAttribute('data-file-id'),
     firstId,
@@ -239,23 +242,17 @@ try {
     },
   });
   await page.goto(f.url(empty));
-  await frame.getByText('该范围没有文件改动。', { exact: true }).waitFor();
-  assert.equal(await openDiff.isDisabled(), true);
-  assert.equal(await expand.isDisabled(), true);
-  assert.equal(await collapse.isDisabled(), true);
+  await frame.getByText('两个版本之间没有文件差异', { exact: true }).waitFor();
+  assert.equal(await toolbar.count(), 0, 'Empty comparisons hide the file toolbar.');
   await git('clean', '-fd');
   const emptyChanges = await f.run({
     ...params,
     initialView: { repositoryId: 'toolbar', type: 'changes' },
   });
   await page.goto(f.url(emptyChanges));
-  const emptyMessage = frame.getByText('该范围没有文件改动。', { exact: true });
+  const emptyMessage = frame.getByText('工作区干净', { exact: true });
   await emptyMessage.waitFor();
-  const toolbarBox = await toolbar.boundingBox();
-  const emptyBox = await emptyMessage.boundingBox();
-  assert.ok(emptyBox.y >= toolbarBox.y + toolbarBox.height, 'Empty state follows the toolbar');
-  assert.equal(await toolbar.getByRole('button').count(), 4);
-  assert.equal(await openDiff.isDisabled(), true);
+  assert.equal(await toolbar.count(), 0, 'A clean working tree hides the file toolbar.');
   assert.deepEqual(errors, []);
   assert.equal((await f.events(changes)).length, 0);
   console.log(JSON.stringify({ status: 'passed', artifacts, errors }));

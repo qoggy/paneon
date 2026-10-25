@@ -6,9 +6,8 @@ import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
 
-const { startServer } = (await import(
-  '../dist/runtime/' + 'server.js'
-)) as typeof import('../src/runtime/server.js');
+const { startServer } =
+  (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 const execute = promisify(execFile);
 const cliEntry = join(import.meta.dirname, '../dist/cli/index.js');
 type Envelope = {

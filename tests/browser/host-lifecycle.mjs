@@ -3,9 +3,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-const runtimeEntry =
-  process.env.PANEON_TEST_RUNTIME_ENTRY ??
-  new URL('../../dist/runtime/server.js', import.meta.url).href;
+const runtimeEntry = new URL('../runtime-fixture.ts', import.meta.url).href;
 const { startServer } = await import(runtimeEntry);
 const root = await mkdtemp(join(tmpdir(), 'paneon-host-lifecycle-'));
 const source = (title) =>

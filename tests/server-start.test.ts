@@ -10,6 +10,8 @@ import { promisify } from 'node:util';
 import { test } from 'node:test';
 import type { RuntimeDescriptor } from '../src/shared/types.js';
 import type { serverStatus, stopServer } from '../src/cli/client.js';
+import { Preferences } from '../dist/runtime/preferences.js';
+import { prepareRuntimeHome } from './runtime-fixture.ts';
 
 const execute = promisify(execFile);
 
@@ -34,11 +36,13 @@ void test(
     };
     try {
       assert.deepEqual(await run(cli, 'server', 'status'), { running: false, runtime: null });
+      assert.equal(new Preferences(join(home, '.paneon')).port, 49321);
+      prepareRuntimeHome(join(home, '.paneon'));
       const started = await run(cli, 'server', 'start');
       assert.equal(started.running, true);
       assert.ok(started.runtime);
       assert.ok(started.runtime.pid > 0);
-      assert.equal(started.runtime.port, 49321);
+      assert.ok(started.runtime.port > 0);
       assert.equal(started.runtime.host, '127.0.0.1');
       assert.equal('controlToken' in started.runtime, false);
       assert.deepEqual(await run(cli, 'server', 'status'), started);

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
-import { startServer } from '../../dist/runtime/server.js';
+import { startServer } from '../runtime-fixture.ts';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-production-runtime-'));
 const previousEnv = process.env.NODE_ENV;
