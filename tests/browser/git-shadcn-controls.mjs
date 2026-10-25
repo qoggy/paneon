@@ -59,7 +59,10 @@ try {
   await page.keyboard.press('Enter');
   assert.equal(await counter.textContent(), '1 / 3 处差异');
   await page.screenshot({ path: join(artifacts, 'git-diff.png'), fullPage: true });
-  const source = await frame.locator('[data-diff-source]').getAttribute('data-diff-source');
+  const diffText = await frame.locator('[data-diff-source]').innerText();
+  const selectedFile = await frame
+    .locator('[data-file-id][aria-pressed=true]')
+    .getAttribute('data-file-id');
   const changes = frame.getByRole('tab', { name: '未提交改动', exact: true });
   await changes.focus();
   await page.keyboard.press('ArrowRight');
@@ -74,7 +77,12 @@ try {
   await frame.getByRole('combobox', { name: '基线', exact: true }).waitFor();
   await frame.getByRole('tab', { name: '分支/版本对比', exact: true }).press('Home');
   await frame.locator('[data-diff-source]').waitFor();
-  assert.equal(await frame.locator('[data-diff-source]').getAttribute('data-diff-source'), source);
+  // The diff gets a new React ID when its tab remounts; the file and content must be restored.
+  assert.equal(await frame.locator('[data-diff-source]').innerText(), diffText);
+  assert.equal(
+    await frame.locator('[data-file-id][aria-pressed=true]').getAttribute('data-file-id'),
+    selectedFile,
+  );
   await frame.getByRole('tab', { name: '分支/版本对比', exact: true }).click();
   const mode = frame.getByRole('combobox', { name: '比较方式', exact: true });
   await mode.click();

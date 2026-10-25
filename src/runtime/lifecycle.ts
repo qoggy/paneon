@@ -261,6 +261,8 @@ export class Runtime extends EventEmitter {
         const current = this.assertOpen(panel, signal);
         let previous = this.live.get(current.instanceId);
         if (previous?.execution && !previous.execution.alive) previous.execution = undefined;
+        // A user action may have started execution while this watch reload was waiting.
+        const shouldExecute = refresh === 'watch' ? Boolean(previous?.execution) : execute;
         let compiled = previous?.compiled;
         if (!compiled) {
           try {
@@ -358,7 +360,7 @@ export class Runtime extends EventEmitter {
             createdWatcher = await this.watch(next, compiled, signal);
             live.watcher = createdWatcher;
           }
-          if (execute && !live.execution) {
+          if (shouldExecute && !live.execution) {
             createdExecution = new Execution(compiled, next);
             this.initializing.set(current.instanceId, createdExecution);
             await createdExecution.ready;

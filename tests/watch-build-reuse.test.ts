@@ -14,6 +14,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import pino from 'pino';
+import type { ResourcePool } from '../src/runtime/resource-pool.js';
+import type { SourceWatcher } from '../src/runtime/source-watcher.js';
 
 const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
@@ -187,6 +189,86 @@ void test(
     } finally {
       if (priorEnv === undefined) delete process.env.VITE_PANEON_REUSE_TEST;
       else process.env.VITE_PANEON_REUSE_TEST = priorEnv;
+      await runtime.stop();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'watch reload preserves an execution started while its resource acquisition was pending',
+  { timeout: 60000 },
+  async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'paneon-watch-wake-race-')));
+    const entry = join(root, 'panel.tsx');
+    const dependency = join(root, 'value.ts');
+    const home = join(root, 'data');
+    writeFileSync(dependency, "export const value='before';");
+    writeFileSync(entry, source(join(root, 'boots'), "import{value}from'./value';", 'value'));
+    let runtime = new Runtime(home, logger);
+    let release = () => {};
+    let reloading: Promise<void> | undefined;
+    try {
+      const panel = await runtime.run(entry, root, {}, true);
+      await runtime.stop();
+      runtime = new Runtime(home, logger);
+      const resources = runtime as unknown as { residents: ResourcePool; sources: SourceWatcher };
+      let onChange: (() => Promise<void>) | undefined;
+      // Drive the real runtime callback directly so the ordering does not depend
+      // on filesystem notifications or watcher startup timing.
+      resources.sources.subscribe = (_inputs, callback) => {
+        onChange = callback;
+        return Promise.resolve({ update: () => Promise.resolve(), close: () => Promise.resolve() });
+      };
+      await runtime.observe(panel.instanceId);
+      assert.equal(runtime.live.get(panel.instanceId)?.execution, undefined);
+      assert.ok(onChange);
+
+      let acquired = () => {};
+      const waiting = new Promise<void>((resolve) => {
+        acquired = resolve;
+      });
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const acquire = resources.residents.acquire.bind(resources.residents);
+      let pauseNext = true;
+      resources.residents.acquire = async (...args) => {
+        const pause = pauseNext;
+        pauseNext = false;
+        const lease = await acquire(...args);
+        if (pause) {
+          acquired();
+          await gate;
+        }
+        return lease;
+      };
+
+      reloading = onChange();
+      await waiting;
+      assert.deepEqual(
+        await runtime.invoke(panel.instanceId, panel.revision, 'panel.tsx#read', {}),
+        { count: 1, value: 'before', boot: true },
+      );
+      const previous = runtime.live.get(panel.instanceId)?.execution;
+      assert.ok(previous?.alive);
+      writeFileSync(dependency, "export const value='after';");
+      release();
+      await reloading;
+
+      const replacement = runtime.live.get(panel.instanceId)?.execution;
+      assert.ok(replacement?.alive, 'watch reload must replace the execution it stopped');
+      assert.notEqual(replacement.child.pid, previous.child.pid);
+      assert.equal(previous.alive, false);
+      const current = runtime.inspect(panel.instanceId);
+      assert.notEqual(current.revision, panel.revision);
+      assert.deepEqual(
+        await runtime.invoke(panel.instanceId, current.revision, 'panel.tsx#read', {}),
+        { count: 1, value: 'after', boot: true },
+      );
+    } finally {
+      release();
+      await reloading;
       await runtime.stop();
       rmSync(root, { recursive: true, force: true });
     }
