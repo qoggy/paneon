@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { readdirSync, rmSync, existsSync } from 'node:fs';
 import { PACKAGE_ROOT } from '../shared/paths.js';
 import { PaneonError } from '../shared/types.js';
-import type { Diagnostic } from '../shared/types.js';
+import type { Diagnostic, WatchInputs } from '../shared/types.js';
 import type { CompiledPanel } from './index.js';
 
 // Compilation is CPU-bound. Keep it outside the HTTP process so health/control
@@ -12,6 +12,7 @@ import type { CompiledPanel } from './index.js';
 export class CompilerProcess {
   readonly child: ChildProcess;
   readonly result: Promise<CompiledPanel>;
+  watchInputs?: WatchInputs;
   private cancelled = false;
   private panelRoot: string;
 
@@ -28,7 +29,13 @@ export class CompilerProcess {
       let output: CompiledPanel | undefined;
       let failure: Diagnostic | undefined;
       this.child.on('message', (raw: unknown) => {
-        const message = raw as { ok: boolean; data?: CompiledPanel; error?: Diagnostic };
+        const message = raw as {
+          ok: boolean;
+          data?: CompiledPanel;
+          error?: Diagnostic;
+          watchInputs?: WatchInputs;
+        };
+        this.watchInputs = message.watchInputs;
         if (message.ok && message.data) output = message.data;
         else if (message.error) failure = message.error;
       });

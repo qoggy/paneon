@@ -43,6 +43,16 @@ export type ActionManifest = {
   kind: 'query' | 'mutation';
   inputSchema: JsonValue;
 };
+export type BuildReuse = {
+  environment: string;
+  files: Record<string, string>;
+  paths: Record<string, 'file' | 'directory' | 'missing' | 'other'>;
+  outputs: Record<string, string>;
+};
+export type WatchInputs = {
+  files: Record<string, string>;
+  paths: BuildReuse['paths'];
+};
 export type Manifest = {
   inputSchema: JsonValue;
   definitionId: string;
@@ -53,6 +63,8 @@ export type Manifest = {
   serverEntry: string;
   assets: string[];
   dependencies: string[];
+  reuse?: BuildReuse;
+  watchInputs?: WatchInputs;
   actions: ActionManifest[];
   events: Record<string, JsonValue>;
 };

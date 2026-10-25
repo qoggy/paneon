@@ -13,7 +13,10 @@ import { createRectClipper } from './annotation-geometry';
 import type { ClippedRect } from './annotation-geometry';
 import { indexTextSegments, textSegmentsInRange } from './annotation-text-index';
 
-const schema = annotationValueSchema(z.unknown());
+let schema: ReturnType<typeof annotationValueSchema> | undefined;
+function getSchema() {
+  return (schema ??= annotationValueSchema(z.unknown()));
+}
 function frozen<T>(value: T): T {
   if (value && typeof value === 'object') {
     Object.values(value).forEach(frozen);
@@ -90,7 +93,7 @@ export class AnnotationStore<TRef> {
       throw new Error('Annotations cannot be edited while disabled or submitting.');
   }
   private save(value: AnnotationValue<TRef>, activeAnnotationId = this.state.activeAnnotationId) {
-    schema.parse(value);
+    getSchema().parse(value);
     const retained = new Set(
       value.annotations.flatMap((entry) => entry.targets.map(annotationTargetKey)),
     );
@@ -492,7 +495,7 @@ export class AnnotationStore<TRef> {
     this.publish({ submitting: true, error: null, pending: [], uiError: null });
     const value = frozen(copy(this.state.value));
     try {
-      schema.parse(value);
+      getSchema().parse(value);
       for (const [annotationIndex, annotation] of value.annotations.entries())
         for (const [targetIndex, target] of annotation.targets.entries()) {
           try {

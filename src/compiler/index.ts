@@ -17,11 +17,13 @@ import semver from 'semver';
 import { build, createServer } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { SourceSnapshot } from './source-snapshot.js';
+import { buildEnvironment, buildReuse, captureBuildEnvironment } from './build-inputs.js';
 import type { Graph } from './action-transform.js';
 import type { Plugin, ViteDevServer } from 'vite';
 import { PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
 import { PaneonError } from '../shared/types.js';
-import type { Manifest, JsonValue } from '../shared/types.js';
+import type { Manifest, JsonValue, WatchInputs } from '../shared/types.js';
+import { isLocalSource } from './watch-inputs.js';
 import {
   parseModule,
   staticRequirement,
@@ -66,9 +68,13 @@ function typecheck(entry: string, snapshot: SourceSnapshot) {
     esModuleInterop: true,
   };
   const host = ts.createCompilerHost(options);
+  host.fileExists = (file) => snapshot.exists(file, 'file');
+  host.directoryExists = (file) => snapshot.exists(file, 'directory');
   host.readFile = (file) => {
     try {
-      return snapshot.text(file);
+      return isLocalSource(file) && !file.endsWith('/package.json')
+        ? snapshot.track(() => snapshot.text(file))
+        : snapshot.text(file);
     } catch {
       return undefined;
     }
@@ -87,7 +93,12 @@ function typecheck(entry: string, snapshot: SourceSnapshot) {
           extension: ts.Extension.Dts,
           isExternalLibraryImport: true,
         };
-      const normal = ts.resolveModuleName(name, containingFile, options, host).resolvedModule;
+      const resolveNormal = () =>
+        ts.resolveModuleName(name, containingFile, options, host).resolvedModule;
+      const normal =
+        name.startsWith('.') && isLocalSource(containingFile)
+          ? snapshot.track(resolveNormal)
+          : resolveNormal();
       if (normal) return normal;
       return ts.resolveModuleName(name, join(PACKAGE_ROOT, 'package.json'), options, host)
         .resolvedModule;
@@ -156,15 +167,34 @@ function files(root: string): string[] {
   );
 }
 export type CompiledPanel = { manifest: Manifest; directory: string };
-export async function compilePanel(entry: string, panelRoot: string): Promise<CompiledPanel> {
+export async function compilePanel(
+  entry: string,
+  panelRoot: string,
+  onWatchInputs?: (inputs: WatchInputs) => void,
+): Promise<CompiledPanel> {
   entry = realpathSync(entry);
   const snapshot = new SourceSnapshot();
-  const readSource = (file: string) => snapshot.text(file);
+  try {
+    return await compileSnapshot(entry, panelRoot, snapshot);
+  } finally {
+    onWatchInputs?.(snapshot.watchInputs());
+  }
+}
+async function compileSnapshot(
+  entry: string,
+  panelRoot: string,
+  snapshot: SourceSnapshot,
+): Promise<CompiledPanel> {
+  const readSource = (file: string) => snapshot.track(() => snapshot.text(file));
+  const environment = buildEnvironment();
+  const environmentFiles = captureBuildEnvironment(snapshot, entry);
   const range = validateRequirement(entry, PACKAGE_VERSION, readSource);
   typecheck(entry, snapshot);
-  const client = createGraph(entry, 'client', readSource);
-  const server = createGraph(entry, 'server', readSource);
+  const isFile = (file: string) => snapshot.track(() => snapshot.exists(file, 'file'));
+  const client = createGraph(entry, 'client', readSource, isFile);
+  const server = createGraph(entry, 'server', readSource, isFile);
   const dependencySet = new Set([
+    ...environmentFiles,
     ...client.modules.keys(),
     ...server.modules.keys(),
     ...[...snapshot.files].filter(
@@ -187,14 +217,14 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
   const captureResource = (path: string) => {
     if (capturedResources.has(path)) return;
     capturedResources.add(path);
-    snapshot.read(path);
+    snapshot.track(() => snapshot.read(path));
     dependencySet.add(path);
     if (extname(path) === '.css')
       for (const match of snapshot
         .text(path)
         .matchAll(/(?:url\(|@import\s+)["']?(\.[^"'\s)]+)["']?/g)) {
         const candidate = resolve(dirname(path), match[1].split('?')[0]);
-        if (existsSync(candidate) && statSync(candidate).isFile())
+        if (snapshot.track(() => snapshot.exists(candidate, 'file')))
           captureResource(realpathSync(candidate));
       }
   };
@@ -205,27 +235,25 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
       const raw = id.split('?')[0];
       if (!existsSync(raw) || !statSync(raw).isFile()) return;
       const path = realpathSync(raw);
-      if (
-        path.includes('/node_modules/') ||
-        path.startsWith(realpathSync(temporary) + '/') ||
-        path.startsWith(join(PACKAGE_ROOT, 'dist') + '/')
-      )
+      if (path.startsWith(realpathSync(temporary) + '/')) return;
+      snapshot.read(path);
+      if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
         return;
       captureResource(path);
       if (extname(path) === '.css') return snapshot.text(path);
     },
-    generateBundle() {
-      for (const file of this.getModuleIds()) {
+    generateBundle(_options, bundle) {
+      const assets = Object.values(bundle).flatMap((output) =>
+        output.type === 'asset' ? output.originalFileNames : [],
+      );
+      for (const file of new Set([...this.getModuleIds(), ...assets])) {
         const raw = file.split('?')[0];
         if (!existsSync(raw) || !statSync(raw).isFile()) continue;
         const path = realpathSync(raw);
-        if (
-          path.includes('/node_modules/') ||
-          path.startsWith(realpathSync(temporary) + '/') ||
-          path.startsWith(join(PACKAGE_ROOT, 'dist') + '/')
-        )
-          continue;
+        if (path.startsWith(realpathSync(temporary) + '/')) continue;
         snapshot.read(path);
+        if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
+          continue;
         dependencySet.add(path);
       }
     },
@@ -317,6 +345,18 @@ export async function compilePanel(entry: string, panelRoot: string): Promise<Co
       dependencies,
       actions: metadata.actions,
       events: metadata.events,
+      watchInputs: snapshot.track(() => {
+        for (const path of dependencies) snapshot.read(path);
+        return snapshot.watchInputs();
+      }),
+      reuse: buildReuse(
+        snapshot,
+        temporary,
+        [...clientFiles, 'frame.html']
+          .map((file) => 'client/' + file)
+          .concat(files(join(temporary, 'server')).map((file) => relative(temporary, file))),
+        environment,
+      ),
     };
     writeFileSync(join(temporary, 'manifest.json'), JSON.stringify(manifest));
     rmSync(frameSource, { force: true });

@@ -219,10 +219,14 @@ function references(node: ts.Node, module: SourceModule) {
   visit(node);
   return refs;
 }
-function localPath(from: string, specifier: string): string | undefined {
+function localPath(
+  from: string,
+  specifier: string,
+  isFile = (path: string) => existsSync(path) && statSync(path).isFile(),
+): string | undefined {
   if (!specifier.startsWith('.')) return;
   const raw = resolve(dirname(from), specifier);
-  if (existsSync(raw) && statSync(raw).isFile() && !/\.[cm]?[jt]sx?$/.test(raw)) return;
+  if (isFile(raw) && !/\.[cm]?[jt]sx?$/.test(raw)) return;
   for (const path of [
     raw,
     raw + '.ts',
@@ -232,7 +236,7 @@ function localPath(from: string, specifier: string): string | undefined {
     resolve(raw, 'index.ts'),
     resolve(raw, 'index.tsx'),
   ])
-    if (existsSync(path) && statSync(path).isFile() && !path.endsWith('.css')) return path;
+    if (isFile(path) && !path.endsWith('.css')) return path;
   if (specifier.endsWith('.css')) return;
   throw new PaneonError('BUILD_FAILED', 'A local dependency could not be resolved.', {
     entryPath: from,
@@ -248,7 +252,9 @@ export function createGraph(
   entry: string,
   side: 'client' | 'server',
   readSource?: (file: string) => string,
+  isFile?: (file: string) => boolean,
 ): Graph {
+  const resolveLocal = (from: string, specifier: string) => localPath(from, specifier, isFile);
   const modules = new Map<string, SourceModule>();
   const selected = new Map<string, Set<ts.Statement>>();
   const selectedImports = new Map<string, Set<string>>();
@@ -303,7 +309,7 @@ export function createGraph(
     const imported = m.imports.get(name);
     if (imported) {
       selectedImports.get(file)!.add(name);
-      const local = localPath(file, imported.specifier);
+      const local = resolveLocal(file, imported.specifier);
       if (local) include(local, imported.imported);
       else if (
         side === 'client' &&
@@ -337,7 +343,7 @@ export function createGraph(
           for (const e of s.exportClause.elements) if (!e.isTypeOnly) names.add(e.name.text);
         } else if (s.exportClause) names.add(s.exportClause.name.text);
         else if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-          const path = localPath(file, s.moduleSpecifier.text);
+          const path = resolveLocal(file, s.moduleSpecifier.text);
           if (path)
             for (const name of exportedNames(path, branch)) if (name !== 'default') names.add(name);
         }
@@ -357,7 +363,7 @@ export function createGraph(
         !ts.isStringLiteral(s.moduleSpecifier)
       )
         return false;
-      const path = localPath(file, s.moduleSpecifier.text);
+      const path = resolveLocal(file, s.moduleSpecifier.text);
       return !path || hasExternalStar(path, branch);
     });
   }
@@ -410,7 +416,7 @@ export function createGraph(
           s.moduleSpecifier &&
           ts.isStringLiteral(s.moduleSpecifier)
         ) {
-          const path = localPath(file, s.moduleSpecifier.text);
+          const path = resolveLocal(file, s.moduleSpecifier.text);
           if (path && !hasExternalStar(path, branch)) continue;
           retainExport(file, s, '*');
           if (path) include(path, '*', branch);
@@ -431,14 +437,14 @@ export function createGraph(
             retainExport(file, s, exported);
             const name = binding.propertyName?.text ?? binding.name.text;
             if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-              const path = localPath(file, s.moduleSpecifier.text);
+              const path = resolveLocal(file, s.moduleSpecifier.text);
               if (path) include(path, name, branch);
             } else reference(file, name);
           } else if (s.exportClause.name.text === exported) {
             matched = true;
             retainExport(file, s, exported);
             if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-              const path = localPath(file, s.moduleSpecifier.text);
+              const path = resolveLocal(file, s.moduleSpecifier.text);
               if (path) include(path, '*', branch);
             }
           }
@@ -455,7 +461,7 @@ export function createGraph(
               !ts.isStringLiteral(s.moduleSpecifier)
             )
               continue;
-            const path = localPath(file, s.moduleSpecifier.text);
+            const path = resolveLocal(file, s.moduleSpecifier.text);
             if (
               path &&
               !exportedNames(path, branch).has(exported) &&
@@ -503,7 +509,7 @@ export function createGraph(
     }
     for (const a of m.actions.values()) if (side === 'server') select(file, a.statement);
     for (const imported of m.imports.values()) {
-      const path = localPath(file, imported.specifier);
+      const path = resolveLocal(file, imported.specifier);
       if (path) discover(path, imported.imported);
     }
     if (directExport(m, exported)) return;
@@ -519,7 +525,7 @@ export function createGraph(
           : [];
       if (names.length) matched = true;
       if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-        const path = localPath(file, s.moduleSpecifier.text);
+        const path = resolveLocal(file, s.moduleSpecifier.text);
         if (path) for (const name of names) discover(path, name, branch);
       }
     }
@@ -533,7 +539,7 @@ export function createGraph(
         !ts.isStringLiteral(s.moduleSpecifier)
       )
         continue;
-      const path = localPath(file, s.moduleSpecifier.text);
+      const path = resolveLocal(file, s.moduleSpecifier.text);
       if (
         path &&
         (exported === '*' ||

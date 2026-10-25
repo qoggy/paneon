@@ -1,4 +1,4 @@
-import { createServer, createServerModuleRunner } from 'vite';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { Action, PanelDefinition, ActionContext } from '../sdk/server.js';
 import { diagnostic, jsonValue, PaneonError } from '../shared/types.js';
@@ -31,21 +31,12 @@ async function handle(raw: unknown) {
     payload: unknown;
   };
   if (m.kind === 'init') {
-    const server = await createServer({
-      configFile: false,
-      root: process.cwd(),
-      logLevel: 'silent',
-      server: { middlewareMode: true },
-      appType: 'custom',
-      ssr: { external: ['node:fs', 'node:path'] },
-    });
-    const runner = createServerModuleRunner(server.environments.ssr);
-    const mod = await runner.import<
-      { default: PanelDefinition; __paneonActions?: Record<string, Action> } & Record<
-        string,
-        unknown
-      >
-    >(m.serverFile);
+    // The compiler already bundled this revision. Source watching and worker
+    // replacement belong to the parent runtime, so no dev server is needed here.
+    const mod = (await import(pathToFileURL(m.serverFile).href)) as {
+      default: PanelDefinition;
+      __paneonActions?: Record<string, Action>;
+    } & Record<string, unknown>;
 
     definition = mod.default;
     if (

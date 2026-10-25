@@ -43,7 +43,7 @@ type RenderProps = Omit<MarkdownProps, 'annotationTarget'> & {
   rootRef?: Ref<HTMLDivElement>;
   annotated?: boolean;
 };
-const MarkdownContent = memo(function MarkdownContent({
+const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   children,
   className,
   components: overrides,
