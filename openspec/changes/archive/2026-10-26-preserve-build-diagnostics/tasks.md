@@ -1,3 +1,5 @@
+2026-10-26：主 agent 已按用户要求从快照 `3d9f10b` 集成实现并在当前主工作区验证，见 verification.md。归档前已完成本地提交 `e97df32`，3.5 全部完成；原 worktree 已清理，快照保留。未推送。旧 CLI 参考文件已被后续变更删除，本轮不恢复该旧文档。
+
 ## 1. Scope and dispatch
 
 - [x] 1.1 记录用户确认、现有丢失点、结构/输出契约及独立 worktree 基线，保留其他未提交改动。
@@ -17,4 +19,4 @@
 - [x] 3.2 验证编译IPC、SQLite重读、CLI inspect/reload的stdout/stderr/退出码及debug一致性。
 - [x] 3.3 真实Chrome隔离实例验证原因/位置/片段、旧面板仍可用及成功恢复，保留截图。
 - [x] 3.4 worktree build、适当有界并发回归、lint/格式与OpenSpec strict通过，报告未完成和限制。
-- [ ] 3.5 主 agent 验收 worktree 结果，按实际差异合入、commit并清理 worktree；不推送。
+- [x] 3.5 主 agent 验收 worktree 结果，按实际差异合入、commit并清理 worktree；不推送。

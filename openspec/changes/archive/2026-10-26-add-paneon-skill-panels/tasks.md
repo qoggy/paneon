@@ -1,6 +1,6 @@
 # 任务与阶段记录
 
-当前未完成项仍为 3.5，原勾选和阶段编号保留。已完成条目中的“尚未实现”、旧 Feedback 名称、对象选择入口和 concurrency 示例描述记录的是当时进度；现行契约见 [design.md](design.md)、specs/ 及专题设计，不按历史任务文字复活旧 API 或已删除页面。并发讲解当前为 dining-philosophers；用户亲自体验 Sentinel 不由工程测试替代。
+2026-10-26，用户明确确认已体验 Sentinel 讲解页且“体验很好”；结合既有工程验收，3.5 已关闭。原阶段编号保留。已完成条目中的“尚未实现”、旧 Feedback 名称、对象选择入口和 concurrency 示例描述记录的是当时进度；现行契约见 [design.md](design.md)、specs/ 及专题设计，不按历史任务文字复活旧 API 或已删除页面。并发讲解当前为 dining-philosophers。
 
 ## 1. Requirement alignment and contract refinement — complete
 
@@ -119,7 +119,7 @@
 
 ## 2. Implementation — authorized
 
-首批、第二批及已开启的第三批均通过主 agent 验收并本地集成，记录见 verification.md。PR 示例、编译器重导出修复及仅 skill 指导已完成。CLI 安装器 2.13 已按 init-implementation.md 两组交付，并通过主 agent 单测/真实 PTY 验收；用户亲自体验 Sentinel 仍待进行；不将本 change 整体标记完成。
+首批、第二批及已开启的第三批均通过主 agent 验收并本地集成，记录见 verification.md。PR 示例、编译器重导出修复及仅 skill 指导已完成。CLI 安装器 2.13 已按 init-implementation.md 两组交付，并通过主 agent 单测/真实 PTY 验收；用户亲自体验 Sentinel 已于 2026-10-26 确认通过。
 
 - [x] 2.1 建立产品 skill 的入口、按页面读取的契约说明和资源目录；按 B10 随 CLI 同版本打包完整资源并纳入类型检查。
 - [x] 2.2 实现多问题方案选择页，覆盖无说明选择、附说明选择和自填答案。
@@ -184,7 +184,7 @@
 
 - [x] 3.4 在真实浏览器和独立安装产物验证公共反馈模块：自定义 TSX 导入、对象多选/文字范围、多条批注、复制和普通控件、定位及内容失效、失败保留草稿、明确提交及 CLI events/ack 读取；验证 SDK browser/default 和 UI 导出。
 
-- [ ] 3.5 验证表单/表格/Git/Markdown 的完整提交及修正、跨页/跨视图原文定位、失败保留、旧事件历史；验证真实只读 gh 查询与范围限制、两个一次性讲解页，并由用户体验 Sentinel。
+- [x] 3.5 验证表单/表格/Git/Markdown 的完整提交及修正、跨页/跨视图原文定位、失败保留、旧事件历史；验证真实只读 gh 查询与范围限制、两个一次性讲解页，并由用户体验 Sentinel。
 - [x] 3.6 验证 UTF-8 中文长反馈、事件 65536 字符边界和完整 HTTP 请求 262144 字节边界；验证文件输入在相同限制下得到清晰诊断。
 
 - [x] 3.7 第二批主 agent 验收：表格/Markdown/Git 与两个讲解页的源码和独立安装包 Chrome，原文范围、旧快照定位、完整更正及 CLI events/ack；85/85 回归、构建、lint/格式与规范校验。此项不表示真实 PR 集成或用户亲自体验 Sentinel 已完成。

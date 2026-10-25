@@ -66,7 +66,7 @@
 
 Markdown 原文适配复用公共 `Markdown`，通过可选 `components` 与 `rehypePlugins` 接入。组件合并默认 renderer 与覆盖项，保留 GFM、GitHub 样式和默认 Mermaid，不为 skill 复制一套渲染器，也不改变原始 HTML 默认禁用策略。正文显式注册的链接文字可参与连续源范围；普通点击仍使用链接自身行为，按钮/表单/反馈控件不参与文字选择。
 
-表格、Markdown 与 Git 实现和验证见 verification.md。Git 的缓存原文只在当前页面会话可用，不承诺刷新浏览器或源码更新后恢复。Sentinel 使用固定公开 commit 的教学模型，未声称执行 Java 或验证并发竞争。PR 与 skill-only 指南已交付；CLI 安装器已实现并验收，用户 Sentinel 体验尚未完成，不把整个 change 标记为完成。
+表格、Markdown 与 Git 实现和验证见 verification.md。Git 的缓存原文只在当前页面会话可用，不承诺刷新浏览器或源码更新后恢复。Sentinel 使用固定公开 commit 的教学模型，未声称执行 Java 或验证并发竞争。PR 与 skill-only 指南已交付；CLI 安装器已实现并验收，用户 Sentinel 体验已于 2026-10-26 明确确认通过，原话为“我体验过 Sentinel 讲解页了，体验很好”。
 
 验收发现 action-transform 的选择性重导出会保留整条导出却裁掉其部分依赖。例如 `export {first,second} from './values'` 仅被导入 first 时，values 只剩 first 而 barrel 仍导出 second。已修复并验证按实际导出名称/别名裁剪，未以全量服务端依赖打包到浏览器绕过。已交付 skill 共享模块采用直接依赖，页面验收不受该缺陷影响。
 
