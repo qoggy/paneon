@@ -298,18 +298,88 @@ try {
     await page.keyboard.press('ArrowRight');
     await page.screenshot({ path: join(evidence, 'mobile.png') });
   }
-  for (const kind of ['added', 'deleted', 'same']) {
+  for (const kind of [
+    'added',
+    'deleted',
+    'filled',
+    'cleared',
+    'same',
+    'spaces-old',
+    'spaces-new',
+    'empty',
+  ]) {
     await button(kind).click();
-    await page.waitForTimeout(120);
+    await frame.locator(`[data-reading-kind="${kind}"] [data-diff-source]`).waitFor();
     assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
-    assert.equal(
-      await frame
-        .locator('[data-code-side="' + (kind === 'deleted' ? 'old' : 'new') + '"]')
-        .count(),
-      340,
-    );
-    if (kind === 'same') assert.equal(await button('定位当前差异').isDisabled(), true);
+    const side = ['deleted', 'cleared'].includes(kind) ? 'old' : 'new';
+    const single = ['added', 'deleted', 'filled', 'cleared'].includes(kind);
+    assert.equal(await divider.count(), single ? 0 : 1);
+    assert.equal(await frame.locator('[data-diff-source-header]').count(), single ? 1 : 2);
+    assert.equal(await button('左右对比').getAttribute('aria-pressed'), 'true');
+    if (kind === 'empty') {
+      assert.equal(await frame.locator('[data-code-side]').count(), 0);
+    } else {
+      const fullSide = kind === 'spaces-new' ? 'old' : side;
+      assert.equal(await frame.locator(`[data-code-side="${fullSide}"]`).count(), 340);
+    }
+    if (single) {
+      const pane = frame.locator(`[data-diff-scroll="${side}"]`);
+      const width = await source.evaluate((element) => element.clientWidth);
+      assert.ok(
+        Math.abs((await pane.boundingBox()).width - width) <= 1,
+        `${kind} fills the code width`,
+      );
+      const header = frame.locator(`[data-diff-source-header="${side}"]`);
+      assert.ok(
+        Math.abs((await header.boundingBox()).width - width) <= 1,
+        `${kind} fills the header width`,
+      );
+      assert.ok((await header.innerText()).includes(side === 'old' ? '764da2f4' : 'ba6b313e'));
+      assert.equal(
+        await frame.locator(`[data-code-side="${side === 'old' ? 'new' : 'old'}"]`).count(),
+        0,
+      );
+      const color = await pane
+        .locator('[data-code-side]')
+        .first()
+        .evaluate((element) => getComputedStyle(element.closest('td')).backgroundColor);
+      assert.notEqual(color, 'rgba(0, 0, 0, 0)', 'single-side rows retain their change color');
+      for (const mode of ['单列对比', '左右对比']) {
+        await button(mode).click();
+        await button('收起上下文').click();
+        await button('定位当前差异').click();
+        assert.equal(await frame.locator(`[data-code-side="${side}"]`).count(), 340);
+        assert.equal(await divider.count(), 0);
+        await button('展开全部上下文').click();
+      }
+      if (kind === 'added' || kind === 'deleted') {
+        await selectDiffLines(frame, side, 1);
+        await annotations.write(`Single-side ${kind}`);
+        await annotations.save();
+        const draft = JSON.parse(await frame.locator('[data-reading-feedback]').textContent());
+        const target = draft.annotations.at(-1).targets[0];
+        assert.equal(target.ref.side, side);
+        assert.equal(target.ref.sourceId, kind);
+        assert.equal(target.ref.startLine, 1);
+        assert.equal(target.text.start, 0);
+        assert.ok(target.text.quote.startsWith('const line1'));
+      }
+      if (kind === 'added' || kind === 'deleted')
+        await page.screenshot({ path: join(evidence, `${kind}.png`) });
+    }
+    if (kind === 'spaces-old' || kind === 'spaces-new') {
+      const blankSide = kind === 'spaces-old' ? 'old' : 'new';
+      assert.equal(await frame.locator(`[data-code-side="${blankSide}"]`).textContent(), ' \r\n');
+    }
+    if (kind === 'same' || kind === 'empty')
+      assert.equal(await button('定位当前差异').isDisabled(), true);
   }
+  await button('changed').click();
+  await divider.waitFor();
+  assert.ok(
+    (await left()) < (await source.boundingBox()).width - 190,
+    'two-sided layout returns after source prop updates',
+  );
   await button('located').click();
   await page.waitForTimeout(120);
   const located = await frame.locator('[data-code-side="new"][data-line="12"]').boundingBox();
@@ -329,7 +399,7 @@ try {
     ),
   );
   console.log(
-    'PASS Diff reading: late first change/full context, sticky clipping, bounded scroll, pointer/keyboard/cancel/resize, one ratio across hunks and modes, independent horizontal panes, annotation, collapse state and Command+A; light/dark/en/zh screenshots.',
+    'PASS Diff reading: late first change/full context, sticky clipping, bounded scroll, pointer/keyboard/cancel/resize, shared split ratio, horizontal panes, annotations, collapse state, Command+A; full-width added/deleted/filled/cleared, whitespace and empty boundaries, prop updates, modes, exact annotation sides; light/dark/en/zh screenshots.',
     evidence,
   );
 } catch (error) {

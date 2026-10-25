@@ -1,5 +1,6 @@
 import { z } from 'paneon/sdk';
 import type { AnnotationTarget } from 'paneon/sdk';
+import type { DiffLocation } from 'paneon/ui';
 import { sourceLines } from './diff-model.ts';
 import type { DiffModel } from './diff-model.ts';
 export const gitRefSchema = z.intersection(
@@ -23,6 +24,45 @@ export const gitRefSchema = z.intersection(
   ]),
 );
 export type GitRef = z.infer<typeof gitRefSchema>;
+/** The Git/PR page owns its references; DiffView only registers them unchanged. */
+export function diffAnnotationTargets(model: DiffModel, sourceId: string) {
+  const targets: { old?: GitRef; new?: GitRef } = {};
+  for (const side of ['old', 'new'] as const) {
+    const source = side === 'old' ? model.oldText : model.newText;
+    if (!source) continue;
+    targets[side] = {
+      sourceId,
+      kind: 'lines',
+      side,
+      startLine: 1,
+      endLine: sourceLines(source).length,
+    };
+  }
+  return targets;
+}
+
+/** Convert the page's saved reference into coordinates in the full side source. */
+export function diffTargetLocation(
+  model: DiffModel,
+  target: AnnotationTarget<GitRef>,
+): DiffLocation {
+  diffTargetText(model, target);
+  const ref = target.ref;
+  if (ref.kind === 'file') return { kind: 'file' };
+  if (ref.kind === 'hunk')
+    return { kind: 'hunk', index: model.hunks.findIndex((hunk) => hunk.patch === ref.patch) };
+  const source = ref.side === 'old' ? model.oldText : model.newText;
+  const range = target.text;
+  if (source === undefined || !range) throw new Error('Missing diff text location.');
+  const offset = sourceLines(source)[ref.startLine - 1].start;
+  return {
+    kind: 'text',
+    side: ref.side,
+    start: offset + range.start,
+    end: offset + range.end,
+    quote: range.quote,
+  };
+}
 export function diffTargetText(
   model: DiffModel,
   target: AnnotationTarget<GitRef>,

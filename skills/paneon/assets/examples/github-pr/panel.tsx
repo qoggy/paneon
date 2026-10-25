@@ -43,7 +43,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from 'paneon/ui';
-import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
+import { DiffView } from '../../shared/diff.tsx';
+import type { DiffViewHandle } from '../../shared/diff.tsx';
+import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   GitHubReview,
@@ -184,8 +186,9 @@ function GithubPR() {
     [comparison, setComparison] = useState<PRComparison>(),
     [checks, setChecks] = useState<PRChecks>();
   const [selected, setSelected] = useState<PRSnapshot>(),
-    [old, setOld] = useState<PRSnapshot>(),
-    [locateTarget, setLocateTarget] = useState<Target<PRRef>>();
+    [old, setOld] = useState<PRSnapshot>();
+  const diffView = useRef<DiffViewHandle>(null);
+  const mountedDiff = useRef<string | undefined>(undefined);
   const [tabLoading, setTabLoading] = useState(false),
     [tabError, setTabError] = useState<string | { filename: string; error: string }>(''),
     [fileFilter, setFileFilter] = useState('');
@@ -498,10 +501,18 @@ function GithubPR() {
         },
         targetRanges(target: Target<PRRef>) {
           const snapshot = snapshots.current.get(target.ref.sourceId);
-          if (!snapshot?.model || !['file', 'hunk', 'lines'].includes(target.ref.kind)) return [];
-          return diffTargetRanges(
-            snapshot.model,
-            target as Target<Extract<PRRef, { kind: 'lines' | 'file' | 'hunk' }>>,
+          if (
+            !snapshot?.model ||
+            mountedDiff.current !== snapshot.id ||
+            (target.ref.kind !== 'file' &&
+              target.ref.kind !== 'hunk' &&
+              target.ref.kind !== 'lines')
+          )
+            return [];
+          return (
+            diffView.current?.getRanges(
+              diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
+            ) ?? []
           );
         },
         async locate(target) {
@@ -509,7 +520,6 @@ function GithubPR() {
             snapshot = snapshots.current.get(target.ref.sourceId);
           if (!snapshot) return;
           setOld(snapshot);
-          setLocateTarget(target);
           setTab(
             snapshot.source.kind === 'diff'
               ? 'files'
@@ -532,8 +542,12 @@ function GithubPR() {
             (target.ref.kind === 'file' ||
               target.ref.kind === 'hunk' ||
               target.ref.kind === 'lines')
-          )
-            locateDiffTarget(snapshot.model, { ...target, ref: target.ref });
+          ) {
+            if (mountedDiff.current !== snapshot.id) return;
+            await diffView.current?.reveal(
+              diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
+            );
+          }
         },
       }}
     >
@@ -1153,20 +1167,17 @@ function GithubPR() {
                               ) : (
                                 <DiffView
                                   key={displayedDiff.id}
-                                  sourceId={displayedDiff.id}
+                                  ref={(handle) => {
+                                    diffView.current = handle;
+                                    mountedDiff.current = handle ? displayedDiff.id : undefined;
+                                  }}
+                                  annotationTargets={diffAnnotationTargets(
+                                    displayedDiff.model,
+                                    displayedDiff.id,
+                                  )}
                                   model={displayedDiff.model}
                                   oldPath={displayedDiff.source.old?.path}
                                   newPath={displayedDiff.source.new?.path}
-
-                                  locateTarget={
-                                    locateTarget &&
-                                    (locateTarget.ref.kind === 'file' ||
-                                      locateTarget.ref.kind === 'hunk' ||
-                                      locateTarget.ref.kind === 'lines') &&
-                                    locateTarget.ref.sourceId === displayedDiff.id
-                                      ? { ...locateTarget, ref: locateTarget.ref }
-                                      : undefined
-                                  }
                                 />
                               )}
                             </>

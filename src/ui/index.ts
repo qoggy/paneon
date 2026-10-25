@@ -50,5 +50,5 @@ export { useUI } from './use-ui';
 export type { UIPreferences, UITheme, UILanguage, UIMessage } from './use-ui';
 
 export { DiffView } from './diff';
-export { diffTargetRanges, locateDiffTarget } from './diff-annotation';
-export type { DiffViewProps } from './diff';
+export type { DiffViewProps, DiffViewHandle } from './diff';
+export type { DiffLocation } from './diff-annotation';

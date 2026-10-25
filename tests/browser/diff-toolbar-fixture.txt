@@ -1,10 +1,11 @@
 import { FileDiffNotice } from './shared/file-diff-notice';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { definePanel, z } from 'paneon/sdk';
 import { Button, AnnotationRoot, AnnotationMenu } from 'paneon/ui';
-import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
+import { DiffView } from './shared/diff.tsx';
+import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
-import { diffTargetText } from './shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation, diffTargetText } from './shared/diff-schema.ts';
 import type { GitRef } from './shared/diff-schema.ts';
 
 const original = Array.from(
@@ -16,15 +17,22 @@ const modified = original
   .replace('original 45', 'changed 45')
   .replace('original 80', 'changed 80');
 function Panel() {
+  const diff = useRef<DiffViewHandle>(null);
   const [kind, setKind] = useState('changed');
-  const model = createDiffModel(original, kind === 'same' ? original : modified);
+  const model = useMemo(
+    () => createDiffModel(original, kind === 'same' ? original : modified),
+    [kind],
+  );
   return (
     <AnnotationRoot<GitRef>
       onSubmit={async () => {}}
       adapter={{
         resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-        targetRanges: (target) => diffTargetRanges(model, target),
-        locate: (target) => locateDiffTarget(model, target),
+        targetRanges: (target) =>
+          target.ref.sourceId === kind
+            ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
+            : [],
+        locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
       }}
     >
       <div className="flex flex-wrap items-center gap-2 p-2">
@@ -34,15 +42,18 @@ function Panel() {
         <AnnotationMenu />
       </div>
       <div data-toolbar-viewport className="h-[32rem] min-w-0 overflow-y-auto border">
-        {kind === 'binary' ? <FileDiffNotice oldPath="file.ts"
-newPath="file.ts"/> : <DiffView
-          sourceId={kind}
-          oldPath="file.ts"
-          newPath="file.ts"
-          oldText={original}
-          newText={kind === 'same' ? original : modified}
-
-        />}
+        {kind === 'binary' ? (
+          <FileDiffNotice oldPath="file.ts" newPath="file.ts" />
+        ) : (
+          <DiffView
+            key={kind}
+            ref={diff}
+            model={model}
+            annotationTargets={diffAnnotationTargets(model, kind)}
+            oldPath="file.ts"
+            newPath="file.ts"
+          />
+        )}
       </div>
     </AnnotationRoot>
   );

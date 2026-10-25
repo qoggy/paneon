@@ -1,27 +1,27 @@
-import type { AnnotationTarget as Target } from '../sdk/annotation';
-import type { DiffModel, DiffRef } from '../shared/diff-model';
-import { sourceLines } from '../shared/diff-model';
+import type { AnnotationTextRange } from '../sdk/annotation';
+import type { DiffModel } from '../shared/diff-model';
+import { validTextRange } from './annotation-selection';
 
-/** Exact DOM geometry for saved line-interval references.
+/** Display coordinates only; the owning page resolves business references. */
+export type DiffLocation =
+  | { kind: 'file' }
+  | { kind: 'hunk'; index: number }
+  | ({ kind: 'text'; side: 'old' | 'new' } & AnnotationTextRange);
+
+/** Exact DOM geometry for full-source text coordinates.
  * The same mapping powers location and contextual markers, without registering
  * overlapping text sources or searching repeated quotes. */
-export function diffTargetRanges(model: DiffModel, target: Target<DiffRef>): Range[] {
-  if (target.ref.kind !== 'lines' || !target.text) return [];
-  const ref = target.ref,
-    text = ref.side === 'old' ? model.oldText : model.newText;
-  if (text === undefined) return [];
-  const line = sourceLines(text)[ref.startLine - 1];
-  if (!line) return [];
-  const start = line.start + target.text.start,
-    end = line.start + target.text.end;
-  const root = document.querySelector<HTMLElement>(
-    `[data-diff-source="${CSS.escape(ref.sourceId)}"]`,
-  );
-  if (!root) return [];
-  const expected = text.slice(start, end);
-  if (expected !== target.text.quote) return [];
+export function diffLocationRanges(
+  root: HTMLElement,
+  model: DiffModel,
+  location: DiffLocation,
+): Range[] {
+  if (location.kind !== 'text') return [];
+  const text = location.side === 'old' ? model.oldText : model.newText;
+  if (text === undefined || !validTextRange(text, { ref: null, text: location })) return [];
+  const { start, end } = location;
   const ranges: Range[] = [];
-  root.querySelectorAll<HTMLElement>(`[data-code-side="${ref.side}"]`).forEach((element) => {
+  root.querySelectorAll<HTMLElement>(`[data-code-side="${location.side}"]`).forEach((element) => {
     let offset = Number(element.dataset.sourceStart);
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     let node: Node | null;
@@ -65,24 +65,53 @@ export function revealDiffElement(element: HTMLElement) {
 }
 
 /** Reveal the actual selected source fragment in its own scroll pane. */
-export function locateDiffTarget(model: DiffModel, target: Target<DiffRef>) {
-  const ranges = diffTargetRanges(model, target);
-  const first = ranges[0]?.startContainer.parentElement;
+export function revealDiffLocation(root: HTMLElement, model: DiffModel, location: DiffLocation) {
+  const ranges = diffLocationRanges(root, model, location);
+  const first =
+    location.kind === 'file'
+      ? root.querySelector<HTMLElement>('[data-diff-header]')
+      : location.kind === 'hunk'
+        ? root.querySelector<HTMLElement>(`[data-diff-hunk="${location.index}"]`)
+        : ranges[0]?.startContainer.parentElement;
   if (first) revealDiffElement(first);
   // Run after the public controller's default highlight. Separate ranges avoid
   // highlighting the opposite column between consecutive same-side rows.
-  requestAnimationFrame(() => {
+  let highlight: Highlight | undefined;
+  let shouldReveal = true;
+  const paint = () => {
+    if (!root.isConnected) return;
+    if (highlight && CSS.highlights?.get('paneon-diff-location') !== highlight) return;
+    // Syntax highlighting replaces Text nodes asynchronously. Always rebuild
+    // ranges from source coordinates rather than retaining detached DOM ranges.
+    const ranges = diffLocationRanges(root, model, location);
     // A source span can be wider than its pane: reveal the selected fragment,
     // rather than merely scrolling the whole line's start into view.
-    const viewport = first?.closest<HTMLElement>('[data-diff-scroll]');
+    const viewport =
+      ranges[0]?.startContainer.parentElement?.closest<HTMLElement>('[data-diff-scroll]');
     const bounds = ranges[0]?.getBoundingClientRect();
-    if (viewport && bounds) {
+    if (shouldReveal && viewport && bounds) {
       const clip = viewport.getBoundingClientRect();
       if (bounds.left < clip.left || bounds.right > clip.right)
         viewport.scrollLeft += bounds.left - clip.left - 16;
     }
-    document.getSelection()?.removeAllRanges();
-    if (CSS.highlights && typeof Highlight !== 'undefined')
-      CSS.highlights.set('paneon-diff-location', new Highlight(...ranges));
+    if (shouldReveal) document.getSelection()?.removeAllRanges();
+    shouldReveal = false;
+    if (location.kind === 'text' && CSS.highlights && typeof Highlight !== 'undefined') {
+      highlight = new Highlight(...ranges);
+      CSS.highlights.set('paneon-diff-location', highlight);
+    }
+  };
+  let frame = requestAnimationFrame(paint);
+  const observer = new MutationObserver(() => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(paint);
   });
+  if (location.kind === 'text')
+    observer.observe(root, { childList: true, characterData: true, subtree: true });
+  return () => {
+    cancelAnimationFrame(frame);
+    observer.disconnect();
+    if (highlight && CSS.highlights?.get('paneon-diff-location') === highlight)
+      CSS.highlights.delete('paneon-diff-location');
+  };
 }

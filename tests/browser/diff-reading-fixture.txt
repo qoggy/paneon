@@ -1,9 +1,10 @@
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { definePanel, z } from 'paneon/sdk';
-import { Button, AnnotationRoot, AnnotationMenu } from 'paneon/ui';
-import { DiffView, diffTargetRanges, locateDiffTarget } from './shared/diff.tsx';
+import { Button, AnnotationRoot, AnnotationMenu, useAnnotations } from 'paneon/ui';
+import { DiffView } from './shared/diff.tsx';
+import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
-import { diffTargetText } from './shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation, diffTargetText } from './shared/diff-schema.ts';
 import type { GitRef } from './shared/diff-schema.ts';
 const original = Array.from(
   { length: 340 },
@@ -13,17 +14,31 @@ const original = Array.from(
 const modified = original
   .replace('original 250', 'changed 250')
   .replace('original 290', 'changed 290');
+const sources: Record<string, [string | undefined, string | undefined]> = {
+  changed: [original, modified],
+  same: [original, original],
+  added: [undefined, modified],
+  deleted: [original, undefined],
+  filled: ['', modified],
+  cleared: [original, ''],
+  'spaces-old': [' \r\n', modified],
+  'spaces-new': [original, ' \r\n'],
+  empty: ['', ''],
+  located: [original, modified],
+};
+function Draft() {
+  const feedback = useAnnotations<GitRef>();
+  return (
+    <output data-reading-feedback className="sr-only">
+      {JSON.stringify(feedback.value)}
+    </output>
+  );
+}
 function Panel() {
+  const diff = useRef<DiffViewHandle>(null);
   const [kind, setKind] = useState('changed'),
     [collapsed, setCollapsed] = useState(false);
-  const model = useMemo(
-    () =>
-      createDiffModel(
-        kind === 'added' ? undefined : original,
-        kind === 'deleted' ? undefined : kind === 'same' ? original : modified,
-      ),
-    [kind],
-  );
+  const model = useMemo(() => createDiffModel(...sources[kind]), [kind]);
   const target = useMemo(
     () =>
       kind === 'located'
@@ -42,7 +57,9 @@ function Panel() {
   );
   useLayoutEffect(() => {
     if (!target) return;
-    const frame = requestAnimationFrame(() => locateDiffTarget(model, target));
+    const frame = requestAnimationFrame(() => {
+      void diff.current?.reveal(diffTargetLocation(model, target));
+    });
     return () => cancelAnimationFrame(frame);
   }, [target, model]);
   return (
@@ -50,13 +67,17 @@ function Panel() {
       onSubmit={async () => {}}
       adapter={{
         resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-        targetRanges: (target) => diffTargetRanges(model, target),
-        locate: (target) => locateDiffTarget(model, target),
+        targetRanges: (target) =>
+          target.ref.sourceId === kind
+            ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
+            : [],
+        locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
       }}
     >
+      <Draft />
       <div className="h-24 p-3">Diff reading acceptance</div>
       <div className="flex flex-wrap gap-1 p-2">
-        {['changed', 'same', 'added', 'deleted', 'located'].map((value) => (
+        {Object.keys(sources).map((value) => (
           <Button
             key={value}
             onClick={() => {
@@ -71,6 +92,7 @@ function Panel() {
         <AnnotationMenu />
       </div>
       <div
+        data-reading-kind={kind}
         data-reading-viewport
         className="h-[28rem] min-w-0 overflow-auto rounded-md border"
         hidden={collapsed}
@@ -79,9 +101,9 @@ function Panel() {
         <DiffView
           defaultExpanded
           key={kind}
-          sourceId={kind}
+          ref={diff}
+          annotationTargets={diffAnnotationTargets(model, kind)}
           model={model}
-          locateTarget={target}
           oldPath="packages/application/reader.ts"
           newPath="packages/application/reader.ts"
           oldRevision="764da2f4"

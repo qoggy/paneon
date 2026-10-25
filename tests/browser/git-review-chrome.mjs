@@ -182,6 +182,66 @@ try {
         });
       }
   }
+  // Git review reuses the public DiffView for whole-file additions and deletions.
+  await prefs('light', 'zh-CN');
+  await writeFile(
+    join(f.repo, 'single-added.ts'),
+    Array.from({ length: 340 }, (_, i) => `export const addedLine${i + 1} = ${i + 1};\n`).join(''),
+  );
+  await git(f.repo, 'add', 'single-added.ts');
+  await git(f.repo, 'rm', 'reading.ts');
+  await git(f.repo, 'commit', '-qm', 'Add and delete whole files');
+  const singleCommit = await git(f.repo, 'rev-parse', 'HEAD');
+  const singleStatuses = await git(
+    f.repo,
+    'diff',
+    '--name-status',
+    `${singleCommit}^`,
+    singleCommit,
+  );
+  assert.match(singleStatuses, /^A\tsingle-added\.ts$/m);
+  assert.match(singleStatuses, /^D\treading\.ts$/m);
+  for (const [file, side] of [
+    ['single-added.ts', 'new'],
+    ['reading.ts', 'old'],
+  ]) {
+    const singlePanel = await f.run({
+      ...f.params,
+      initialView: { repositoryId: 'web', type: 'history', commit: singleCommit, file },
+    });
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.goto(f.url(singlePanel));
+    const pane = frame.locator(`[data-diff-scroll="${side}"]`);
+    await pane.waitFor();
+    assert.equal(await frame.getByText(/^(?:Mode|模式)[:：]/).count(), 0);
+    assert.equal(await frame.locator('[data-diff-divider]').count(), 0);
+    assert.equal(await frame.locator('[data-diff-source-header]').count(), 1);
+    assert.equal(await frame.locator(`[data-code-side="${side}"]`).count(), 340);
+    const sourceWidth = (await frame.locator('[data-diff-source]').boundingBox()).width;
+    assert.ok(Math.abs((await pane.boundingBox()).width - sourceWidth) <= 1);
+    assert.ok(
+      Math.abs(
+        (await frame.locator(`[data-diff-source-header="${side}"]`).boundingBox()).width -
+          sourceWidth,
+      ) <= 1,
+    );
+    await selectDiffLines(frame, side, 1);
+    await comments.write(`Whole file ${side}`);
+    await comments.save();
+    await submitAnnotations(frame);
+    for (let i = 0; i < 100 && (await f.events(singlePanel)).length === 0; i++)
+      await page.waitForTimeout(50);
+    const target = (await f.events(singlePanel))[0].payload.annotations[0].targets[0];
+    assert.equal(target.ref.side, side);
+    assert.equal(target.ref.startLine, 1);
+    assert.equal(target.text.start, 0);
+    assert.ok(
+      target.text.quote.startsWith(
+        side === 'old' ? 'export const line1' : 'export const addedLine1',
+      ),
+    );
+    await page.screenshot({ path: join(evidence, `single-${side}.png`) });
+  }
   // A plain string consumer has no AnnotationRoot and retains document scrolling.
   const plainEntry = join(
     f.root,
@@ -219,7 +279,7 @@ export default definePanel({id:'plain-diff',requires:{paneon:'0.0.0'},input:z.ob
     JSON.stringify({ pass: true, left, total, initial, after, geometry, errors, crashes }, null, 2),
   );
   console.log(
-    'PASS Git chrome: initial branch proportions, removed duplicate copy, accessible current branch, body-only vertical viewport, stable headers, centred changes, registered text annotations, native Command+A, theme screenshots; no page errors.',
+    'PASS Git chrome: initial branch proportions, removed duplicate copy, accessible current branch, body-only vertical viewport, stable headers, centred changes, registered text annotations, native Command+A, theme screenshots; full-width added/deleted files and submitted annotation sides; no page errors.',
     evidence,
   );
 } catch (error) {

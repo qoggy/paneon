@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { writeFile, mkdir, rm, chmod, symlink } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import {
   readGit as readGitListing,
@@ -383,6 +383,46 @@ void test('hunk/line targets reject altered patches and non-source positions', (
       text: { start: 0, end: 1, quote: 'a' },
     }),
   );
+});
+void test('mode notes describe permission/type changes without repeating file additions and deletions', async () => {
+  const f = await fixture();
+  try {
+    const params = { repositories: [{ id: 'empty', path: f.empty }] };
+    await writeFile(join(f.empty, 'removed.txt'), 'removed\n');
+    await writeFile(join(f.empty, 'script.sh'), '#!/bin/sh\necho hello\n');
+    await writeFile(join(f.empty, 'link'), 'ordinary file\n');
+    await git(f.empty, 'add', '.');
+    await git(f.empty, 'commit', '-qm', 'Mode baseline');
+    await rm(join(f.empty, 'removed.txt'));
+    await writeFile(join(f.empty, 'added.txt'), 'new content\n');
+    await chmod(join(f.empty, 'script.sh'), 0o755);
+    await rm(join(f.empty, 'link'));
+    await symlink('script.sh', join(f.empty, 'link'));
+    await git(f.empty, 'add', '-A');
+    const listing = await readGit(params, { repositoryId: 'empty', type: 'changes' });
+    for (const [path, status] of [
+      ['added.txt', 'A'],
+      ['removed.txt', 'D'],
+    ]) {
+      const snapshot = required(
+        listing.snapshots.find((s) => (s.source.new?.path ?? s.source.old?.path) === path),
+      );
+      assert.equal(snapshot.status, status);
+      assert.deepEqual(snapshot.notes, []);
+      assert.deepEqual(snapshot.notesUI, []);
+    }
+    const script = required(listing.snapshots.find((s) => s.source.new?.path === 'script.sh'));
+    assert.equal(script.model.oldText, script.model.newText);
+    assert.deepEqual(script.notes, ['Mode: 100644 → 100755']);
+    assert.deepEqual(script.notesUI, [
+      { key: 'Mode: {old} → {next}', params: { old: '100644', next: '100755' } },
+    ]);
+    const link = required(listing.snapshots.find((s) => s.source.new?.path === 'link'));
+    assert.ok(link.notes.includes('Mode: 100644 → 120000'));
+    assert.ok(link.notes.some((note) => note.startsWith('Symbolic link:')));
+  } finally {
+    await f.close();
+  }
 });
 void test('conflicts, gitlinks, invalid UTF-8 and external diff config are represented without content substitution', async () => {
   const f = await fixture();

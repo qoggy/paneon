@@ -1,0 +1,162 @@
+import { Component, useRef, useState, type ReactNode } from 'react';
+import { agent, annotationValueSchema, definePanel, z } from 'paneon/sdk';
+import {
+  AnnotationMenu,
+  AnnotationRoot,
+  Button,
+  DiffView,
+  useAnnotations,
+  type DiffViewHandle,
+} from 'paneon/ui';
+
+type Ref = { documentId: string; version: string } | boolean | null;
+const before = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
+const after = before.replace('line 80', 'changed 80');
+const quote = '重复';
+const start = after.indexOf(quote, after.indexOf('line 12'));
+const location = {
+  kind: 'text' as const,
+  side: 'new' as const,
+  start,
+  end: start + quote.length,
+  quote,
+};
+
+class Boundary extends Component<{ children: ReactNode }, { error?: string }> {
+  state: { error?: string } = {};
+  static getDerivedStateFromError(error: Error) {
+    return { error: error.message };
+  }
+  render() {
+    return this.state.error ? (
+      <output data-expected-error>{this.state.error}</output>
+    ) : (
+      this.props.children
+    );
+  }
+}
+function Draft() {
+  const state = useAnnotations<Ref>();
+  return (
+    <>
+      <output data-diff-draft className="sr-only">
+        {JSON.stringify(state.value)}
+      </output>
+      <output data-submit-error>{state.error}</output>
+    </>
+  );
+}
+function Annotated() {
+  const diff = useRef<DiffViewHandle>(null);
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [updated, setUpdated] = useState(false);
+  const [geometry, setGeometry] = useState('');
+  return (
+    <AnnotationRoot<Ref>
+      onSubmit={async (value) => {
+        await agent.emit('annotations-submitted', value);
+      }}
+    >
+      <AnnotationMenu />
+      <Draft />
+      <Button onClick={() => setOnlyNew(true)}>Only new</Button>
+      <Button onClick={() => setUpdated(true)}>Refresh source</Button>
+      <Button onClick={() => setUpdated(false)}>Restore source</Button>
+      <Button
+        onClick={async () => {
+          await diff.current?.reveal(location);
+          const ranges = diff.current?.getRanges(location) ?? [];
+          setGeometry(
+            JSON.stringify({
+              count: ranges.length,
+              quote: ranges.map((range) => range.toString()).join(''),
+              scoped: ranges.every((range) =>
+                range.startContainer.parentElement?.closest('[data-testid="annotated"]'),
+              ),
+              stale: diff.current?.getRanges({ ...location, quote: '错误' }).length,
+            }),
+          );
+        }}
+      >
+        Reveal hidden text
+      </Button>
+      <Button
+        onClick={() => {
+          void diff.current?.reveal({ kind: 'hunk', index: 0 });
+        }}
+      >
+        Reveal hunk
+      </Button>
+      <output data-geometry>{geometry}</output>
+      <div data-testid="annotated" className="h-96 overflow-auto border">
+        <DiffView<Ref>
+          ref={diff}
+          oldText={before}
+          oldPath="file.ts"
+          newPath="file.ts"
+          newText={updated ? after.replace('line 12', 'replaced 12') : after}
+          annotationTargets={{
+            old: onlyNew ? undefined : { documentId: 'plan-a', version: 'before' },
+            new: { documentId: 'plan-a', version: 'after' },
+          }}
+        />
+      </div>
+      <div data-testid="falsy">
+        <DiffView<Ref>
+          oldText="same"
+          newText="same"
+          defaultExpanded
+          annotationTargets={{ old: false, new: null }}
+        />
+      </div>
+    </AnnotationRoot>
+  );
+}
+function Panel() {
+  const plain = useRef<DiffViewHandle>(null);
+  return (
+    <main className="p-4">
+      <h1>Diff annotation API</h1>
+      <Button
+        onClick={() => {
+          void plain.current?.reveal(location);
+        }}
+      >
+        Reveal plain text
+      </Button>
+      <div data-testid="plain" className="h-64 overflow-auto border">
+        <DiffView
+          ref={plain}
+          oldText={before}
+          newText={after}
+          oldPath="file.ts"
+          newPath="file.ts"
+        />
+      </div>
+      <Annotated />
+      <Boundary>
+        <DiffView oldText="a" newText="b" annotationTargets={{ new: 'missing-root' }} />
+      </Boundary>
+      <AnnotationRoot onSubmit={async () => {}}>
+        <Boundary>
+          <DiffView
+            oldText="same"
+            newText="same"
+            annotationTargets={{ old: 'duplicate', new: 'duplicate' }}
+          />
+        </Boundary>
+      </AnnotationRoot>
+    </main>
+  );
+}
+export default definePanel({
+  id: 'diff-annotations',
+  requires: { paneon: '0.0.0' },
+  input: z.object({}),
+  events: {
+    'annotations-submitted': annotationValueSchema(
+      z.union([z.object({ documentId: z.string(), version: z.string() }), z.boolean(), z.null()]),
+    ),
+  },
+  render: Panel,
+});

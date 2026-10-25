@@ -2,7 +2,7 @@ import { FileDiffNotice } from '../../shared/file-diff-notice';
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { agent, definePanel, usePanelInput } from 'paneon/sdk';
-import type { AnnotationValue, AnnotationTarget as Target } from 'paneon/sdk';
+import type { AnnotationValue } from 'paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -25,8 +25,13 @@ import {
   TabsList,
   TabsTrigger,
 } from 'paneon/ui';
-import { DiffView, diffTargetRanges, locateDiffTarget } from '../../shared/diff.tsx';
-import { diffTargetText } from '../../shared/diff-schema.ts';
+import { DiffView } from '../../shared/diff.tsx';
+import type { DiffViewHandle } from '../../shared/diff.tsx';
+import {
+  diffAnnotationTargets,
+  diffTargetLocation,
+  diffTargetText,
+} from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
 import { checkFeedback, queryGitRevisions } from './actions.ts';
 import { RevisionPicker } from './revision-picker.tsx';
@@ -88,7 +93,9 @@ function Review() {
   }, [params, view.request.repositoryId, view.request.type, revisionRefresh]);
   const [oldSnapshot, setOldSnapshot] = useState<GitSnapshot>();
   const [oldFileSelected, setOldFileSelected] = useState(false);
-  const [locateTarget, setLocateTarget] = useState<Target<GitRef>>();
+  const diffView = useRef<DiffViewHandle>(null);
+  const mountedDiff = useRef<string | undefined>(undefined);
+  const locating = useRef(0);
   const [fileReveal, setFileReveal] = useState(0);
   const [fileGrouping, setFileGrouping] = useState<Record<string, boolean>>({});
   const submission = useSubmission<AnnotationValue<GitRef>>(
@@ -358,22 +365,25 @@ function Review() {
             };
           }
         },
-        targetRanges(target: Target<GitRef>) {
+        targetRanges(target) {
           const snapshot = snapshots.current.get(target.ref.sourceId);
-          return snapshot ? diffTargetRanges(snapshot.model, target) : [];
+          return snapshot && mountedDiff.current === snapshot.id
+            ? (diffView.current?.getRanges(diffTargetLocation(snapshot.model, target)) ?? [])
+            : [];
         },
         async locate(target) {
+          const serial = ++locating.current;
           const snapshot = snapshots.current.get(target.ref.sourceId);
           if (snapshot) {
             setOldSnapshot(snapshot);
             setOldFileSelected(true);
             setCollapsed(false);
-            setLocateTarget(target);
             setFileReveal((value) => value + 1);
             await new Promise<void>((done) =>
               requestAnimationFrame(() => requestAnimationFrame(() => done())),
             );
-            locateDiffTarget(snapshot.model, target);
+            if (serial !== locating.current || mountedDiff.current !== snapshot.id) return;
+            await diffView.current?.reveal(diffTargetLocation(snapshot.model, target));
           }
         },
       }}
@@ -755,14 +765,15 @@ function Review() {
                         ) : (
                           <DiffView
                             key={selected.id}
-                            sourceId={selected.id}
+                            ref={(handle) => {
+                              diffView.current = handle;
+                              mountedDiff.current = handle ? selected.id : undefined;
+                            }}
+                            annotationTargets={diffAnnotationTargets(selected.model, selected.id)}
                             model={selected.model}
                             defaultExpanded
                             layout="bounded"
                             onCollapse={collapseDiff}
-                            locateTarget={
-                              locateTarget?.ref.sourceId === selected.id ? locateTarget : undefined
-                            }
                             oldPath={selected.source.old?.path}
                             newPath={selected.source.new?.path}
                             oldRevision={

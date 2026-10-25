@@ -1,15 +1,25 @@
 import { useUI } from './use-ui';
-import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { Ref } from 'react';
 import { Button } from './button';
 import { CodeBlock } from './code-block';
 import { useAnnotations } from './annotation-context';
-import type { AnnotationTarget as Target } from '../sdk/annotation';
-import { createDiffModel, diffChanges, sourceLines } from '../shared/diff-model';
+import { annotationKey } from '../sdk/annotation';
+import type { JsonValue } from '../sdk/annotation';
+import { createDiffModel, diffChanges } from '../shared/diff-model';
 import type { DiffLine, DiffModel, DiffRow } from '../shared/diff-model';
-import type { DiffRef } from '../shared/diff-model';
 import { DiffToolbar } from './diff-toolbar';
 import { useDiffSplit } from './diff-split';
-import { revealDiffElement } from './diff-annotation';
+import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
+import type { DiffLocation } from './diff-annotation';
 function splitRows(rows: DiffRow[]) {
   const result: { old?: DiffLine; new?: DiffLine; kind: DiffRow['kind'] }[] = [];
   for (let i = 0; i < rows.length;) {
@@ -29,8 +39,15 @@ function splitRows(rows: DiffRow[]) {
   }
   return result;
 }
-export type DiffViewProps = {
-  sourceId?: string;
+export type DiffViewHandle = {
+  /** Expands the required context and reveals coordinates after the DOM is ready. */
+  reveal(location: DiffLocation): Promise<void>;
+  getRanges(location: DiffLocation): Range[];
+};
+export type DiffViewProps<TRef = JsonValue> = {
+  ref?: Ref<DiffViewHandle>;
+  /** References are delivered unchanged as target.ref; an omitted side cannot be annotated. */
+  annotationTargets?: { old?: TRef; new?: TRef };
   model?: DiffModel;
   oldText?: string;
   newText?: string;
@@ -39,23 +56,28 @@ export type DiffViewProps = {
   oldRevision?: string;
   newRevision?: string;
   defaultExpanded?: boolean;
-  locateTarget?: Target<DiffRef>;
   onCollapse?: () => void;
   /** Opt into a bounded code viewport; ordinary document consumers retain natural flow. */
   layout?: 'document' | 'bounded';
 };
-/** String diff needs no provider; supplying sourceId opts into the existing annotation adapter. */
-export function DiffView(props: DiffViewProps) {
-  return props.sourceId ? <AnnotatedDiffView {...props} /> : <StringDiffView {...props} />;
+/** Display needs no provider; supplying side references opts into AnnotationRoot. */
+export function DiffView<TRef = JsonValue>(props: DiffViewProps<TRef>) {
+  return props.annotationTargets?.old !== undefined ||
+    props.annotationTargets?.new !== undefined ? (
+    <AnnotatedDiffView {...props} />
+  ) : (
+    <StringDiffView {...props} />
+  );
 }
-function AnnotatedDiffView(props: DiffViewProps) {
-  const feedback = useAnnotations<DiffRef>();
+function AnnotatedDiffView<TRef>(props: DiffViewProps<TRef>) {
+  const feedback = useAnnotations<TRef>();
   return <StringDiffView {...props} feedback={feedback} />;
 }
 
 /** Pure display/coordinate adapter: no repository, local Git call or source lookup. */
-function StringDiffView({
-  sourceId: suppliedSourceId,
+function StringDiffView<TRef>({
+  ref,
+  annotationTargets,
   model: supplied,
   oldText,
   newText,
@@ -64,13 +86,24 @@ function StringDiffView({
   oldRevision,
   newRevision,
   defaultExpanded = false,
-  locateTarget,
   onCollapse,
   layout = 'document',
   feedback,
-}: DiffViewProps & { feedback?: ReturnType<typeof useAnnotations<DiffRef>> }) {
-  const localSourceId = useId();
-  const sourceId = suppliedSourceId ?? localSourceId;
+}: DiffViewProps<TRef> & { feedback?: ReturnType<typeof useAnnotations<TRef>> }) {
+  const sourceId = useId();
+  const oldKey =
+    annotationTargets?.old === undefined ? undefined : annotationKey(annotationTargets.old);
+  const newKey =
+    annotationTargets?.new === undefined ? undefined : annotationKey(annotationTargets.new);
+  if (oldKey !== undefined && oldKey === newKey)
+    throw new Error('DiffView old and new annotation targets must be different.');
+  const targets = useMemo(
+    () => ({
+      old: oldKey === undefined ? undefined : (JSON.parse(oldKey) as TRef),
+      new: newKey === undefined ? undefined : (JSON.parse(newKey) as TRef),
+    }),
+    [oldKey, newKey],
+  );
   const { t, message } = useUI();
   const model = useMemo(
     () => supplied ?? createDiffModel(oldText, newText),
@@ -81,35 +114,36 @@ function StringDiffView({
   const registerText = feedback?.registerText;
   const root = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({
-    sourceId,
+    model,
     defaultExpanded,
-    locateTarget,
     unified: false,
-    expanded: locateTarget ? locateTarget.ref.kind === 'lines' : defaultExpanded,
+    expanded: defaultExpanded,
     index: 0,
+    reveal: 0,
   });
-  const sourceChanged = view.sourceId !== sourceId || view.defaultExpanded !== defaultExpanded;
-  const targetChanged = view.locateTarget !== locateTarget;
-  if (sourceChanged || targetChanged) {
+  const sourceChanged = view.model !== model || view.defaultExpanded !== defaultExpanded;
+  if (sourceChanged) {
     setView({
       ...view,
-      sourceId,
+      model,
       defaultExpanded,
-      locateTarget,
-      index: sourceChanged ? 0 : view.index,
-      unified: targetChanged && locateTarget ? false : view.unified,
-      expanded:
-        targetChanged && locateTarget
-          ? locateTarget.ref.kind === 'lines'
-          : sourceChanged
-            ? defaultExpanded
-            : view.expanded,
+      index: 0,
+      expanded: defaultExpanded,
     });
   }
   const { unified, expanded } = view;
+  // Decide from whole source texts, never from an individual hunk or trimmed content.
+  const sides: ('old' | 'new')[] =
+    !model.oldText && model.newText
+      ? ['new']
+      : model.oldText && !model.newText
+        ? ['old']
+        : ['old', 'new'];
+  const sideBySide = !unified && sides.length === 2;
+  const columns = sideBySide ? 'var(--diff-columns, 50% 50%)' : 'minmax(0,1fr)';
   const setUnified = (value: boolean) => setView((current) => ({ ...current, unified: value }));
   const setExpanded = (value: boolean) => setView((current) => ({ ...current, expanded: value }));
-  const splitLayout = useDiffSplit(!unified, t('调整差异两侧宽度'));
+  const splitLayout = useDiffSplit(sideBySide, t('调整差异两侧宽度'));
   const attachSplitRoot = splitLayout.attachRoot;
   const attachRoot = useCallback(
     (element: HTMLDivElement | null) => {
@@ -118,12 +152,50 @@ function StringDiffView({
     },
     [attachSplitRoot],
   );
-  const initialLocation = useRef<string | null>(null);
+  const initialLocation = useRef<DiffModel | null>(null);
+  const pendingReveal = useRef<{ location: DiffLocation; resolve: () => void } | null>(null);
+  const cancelHighlight = useRef<(() => void) | undefined>(undefined);
+  useImperativeHandle(
+    ref,
+    () => ({
+      getRanges: (location) =>
+        root.current ? diffLocationRanges(root.current, model, location) : [],
+      reveal: (location) =>
+        new Promise<void>((resolve) => {
+          pendingReveal.current?.resolve();
+          cancelHighlight.current?.();
+          initialLocation.current = model;
+          pendingReveal.current = { location, resolve };
+          setView((current) => ({
+            ...current,
+            unified: false,
+            expanded: location.kind === 'text',
+            reveal: current.reveal + 1,
+          }));
+        }),
+    }),
+    [model],
+  );
+  useLayoutEffect(() => {
+    const request = pendingReveal.current;
+    if (!request || !root.current) return;
+    pendingReveal.current = null;
+    cancelHighlight.current = revealDiffLocation(root.current, model, request.location);
+    request.resolve();
+  }, [model, view.reveal, unified, expanded]);
+  useLayoutEffect(
+    () => () => {
+      pendingReveal.current?.resolve();
+      pendingReveal.current = null;
+      cancelHighlight.current?.();
+    },
+    [model],
+  );
   const currentChange = Math.min(view.index, Math.max(0, changes.length - 1));
   const pendingLocation = useRef(false);
   useLayoutEffect(() => {
     pendingLocation.current = false;
-  }, [sourceId, defaultExpanded]);
+  }, [model, defaultExpanded]);
   const revealChange = useCallback(
     (index: number) => {
       const change = changes[index];
@@ -138,13 +210,13 @@ function StringDiffView({
     [changes],
   );
   useLayoutEffect(() => {
-    if (initialLocation.current === sourceId) return;
+    if (initialLocation.current === model) return;
     if (defaultExpanded && !expanded) return;
-    initialLocation.current = sourceId;
-    if (!defaultExpanded || locateTarget) return;
+    initialLocation.current = model;
+    if (!defaultExpanded) return;
     const frame = requestAnimationFrame(() => revealChange(0));
     return () => cancelAnimationFrame(frame);
-  }, [sourceId, expanded, defaultExpanded, locateTarget, revealChange]);
+  }, [model, expanded, defaultExpanded, revealChange]);
   const navigate = (index: number) => {
     setView((current) => ({ ...current, index }));
     revealChange(index);
@@ -163,8 +235,9 @@ function StringDiffView({
       removers.forEach((remove) => remove());
       removers = [];
       for (const side of ['old', 'new'] as const) {
+        const target = targets[side];
         const source = side === 'old' ? model.oldText : model.newText;
-        if (!source) continue;
+        if (target === undefined || !source) continue;
         const segments: { node: Text; sourceOffsets: number[] }[] = [];
         elementRoot
           .querySelectorAll<HTMLElement>(`[data-code-side="${side}"]`)
@@ -183,13 +256,7 @@ function StringDiffView({
           });
         removers.push(
           registerText({
-            ref: {
-              sourceId,
-              kind: 'lines',
-              side,
-              startLine: 1,
-              endLine: sourceLines(source).length,
-            },
+            ref: target,
             source,
             segments,
           }),
@@ -203,7 +270,7 @@ function StringDiffView({
       observer.disconnect();
       removers.forEach((remove) => remove());
     };
-  }, [sourceId, model, unified, expanded, registerText]);
+  }, [targets, model, unified, expanded, registerText]);
   function code(
     side: 'old' | 'new',
     line: DiffLine | undefined,
@@ -307,10 +374,10 @@ function StringDiffView({
     ) : (
       <div
         className="grid min-w-0"
-        style={{ gridTemplateColumns: 'var(--diff-columns, 50% 50%)' }}
-        data-diff-split=""
+        style={{ gridTemplateColumns: columns }}
+        data-diff-split={sideBySide ? '' : undefined}
       >
-        {(['old', 'new'] as const).map((side) => (
+        {sides.map((side) => (
           <div
             key={side}
             className="min-w-0 overflow-x-auto"
@@ -399,14 +466,14 @@ function StringDiffView({
             data-diff-source-headers=""
             className="grid min-w-0 border-t bg-muted/30 text-xs"
             style={{
-              gridTemplateColumns: unified ? 'minmax(0,1fr)' : 'var(--diff-columns, 50% 50%)',
+              gridTemplateColumns: columns,
             }}
           >
-            {(['old', 'new'] as const).map((side) => (
+            {sides.map((side) => (
               <div
                 key={side}
                 data-diff-source-header={side}
-                className="flex min-w-0 items-center gap-2 px-3 py-1.5 first:border-r"
+                className={`flex min-w-0 items-center gap-2 px-3 py-1.5 ${sides.length === 2 ? 'first:border-r' : ''}`}
                 title={[
                   side === 'old' ? oldRevision : newRevision,
                   side === 'old' ? oldPath : newPath,
@@ -438,7 +505,7 @@ function StringDiffView({
           data-diff-body=""
           data-annotation-clip-top={headerId}
         >
-          {!unified && (
+          {sideBySide && (
             <div
               {...splitLayout.separatorProps}
               data-diff-divider=""

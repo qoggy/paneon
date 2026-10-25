@@ -289,8 +289,7 @@ function capture(
   };
   if (!old && !next)
     throw new Error(`File disappeared while reading: ${entry.newPath}. Refresh changes.`);
-  if (old?.mode !== next?.mode)
-    notes.push(`Mode: ${old?.mode ?? 'absent'} → ${next?.mode ?? 'absent'}`);
+  if (old && next && old.mode !== next.mode) notes.push(`Mode: ${old.mode} → ${next.mode}`);
   if ([old?.mode, next?.mode].includes('120000'))
     notes.push(
       'Symbolic link: link target bytes only; target contents are not read. File-level feedback only.',
