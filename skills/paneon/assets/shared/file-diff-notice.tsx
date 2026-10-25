@@ -1,4 +1,4 @@
-import { Button } from 'paneon/ui';
+import { Button } from '@qoggy/paneon/ui';
 import { useLocale } from './i18n';
 
 /** Non-text Git/PR policy stays in the page, outside the public string diff component. */

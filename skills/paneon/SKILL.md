@@ -56,7 +56,7 @@ paneon panel events <instance-id> --consumer <stable-name> --wait-ms 60000 --jso
 
 ## Custom pages
 
-Write an ordinary TSX file with `definePanel`, components from `paneon/ui`, optional `serverAction` functions and declared events. Set `requires.paneon` to a range that includes the installed CLI (`paneon --version`).
+Write an ordinary TSX file with `definePanel`, components from `@qoggy/paneon/ui`, optional `serverAction` functions and declared events. Set `requires.paneon` to a range that includes the installed CLI (`paneon --version`).
 
 Give each page its own directory, so its relative modules stay together. Choose the location by how the page will be used; an explicit instruction from the human always wins:
 
@@ -68,4 +68,4 @@ Give each page its own directory, so its relative modules stay together. Choose 
 - [Annotations](references/annotations.md): selection and annotations on custom content, for pages that collect precise opinions.
 - [Examples](references/examples.md): complete pages to run as-is or borrow techniques from: two explanations (dining philosophers, Sentinel LeapArray) and a read-only GitHub PR workspace through the local `gh` CLI.
 
-Built-in pages and examples are for running and reading, not importing. Build custom pages on `paneon/sdk`, `paneon/ui` and the page's own modules.
+Built-in pages and examples are for running and reading, not importing. Build custom pages on `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and the page's own modules.

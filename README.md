@@ -28,11 +28,7 @@ Your agent could write a one-off HTML page. With Paneon:
 Development preview. Requires **Node.js 24**.
 
 ```sh
-git clone https://github.com/qoggy/paneon.git
-cd paneon
-npm ci
-npm run build
-npm install -g .
+npm install -g @qoggy/paneon
 ```
 
 In the project where you use your agent, run:
@@ -58,6 +54,16 @@ Browse the changes and leave feedback directly on the code.
 - “Use Paneon to compare these architectures.”
 
 Ready-made pages cover choices, forms, tables, document review, Git review and GitHub pull requests. For anything else, your agent builds a custom page.
+
+## Install from source
+
+```sh
+git clone https://github.com/qoggy/paneon.git
+cd paneon
+npm ci
+npm run build
+npm install -g .
+```
 
 ## Feedback
 

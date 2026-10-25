@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { agent, definePanel, annotationValueSchema, z } from 'paneon/sdk';
-import type { AnnotationValue } from 'paneon/sdk';
+import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import type { AnnotationValue } from '@qoggy/paneon/sdk';
 import {
   Button,
   AnnotationRoot,
@@ -8,8 +8,8 @@ import {
   AnnotationSubmitButton,
   AnnotationText,
   useAnnotations,
-} from 'paneon/ui';
-import type { AnnotationAdapter } from 'paneon/ui';
+} from '@qoggy/paneon/ui';
+import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
 type Ref = string;
 const text = 'Shared annotation target';
@@ -87,7 +87,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'annotation-editor-acceptance',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: { feedback: annotationValueSchema(z.string()) },
   render: Panel,

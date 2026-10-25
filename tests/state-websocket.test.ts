@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -32,8 +33,8 @@ void test(
         watch: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        requires: { paneon: '0.0.0' },
-        paneonVersion: '0.0.0',
+        requires: { paneon: PACKAGE_VERSION },
+        paneonVersion: PACKAGE_VERSION,
       });
     store.close();
     const service = await startServer(home);

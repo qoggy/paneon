@@ -1,7 +1,7 @@
 import { useLocale } from '../../shared/i18n';
 import { useMemo, useRef, useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import type { AnnotationValue, AnnotationTarget as Target } from 'paneon/sdk';
+import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
+import type { AnnotationValue, AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Button,
   AnnotationMenu,
@@ -22,7 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import {
   cellText,
@@ -421,7 +421,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: tableParamsSchema,
   events: { 'table-submitted': tableSubmittedSchema },
   render: TablePanel,

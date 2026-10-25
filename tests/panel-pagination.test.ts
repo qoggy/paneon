@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -40,8 +41,8 @@ void test(
         watch: false,
         createdAt: new Date(Date.UTC(2026, 9, 21, 0, Math.floor(i / 2))).toISOString(),
         updatedAt: new Date(Date.UTC(2026, 9, 22, 0, 44 - i)).toISOString(),
-        requires: { paneon: '0.0.0' },
-        paneonVersion: '0.0.0',
+        requires: { paneon: PACKAGE_VERSION },
+        paneonVersion: PACKAGE_VERSION,
       });
     const first = store.listPage();
     assert.equal(first.panels.length, 20);

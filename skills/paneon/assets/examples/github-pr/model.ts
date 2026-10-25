@@ -1,4 +1,4 @@
-import type { AnnotationTarget } from 'paneon/sdk';
+import type { AnnotationTarget } from '@qoggy/paneon/sdk';
 import { diffTargetText } from '../../shared/diff-schema.ts';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 import type { PRSnapshot } from './github.ts';

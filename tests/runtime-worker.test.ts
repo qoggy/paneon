@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -80,10 +81,10 @@ void test('reload of an unchanged bundle replaces the process and resets its mod
   const entry = join(root, 'panel.tsx');
   writeFileSync(
     entry,
-    `import{definePanel,serverAction,z}from'paneon/sdk';const state={count:0};
+    `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';const state={count:0};
 export const read=serverAction({input:z.object({}),handler:async()=>({count:++state.count})});
 function Panel(){return <div>Reload</div>}
-export default definePanel({id:'reload',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+export default definePanel({id:'reload',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
   );
   const runtime = new Runtime(join(root, 'data'));
   try {

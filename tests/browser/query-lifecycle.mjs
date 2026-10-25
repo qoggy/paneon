@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -149,7 +150,7 @@ try {
   const invalid = join(root, 'invalid-query.tsx');
   await writeFile(
     invalid,
-    `import{definePanel,serverAction,useQuery,z}from'paneon/sdk';export const mutation=serverAction({input:z.object({}),handler:()=>({ok:true})});function Panel(){const result=useQuery(mutation,{});return <div>{String(result.loading)}</div>}export default definePanel({id:'invalid-query',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+    `import{definePanel,serverAction,useQuery,z}from'@qoggy/paneon/sdk';export const mutation=serverAction({input:z.object({}),handler:()=>({ok:true})});function Panel(){const result=useQuery(mutation,{});return <div>{String(result.loading)}</div>}export default definePanel({id:'invalid-query',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
   );
   await assert.rejects(
     service.runtime.run(invalid, root, {}, false),

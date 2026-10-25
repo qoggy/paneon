@@ -1,4 +1,4 @@
-import { z } from 'paneon/sdk';
+import { z } from '@qoggy/paneon/sdk';
 const nonblank = z.string().refine((value) => value.trim().length > 0, 'Must not be blank.');
 const base = {
   name: nonblank,

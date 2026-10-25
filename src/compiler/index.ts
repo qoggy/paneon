@@ -83,9 +83,9 @@ function typecheck(entry: string, snapshot: SourceSnapshot) {
   host.resolveModuleNames = (names, containingFile) =>
     names.map((name) => {
       const mapped =
-        name === 'paneon/sdk'
+        name === '@qoggy/paneon/sdk'
           ? join(sdkPath, 'index.d.ts')
-          : name === 'paneon/ui'
+          : name === '@qoggy/paneon/ui'
             ? join(PACKAGE_ROOT, 'dist/ui/index.d.ts')
             : undefined;
       if (mapped && existsSync(mapped))
@@ -149,9 +149,9 @@ export function panelPlugin(
     name: 'paneon-actions',
     enforce: 'pre',
     resolveId(source, importer) {
-      if (source === 'paneon/sdk' || source === 'paneon/sdk/client')
+      if (source === '@qoggy/paneon/sdk' || source === '@qoggy/paneon/sdk/client')
         return join(sdkPath, side === 'client' ? 'client.js' : 'server.js');
-      if (source === 'paneon/ui')
+      if (source === '@qoggy/paneon/ui')
         return existsSync(uiEntry) ? uiEntry : join(PACKAGE_ROOT, 'src/ui/index.ts');
       if (
         source === 'react' ||
@@ -308,7 +308,7 @@ async function compileSnapshot(
     const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
     writeFileSync(
       frameSource,
-      `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React,{useSyncExternalStore} from 'react';import {TooltipProvider,UIProvider} from 'paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext,getUI,subscribeUI,panelBrowserAction} from 'paneon/sdk/client';\nfunction Environment(){const ui=useSyncExternalStore(subscribeUI,getUI);return React.createElement(UIProvider,{ui,onBrowserAction:panelBrowserAction},React.createElement(TooltipProvider,null,React.createElement(definition.render)));}let mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(Environment)));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
+      `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React,{useSyncExternalStore} from 'react';import {TooltipProvider,UIProvider} from '@qoggy/paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext,getUI,subscribeUI,panelBrowserAction} from '@qoggy/paneon/sdk/client';\nfunction Environment(){const ui=useSyncExternalStore(subscribeUI,getUI);return React.createElement(UIProvider,{ui,onBrowserAction:panelBrowserAction},React.createElement(TooltipProvider,null,React.createElement(definition.render)));}let mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(Environment)));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
     );
     stage = 'client-build';
     await build({

@@ -1,6 +1,12 @@
 import { useLocale } from '../../shared/i18n';
 import { useState } from 'react';
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Input } from 'paneon/ui';
+import {
+  Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Input,
+} from '@qoggy/paneon/ui';
 import { TreeIcon } from './file-icons.tsx';
 import type { HistoryRef } from './git.ts';
 import { RevisionContextMenu } from './revision-context-menu.tsx';

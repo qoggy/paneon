@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from 'paneon/ui';
+import { Button } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { queryGit, queryGitBranches, queryGitFile } from './actions.ts';
 import { Branches } from './branches.tsx';

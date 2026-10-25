@@ -11,7 +11,7 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import type { GitRevision } from './git.ts';
 

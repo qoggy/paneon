@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,7 +8,7 @@ const runtimeEntry = new URL('../runtime-fixture.ts', import.meta.url).href;
 const { startServer } = await import(runtimeEntry);
 const root = await mkdtemp(join(tmpdir(), 'paneon-host-lifecycle-'));
 const source = (title) =>
-  `import{definePanel,z}from'paneon/sdk';import{Page}from'paneon/ui';function Panel(){return <Page title=${JSON.stringify(title)}/>;}export default definePanel({id:'host-lifecycle',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`;
+  `import{definePanel,z}from'@qoggy/paneon/sdk';import{Page}from'@qoggy/paneon/ui';function Panel(){return <Page title=${JSON.stringify(title)}/>;}export default definePanel({id:'host-lifecycle',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 let service, browser;
 const evidence = [];
 async function settle(page) {

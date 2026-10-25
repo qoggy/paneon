@@ -4,8 +4,8 @@
 
 ```tsx
 import { useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import { Button, Page, Stack } from 'paneon/ui';
+import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { Button, Page, Stack } from '@qoggy/paneon/ui';
 
 export const calculate = serverAction({
   kind: 'query',
@@ -47,7 +47,7 @@ function Review() {
 
 export default definePanel({
   id: 'review-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({ topic: z.string() }),
   events: { 'review-requested': z.object({ topic: z.string() }) },
   render: Review,
@@ -58,8 +58,8 @@ export default definePanel({
 paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this proposal"}' --json
 ```
 
-- `paneon/sdk`, `paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
-- `requires.paneon` must be a literal npm semver range. Paneon never widens it; on `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
+- `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
+- `requires.paneon` must be a literal npm semver range. For example, `>=0.0.1 <0.1.0` declares a minimum supported version and accepts later patches in that range; it does not need to match the current release. Change it when the panel's compatibility requirements change. Paneon never widens it; on `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
 ## Deliver events
 
@@ -77,7 +77,7 @@ Declare every event type in `events`. `await agent.emit(type, payload)` resolves
 ```ts
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { serverAction, z } from 'paneon/sdk';
+import { serverAction, z } from '@qoggy/paneon/sdk';
 
 export const readGitStatus = serverAction({
   kind: 'query',
@@ -155,7 +155,7 @@ return (
 
 ## Components
 
-Prefer the existing components over hand-built ones: pages get built faster and stay consistent in style and experience. Import them from `paneon/ui`. They follow upstream shadcn with its default Neutral theme; do not redefine the palette, font scale, radius or control height. Compound components export their parts with the same prefix, such as `Card` with `CardHeader` and `CardContent`.
+Prefer the existing components over hand-built ones: pages get built faster and stay consistent in style and experience. Import them from `@qoggy/paneon/ui`. They follow upstream shadcn with its default Neutral theme; do not redefine the palette, font scale, radius or control height. Compound components export their parts with the same prefix, such as `Card` with `CardHeader` and `CardContent`.
 
 <!-- prettier-ignore -->
 | Component | Purpose |
@@ -194,7 +194,7 @@ Slider is not included.
 - `CodeBlock` highlights javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml and diff; other languages render as plain text.
 - `Markdown` renders GFM with raw HTML disabled. `components` overrides and `rehypePlugins` compose with the defaults; replacing `pre` also drops Mermaid handling.
 - `Mermaid` and Markdown diagrams use the bundled Mermaid library; never load Mermaid from a CDN. Invalid source shows an error in place of that diagram.
-- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).
+- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).
 
 ## Theme and language
 

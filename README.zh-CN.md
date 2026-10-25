@@ -28,11 +28,7 @@ Agent 也能临时写一个 HTML 页面。用 Paneon 的区别在于：
 当前为开发预览版，需要 **Node.js 24**。
 
 ```sh
-git clone https://github.com/qoggy/paneon.git
-cd paneon
-npm ci
-npm run build
-npm install -g .
+npm install -g @qoggy/paneon
 ```
 
 然后在你使用 Agent 的项目中运行：
@@ -58,6 +54,16 @@ paneon init
 - “用 Paneon 对比这几种架构。”
 
 选择题、表单、表格、文档评审、Git 评审和 GitHub PR 都有现成页面。其他需求由 Agent 编写自定义页面。
+
+## 从源码安装
+
+```sh
+git clone https://github.com/qoggy/paneon.git
+cd paneon
+npm ci
+npm run build
+npm install -g .
+```
 
 ## 反馈
 

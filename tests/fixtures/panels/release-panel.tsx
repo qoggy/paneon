@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, serverAction, useQuery, z } from 'paneon/sdk';
+import { agent, definePanel, serverAction, useQuery, z } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -30,7 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { releaseCommand } from './business';
 
 export const readRelease = serverAction({
@@ -203,7 +203,7 @@ function ReleasePanel() {
 }
 export default definePanel({
   id: 'release-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: { 'analyze-requested': z.object({ environment: z.string() }) },
   render: ReleasePanel,

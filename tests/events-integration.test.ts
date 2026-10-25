@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -34,7 +35,7 @@ void test(
     const entry = join(home, 'feedback.tsx');
     await writeFile(
       entry,
-      `import {definePanel,z} from 'paneon/sdk';function Panel(){return <p>Feedback</p>}export default definePanel({id:'feedback',requires:{paneon:'0.0.0'},input:z.object({}),events:{feedback:z.object({text:z.string().min(1)})},render:Panel});`,
+      `import {definePanel,z} from '@qoggy/paneon/sdk';function Panel(){return <p>Feedback</p>}export default definePanel({id:'feedback',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string().min(1)})},render:Panel});`,
     );
     const started = await startServer(storage);
     const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };

@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -19,11 +20,11 @@ const { Runtime } = (await import(
 const logger = pino({ level: 'silent' });
 
 function source(marker: string, label = 'original') {
-  return `import{definePanel,serverAction,z}from'paneon/sdk';import{appendFileSync}from'node:fs';
+  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{appendFileSync}from'node:fs';
 const boot=(appendFileSync(${JSON.stringify(marker)},'boot\\n'),true);const state={count:0};
 export const read=serverAction({input:z.object({delay:z.number().optional()}),handler:async(_ctx,input)=>{await new Promise(resolve=>setTimeout(resolve,input.delay??0));return{count:++state.count,boot,label:${JSON.stringify(label)},cwd:process.cwd()};}});
 function Panel(){return <div>${label}</div>}
-export default definePanel({id:'resource',requires:{paneon:'0.0.0'},input:z.object({}),events:{done:z.object({text:z.string().refine(text=>text!=='blocked')})},render:Panel});`;
+export default definePanel({id:'resource',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{done:z.object({text:z.string().refine(text=>text!=='blocked')})},render:Panel});`;
 }
 async function until(check: () => boolean, timeout = 15000) {
   const end = Date.now() + timeout;
@@ -48,8 +49,8 @@ void test('restore and indexed history reads do not evaluate any historical pane
         revision: 'old',
         createdAt: now,
         updatedAt: now,
-        requires: { paneon: '0.0.0' },
-        paneonVersion: '0.0.0',
+        requires: { paneon: PACKAGE_VERSION },
+        paneonVersion: PACKAGE_VERSION,
       });
     runtime.store.db
       .prepare("UPDATE panels SET params_json = 'invalid JSON' WHERE id = 'history-999'")

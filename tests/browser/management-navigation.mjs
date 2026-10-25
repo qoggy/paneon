@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -27,15 +28,15 @@ try {
       status: 'closed',
       createdAt: new Date(2020, 0, 1, 0, index).toISOString(),
       updatedAt: new Date(2020, 0, 1, 0, index).toISOString(),
-      requires: { paneon: '0.0.0' },
-      paneonVersion: '0.0.0',
+      requires: { paneon: PACKAGE_VERSION },
+      paneonVersion: PACKAGE_VERSION,
     });
   }
   const entry = join(root, 'probe.tsx');
   await writeFile(
     entry,
-    `import {definePanel,z} from 'paneon/sdk';
-export default definePanel({id:'navigation-probe',requires:{paneon:'0.0.0'},input:z.object({}),events:{},render:()=> <h1>Author content 原文</h1>});`,
+    `import {definePanel,z} from '@qoggy/paneon/sdk';
+export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{},render:()=> <h1>Author content 原文</h1>});`,
   );
   const panel = await service.runtime.run(entry, root, {}, false);
   browser = await chromium.launch({

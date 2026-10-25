@@ -1,4 +1,4 @@
-import type { AnnotationValue, AnnotationTarget } from 'paneon/sdk';
+import type { AnnotationValue, AnnotationTarget } from '@qoggy/paneon/sdk';
 import { sourceLines } from '../../shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import type { GitSnapshot } from './git.ts';

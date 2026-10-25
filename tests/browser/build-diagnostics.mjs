@@ -19,7 +19,7 @@ const cli = resolve('dist/cli/index.js');
 const source = (
   title,
   broken = false,
-) => `import{useState}from'react';import{definePanel,z}from'paneon/sdk';
+) => `import{useState}from'react';import{definePanel,z}from'@qoggy/paneon/sdk';
 function Panel(){const [count,setCount]=useState(0);const label:string=${broken ? '42' : JSON.stringify(title)};return <><h1>{label}</h1><button onClick={()=>setCount(count+1)}>Count {count}</button></>}
 export default definePanel({id:'build-diagnostics',requires:{paneon:'*'},input:z.object({}),render:Panel});`;
 const evidence = [];

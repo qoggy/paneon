@@ -1,8 +1,8 @@
 import { FileDiffNotice } from '../../shared/file-diff-notice';
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
-import { agent, definePanel, usePanelInput } from 'paneon/sdk';
-import type { AnnotationValue } from 'paneon/sdk';
+import { agent, definePanel, usePanelInput } from '@qoggy/paneon/sdk';
+import type { AnnotationValue } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -24,7 +24,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
 import {
@@ -826,7 +826,7 @@ function Review() {
 }
 export default definePanel({
   id: 'git-review',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: gitReviewParamsSchema,
   events: { 'git-review-submitted': gitReviewSubmittedSchema },
   render: Review,

@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -34,9 +35,9 @@ async function until(check: () => boolean, message = 'Expected source update did
   assert.ok(check(), message);
 }
 function source(specifier = './value', extra = '') {
-  return `import{definePanel,serverAction,z}from'paneon/sdk';import{value}from'${specifier}';${extra}
+  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{value}from'${specifier}';${extra}
 export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({value})});
-export default definePanel({id:'source-watch',requires:{paneon:'0.0.0'},input:z.object({}),render:()=> <div>{value}</div>});`;
+export default definePanel({id:'source-watch',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:()=> <div>{value}</div>});`;
 }
 function inputs(file: string, value: string): WatchInputs {
   return { files: { [file]: contentHash(value) }, paths: {} };

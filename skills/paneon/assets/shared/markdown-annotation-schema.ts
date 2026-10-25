@@ -1,4 +1,4 @@
-import type { AnnotationTarget } from 'paneon/sdk';
+import type { AnnotationTarget } from '@qoggy/paneon/sdk';
 
 /** Offsets refer to the complete, unmodified source, and must not split a grapheme. */
 export function validSourceRange(source: string, target: AnnotationTarget<unknown>) {

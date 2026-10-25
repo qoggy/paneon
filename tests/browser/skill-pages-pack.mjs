@@ -34,7 +34,7 @@ try {
     ['install', '--prefix', install, '--no-audit', '--no-fund', join(root, metadata.filename)],
     { cwd: project, maxBuffer: 4 * 1024 * 1024 },
   );
-  const packageRoot = join(install, 'node_modules/paneon');
+  const packageRoot = join(install, 'node_modules/@qoggy/paneon');
   assert.equal(
     JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version,
     metadata.version,

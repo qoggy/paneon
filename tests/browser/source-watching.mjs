@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, realpath, writeFile, readFile, unlink, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -18,10 +19,10 @@ const entry = join(dir, 'panel.tsx'),
   shared = join(root, 'shared.ts');
 const source = (
   specifier = '../shared',
-) => `import{definePanel,serverAction,z}from'paneon/sdk';import{Button,Checkbox,CodeBlock,Markdown}from'paneon/ui';import{useState}from'react';import{value}from'${specifier}';
+) => `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{Button,Checkbox,CodeBlock,Markdown}from'@qoggy/paneon/ui';import{useState}from'react';import{value}from'${specifier}';
 export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({value})});
 function Panel(){const[draft,setDraft]=useState('');return <><h1>Source watching acceptance</h1><p data-testid="value">{value}</p><p data-testid="env">{import.meta.env.VITE_SOURCE_LABEL??'absent'}</p><input aria-label="Draft" value={draft} onChange={e=>setDraft(e.target.value)}/><Checkbox aria-label="Enabled"/><Button onClick={()=>setDraft('clicked')}>Interact</Button><CodeBlock language="typescript" code={'const example = 42;'} /><Markdown>{'**Local Markdown**'}</Markdown></>}
-export default definePanel({id:'source-watching',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`;
+export default definePanel({id:'source-watching',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 await writeFile(shared, `export const value='outside-one';`);
 await writeFile(env, 'VITE_SOURCE_LABEL=one');
 await writeFile(entry, source());

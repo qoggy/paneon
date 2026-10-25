@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
@@ -26,13 +27,13 @@ function temporary(fn: (root: string) => void) {
     rmSync(root, { recursive: true, force: true });
   }
 }
-const definition = `export default definePanel({id:'test',requires:{paneon:'0.0.0'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+const definition = `export default definePanel({id:'test',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
 void test('AST graph follows binding symbols, preserves UI shadowing, and removes action handlers', () =>
   temporary((root) => {
     const entry = join(root, 'panel.tsx');
     writeFileSync(
       entry,
-      `import{definePanel,serverAction,z}from'paneon/sdk';import{readFileSync}from'node:fs';const label=readFileSync('/server-only','utf8');export const run=serverAction({input:z.object({}),handler:async()=>label});function Panel(){const label='Browser label';return <button onClick={()=>run({})}>{label}</button>}${definition}`,
+      `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{readFileSync}from'node:fs';const label=readFileSync('/server-only','utf8');export const run=serverAction({input:z.object({}),handler:async()=>label});function Panel(){const label='Browser label';return <button onClick={()=>run({})}>{label}</button>}${definition}`,
     );
     const browser = createGraph(entry, 'client').sources.get(entry)!;
     assert.match(browser, /__paneonProxy/);
@@ -47,12 +48,12 @@ void test('AST graph rejects genuine browser Node references and dynamic action 
     const entry = join(root, 'panel.tsx');
     writeFileSync(
       entry,
-      `import{definePanel,z}from'paneon/sdk';import{readFileSync}from'node:fs';function Panel(){return <div>{readFileSync('/bad','utf8')}</div>}${definition}`,
+      `import{definePanel,z}from'@qoggy/paneon/sdk';import{readFileSync}from'node:fs';function Panel(){return <div>{readFileSync('/bad','utf8')}</div>}${definition}`,
     );
     assert.throws(() => createGraph(entry, 'client'), { code: 'BUILD_FAILED' });
     writeFileSync(
       entry,
-      `import{definePanel,serverAction,z}from'paneon/sdk';function Panel(){const run=serverAction({input:z.object({}),handler:()=>1});return <div/>}${definition}`,
+      `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';function Panel(){const run=serverAction({input:z.object({}),handler:()=>1});return <div/>}${definition}`,
     );
     assert.throws(() => createGraph(entry, 'client'), { code: 'UNSUPPORTED_ACTION_CAPTURE' });
   }));
@@ -61,7 +62,7 @@ void test('server extraction rejects mutable top-level captures', () =>
     const entry = join(root, 'panel.tsx');
     writeFileSync(
       entry,
-      `import{definePanel,serverAction,z}from'paneon/sdk';let counter=0;export const run=serverAction({input:z.object({}),handler:()=>counter++});function Panel(){return <div/>}${definition}`,
+      `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';let counter=0;export const run=serverAction({input:z.object({}),handler:()=>counter++});function Panel(){return <div/>}${definition}`,
     );
     assert.throws(() => createGraph(entry, 'server'), { code: 'UNSUPPORTED_ACTION_CAPTURE' });
   }));
@@ -71,7 +72,7 @@ void test('type-only imports do not create runtime dependencies or discover acti
     const types = join(root, 'types.ts');
     writeFileSync(
       types,
-      `import{serverAction,z}from'paneon/sdk';export type Model={label:string};export default interface DefaultModel{label:string}export const hidden=serverAction({input:z.object({}),handler:async()=>42});`,
+      `import{serverAction,z}from'@qoggy/paneon/sdk';export type Model={label:string};export default interface DefaultModel{label:string}export const hidden=serverAction({input:z.object({}),handler:async()=>42});`,
     );
     for (const [declaration, annotation] of [
       ["import type {Model} from './types';", 'Model'],
@@ -81,7 +82,7 @@ void test('type-only imports do not create runtime dependencies or discover acti
     ]) {
       writeFileSync(
         entry,
-        `import{definePanel,serverAction,z}from'paneon/sdk';${declaration}export const run=serverAction({input:z.object({label:z.string()}),handler:async(_ctx,input)=>{const model:${annotation}=input;return model.label;}});function Panel(){const model:${annotation}={label:'typed'};return <div>{model.label}</div>}export default definePanel({id:'typed',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+        `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${declaration}export const run=serverAction({input:z.object({label:z.string()}),handler:async(_ctx,input)=>{const model:${annotation}=input;return model.label;}});function Panel(){const model:${annotation}={label:'typed'};return <div>{model.label}</div>}export default definePanel({id:'typed',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
       );
       for (const side of ['client', 'server'] as const) {
         const graph = createGraph(entry, side);
@@ -108,7 +109,7 @@ void test('mixed type and value imports retain their runtime bindings', () =>
     ]) {
       writeFileSync(
         entry,
-        `import{definePanel,serverAction,z}from'paneon/sdk';${declaration}export const run=serverAction({input:z.object({}),handler:async()=>{const model:Model={label:value};return model.label;}});function Panel(){const model:Model={label:value};return <div>{model.label}</div>}export default definePanel({id:'mixed',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+        `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${declaration}export const run=serverAction({input:z.object({}),handler:async()=>{const model:Model={label:value};return model.label;}});function Panel(){const model:Model={label:value};return <div>{model.label}</div>}export default definePanel({id:'mixed',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
       );
       for (const side of ['client', 'server'] as const) {
         const graph = createGraph(entry, side);
@@ -122,7 +123,7 @@ void test('mixed type and value imports retain their runtime bindings', () =>
 void test('version preflight follows npm ranges and never evaluates imports', () =>
   temporary((root) => {
     const entry = join(root, 'panel.tsx');
-    const source = `import{definePanel}from'paneon/sdk';throw new Error('must not evaluate');export default definePanel({requires:{paneon:'>=1.4.0 <2.0.0'}});`;
+    const source = `import{definePanel}from'@qoggy/paneon/sdk';throw new Error('must not evaluate');export default definePanel({requires:{paneon:'>=1.4.0 <2.0.0'}});`;
     writeFileSync(entry, source);
     assert.equal(validateRequirement(entry, '1.5.0'), '>=1.4.0 <2.0.0');
     for (const version of ['1.3.0', '2.0.0', '1.5.0-beta.1'])
@@ -160,8 +161,8 @@ void test('SQLite events survive reopen and only explicit delivered acknowledgem
       watch: true,
       createdAt: '2026-10-20',
       updatedAt: '2026-10-20',
-      requires: { paneon: '0.0.0' },
-      paneonVersion: '0.0.0',
+      requires: { paneon: PACKAGE_VERSION },
+      paneonVersion: PACKAGE_VERSION,
     };
     store.save(panel);
     store.save({ ...panel, instanceId: 'other' });

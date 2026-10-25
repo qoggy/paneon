@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { definePanel, agent, annotationValueSchema, z } from 'paneon/sdk';
-import type { AnnotationTarget as Target, AnnotationValue } from 'paneon/sdk';
+import { definePanel, agent, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import type { AnnotationTarget as Target, AnnotationValue } from '@qoggy/paneon/sdk';
 import {
   Button,
   Card,
@@ -10,8 +10,8 @@ import {
   Input,
   Page,
   useAnnotations,
-} from 'paneon/ui';
-import type { AnnotationAdapter } from 'paneon/ui';
+} from '@qoggy/paneon/ui';
+import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
 type Ref = string;
 const original = '重复中文👨‍👩‍👧‍👦é😀，重复中文。';
@@ -369,7 +369,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'feedback-acceptance',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: {
     'feedback-submitted': annotationValueSchema(z.string()),

@@ -1,7 +1,6 @@
 {
-  "name": "paneon",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@qoggy/paneon",
+  "version": "0.0.1",
   "type": "module",
   "description": "Let agents build interactive local pages and bring your feedback back.",
   "license": "MIT",
@@ -30,7 +29,7 @@
     "dev": "vite --host 127.0.0.1",
     "dev:cli": "node src/cli/index.ts",
     "build": "npm run build:cli && npm run build:ui && npm run typecheck && npm run build:web",
-    "build:cli": "tsc -p tsconfig.cli.json",
+    "build:cli": "tsc -p tsconfig.cli.json && node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
     "build:web": "vite build",
     "prepack": "npm run build",
     "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=1 tests/*.test.ts",

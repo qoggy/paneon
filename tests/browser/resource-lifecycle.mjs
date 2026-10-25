@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,10 +14,10 @@ await mkdir(home);
 await writeFile(join(home, 'config.json'), JSON.stringify({ server: { port: 0 } }));
 await writeFile(
   entry,
-  `import{useState}from'react';import{definePanel,serverAction,z}from'paneon/sdk';
+  `import{useState}from'react';import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';
 const state={count:0};export const read=serverAction({input:z.object({}),handler:async()=>({count:++state.count,pid:process.pid})});
 function Panel(){const[result,setResult]=useState<{count:number;pid:number}|null>(null);return <div><h1>Cold lifecycle</h1><input aria-label="Draft"/><button onClick={()=>void read({}).then(setResult)}>Read</button><output aria-label="Action result">{result?result.count+':'+result.pid:'idle'}</output></div>}
-export default definePanel({id:'cold-lifecycle',requires:{paneon:'0.0.0'},input:z.object({}),events:{done:z.object({text:z.string()})},render:Panel});`,
+export default definePanel({id:'cold-lifecycle',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{done:z.object({text:z.string()})},render:Panel});`,
 );
 let service;
 let browser;

@@ -1,5 +1,5 @@
 import { Component, useRef, useState, type ReactNode } from 'react';
-import { agent, annotationValueSchema, definePanel, z } from 'paneon/sdk';
+import { agent, annotationValueSchema, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   AnnotationMenu,
   AnnotationRoot,
@@ -7,7 +7,7 @@ import {
   DiffView,
   useAnnotations,
   type DiffViewHandle,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 type Ref = { documentId: string; version: string } | boolean | null;
 const before = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
@@ -151,7 +151,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'diff-annotations',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: {
     'annotations-submitted': annotationValueSchema(

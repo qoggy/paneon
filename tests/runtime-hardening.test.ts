@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawn, execFile, spawnSync } from 'node:child_process';
@@ -30,9 +31,6 @@ const execute = promisify(execFile);
 const packageRoot = join(import.meta.dirname, '..');
 const builtCli = join(packageRoot, 'dist/cli/index.js');
 const sourceCli = join(packageRoot, 'src/cli/index.ts');
-const packageVersion = (
-  JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { version: string }
-).version;
 type Envelope = {
   ok: boolean;
   data?: Record<string, unknown>;
@@ -46,7 +44,7 @@ function source(
   range: string,
   options: { marker?: string; moduleMarker?: string; missingApi?: boolean } = {},
 ) {
-  return `import {definePanel,serverAction,z${options.missingApi ? ',nonexistentPaneonApi' : ''}} from 'paneon/sdk';
+  return `import {definePanel,serverAction,z${options.missingApi ? ',nonexistentPaneonApi' : ''}} from '@qoggy/paneon/sdk';
 ${options.marker || options.moduleMarker ? `import {appendFileSync} from 'node:fs';` : ''}
 ${options.moduleMarker ? `const loaded=(appendFileSync(${JSON.stringify(options.moduleMarker)},'loaded\\n'),1);` : ''}
 export const invoke=serverAction({kind:'mutation',input:z.object({}),handler:async()=>{${options.marker ? `appendFileSync(${JSON.stringify(options.marker)},'called\\n');` : ''}return {done:true${options.moduleMarker ? ',loaded' : ''}};}});
@@ -119,7 +117,7 @@ async function until(check: () => boolean | Promise<boolean>, message: string, t
 void test('manifest persists the panel input schema alongside action and event schemas', async () => {
   const root = directory('paneon-schema-');
   const entry = join(root, 'panel.tsx');
-  writeFileSync(entry, source('schema', packageVersion));
+  writeFileSync(entry, source('schema', PACKAGE_VERSION));
   try {
     const compiled = await compilePanel(entry, join(root, 'build'));
     const disk = JSON.parse(
@@ -146,7 +144,7 @@ void test('action extraction resolves the value symbol in object shorthand captu
   const root = directory('paneon-shorthand-');
   const entry = join(root, 'panel.tsx');
   const marker = join(root, 'evaluated');
-  writeFileSync(entry, source('shorthand', packageVersion, { moduleMarker: marker }));
+  writeFileSync(entry, source('shorthand', PACKAGE_VERSION, { moduleMarker: marker }));
   const runtime = new Runtime(join(root, 'data'));
   try {
     const panel = await runtime.run(entry, root, { topic: 'bound' }, false);
@@ -166,7 +164,7 @@ void test('module-level const destructuring is retained while React/function loc
   const entry = join(root, 'panel.tsx');
   writeFileSync(
     entry,
-    `import{definePanel,serverAction,z}from'paneon/sdk';const {value,nested:{other},list:[first]}={value:3,nested:{other:4},list:[5]};export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({value,other,first})});function Panel(){const {value}={value:'local UI'};return <div>{value}</div>}export default definePanel({id:'bindings',requires:{paneon:${JSON.stringify(packageVersion)}},input:z.object({}),render:Panel});`,
+    `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';const {value,nested:{other},list:[first]}={value:3,nested:{other:4},list:[5]};export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({value,other,first})});function Panel(){const {value}={value:'local UI'};return <div>{value}</div>}export default definePanel({id:'bindings',requires:{paneon:${JSON.stringify(PACKAGE_VERSION)}},input:z.object({}),render:Panel});`,
   );
   const runtime = new Runtime(join(root, 'data'));
   try {
@@ -219,7 +217,7 @@ void test('semver preflight covers 0.x, prereleases, missing/empty/illegal/dynam
     assert.equal(existsSync(marker), false);
     writeFileSync(
       entry,
-      source('semver', packageVersion, { moduleMarker: marker, missingApi: true }),
+      source('semver', PACKAGE_VERSION, { moduleMarker: marker, missingApi: true }),
     );
     await assert.rejects(compilePanel(entry, join(root, 'build')), (error: unknown) => {
       const failure = error as { code: string; details?: { diagnostic?: string } };
@@ -240,7 +238,7 @@ void test(
   async () => {
     const root = directory('paneon-concurrent-');
     const entry = join(root, 'panel.tsx');
-    writeFileSync(entry, source('concurrent', packageVersion));
+    writeFileSync(entry, source('concurrent', PACKAGE_VERSION));
     mkdirSync(join(root, '.paneon'));
     prepareRuntimeHome(join(root, '.paneon'));
     const gone = spawnSync(process.execPath, ['-e', ''], { encoding: 'utf8' });
@@ -252,7 +250,7 @@ void test(
       pid: gone.pid,
       port: 9,
       controlToken: 'dummy-stale-control',
-      paneonVersion: packageVersion,
+      paneonVersion: PACKAGE_VERSION,
       protocolVersion: 1,
       startedAt: new Date().toISOString(),
     };
@@ -308,14 +306,14 @@ void test(
 void test('an alive process with an unverifiable health identity is never overwritten or killed', async () => {
   const root = directory('paneon-alive-');
   const entry = join(root, 'panel.tsx');
-  writeFileSync(entry, source('alive', packageVersion));
+  writeFileSync(entry, source('alive', PACKAGE_VERSION));
   mkdirSync(join(root, '.paneon'));
   const fake: RuntimeDescriptor = {
     runtimeId: 'unverified-live-runtime',
     pid: process.pid,
     port: 9,
     controlToken: 'dummy-live-control',
-    paneonVersion: packageVersion,
+    paneonVersion: PACKAGE_VERSION,
     protocolVersion: 1,
     startedAt: new Date().toISOString(),
   };
@@ -400,7 +398,7 @@ void test('debug stderr contains only fixed framework steps and elapsed time, ne
   const business = 'DUMMY_BUSINESS_中文_body';
   const cookie = 'DUMMY_COOKIE_cookie-value';
   const token = 'DUMMY_ENV_TOKEN_private';
-  writeFileSync(entry, source('debug', packageVersion));
+  writeFileSync(entry, source('debug', PACKAGE_VERSION));
   try {
     const run = await cli(
       root,
@@ -458,6 +456,8 @@ void test(
   'a copied upgraded package rebuilds on first use and preserves incompatible instance history',
   { timeout: 120000 },
   async () => {
+    const oldVersion = '0.0.0';
+    const upgradedVersion = '0.0.1';
     const root = directory('paneon-upgrade-');
     const home = join(root, 'home');
     mkdirSync(home);
@@ -467,7 +467,10 @@ void test(
     const exactLoaded = join(root, 'exact-loaded');
     const broadLoaded = join(root, 'broad-loaded');
     const called = join(root, 'handler-called');
-    writeFileSync(exact, source('exact', '0.0.0', { marker: called, moduleMarker: exactLoaded }));
+    writeFileSync(
+      exact,
+      source('exact', oldVersion, { marker: called, moduleMarker: exactLoaded }),
+    );
     writeFileSync(
       broad,
       source('broad', '>=0.0.0 <0.1.0', { marker: called, moduleMarker: broadLoaded }),
@@ -484,7 +487,7 @@ void test(
       symlinkSync(join(packageRoot, 'node_modules'), join(copy, 'node_modules'), 'dir');
       return copy;
     };
-    const oldPackage = copyPackage('0.0.0', 'old-package');
+    const oldPackage = copyPackage(oldVersion, 'old-package');
     const oldCli = join(oldPackage, 'dist/cli/index.js');
     const old = (args: string[]) => cli(home, args, oldCli);
     let upgraded: ChildProcess | undefined;
@@ -517,7 +520,7 @@ void test(
       const exactEvaluations = readFileSync(exactLoaded, 'utf8');
       const broadEvaluations = readFileSync(broadLoaded, 'utf8');
       await stop(home, oldCli);
-      const copy = copyPackage('0.0.1', 'upgraded-package');
+      const copy = copyPackage(upgradedVersion, 'upgraded-package');
       const upgradedCli = join(copy, 'dist/cli/index.js');
       upgraded = spawn(process.execPath, [join(copy, 'dist/runtime/index.js')], {
         env: { ...process.env, HOME: home },
@@ -529,11 +532,11 @@ void test(
         'upgraded service did not publish a descriptor',
         45000,
       );
-      assert.equal(descriptor(home).paneonVersion, '0.0.1');
+      assert.equal(descriptor(home).paneonVersion, upgradedVersion);
       const coldExact = await cli(home, ['panel', 'inspect', exactId], upgradedCli);
       const coldBroad = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
-      assert.equal(coldExact.result.data?.paneonVersion, '0.0.0');
-      assert.equal(coldBroad.result.data?.paneonVersion, '0.0.0');
+      assert.equal(coldExact.result.data?.paneonVersion, oldVersion);
+      assert.equal(coldBroad.result.data?.paneonVersion, oldVersion);
       assert.equal(readFileSync(exactLoaded, 'utf8'), exactEvaluations);
       assert.equal(readFileSync(broadLoaded, 'utf8'), broadEvaluations);
       const upgradedDescriptor = descriptor(home);
@@ -551,7 +554,7 @@ void test(
         'PANEON_VERSION_UNSUPPORTED',
       );
       assert.equal(incompatible.result.data?.revision, created[0]?.revision);
-      assert.equal(incompatible.result.data?.paneonVersion, '0.0.0');
+      assert.equal(incompatible.result.data?.paneonVersion, oldVersion);
       assert.equal(readFileSync(exactLoaded, 'utf8'), exactEvaluations);
       const events = await cli(
         home,
@@ -571,13 +574,13 @@ void test(
       );
       const compatible = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
       assert.equal(compatible.result.data?.status, 'running');
-      assert.equal(compatible.result.data?.paneonVersion, '0.0.1');
+      assert.equal(compatible.result.data?.paneonVersion, upgradedVersion);
       assert.notEqual(compatible.result.data?.revision, created[1]?.revision);
       assert.ok(readFileSync(broadLoaded, 'utf8').length > broadEvaluations.length);
       const current = descriptor(home);
       const detail = await request(current, `/api/panels/${broadId}`);
       const manifest = detail.data?.manifest as Manifest;
-      assert.equal(manifest.paneonVersion, '0.0.1');
+      assert.equal(manifest.paneonVersion, upgradedVersion);
       assert.equal(manifest.revision, compatible.result.data?.revision);
       assert.equal(manifest.requires.paneon, '>=0.0.0 <0.1.0');
       assert.ok(manifest.inputSchema);
@@ -585,7 +588,7 @@ void test(
       assert.equal(
         (JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { version: string })
           .version,
-        packageVersion,
+        PACKAGE_VERSION,
       );
       const mismatch = await old(['server', 'status']);
       assert.equal(mismatch.result.error?.code, 'RUNTIME_VERSION_MISMATCH');
@@ -615,7 +618,7 @@ void test(
     const entry = join(root, 'panel.tsx');
     const helper = join(root, 'helper.ts');
     const panel = (label: string, prefix: string) =>
-      `import{definePanel,serverAction,z}from'paneon/sdk';import{message}from'./helper';export const read=serverAction({kind:'query',input:z.object({}),handler:async()=>({message:${JSON.stringify(prefix)}+message})});function Panel(){return <div>${label}</div>}export default definePanel({id:'latest',requires:{paneon:${JSON.stringify(packageVersion)}},input:z.object({}),render:Panel});`;
+      `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{message}from'./helper';export const read=serverAction({kind:'query',input:z.object({}),handler:async()=>({message:${JSON.stringify(prefix)}+message})});function Panel(){return <div>${label}</div>}export default definePanel({id:'latest',requires:{paneon:${JSON.stringify(PACKAGE_VERSION)}},input:z.object({}),render:Panel});`;
     writeFileSync(helper, "export const message='v1';");
     writeFileSync(entry, panel('UI-initial', 'initial:'));
     const runtime = new Runtime(join(root, 'data'));
@@ -665,7 +668,7 @@ void test(
         .join('');
       assert.match(client, /UI-final/);
       assert.doesNotMatch(client, /UI-initial/);
-      const hash = createHash('sha256').update(packageVersion);
+      const hash = createHash('sha256').update(PACKAGE_VERSION);
       for (const file of live.compiled.manifest.dependencies)
         hash.update(file).update(readFileSync(file));
       assert.equal(live.compiled.manifest.revision, 'sha256:' + hash.digest('hex'));
@@ -716,12 +719,12 @@ void test(
     const marker = join(root, 'metadata-source');
     const release = join(root, 'release');
     const sourceFor = (label: string) => `
-import{definePanel,serverAction,z}from'paneon/sdk';
+import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';
 import{existsSync,writeFileSync}from'node:fs';import{message}from'./helper';
 const held=(()=>{if(existsSync(${JSON.stringify(gate)})){writeFileSync(${JSON.stringify(marker)},message);while(!existsSync(${JSON.stringify(release)})){} }return message;})();
 export const read=serverAction({kind:'query',input:z.object({}),handler:async()=>({message:held})});
 function Panel(){return <div>${label}</div>}
-export default definePanel({id:'snapshot',requires:{paneon:${JSON.stringify(packageVersion)}},input:z.object({}),render:Panel});`;
+export default definePanel({id:'snapshot',requires:{paneon:${JSON.stringify(PACKAGE_VERSION)}},input:z.object({}),render:Panel});`;
     writeFileSync(helper, "export const message='original';");
     writeFileSync(entry, sourceFor('Original UI'));
     const runtime = new Runtime(join(root, 'data'));
@@ -780,7 +783,7 @@ export default definePanel({id:'snapshot',requires:{paneon:${JSON.stringify(pack
       const client = readFileSync(join(compiled.directory, 'client/client.js'), 'utf8');
       assert.match(client, /Recovered UI/);
       assert.doesNotMatch(client, /Never publish this UI/);
-      const hash = createHash('sha256').update(packageVersion);
+      const hash = createHash('sha256').update(PACKAGE_VERSION);
       for (const file of compiled.manifest.dependencies)
         hash.update(file).update(readFileSync(file));
       assert.equal(compiled.manifest.revision, 'sha256:' + hash.digest('hex'));
@@ -798,7 +801,7 @@ void test(
     const root = directory('paneon-compiler-health-');
     const home = join(root, '.paneon');
     const entry = join(root, 'panel.tsx');
-    writeFileSync(entry, source('health', packageVersion));
+    writeFileSync(entry, source('health', PACKAGE_VERSION));
     const { startServer } =
       (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
     const service = await startServer(home);
@@ -809,7 +812,7 @@ void test(
         { length: 30000 },
         (_, index) => `type Padding${index} = { text: string; count: number };`,
       ).join('\n');
-      writeFileSync(entry, padding + '\n' + source('health', packageVersion));
+      writeFileSync(entry, padding + '\n' + source('health', PACKAGE_VERSION));
       let settled = false;
       const building = service.runtime.reload(panel.instanceId).finally(() => {
         settled = true;
@@ -839,7 +842,7 @@ void test(
       }
       await Promise.all(observed);
       await building;
-      writeFileSync(entry, padding + '\n' + source('close-during-build', packageVersion));
+      writeFileSync(entry, padding + '\n' + source('close-during-build', PACKAGE_VERSION));
       const cancelled = service.runtime.reload(panel.instanceId);
       void cancelled.catch(() => {});
       await delay(100);
@@ -849,9 +852,9 @@ void test(
       assert.ok(Date.now() - closeStarted < 3000, 'panel close must terminate its compiler');
       assert.equal(service.runtime.inspect(panel.instanceId).status, 'closed');
       const secondEntry = join(root, 'second.tsx');
-      writeFileSync(secondEntry, source('second', packageVersion));
+      writeFileSync(secondEntry, source('second', PACKAGE_VERSION));
       const second = await service.runtime.run(secondEntry, root, { topic: 'stop' }, false);
-      writeFileSync(secondEntry, padding + '\n' + source('stop-during-build', packageVersion));
+      writeFileSync(secondEntry, padding + '\n' + source('stop-during-build', PACKAGE_VERSION));
       const stoppingBuild = service.runtime.reload(second.instanceId);
       void stoppingBuild.catch(() => {});
       await delay(100);
@@ -872,16 +875,16 @@ void test(
   async () => {
     const root = directory('paneon-cancel-resources-');
     const entry = join(root, 'panel.tsx');
-    writeFileSync(entry, source('cancel-resources', packageVersion));
+    writeFileSync(entry, source('cancel-resources', PACKAGE_VERSION));
     const runtime = new Runtime(join(root, 'data'));
     let stopped = false;
     try {
       const panel = await runtime.run(entry, root, { topic: 'cancel' }, false);
       const marker = join(root, 'metadata-pid');
-      const stuck = source('cancel-resources', packageVersion)
+      const stuck = source('cancel-resources', PACKAGE_VERSION)
         .replace(
-          "import {definePanel,serverAction,z} from 'paneon/sdk';",
-          `import {definePanel,serverAction,z} from 'paneon/sdk';import{writeFileSync}from'node:fs';const held=(()=>{writeFileSync(${JSON.stringify(marker)},String(process.pid));for(;;){}})();`,
+          "import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';",
+          `import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';import{writeFileSync}from'node:fs';const held=(()=>{writeFileSync(${JSON.stringify(marker)},String(process.pid));for(;;){}})();`,
         )
         .replace('return {done:true};', 'return {done:true,held};');
       writeFileSync(entry, stuck);
@@ -909,11 +912,11 @@ void test(
         5000,
       );
       const secondEntry = join(root, 'initializing.tsx');
-      writeFileSync(secondEntry, source('initializing', packageVersion));
+      writeFileSync(secondEntry, source('initializing', PACKAGE_VERSION));
       const second = await runtime.run(secondEntry, root, { topic: 'init' }, false);
       writeFileSync(
         secondEntry,
-        source('initializing', packageVersion).replace(
+        source('initializing', PACKAGE_VERSION).replace(
           'input:z.object({topic:z.string().min(1)})',
           'input:z.object({topic:z.string().min(1)}).refine(()=>{for(;;){}})',
         ),

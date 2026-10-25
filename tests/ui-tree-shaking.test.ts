@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +59,7 @@ void test('public basic UI consumers exclude unused rich content and annotation 
           id === entry
             ? `import { createElement } from 'react';
                import { createRoot } from 'react-dom/client';
-               import { Button, TooltipProvider, UIProvider } from 'paneon/ui';
+               import { Button, TooltipProvider, UIProvider } from '@qoggy/paneon/ui';
                createRoot(document.getElementById('root')).render(
                  createElement(UIProvider, null,
                    createElement(TooltipProvider, null, createElement(Button, null, 'Basic panel'))));`
@@ -89,7 +90,7 @@ void test('a complete basic panel client stays under two MB including SDK and st
     entry = join(directory, 'panel.tsx');
   writeFileSync(
     entry,
-    `import{definePanel,z}from'paneon/sdk';import{Button}from'paneon/ui';export default definePanel({id:'lean',requires:{paneon:'0.0.0'},input:z.object({}),render:()=> <Button>Basic</Button>});`,
+    `import{definePanel,z}from'@qoggy/paneon/sdk';import{Button}from'@qoggy/paneon/ui';export default definePanel({id:'lean',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:()=> <Button>Basic</Button>});`,
   );
   try {
     const compiled = await compilePanel(entry, join(directory, 'output'));

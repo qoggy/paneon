@@ -28,7 +28,7 @@ const { CompilerProcess } = (await import(
   '../dist/compiler/' + 'process.js'
 )) as typeof import('../src/compiler/process.js');
 const rootOfPackage = join(import.meta.dirname, '..');
-const source = (extra = '') => `import{definePanel,serverAction,z}from'paneon/sdk';${extra}
+const source = (extra = '') => `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${extra}
 export const call=serverAction({input:z.object({}),handler:()=>value});
 function Panel(){return <h1>Working panel</h1>}
 export default definePanel({id:'diagnostics',requires:{paneon:'*'},input:z.object({}),render:Panel});`;

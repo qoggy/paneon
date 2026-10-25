@@ -1,14 +1,14 @@
 # Annotations
 
-Import `annotationValueSchema` and data types from `paneon/sdk`; import components, `useAnnotations` and `AnnotationAdapter` from `paneon/ui`. Call the feature 批注 in Chinese copy and annotation in English copy.
+Import `annotationValueSchema` and data types from `@qoggy/paneon/sdk`; import components, `useAnnotations` and `AnnotationAdapter` from `@qoggy/paneon/ui`. Call the feature 批注 in Chinese copy and annotation in English copy.
 
 ## Complete panel
 
 ```tsx
 import { useMemo, useRef, useState } from 'react';
-import { agent, definePanel, annotationValueSchema, serverAction, z } from 'paneon/sdk';
-import { Card, AnnotationMenu, AnnotationRoot, AnnotationText } from 'paneon/ui';
-import type { AnnotationAdapter } from 'paneon/ui';
+import { agent, definePanel, annotationValueSchema, serverAction, z } from '@qoggy/paneon/sdk';
+import { Card, AnnotationMenu, AnnotationRoot, AnnotationText } from '@qoggy/paneon/ui';
+import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
 const source = 'Use Redis for shared cache storage.';
 const refSchema = z.literal('redis-plan');
@@ -82,7 +82,7 @@ function Panel() {
 
 export default definePanel({
   id: 'custom-annotations',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}).strict(),
   events: { 'annotations-submitted': resultSchema },
   render: Panel,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, z } from 'paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -23,7 +23,7 @@ import {
   SelectValue,
   Stack,
   Textarea,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 function FormPanel() {
   const [name, setName] = useState('');
@@ -129,7 +129,7 @@ function FormPanel() {
 }
 export default definePanel({
   id: 'form-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: {
     'parameters-submitted': z.object({

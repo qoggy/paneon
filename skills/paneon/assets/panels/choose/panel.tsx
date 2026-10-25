@@ -1,7 +1,7 @@
 import { useLocale } from '../../shared/i18n';
 import { useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { agent, definePanel, usePanelInput } from 'paneon/sdk';
+import { agent, definePanel, usePanelInput } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -17,7 +17,7 @@ import {
   RadioGroup,
   RadioGroupItem,
   Textarea,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import {
   answerSchema,
@@ -549,7 +549,7 @@ function ChoosePanel() {
 }
 export default definePanel({
   id: 'choose',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: chooseParamsSchema,
   events: { 'answers-submitted': answersSubmittedSchema },
   render: ChoosePanel,

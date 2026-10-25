@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { definePanel, z } from 'paneon/sdk';
-import { AnnotationRoot, AnnotationMenu, AnnotationSubmitButton, Markdown, DiffView, Button, useAnnotations } from 'paneon/ui';
+import { definePanel, z } from '@qoggy/paneon/sdk';
+import { AnnotationRoot, AnnotationMenu, AnnotationSubmitButton, Markdown, DiffView, Button, useAnnotations } from '@qoggy/paneon/ui';
 const original = '## Review\n\nrepeat **repeat** and [linked 中文🙂](https://example.com) &amp; \u005c\u005c* escaped.';
 function Controls() {
   const api = useAnnotations();
@@ -25,4 +25,4 @@ function Panel() {
     </AnnotationRoot>
   </main>;
 }
-export default definePanel({ id:'promoted-ui-acceptance', requires:{ paneon:'0.0.0' }, input:z.object({}), events:{}, render:Panel });
+export default definePanel({ id:'promoted-ui-acceptance', requires:{ paneon:'>=0.0.1 <0.1.0' }, input:z.object({}), events:{}, render:Panel });

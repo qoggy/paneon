@@ -1,9 +1,9 @@
-import { Markdown } from 'paneon/ui';
+import { Markdown } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { useMemo, useState, useRef } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import type { AnnotationValue } from 'paneon/sdk';
-import { Button, AnnotationMenu, AnnotationRoot, Page } from 'paneon/ui';
+import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
+import type { AnnotationValue } from '@qoggy/paneon/sdk';
+import { Button, AnnotationMenu, AnnotationRoot, Page } from '@qoggy/paneon/ui';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import { validSourceRange } from '../../shared/markdown-annotation-schema';
 import { useSubmission } from '../../shared/submission';
@@ -83,7 +83,7 @@ function ReviewPanel() {
 }
 export default definePanel({
   id: 'review',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: reviewParamsSchema,
   events: { 'review-submitted': reviewSubmittedSchema },
   render: ReviewPanel,

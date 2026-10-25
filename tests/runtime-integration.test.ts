@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, mkdirSync } from 'node:fs';
@@ -45,7 +46,7 @@ void test('real external TSX separates handler code, runs in cwd, persists event
   const data = join(root, 'data');
   const entry = join(root, 'panel.tsx');
   const sideEffect = join(root, 'called.txt');
-  const source = `import{definePanel,serverAction,z}from'paneon/sdk';import{Button}from'paneon/ui';import{appendFileSync}from'node:fs';export const run=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>{appendFileSync(${JSON.stringify(sideEffect)},'call\\n');return{cwd:process.cwd(),text:input.text,marker:'SERVER_ONLY_HANDLER_MARKER'};}});function Panel(){return <Button onClick={()=>run({text:'中文'})}>Run</Button>}export default definePanel({id:'external',requires:{paneon:'0.0.0'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+  const source = `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{Button}from'@qoggy/paneon/ui';import{appendFileSync}from'node:fs';export const run=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>{appendFileSync(${JSON.stringify(sideEffect)},'call\\n');return{cwd:process.cwd(),text:input.text,marker:'SERVER_ONLY_HANDLER_MARKER'};}});function Panel(){return <Button onClick={()=>run({text:'中文'})}>Run</Button>}export default definePanel({id:'external',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
   writeFileSync(entry, source);
   let runtime = new Runtime(data);
   try {
@@ -78,7 +79,7 @@ void test('real external TSX separates handler code, runs in cwd, persists event
     assert.equal(readFileSync(sideEffect, 'utf8'), 'call\n');
     assert.equal((await runtime.events(p.instanceId, 'agent', 100, 0)).events.length, 0);
     assert.equal((await runtime.events(p.instanceId, 'other', 100, 0)).events.length, 1);
-    writeFileSync(entry, source.replace("paneon:'0.0.0'", "paneon:'>=99.0.0'"));
+    writeFileSync(entry, source.replace(`paneon:'${PACKAGE_VERSION}'`, "paneon:'>=99.0.0'"));
     const previous = runtime.inspect(p.instanceId).revision;
     await assert.rejects(runtime.reload(p.instanceId), { code: 'PANEON_VERSION_UNSUPPORTED' });
     assert.equal(runtime.inspect(p.instanceId).revision, previous);
@@ -97,7 +98,7 @@ void test('Vite source watching updates a local CSS dependency and retains a fai
   writeFileSync(css, '.marker{color:red}');
   writeFileSync(
     entry,
-    `import{definePanel,z}from'paneon/sdk';import './panel.css';function Panel(){return <div className='marker'>Watch</div>}export default definePanel({id:'watch',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+    `import{definePanel,z}from'@qoggy/paneon/sdk';import './panel.css';function Panel(){return <div className='marker'>Watch</div>}export default definePanel({id:'watch',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
   );
   const runtime = new Runtime(join(root, 'data'));
   try {
@@ -142,7 +143,7 @@ void test('real CLI watch choices, compact command results, English debug, and e
   const entry = join(root, 'panel.tsx');
   writeFileSync(
     entry,
-    `import{definePanel,z}from'paneon/sdk';function Panel(){return <div>CLI</div>}export default definePanel({id:'cli',requires:{paneon:'0.0.0'},input:z.object({topic:z.string()}),events:{feedback:z.object({text:z.string()})},render:Panel});`,
+    `import{definePanel,z}from'@qoggy/paneon/sdk';function Panel(){return <div>CLI</div>}export default definePanel({id:'cli',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({topic:z.string()}),events:{feedback:z.object({text:z.string()})},render:Panel});`,
   );
   const { startServer } =
     (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
@@ -240,7 +241,7 @@ void test('actual SVG imports are handled by Vite and resource changes update th
   writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>');
   writeFileSync(
     entry,
-    `import{definePanel,z}from'paneon/sdk';import logo from './logo.svg';function Panel(){return <img src={logo} alt='Local SVG'/>}export default definePanel({id:'svg',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+    `import{definePanel,z}from'@qoggy/paneon/sdk';import logo from './logo.svg';function Panel(){return <img src={logo} alt='Local SVG'/>}export default definePanel({id:'svg',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
   );
   const runtime = new Runtime(join(root, 'data'));
   try {
@@ -284,8 +285,8 @@ void test('a real daemon and CLI stop complete while a framework WebSocket stays
     watch: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    requires: { paneon: '0.0.0' },
-    paneonVersion: '0.0.0',
+    requires: { paneon: PACKAGE_VERSION },
+    paneonVersion: PACKAGE_VERSION,
   });
   store.close();
   const { spawn, execFile } = await import('node:child_process');

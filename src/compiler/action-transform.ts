@@ -86,7 +86,7 @@ export function parseModule(
   }
   const serverNames = new Set(
     [...imports]
-      .filter(([, i]) => i.specifier === 'paneon/sdk' && i.imported === 'serverAction')
+      .filter(([, i]) => i.specifier === '@qoggy/paneon/sdk' && i.imported === 'serverAction')
       .map(([n]) => n),
   );
   function visit(node: ts.Node) {
@@ -559,7 +559,7 @@ export function createGraph(
       side === 'client' &&
       [...m.actions.values()].some((a) => selected.get(file)?.has(a.statement))
     )
-      lines.push('import {createActionProxy as __paneonProxy} from "paneon/sdk/client";');
+      lines.push('import {createActionProxy as __paneonProxy} from "@qoggy/paneon/sdk/client";');
     for (const statement of m.source.statements) {
       if (ts.isImportDeclaration(statement) && statement.importClause) {
         const names = selectedImports.get(file)!;

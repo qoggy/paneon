@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { definePanel, z } from 'paneon/sdk';
-import { Button, Markdown, Mermaid, Page, Section, Stack, Textarea } from 'paneon/ui';
+import { definePanel, z } from '@qoggy/paneon/sdk';
+import { Button, Markdown, Mermaid, Page, Section, Stack, Textarea } from '@qoggy/paneon/ui';
 
 const flow = 'flowchart LR\n  Start --> Finish';
 const sequence = 'sequenceDiagram\n  Human->>Agent: Question\n  Agent-->>Human: Answer';
@@ -76,4 +76,4 @@ function Panel() {
     </Page>
   );
 }
-export default definePanel({id:'mermaid-acceptance',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});
+export default definePanel({id:'mermaid-acceptance',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),render:Panel});

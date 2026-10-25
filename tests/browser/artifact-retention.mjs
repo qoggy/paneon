@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, access, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,7 +13,7 @@ const home = join(root, 'data'),
 await mkdir(home);
 await writeFile(join(home, 'config.json'), JSON.stringify({ server: { port: 0 } }));
 const source = (label) =>
-  `import{definePanel,serverAction,z}from'paneon/sdk';import{useState}from'react';export const read=serverAction({input:z.object({}),handler:async()=>({text:${JSON.stringify(label)}})});function Panel(){const[result,setResult]=useState('idle');return <div><h1>${label}</h1><button onClick={()=>void read({}).then(r=>setResult(r.text))}>Read</button><output>{result}</output></div>}export default definePanel({id:'retention-browser',requires:{paneon:'0.0.0'},input:z.object({}),events:{done:z.object({text:z.string()})},render:Panel});`;
+  `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{useState}from'react';export const read=serverAction({input:z.object({}),handler:async()=>({text:${JSON.stringify(label)}})});function Panel(){const[result,setResult]=useState('idle');return <div><h1>${label}</h1><button onClick={()=>void read({}).then(r=>setResult(r.text))}>Read</button><output>{result}</output></div>}export default definePanel({id:'retention-browser',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{done:z.object({text:z.string()})},render:Panel});`;
 const exists = async (path) => {
   try {
     await access(path);

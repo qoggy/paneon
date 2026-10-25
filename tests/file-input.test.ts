@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -36,7 +37,7 @@ void test('omitted panel input creates the same empty snapshot as explicit JSON'
   const entry = join(home, 'panel.tsx');
   await writeFile(
     entry,
-    `import {definePanel,z} from 'paneon/sdk';function Panel(){return <p>No input</p>}export default definePanel({id:'empty-input',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`,
+    `import {definePanel,z} from '@qoggy/paneon/sdk';function Panel(){return <p>No input</p>}export default definePanel({id:'empty-input',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
   );
   const service = await startServer(join(home, '.paneon'));
   try {
@@ -70,7 +71,7 @@ void test(
     const paramsPath = join(caller, 'params.json');
     await writeFile(
       entry,
-      `import {definePanel,z} from 'paneon/sdk';function Panel(){return <p>Input</p>}export default definePanel({id:'file-input',requires:{paneon:'0.0.0'},input:z.object({topic:z.string()}),render:Panel});`,
+      `import {definePanel,z} from '@qoggy/paneon/sdk';function Panel(){return <p>Input</p>}export default definePanel({id:'file-input',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({topic:z.string()}),render:Panel});`,
     );
     await writeFile(paramsPath, JSON.stringify({ topic: '原始问题' }));
     // The same relative filename in --cwd must never be mistaken for the caller's file.

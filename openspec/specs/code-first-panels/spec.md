@@ -12,7 +12,7 @@ Paneon SHALL 接受默认导出 `definePanel` 返回的 PanelDefinition（面板
 
 #### Scenario: Run a definition outside the Paneon repository
 
-- **WHEN** agent 从仓库外目录运行一个使用 `paneon/sdk`、`paneon/ui` 和相对接入模块的面板
+- **WHEN** agent 从仓库外目录运行一个使用 `@qoggy/paneon/sdk`、`@qoggy/paneon/ui` 和相对接入模块的面板
 - **THEN** 系统解析已安装的 SDK 和 React、校验输入并生成可访问实例，不要求面板源码目录初始化 npm 项目
 
 #### Scenario: Reuse source in another session
@@ -38,7 +38,7 @@ Page、Section、Stack SHALL 仅提供必要的页面宽度、分区和排列等
 
 ### Requirement: Provide styled components without mandatory custom CSS
 
-系统 SHALL 通过 paneon/ui 提供基于 shadcn/ui 的 Button、Input、Label、Field、Card、RadioGroup、Checkbox、Textarea、Select、Badge、Alert、Spinner、Table、Pagination、Tabs、Dialog、AlertDialog、Accordion、Collapsible、Tooltip、DropdownMenu、Popover、Switch、CodeBlock、Markdown，以及 Page、Section、Stack、StatusBadge 轻量组合；组件族 SHALL 包含设计公共导出清单中完成组合所需的配套组件，特别是 TabsList、TabsTrigger 和 TabsContent。普通组合 SHALL 在不编写面板 CSS 的情况下具有统一主题、焦点、加载与错误呈现。Tabs、RadioGroup、Checkbox、Switch、Textarea、Accordion、Collapsible 等交互组件 SHALL 支持选定社区实现的受控/非受控方式，以及其适用的禁用状态及键盘交互；组件状态变化 MUST NOT 隐式执行业务动作、提交 agent 事件或持久化值。
+系统 SHALL 通过 @qoggy/paneon/ui 提供基于 shadcn/ui 的 Button、Input、Label、Field、Card、RadioGroup、Checkbox、Textarea、Select、Badge、Alert、Spinner、Table、Pagination、Tabs、Dialog、AlertDialog、Accordion、Collapsible、Tooltip、DropdownMenu、Popover、Switch、CodeBlock、Markdown，以及 Page、Section、Stack、StatusBadge 轻量组合；组件族 SHALL 包含设计公共导出清单中完成组合所需的配套组件，特别是 TabsList、TabsTrigger 和 TabsContent。普通组合 SHALL 在不编写面板 CSS 的情况下具有统一主题、焦点、加载与错误呈现。Tabs、RadioGroup、Checkbox、Switch、Textarea、Accordion、Collapsible 等交互组件 SHALL 支持选定社区实现的受控/非受控方式，以及其适用的禁用状态及键盘交互；组件状态变化 MUST NOT 隐式执行业务动作、提交 agent 事件或持久化值。
 
 #### Scenario: Compose a release interface with defaults
 
@@ -47,7 +47,7 @@ Page、Section、Stack SHALL 仅提供必要的页面宽度、分区和排列等
 
 #### Scenario: Switch between author-defined tabs
 
-- **WHEN** AI 从 paneon/ui 导入 Tabs、TabsList、TabsTrigger 和 TabsContent，组合多个页签
+- **WHEN** AI 从 @qoggy/paneon/ui 导入 Tabs、TabsList、TabsTrigger 和 TabsContent，组合多个页签
 - **THEN** 用户可通过点击或键盘切换对应内容，受控值和禁用状态按社区组件契约生效，样式在面板 iframe 内完整呈现
 
 #### Scenario: Control checkbox and switch values
@@ -138,7 +138,7 @@ CodeBlock MUST NOT 将内容当作 HTML、脚本或命令执行，也 MUST NOT �
 
 ### Requirement: Render Markdown with an existing community presentation
 
-系统 SHALL 通过 paneon/ui 导出只读 Markdown 组件，接受 Markdown 字符串并渲染标题、段落、列表、链接、引用、行内代码和围栏代码块。组件 SHALL 使用 react-markdown + remark-gfm，支持 GFM 表格、删除线、只读任务列表和自动链接；排版 SHALL 采用社区维护的 github-markdown-css 浅色样式，通过 markdown-body 容器限定作用范围，不覆盖外层 shadcn 控件。系统 SHALL 固定依赖版本并记录配置，不另定 Paneon Markdown 皮肤，不将该社区样式项目冒称为 GitHub 官方组件。依赖和样式 SHALL 随包提供并在面板 iframe 内加载。
+系统 SHALL 通过 @qoggy/paneon/ui 导出只读 Markdown 组件，接受 Markdown 字符串并渲染标题、段落、列表、链接、引用、行内代码和围栏代码块。组件 SHALL 使用 react-markdown + remark-gfm，支持 GFM 表格、删除线、只读任务列表和自动链接；排版 SHALL 采用社区维护的 github-markdown-css 浅色样式，通过 markdown-body 容器限定作用范围，不覆盖外层 shadcn 控件。系统 SHALL 固定依赖版本并记录配置，不另定 Paneon Markdown 皮肤，不将该社区样式项目冒称为 GitHub 官方组件。依赖和样式 SHALL 随包提供并在面板 iframe 内加载。
 
 Markdown 内容 MUST NOT 作为 JSX、脚本或命令执行，默认 MUST NOT 启用原始 HTML 解析；本能力不包含编辑器、批注或文档存储。
 

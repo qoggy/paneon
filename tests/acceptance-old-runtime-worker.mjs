@@ -4,7 +4,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const [home, protocol] = process.argv.slice(2);
+const [home, protocol, paneonVersion] = process.argv.slice(2);
 if (!home || !protocol || !process.send)
   throw new Error('Run this fixture through acceptance-versions.mjs.');
 const runtimeDirectory = join(home, '.paneon');
@@ -15,7 +15,7 @@ const descriptor = {
   pid: process.pid,
   port: 0,
   controlToken: randomUUID(),
-  paneonVersion: '0.0.1',
+  paneonVersion,
   protocolVersion: Number(protocol),
   startedAt: new Date().toISOString(),
 };

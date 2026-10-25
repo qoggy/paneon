@@ -129,7 +129,7 @@ void test('type-only re-exports never load their modules or discover their actio
         "export type {Model} from './types';export type * from './types';export {type Model as Shape,value} from './values';",
       'values.ts': "export type Model={label:string};export const value='typed';",
       'types.ts':
-        "import {serverAction,z} from 'paneon/sdk';export type Model={x:number};export const hidden=serverAction({input:z.object({}),handler:()=>1});",
+        "import {serverAction,z} from '@qoggy/paneon/sdk';export type Model={x:number};export const hidden=serverAction({input:z.object({}),handler:()=>1});",
     },
     async (root, entry) => {
       for (const side of ['client', 'server'] as const) {
@@ -238,7 +238,7 @@ void test('star inspection does not register unrelated actions or override expli
       'values.ts': "export const first='selected';",
       'override.ts': "export const chosen='explicit';",
       'unrelated.ts':
-        "import {serverAction,z} from 'paneon/sdk';import {readFileSync} from 'node:fs';export const preferred='wrong';export const hidden=serverAction({input:z.object({}),handler:()=>readFileSync('/hidden','utf8')});",
+        "import {serverAction,z} from '@qoggy/paneon/sdk';import {readFileSync} from 'node:fs';export const preferred='wrong';export const hidden=serverAction({input:z.object({}),handler:()=>readFileSync('/hidden','utf8')});",
     },
     async (root, entry) => {
       for (const side of ['client', 'server'] as const) {
@@ -276,12 +276,12 @@ void test('action aliases through a barrel keep client proxies and exclude unrel
   await fixture(
     {
       'panel.tsx':
-        "import {definePanel,z} from 'paneon/sdk';import {invoke} from './barrel';function Panel(){return <button onClick={()=>invoke({})}>Run</button>}export default definePanel({id:'actions',requires:{paneon:'*'},input:z.object({}),render:Panel});",
+        "import {definePanel,z} from '@qoggy/paneon/sdk';import {invoke} from './barrel';function Panel(){return <button onClick={()=>invoke({})}>Run</button>}export default definePanel({id:'actions',requires:{paneon:'*'},input:z.object({}),render:Panel});",
       'barrel.ts': "export {read as invoke} from './actions';export {hidden} from './hidden';",
       'actions.ts':
-        "import {serverAction,z} from 'paneon/sdk';import {readFileSync} from 'node:fs';const value=()=>readFileSync('/server-only','utf8');export const read=serverAction({kind:'query',input:z.object({}),handler:()=>value()});",
+        "import {serverAction,z} from '@qoggy/paneon/sdk';import {readFileSync} from 'node:fs';const value=()=>readFileSync('/server-only','utf8');export const read=serverAction({kind:'query',input:z.object({}),handler:()=>value()});",
       'hidden.ts':
-        "import {serverAction,z} from 'paneon/sdk';export const hidden=serverAction({input:z.object({}),handler:()=>99});",
+        "import {serverAction,z} from '@qoggy/paneon/sdk';export const hidden=serverAction({input:z.object({}),handler:()=>99});",
     },
     (root, entry) => {
       const client = createGraph(entry, 'client');
@@ -309,12 +309,12 @@ void test(
   async () => {
     await fixture(
       {
-        'panel.tsx': `import {definePanel,z} from 'paneon/sdk';import {invoke,label} from './barrel';function Panel(){return <button onClick={()=>invoke({suffix:'!'})}>{label}</button>}export default definePanel({id:'barrel-runtime',requires:{paneon:${JSON.stringify(version)}},input:z.object({}),render:Panel});`,
+        'panel.tsx': `import {definePanel,z} from '@qoggy/paneon/sdk';import {invoke,label} from './barrel';function Panel(){return <button onClick={()=>invoke({suffix:'!'})}>{label}</button>}export default definePanel({id:'barrel-runtime',requires:{paneon:${JSON.stringify(version)}},input:z.object({}),render:Panel});`,
         'barrel.ts':
           "export {read as invoke} from './actions';export {first as label,second} from './values';export {unused} from './unrelated';",
         'values.ts': "export const first='Browser label';export const second='must be pruned';",
         'actions.ts':
-          "import {serverAction,z} from 'paneon/sdk';import {fromPath} from './server-barrel';export const read=serverAction({kind:'query',input:z.object({suffix:z.string()}),handler:(_ctx,input)=>fromPath('/SERVER_IMPLEMENTATION_ONLY/result')+input.suffix});",
+          "import {serverAction,z} from '@qoggy/paneon/sdk';import {fromPath} from './server-barrel';export const read=serverAction({kind:'query',input:z.object({suffix:z.string()}),handler:(_ctx,input)=>fromPath('/SERVER_IMPLEMENTATION_ONLY/result')+input.suffix});",
         'server-barrel.ts': "export {basename as fromPath,dirname} from 'node:path';",
         'unrelated.ts':
           "import {readFileSync} from 'node:fs';export const unused=readFileSync('/must-never-evaluate','utf8');",

@@ -35,7 +35,7 @@ try {
     ['install', '--prefix', installation, '--no-audit', '--no-fund', join(root, metadata.filename)],
     { cwd: project, maxBuffer: 4 * 1024 * 1024 },
   );
-  const packageRoot = join(installation, 'node_modules/paneon');
+  const packageRoot = join(installation, 'node_modules/@qoggy/paneon');
   for (const script of ['git-review.mjs', 'git-review-loading.mjs']) {
     const result = await exec(
       process.execPath,

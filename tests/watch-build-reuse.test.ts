@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -26,11 +27,11 @@ const { Artifacts } = (await import(
 const logger = pino({ level: 'silent' });
 
 function source(marker: string, imports = '', value = "'original'") {
-  return `import{definePanel,serverAction,z}from'paneon/sdk';import{appendFileSync}from'node:fs';${imports}
+  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{appendFileSync}from'node:fs';${imports}
 const boot=(appendFileSync(${JSON.stringify(marker)},'boot\\n'),true);const state={count:0};
 export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({count:++state.count,value:${value},boot})});
 function Panel(){return <div>Reuse</div>}
-export default definePanel({id:'watch-reuse',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`;
+export default definePanel({id:'watch-reuse',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 }
 
 async function until(check: () => boolean) {

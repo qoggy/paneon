@@ -1,6 +1,6 @@
-import { z } from 'paneon/sdk';
-import type { AnnotationTarget } from 'paneon/sdk';
-import type { DiffLocation } from 'paneon/ui';
+import { z } from '@qoggy/paneon/sdk';
+import type { AnnotationTarget } from '@qoggy/paneon/sdk';
+import type { DiffLocation } from '@qoggy/paneon/ui';
 import { sourceLines } from './diff-model.ts';
 import type { DiffModel } from './diff-model.ts';
 export const gitRefSchema = z.intersection(

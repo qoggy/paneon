@@ -1,4 +1,4 @@
-import type { AnnotationTextRange } from 'paneon/sdk';
+import type { AnnotationTextRange } from '@qoggy/paneon/sdk';
 
 /** Locate a raw-source range using the same explicit boundary map used for selection. */
 export function locateMarkdownAnnotation(root: HTMLElement, text?: AnnotationTextRange) {

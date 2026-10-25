@@ -1,5 +1,10 @@
 import type { ReactElement } from 'react';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from 'paneon/ui';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 
 export function RevisionContextMenu({

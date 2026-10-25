@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, z } from 'paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Badge,
   Button,
@@ -22,7 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 function TablePanel() {
   const [filter, setFilter] = useState('');
@@ -143,7 +143,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: { 'row-selected': z.object({ id: z.number().int().positive() }) },
   render: TablePanel,

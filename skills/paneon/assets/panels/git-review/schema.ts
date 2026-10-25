@@ -1,4 +1,4 @@
-import { annotationValueSchema, z } from 'paneon/sdk';
+import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export type { GitRef } from '../../shared/diff-schema.ts';
 const nonempty = z.string().refine((s) => s.trim().length > 0, 'Must not be blank.');

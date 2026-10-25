@@ -8,7 +8,7 @@ Render reusable Mermaid diagrams and Markdown Mermaid blocks with bundled offici
 
 ### Requirement: Render a reusable Mermaid component
 
-系统 SHALL 从 paneon/ui 导出 Mermaid 组件，接受必需的 code 字符串及可选 className，使用官方 mermaid npm 库在浏览器生成可见图表。系统 MUST NOT 要求调用者手工生成 SVG、加载 CDN 或配置第三方渲染服务。
+系统 SHALL 从 @qoggy/paneon/ui 导出 Mermaid 组件，接受必需的 code 字符串及可选 className，使用官方 mermaid npm 库在浏览器生成可见图表。系统 MUST NOT 要求调用者手工生成 SVG、加载 CDN 或配置第三方渲染服务。
 
 #### Scenario: Render diagrams in TSX
 

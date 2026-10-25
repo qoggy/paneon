@@ -18,8 +18,8 @@ try {
     'utf8',
   );
   const gallery = original
-    .replace("import { definePanel, z } from 'paneon/sdk';", '')
-    .replace("from 'paneon/ui'", "from '../../src/ui/index'")
+    .replace("import { definePanel, z } from '@qoggy/paneon/sdk';", '')
+    .replace("from '@qoggy/paneon/ui'", "from '../../src/ui/index'")
     .replace(/export default definePanel\([\s\S]*$/, 'export default ComponentsPanel;');
   await writeFile(join(directory, 'gallery.tsx'), gallery);
   await writeFile(

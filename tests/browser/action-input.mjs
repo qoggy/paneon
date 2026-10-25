@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -17,8 +18,8 @@ try {
     entry,
     `import { useState } from 'react';
 import { createHash } from 'node:crypto';
-import { definePanel, serverAction, agent, z } from 'paneon/sdk';
-import { Input, Button } from 'paneon/ui';
+import { definePanel, serverAction, agent, z } from '@qoggy/paneon/sdk';
+import { Input, Button } from '@qoggy/paneon/ui';
 export const authenticate = serverAction({
   input: z.object({ token: z.string().min(1) }),
   handler: async (_ctx, { token }) => ({ digest: createHash('sha256').update(token).digest('hex') }),
@@ -38,7 +39,7 @@ function Panel() {
   </div>;
 }
 export default definePanel({
-  id: 'action-input', requires: { paneon: '0.0.0' }, input: z.object({}),
+  id: 'action-input', requires: { paneon: '${PACKAGE_VERSION}' }, input: z.object({}),
   events: { authenticated: z.object({ ok: z.boolean() }) }, render: Panel,
 });`,
   );

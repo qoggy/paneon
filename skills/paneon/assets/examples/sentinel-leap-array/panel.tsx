@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
-import { definePanel } from 'paneon/sdk';
-import { Badge, Button, Input, Label } from 'paneon/ui';
+import { definePanel } from '@qoggy/paneon/sdk';
+import { Badge, Button, Input, Label } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { SOURCE_COMMIT, SOURCE_ROOT } from './model';
 import {
@@ -596,7 +596,7 @@ function SentinelPanel() {
 }
 export default definePanel({
   id: 'sentinel-leap-array-explanation',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}).strict(),
   render: SentinelPanel,
 });

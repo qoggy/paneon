@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,9 +11,9 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-production-runtime-'));
 const previousEnv = process.env.NODE_ENV;
 let service;
 let browser;
-const source = (heading, range = '0.0.0') => `
-import {definePanel,serverAction,z} from 'paneon/sdk';
-import {Checkbox} from 'paneon/ui';
+const source = (heading, range = PACKAGE_VERSION) => `
+import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';
+import {Checkbox} from '@qoggy/paneon/ui';
 export const environment=serverAction({kind:'query',input:z.object({}),handler:async()=>({nodeEnv:process.env.NODE_ENV??'unset'})});
 function Panel(){return <><h1>${heading}</h1><Checkbox aria-label="Include details" /></>}
 export default definePanel({id:'production-test',requires:{paneon:'${range}'},input:z.object({}),events:{},render:Panel});`;

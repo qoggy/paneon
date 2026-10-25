@@ -2,8 +2,8 @@ import { useLocale } from '../../shared/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw } from './icons';
 import { z } from 'zod';
-import { definePanel } from 'paneon/sdk';
-import { Badge, Button } from 'paneon/ui';
+import { definePanel } from '@qoggy/paneon/sdk';
+import { Badge, Button } from '@qoggy/paneon/ui';
 import {
   PHILOSOPHERS,
   STRATEGIES,
@@ -525,7 +525,7 @@ function DiningPhilosophersPanel() {
 }
 export default definePanel({
   id: 'dining-philosophers-explanation',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}).strict(),
   render: DiningPhilosophersPanel,
 });

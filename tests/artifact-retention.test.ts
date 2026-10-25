@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -38,7 +39,7 @@ function output(home: string, id: string, hash: string) {
   return path;
 }
 function source(id = 'retention', input = 'z.object({})') {
-  return `import{definePanel,serverAction,z}from'paneon/sdk';export const read=serverAction({input:z.object({}),handler:async()=>({id:${JSON.stringify(id)}})});function Panel(){return <div>${id}</div>}export default definePanel({id:${JSON.stringify(id)},requires:{paneon:'0.0.0'},input:${input},events:{done:z.object({text:z.string()})},render:Panel});`;
+  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';export const read=serverAction({input:z.object({}),handler:async()=>({id:${JSON.stringify(id)}})});function Panel(){return <div>${id}</div>}export default definePanel({id:${JSON.stringify(id)},requires:{paneon:'${PACKAGE_VERSION}'},input:${input},events:{done:z.object({text:z.string()})},render:Panel});`;
 }
 async function until(check: () => boolean | Promise<boolean>, message: string) {
   const deadline = Date.now() + 15000;
@@ -225,8 +226,8 @@ void test('sweep waits for first-run publication rather than deleting its unpubl
       entry,
       source()
         .replace(
-          "import{definePanel,serverAction,z}from'paneon/sdk';",
-          `import{definePanel,serverAction,z}from'paneon/sdk';import{writeFileSync,existsSync}from'node:fs';const gate=await new Promise<number>(resolve=>{writeFileSync(${JSON.stringify(marker)},'ready');const timer=setInterval(()=>{if(existsSync(${JSON.stringify(release)})){clearInterval(timer);resolve(1)}},10)});`,
+          "import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';",
+          `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{writeFileSync,existsSync}from'node:fs';const gate=await new Promise<number>(resolve=>{writeFileSync(${JSON.stringify(marker)},'ready');const timer=setInterval(()=>{if(existsSync(${JSON.stringify(release)})){clearInterval(timer);resolve(1)}},10)});`,
         )
         .replace('handler:async()=>({id:', 'handler:async()=>({gate,id:'),
     );
@@ -395,8 +396,8 @@ void test(
         entry,
         source('replacement')
           .replace(
-            "import{definePanel,serverAction,z}from'paneon/sdk';",
-            `import{definePanel,serverAction,z}from'paneon/sdk';import{writeFileSync,existsSync}from'node:fs';const gate=await new Promise<number>(resolve=>{writeFileSync(${JSON.stringify(marker)},'ready');const timer=setInterval(()=>{if(existsSync(${JSON.stringify(release)})){clearInterval(timer);resolve(1)}},10)});`,
+            "import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';",
+            `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{writeFileSync,existsSync}from'node:fs';const gate=await new Promise<number>(resolve=>{writeFileSync(${JSON.stringify(marker)},'ready');const timer=setInterval(()=>{if(existsSync(${JSON.stringify(release)})){clearInterval(timer);resolve(1)}},10)});`,
           )
           .replace('handler:async()=>({id:', 'handler:async()=>({gate,id:'),
       );

@@ -1,4 +1,4 @@
-import { Markdown } from 'paneon/ui';
+import { Markdown } from '@qoggy/paneon/ui';
 import { FileDiffNotice } from '../../shared/file-diff-notice';
 import { usePRCopy } from './copy';
 import {
@@ -15,8 +15,8 @@ import {
   X,
 } from './icons';
 import { useEffect, useRef, useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from 'paneon/sdk';
-import type { AnnotationTarget as Target } from 'paneon/sdk';
+import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
+import type { AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -42,7 +42,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
 import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
@@ -1202,7 +1202,7 @@ function GithubPR() {
 }
 export default definePanel({
   id: 'github-pr',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: githubPRParamsSchema,
   events: {
     'review-requested': prReviewRequestedSchema,

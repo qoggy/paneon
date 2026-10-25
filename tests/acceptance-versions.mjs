@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -5,12 +6,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execute, repositoryRoot } from './acceptance-support.mjs';
 
+const OLD_RUNTIME_VERSION = '0.0.0';
+
 async function controlledRuntime(protocolVersion) {
   const home = await mkdtemp(join(tmpdir(), 'paneon-old-runtime-'));
   const operations = [];
   const child = fork(
     join(repositoryRoot, 'tests/acceptance-old-runtime-worker.mjs'),
-    [home, String(protocolVersion)],
+    [home, String(protocolVersion), OLD_RUNTIME_VERSION],
     { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] },
   );
   await new Promise((resolve, reject) => {
@@ -78,8 +81,8 @@ try {
     assert.equal(result.code, 1);
     assert.equal(result.output.error.code, 'RUNTIME_VERSION_MISMATCH');
     assert.deepEqual(result.output.error.details, {
-      expectedVersion: '0.0.0',
-      actualVersion: '0.0.1',
+      expectedVersion: PACKAGE_VERSION,
+      actualVersion: OLD_RUNTIME_VERSION,
     });
   }
   assert.equal(

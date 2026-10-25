@@ -1,6 +1,6 @@
 # Examples
 
-Each example is a complete custom page. Run it as-is, or read its source to borrow a technique; write new pages on `paneon/sdk` and `paneon/ui` rather than importing from the example. `<skill>` is the absolute path of this skill directory.
+Each example is a complete custom page. Run it as-is, or read its source to borrow a technique; write new pages on `@qoggy/paneon/sdk` and `@qoggy/paneon/ui` rather than importing from the example. `<skill>` is the absolute path of this skill directory.
 
 ## Dining philosophers
 

@@ -1,4 +1,4 @@
-import { useUI } from 'paneon/ui';
+import { useUI } from '@qoggy/paneon/ui';
 import { useMemo } from 'react';
 import en from './locales/en';
 import zh from './locales/zh-CN';

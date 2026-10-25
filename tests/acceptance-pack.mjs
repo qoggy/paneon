@@ -19,7 +19,7 @@ try {
     maxBuffer: 16 * 1024 * 1024,
   });
   const { version } = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));
-  const tarball = join(scratch, `paneon-${version}.tgz`);
+  const tarball = join(scratch, `qoggy-paneon-${version}.tgz`);
   const install = join(scratch, 'installation');
   await mkdir(install);
   await writeFile(join(install, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
@@ -32,7 +32,7 @@ try {
       maxBuffer: 16 * 1024 * 1024,
     },
   );
-  const packageRoot = join(install, 'node_modules/paneon');
+  const packageRoot = join(install, 'node_modules/@qoggy/paneon');
   for (const directory of ['examples', 'tests'])
     await assert.rejects(access(join(packageRoot, directory)), { code: 'ENOENT' });
   const { stdout } = await execute(
@@ -40,7 +40,7 @@ try {
     [
       '--input-type=module',
       '-e',
-      "import {definePanel,serverAction,z} from 'paneon/sdk';import {existsSync} from 'node:fs';import {fileURLToPath} from 'node:url';if(![definePanel,serverAction,z].every(Boolean)||!existsSync(fileURLToPath(import.meta.resolve('paneon/ui'))))process.exit(1);console.log('Package exports resolve.');",
+      "import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';import {existsSync} from 'node:fs';import {fileURLToPath} from 'node:url';if(![definePanel,serverAction,z].every(Boolean)||!existsSync(fileURLToPath(import.meta.resolve('@qoggy/paneon/ui'))))process.exit(1);console.log('Package exports resolve.');",
     ],
     { cwd: install },
   );

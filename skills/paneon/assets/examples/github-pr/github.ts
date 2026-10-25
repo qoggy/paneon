@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { z } from 'paneon/sdk';
+import { z } from '@qoggy/paneon/sdk';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { normalizeDiffTarget } from '../../shared/diff-schema.ts';

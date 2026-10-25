@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import { submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
@@ -249,10 +250,10 @@ try {
   );
   await writeFile(
     plainEntry,
-    `import {definePanel,z} from 'paneon/sdk';
+    `import {definePanel,z} from '@qoggy/paneon/sdk';
 import {DiffView} from '../../shared/diff.tsx';
 const oldText=Array.from({length:340},(_,i)=>'line '+(i+1)+'\\n').join('');
-export default definePanel({id:'plain-diff',requires:{paneon:'0.0.0'},input:z.object({}),render:()=> <main><h1>Plain document consumer</h1><DiffView oldText={oldText} newText={oldText.replace('line 250','updated 250')} oldPath="old.txt" newPath="new.txt" defaultExpanded /></main>});`,
+export default definePanel({id:'plain-diff',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:()=> <main><h1>Plain document consumer</h1><DiffView oldText={oldText} newText={oldText.replace('line 250','updated 250')} oldPath="old.txt" newPath="new.txt" defaultExpanded /></main>});`,
   );
   const plainPanel = await f.service.runtime.run(plainEntry, f.root, {}, false);
   await page.setViewportSize({ width: 1280, height: 800 });

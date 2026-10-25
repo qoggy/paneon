@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, useQuery, z } from 'paneon/sdk';
+import { agent, definePanel, serverAction, usePanelInput, useQuery, z } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -11,7 +11,7 @@ import {
   Page,
   Spinner,
   Stack,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 export const readCounter = serverAction({
   kind: 'query',
@@ -113,7 +113,7 @@ function HttpPanel() {
 }
 export default definePanel({
   id: 'http-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({ baseUrl: z.string().url() }),
   events: { 'counter-analysis-requested': z.object({ counter: z.number() }) },
   render: HttpPanel,

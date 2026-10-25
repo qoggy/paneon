@@ -1,7 +1,7 @@
 import { FileDiffNotice } from './shared/file-diff-notice';
 import { useMemo, useRef, useState } from 'react';
-import { definePanel, z } from 'paneon/sdk';
-import { Button, AnnotationRoot, AnnotationMenu } from 'paneon/ui';
+import { definePanel, z } from '@qoggy/paneon/sdk';
+import { Button, AnnotationRoot, AnnotationMenu } from '@qoggy/paneon/ui';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
@@ -60,7 +60,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'diff-toolbar-acceptance',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   render: Panel,
 });

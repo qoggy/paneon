@@ -1,7 +1,7 @@
-import {definePanel,serverAction,useQuery,z} from 'paneon/sdk';
+import {definePanel,serverAction,useQuery,z} from '@qoggy/paneon/sdk';
 import {useEffect,useRef,useState} from 'react';
 import {appendFileSync,existsSync,readFileSync,writeFileSync} from 'node:fs';
-import {Button,Page,Stack} from 'paneon/ui';
+import {Button,Page,Stack} from '@qoggy/paneon/ui';
 export const slowQuery=serverAction({kind:'query',input:z.object({milliseconds:z.number()}),handler:async(_ctx,input)=>{
  const callId=crypto.randomUUID();
  appendFileSync('query.jsonl',JSON.stringify({type:'start',callId,time:Date.now()})+'\n');
@@ -32,4 +32,4 @@ function Panel(){
  <output aria-label="Mutation result">{result}</output>
  </Stack></Page>;
 }
-export default definePanel({id:'query-lifecycle',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});
+export default definePanel({id:'query-lifecycle',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),render:Panel});

@@ -1,4 +1,4 @@
-import { annotationValueSchema, z } from 'paneon/sdk';
+import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 export const reviewParamsSchema = z
   .object({

@@ -1,4 +1,4 @@
-import { annotationValueSchema, z } from 'paneon/sdk';
+import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export const repositorySchema = z
   .string()

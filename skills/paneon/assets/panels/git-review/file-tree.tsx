@@ -14,7 +14,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import type { GitFile } from './git.ts';
 import {
   areaNames,

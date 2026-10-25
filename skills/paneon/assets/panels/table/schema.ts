@@ -1,5 +1,5 @@
-import { annotationValueSchema, z } from 'paneon/sdk';
-import type { AnnotationTarget } from 'paneon/sdk';
+import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import type { AnnotationTarget } from '@qoggy/paneon/sdk';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 const label = z.string().refine((value) => value.trim().length > 0, 'Must not be blank.');
 const cell = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);

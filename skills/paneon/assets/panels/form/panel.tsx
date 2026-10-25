@@ -1,6 +1,6 @@
 import { useLocale } from '../../shared/i18n';
 import { useRef, useState } from 'react';
-import { agent, definePanel, usePanelInput } from 'paneon/sdk';
+import { agent, definePanel, usePanelInput } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -25,7 +25,7 @@ import {
   SelectValue,
   Switch,
   Textarea,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import {
   collectForm,
@@ -304,7 +304,7 @@ function FormPanel() {
 }
 export default definePanel({
   id: 'form',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: formParamsSchema,
   events: { 'form-submitted': formSubmittedSchema },
   render: FormPanel,

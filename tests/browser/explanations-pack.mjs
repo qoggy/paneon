@@ -30,7 +30,7 @@ try {
     ['install', '--prefix', installation, '--no-audit', '--no-fund', join(root, metadata.filename)],
     { cwd: project, maxBuffer: 4 * 1024 * 1024 },
   );
-  const installed = join(installation, 'node_modules/paneon');
+  const installed = join(installation, 'node_modules/@qoggy/paneon');
   assert.equal((await lstat(installed)).isSymbolicLink(), false);
   assert.equal(
     JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')).version,

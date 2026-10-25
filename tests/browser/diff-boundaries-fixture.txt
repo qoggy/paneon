@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
-import { definePanel, z } from 'paneon/sdk';
-import { AnnotationRoot, AnnotationMenu } from 'paneon/ui';
+import { definePanel, z } from '@qoggy/paneon/sdk';
+import { AnnotationRoot, AnnotationMenu } from '@qoggy/paneon/ui';
 import type { GitRef } from './shared/diff-schema.ts';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
@@ -41,7 +41,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'diff-boundaries',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   render: Panel,
 });

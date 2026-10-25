@@ -1,4 +1,4 @@
-import { serverAction, z } from 'paneon/sdk';
+import { serverAction, z } from '@qoggy/paneon/sdk';
 import { readGit, readGitFile, readGitBranches, readGitRevisions } from './git.ts';
 import { validateGitFeedback } from './feedback.ts';
 import {

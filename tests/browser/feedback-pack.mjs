@@ -36,7 +36,7 @@ try {
     ],
     { cwd: installation, timeout: 180000, maxBuffer: 8 * 1024 * 1024 },
   );
-  const installed = join(installation, 'node_modules/paneon');
+  const installed = join(installation, 'node_modules/@qoggy/paneon');
   const exports = await execute(
     process.execPath,
     [
@@ -44,12 +44,12 @@ try {
       '-e',
       `
     import assert from 'node:assert/strict';
-    import {annotationValueSchema,z} from 'paneon/sdk';
-    import {annotationValueSchema as browser} from 'paneon/sdk/client';
+    import {annotationValueSchema,z} from '@qoggy/paneon/sdk';
+    import {annotationValueSchema as browser} from '@qoggy/paneon/sdk/client';
     import {existsSync} from 'node:fs';
     import {fileURLToPath} from 'node:url';
     assert.deepEqual(annotationValueSchema(z.string()).parse({annotations:[]}),browser(z.string()).parse({annotations:[]}));
-    assert.ok(existsSync(fileURLToPath(import.meta.resolve('paneon/ui'))));
+    assert.ok(existsSync(fileURLToPath(import.meta.resolve('@qoggy/paneon/ui'))));
     console.log('Installed public feedback exports resolve.');
   `,
     ],

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { z } from 'paneon/sdk';
+import { z } from '@qoggy/paneon/sdk';
 import {
   chooseParamsSchema,
   completeAnswersSchema,

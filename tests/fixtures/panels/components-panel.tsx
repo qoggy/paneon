@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { definePanel, z } from 'paneon/sdk';
+import { definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Accordion,
   AccordionContent,
@@ -116,7 +116,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 function ComponentsPanel() {
   const [checked, setChecked] = useState(false);
@@ -438,7 +438,7 @@ function ComponentsPanel() {
 }
 export default definePanel({
   id: 'components-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: {},
   render: ComponentsPanel,

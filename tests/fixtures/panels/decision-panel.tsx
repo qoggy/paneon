@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, serverAction, z } from 'paneon/sdk';
+import { agent, definePanel, serverAction, z } from '@qoggy/paneon/sdk';
 import {
   Accordion,
   AccordionContent,
@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
-} from 'paneon/ui';
+} from '@qoggy/paneon/ui';
 
 export const compareCost = serverAction({
   kind: 'query',
@@ -209,7 +209,7 @@ function DecisionPanel() {
 }
 export default definePanel({
   id: 'decision-panel',
-  requires: { paneon: '0.0.0' },
+  requires: { paneon: '>=0.0.1 <0.1.0' },
   input: z.object({}),
   events: { 'decision-submitted': z.object({ choice: z.string(), comment: z.string() }) },
   render: DecisionPanel,

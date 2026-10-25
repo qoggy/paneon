@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -26,8 +27,8 @@ try {
       status: index < 22 ? 'running' : 'closed',
       createdAt: new Date(Date.UTC(2026, 9, 24, 0, index)).toISOString(),
       updatedAt: new Date(Date.UTC(2026, 9, 24, 0, index)).toISOString(),
-      requires: { paneon: '0.0.0' },
-      paneonVersion: '0.0.0',
+      requires: { paneon: PACKAGE_VERSION },
+      paneonVersion: PACKAGE_VERSION,
     });
   browser = await chromium.launch({
     headless: true,

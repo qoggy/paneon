@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,8 +11,8 @@ export async function startMultipleTabsFixture() {
   const source = (title) => `
 import { useState } from 'react';
 import { appendFileSync } from 'node:fs';
-import { definePanel, serverAction, z } from 'paneon/sdk';
-import { Button, Page } from 'paneon/ui';
+import { definePanel, serverAction, z } from '@qoggy/paneon/sdk';
+import { Button, Page } from '@qoggy/paneon/ui';
 export const run = serverAction({kind:'mutation',input:z.object({}),handler:async()=>{
   appendFileSync(${JSON.stringify(calls)}, 'call\\n'); return {done:true};
 }});
@@ -19,7 +20,7 @@ function Panel(){const [done,setDone]=useState(false);return <Page title=${JSON.
 <p>Multiple tabs share the same browser connection pool.</p>
 <Button onClick={async()=>{await run({});setDone(true);}}>Run test action</Button>
 {done&&<p>Action completed</p>}</Page>;}
-export default definePanel({id:'multiple-tabs',requires:{paneon:'0.0.0'},input:z.object({}),render:Panel});`;
+export default definePanel({id:'multiple-tabs',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
   await writeFile(entry, source('Multiple tabs original'));
   const service = await startServer(join(root, 'data'));
   try {
