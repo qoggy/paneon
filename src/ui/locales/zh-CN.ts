@@ -1,5 +1,7 @@
 import type en from './en';
 const zh: Record<keyof typeof en, string> = {
+  'Show code frame': '查看出错代码',
+  'Diagnostic content was truncated.': '错误详情过长，已截断。',
   'Showing the version being annotated. Remove its draft annotations to display the updated content.':
     '当前保留正在批注的原文版本。删除该内容的草稿批注后，可显示更新内容。',
   Server: '服务',
@@ -67,7 +69,8 @@ const zh: Record<keyof typeof en, string> = {
   closed: '已关闭',
   'Reconnecting to Paneon…': '正在重新连接 Paneon…',
   'Runtime connection': '运行时连接',
-  ' The previous working panel remains available.': ' 上一个正常面板仍可使用。',
+  'The new code failed to compile. The page still shows the version from before your changes.':
+    '新代码编译失败，当前仍显示修改前的页面。',
   'This panel has been closed. Interaction history is retained.': '面板已关闭，交互历史已保留。',
   'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.':
     '面板不可用。请让 agent 检查诊断并修正源码。',

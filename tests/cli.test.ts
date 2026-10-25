@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, cpSync, symlinkSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -53,3 +54,29 @@ for (const [name, entry] of Object.entries(entries)) {
     assert.match(result.stderr, /unknown option '--not-a-paneon-option'/);
   });
 }
+
+void test('source CLI help works before a build with no dist directory', () => {
+  const root = mkdtempSync(join(tmpdir(), 'paneon-source-help-'));
+  try {
+    mkdirSync(join(root, 'src/cli'), { recursive: true });
+    cpSync(new URL('../package.json', import.meta.url), join(root, 'package.json'));
+    for (const file of ['index.ts', 'diagnostics.ts'])
+      cpSync(new URL('../src/cli/' + file, import.meta.url), join(root, 'src/cli', file));
+    symlinkSync(
+      fileURLToPath(new URL('../node_modules', import.meta.url)),
+      join(root, 'node_modules'),
+      'dir',
+    );
+    const result = spawnSync(process.execPath, [join(root, 'src/cli/index.ts'), '--help'], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Usage: paneon/);
+    assert.equal(result.stderr, '');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

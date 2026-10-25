@@ -19,6 +19,7 @@ const repository = fileURLToPath(new URL('../', import.meta.url));
 const browserScripts = [
   'production-runtime',
   'host-lifecycle',
+  'build-diagnostics',
   'action-input',
   'multiple-tabs',
   'query-lifecycle',

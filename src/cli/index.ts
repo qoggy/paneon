@@ -2,6 +2,12 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+const { diagnosticLocation, debugDiagnostic } = (await import(
+  import.meta.url.endsWith('.ts')
+    ? new URL('./diagnostics.ts', import.meta.url).href
+    : './diagnostics.js'
+)) as typeof import('./diagnostics.js');
+import type { Diagnostic } from '../shared/types.js';
 import { Command, Option, CommanderError } from 'commander';
 const packageJson = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
@@ -43,6 +49,8 @@ function execute(command: Command, action: () => Promise<unknown>) {
       if (debug) process.stderr.write('[debug] command.start\n');
       try {
         const data = await action();
+        if (debug && data && typeof data === 'object' && 'diagnostic' in data)
+          process.stderr.write(debugDiagnostic(data.diagnostic));
         process.stdout.write(
           command.optsWithGlobals().json
             ? JSON.stringify({ ok: true, data }) + '\n'
@@ -51,7 +59,7 @@ function execute(command: Command, action: () => Promise<unknown>) {
         if (debug)
           process.stderr.write(`[debug] command.complete elapsedMs=${Date.now() - started}\n`);
       } catch (error) {
-        fail(error, command.optsWithGlobals().json);
+        fail(error, command.optsWithGlobals().json, debug);
       }
     });
 }
@@ -313,7 +321,7 @@ logs.action(async () => {
     fail(err, options.json);
   }
 });
-function fail(error: unknown, json: unknown) {
+function fail(error: unknown, json: unknown, debug = false) {
   const e = error as { code?: string; message?: string; details?: unknown };
   const code =
     typeof e.code === 'string' && !e.code.startsWith('commander.') ? e.code : 'INVALID_ARGUMENT';
@@ -325,7 +333,11 @@ function fail(error: unknown, json: unknown) {
         error: { code, message, ...(e.details ? { details: e.details } : {}) },
       }) + '\n',
     );
-  else process.stderr.write(message + '\n');
+  else {
+    const location = diagnosticLocation(e as Diagnostic);
+    process.stderr.write(message + (location ? `\n${location}` : '') + '\n');
+  }
+  if (debug) process.stderr.write(debugDiagnostic(e));
   process.exitCode = 1;
 }
 try {
@@ -336,5 +348,5 @@ try {
     (error.code === 'commander.helpDisplayed' || error.code === 'commander.version')
   ) {
     /* successful built-in output */
-  } else fail(error, process.argv.includes('--json'));
+  } else fail(error, process.argv.includes('--json'), process.argv.includes('--debug'));
 }

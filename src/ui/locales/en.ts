@@ -1,4 +1,6 @@
 const en = {
+  'Show code frame': 'Show code frame',
+  'Diagnostic content was truncated.': 'Diagnostic content was truncated.',
   'Showing the version being annotated. Remove its draft annotations to display the updated content.':
     'Showing the version being annotated. Remove its draft annotations to display the updated content.',
   Server: 'Server',
@@ -67,8 +69,8 @@ const en = {
   closed: 'closed',
   'Reconnecting to Paneon…': 'Reconnecting to Paneon…',
   'Runtime connection': 'Runtime connection',
-  ' The previous working panel remains available.':
-    ' The previous working panel remains available.',
+  'The new code failed to compile. The page still shows the version from before your changes.':
+    'The new code failed to compile. The page still shows the version from before your changes.',
   'This panel has been closed. Interaction history is retained.':
     'This panel has been closed. Interaction history is retained.',
   'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.':

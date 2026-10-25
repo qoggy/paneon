@@ -17,6 +17,7 @@ import semver from 'semver';
 import { build } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { SourceSnapshot } from './source-snapshot.js';
+import { buildError, stderrTail, type BuildStage } from './diagnostics.js';
 import { buildEnvironment, buildReuse, captureBuildEnvironment } from './build-inputs.js';
 import type { Graph } from './action-transform.js';
 import type { Plugin } from 'vite';
@@ -115,11 +116,28 @@ function typecheck(entry: string, snapshot: SourceSnapshot) {
     const d = errors[0];
     const location =
       d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : undefined;
-    throw new PaneonError('BUILD_FAILED', 'Panel TypeScript checking failed.', {
-      entryPath: d.file?.fileName ?? entry,
-      ...(location ? { line: location.line + 1, column: location.character + 1 } : {}),
-      diagnostic: ts.flattenDiagnosticMessageText(d.messageText, ' '),
-    });
+    const reason = ts.flattenDiagnosticMessageText(d.messageText, ' ');
+    let frame: string | undefined;
+    if (d.file && location) {
+      const line = location.line + 1;
+      const start = Math.max(0, location.character - 120);
+      const prefix = start ? '…' : '';
+      const excerpt = d.file.text
+        .split(/\r?\n/)
+        [location.line].slice(start, location.character + 120);
+      frame = `${line} | ${prefix}${excerpt}\n${' '.repeat(String(line).length + 3 + prefix.length + location.character - start)}^`;
+    }
+    throw buildError(
+      new PaneonError('BUILD_FAILED', reason, {
+        entryPath: d.file?.fileName ?? entry,
+        ...(d.file ? { file: d.file.fileName } : {}),
+        ...(location ? { line: location.line + 1, column: location.character + 1 } : {}),
+        diagnostic: reason,
+        ...(frame ? { frame } : {}),
+      }),
+      'typecheck',
+      entry,
+    );
   }
 }
 export function panelPlugin(
@@ -185,115 +203,119 @@ async function compileSnapshot(
   panelRoot: string,
   snapshot: SourceSnapshot,
 ): Promise<CompiledPanel> {
-  const readSource = (file: string) => snapshot.track(() => snapshot.text(file));
-  const environment = buildEnvironment();
-  const environmentFiles = captureBuildEnvironment(snapshot, entry);
-  const range = validateRequirement(entry, PACKAGE_VERSION, readSource);
-  typecheck(entry, snapshot);
-  const isFile = (file: string) => snapshot.track(() => snapshot.exists(file, 'file'));
-  const client = createGraph(entry, 'client', readSource, isFile);
-  const server = createGraph(entry, 'server', readSource, isFile);
-  const dependencySet = new Set([
-    ...environmentFiles,
-    ...client.modules.keys(),
-    ...server.modules.keys(),
-    ...[...snapshot.files].filter(
-      (path) =>
-        !path.includes('/node_modules/') && !path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'),
-    ),
-  ]);
-  let dependencies = [...dependencySet].sort();
-  const sourceHash = () => {
-    const hash = createHash('sha256').update(PACKAGE_VERSION);
-    for (const path of dependencies) hash.update(path).update(snapshot.read(path));
-    return 'sha256:' + hash.digest('hex');
-  };
-  let revision = sourceHash();
-  let directory = join(panelRoot, revision.replace(':', '-'));
-  const temporary = directory + '-build';
-  rmSync(temporary, { recursive: true, force: true });
-  mkdirSync(temporary, { recursive: true, mode: 0o700 });
-  const capturedResources = new Set<string>();
-  const captureResource = (path: string) => {
-    if (capturedResources.has(path)) return;
-    capturedResources.add(path);
-    snapshot.track(() => snapshot.read(path));
-    dependencySet.add(path);
-    if (extname(path) === '.css')
-      for (const match of snapshot
-        .text(path)
-        .matchAll(/(?:url\(|@import\s+)["']?(\.[^"'\s)]+)["']?/g)) {
-        const candidate = resolve(dirname(path), match[1].split('?')[0]);
-        if (snapshot.track(() => snapshot.exists(candidate, 'file')))
-          captureResource(realpathSync(candidate));
-      }
-  };
-  const resourceGraph: Plugin = {
-    name: 'paneon-resource-graph',
-    enforce: 'pre',
-    load(id) {
-      const raw = id.split('?')[0];
-      if (!existsSync(raw) || !statSync(raw).isFile()) return;
-      const path = realpathSync(raw);
-      if (path.startsWith(realpathSync(temporary) + '/')) return;
-      snapshot.read(path);
-      if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
-        return;
-      captureResource(path);
-      if (extname(path) === '.css') return snapshot.text(path);
-    },
-    generateBundle(_options, bundle) {
-      const assets = Object.values(bundle).flatMap((output) =>
-        output.type === 'asset' ? output.originalFileNames : [],
-      );
-      for (const file of new Set([...this.getModuleIds(), ...assets])) {
-        const raw = file.split('?')[0];
-        if (!existsSync(raw) || !statSync(raw).isFile()) continue;
+  let stage: BuildStage = 'typecheck';
+  let temporary: string | undefined;
+  try {
+    const readSource = (file: string) => snapshot.track(() => snapshot.text(file));
+    const environment = buildEnvironment();
+    const environmentFiles = captureBuildEnvironment(snapshot, entry);
+    const range = validateRequirement(entry, PACKAGE_VERSION, readSource);
+    typecheck(entry, snapshot);
+    const isFile = (file: string) => snapshot.track(() => snapshot.exists(file, 'file'));
+    const client = createGraph(entry, 'client', readSource, isFile);
+    const server = createGraph(entry, 'server', readSource, isFile);
+    const dependencySet = new Set([
+      ...environmentFiles,
+      ...client.modules.keys(),
+      ...server.modules.keys(),
+      ...[...snapshot.files].filter(
+        (path) =>
+          !path.includes('/node_modules/') && !path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'),
+      ),
+    ]);
+    let dependencies = [...dependencySet].sort();
+    const sourceHash = () => {
+      const hash = createHash('sha256').update(PACKAGE_VERSION);
+      for (const path of dependencies) hash.update(path).update(snapshot.read(path));
+      return 'sha256:' + hash.digest('hex');
+    };
+    let revision = sourceHash();
+    let directory = join(panelRoot, revision.replace(':', '-'));
+    temporary = directory + '-build';
+    const buildDirectory = temporary;
+    rmSync(buildDirectory, { recursive: true, force: true });
+    mkdirSync(buildDirectory, { recursive: true, mode: 0o700 });
+    const capturedResources = new Set<string>();
+    const captureResource = (path: string) => {
+      if (capturedResources.has(path)) return;
+      capturedResources.add(path);
+      snapshot.track(() => snapshot.read(path));
+      dependencySet.add(path);
+      if (extname(path) === '.css')
+        for (const match of snapshot
+          .text(path)
+          .matchAll(/(?:url\(|@import\s+)["']?(\.[^"'\s)]+)["']?/g)) {
+          const candidate = resolve(dirname(path), match[1].split('?')[0]);
+          if (snapshot.track(() => snapshot.exists(candidate, 'file')))
+            captureResource(realpathSync(candidate));
+        }
+    };
+    const resourceGraph: Plugin = {
+      name: 'paneon-resource-graph',
+      enforce: 'pre',
+      load(id) {
+        const raw = id.split('?')[0];
+        if (!existsSync(raw) || !statSync(raw).isFile()) return;
         const path = realpathSync(raw);
-        if (path.startsWith(realpathSync(temporary) + '/')) continue;
+        if (path.startsWith(realpathSync(buildDirectory) + '/')) return;
         snapshot.read(path);
         if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
-          continue;
-        dependencySet.add(path);
-      }
-    },
-  };
-  const common = {
-    configFile: false as const,
-    root: dirname(entry),
-    logLevel: 'silent' as const,
-    plugins: [resourceGraph, panelPlugin(entry, 'client', client), tailwindcss()],
-    oxc: { jsx: { development: false } },
-    resolve: { dedupe: ['react', 'react-dom'] },
-  };
-  const frameSource = join(temporary, 'frame-source.tsx');
-  const nodeSource = join(temporary, 'node-source.ts');
-  writeFileSync(
-    nodeSource,
-    `import definition from ${JSON.stringify(entry)};\n${server.actions.map((a, i) => `import {${a.name} as a${i}} from ${JSON.stringify(a.file)};`).join('\n')}\nexport default definition;export const __paneonActions={${server.actions.map((a, i) => `${JSON.stringify(a.id)}:a${i}`).join(',')}};`,
-  );
-  const authorCss = join(temporary, 'author.css');
-  const authorSource = join(temporary, 'author-source.txt');
-  // Tailwind must scan exactly the captured client graph, including shared
-  // components outside the entry directory. Transformed sources exclude action
-  // implementations and unused exports; scanning the filesystem would include
-  // unrelated/server-only content and could race the source snapshot.
-  writeFileSync(authorSource, [...client.sources.values()].join('\n'));
-  writeFileSync(
-    authorCss,
-    `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))} source(none);\n@source ${JSON.stringify(authorSource)};`,
-  );
-  const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
-  writeFileSync(
-    frameSource,
-    `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React,{useSyncExternalStore} from 'react';import {TooltipProvider,UIProvider} from 'paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext,getUI,subscribeUI,panelBrowserAction} from 'paneon/sdk/client';\nfunction Environment(){const ui=useSyncExternalStore(subscribeUI,getUI);return React.createElement(UIProvider,{ui,onBrowserAction:panelBrowserAction},React.createElement(TooltipProvider,null,React.createElement(definition.render)));}let mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(Environment)));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
-  );
-  try {
+          return;
+        captureResource(path);
+        if (extname(path) === '.css') return snapshot.text(path);
+      },
+      generateBundle(_options, bundle) {
+        const assets = Object.values(bundle).flatMap((output) =>
+          output.type === 'asset' ? output.originalFileNames : [],
+        );
+        for (const file of new Set([...this.getModuleIds(), ...assets])) {
+          const raw = file.split('?')[0];
+          if (!existsSync(raw) || !statSync(raw).isFile()) continue;
+          const path = realpathSync(raw);
+          if (path.startsWith(realpathSync(buildDirectory) + '/')) continue;
+          snapshot.read(path);
+          if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
+            continue;
+          dependencySet.add(path);
+        }
+      },
+    };
+    const common = {
+      configFile: false as const,
+      root: dirname(entry),
+      logLevel: 'silent' as const,
+      plugins: [resourceGraph, panelPlugin(entry, 'client', client), tailwindcss()],
+      oxc: { jsx: { development: false } },
+      resolve: { dedupe: ['react', 'react-dom'] },
+    };
+    const frameSource = join(buildDirectory, 'frame-source.tsx');
+    const nodeSource = join(buildDirectory, 'node-source.ts');
+    writeFileSync(
+      nodeSource,
+      `import definition from ${JSON.stringify(entry)};\n${server.actions.map((a, i) => `import {${a.name} as a${i}} from ${JSON.stringify(a.file)};`).join('\n')}\nexport default definition;export const __paneonActions={${server.actions.map((a, i) => `${JSON.stringify(a.id)}:a${i}`).join(',')}};`,
+    );
+    const authorCss = join(buildDirectory, 'author.css');
+    const authorSource = join(buildDirectory, 'author-source.txt');
+    // Tailwind must scan exactly the captured client graph, including shared
+    // components outside the entry directory. Transformed sources exclude action
+    // implementations and unused exports; scanning the filesystem would include
+    // unrelated/server-only content and could race the source snapshot.
+    writeFileSync(authorSource, [...client.sources.values()].join('\n'));
+    writeFileSync(
+      authorCss,
+      `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))} source(none);\n@source ${JSON.stringify(authorSource)};`,
+    );
+    const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
+    writeFileSync(
+      frameSource,
+      `import ${JSON.stringify(authorCss)};${existsSync(theme) ? `import ${JSON.stringify(theme)};` : ''}\nimport React,{useSyncExternalStore} from 'react';import {TooltipProvider,UIProvider} from 'paneon/ui';import {createRoot} from 'react-dom/client';import definition from ${JSON.stringify(entry)};import {initializeBridge,PanelInputContext,getUI,subscribeUI,panelBrowserAction} from 'paneon/sdk/client';\nfunction Environment(){const ui=useSyncExternalStore(subscribeUI,getUI);return React.createElement(UIProvider,{ui,onBrowserAction:panelBrowserAction},React.createElement(TooltipProvider,null,React.createElement(definition.render)));}let mounted=false;window.addEventListener('message',(event)=>{const m=event.data;if(m?.paneon!==true||m.direction!=='init'||event.source!==parent||mounted)return;mounted=true;initializeBridge(m);createRoot(document.getElementById('root')!).render(React.createElement(PanelInputContext.Provider,{value:m.params},React.createElement(Environment)));});parent.postMessage({paneon:true,direction:'ready'},'*');`,
+    );
+    stage = 'client-build';
     await build({
       ...common,
       define: { 'process.env.NODE_ENV': JSON.stringify('production') },
       build: {
-        outDir: join(temporary, 'client'),
+        outDir: join(buildDirectory, 'client'),
         emptyOutDir: true,
         sourcemap: false,
         minify: false,
@@ -303,11 +325,12 @@ async function compileSnapshot(
         },
       },
     });
+    stage = 'server-build';
     await build({
       ...common,
       plugins: [resourceGraph, panelPlugin(entry, 'server', server)],
       build: {
-        outDir: join(temporary, 'server'),
+        outDir: join(buildDirectory, 'server'),
         emptyOutDir: true,
         ssr: nodeSource,
         sourcemap: false,
@@ -319,18 +342,19 @@ async function compileSnapshot(
     dependencies = [...dependencySet].sort();
     revision = sourceHash();
     directory = join(panelRoot, revision.replace(':', '-'));
-    const serverFile = join(temporary, 'server/server.js');
+    const serverFile = join(buildDirectory, 'server/server.js');
     // Validation runs in an isolated child, never in the persistent control process.
+    stage = 'metadata';
     const metadata = await inspectServer(serverFile, server.actions);
-    const clientFiles = files(join(temporary, 'client')).map((f) =>
-      relative(join(temporary, 'client'), f).replaceAll('\\', '/'),
+    const clientFiles = files(join(buildDirectory, 'client')).map((f) =>
+      relative(join(buildDirectory, 'client'), f).replaceAll('\\', '/'),
     );
     const css = clientFiles
       .filter((f) => extname(f) === '.css')
       .map((f) => `<link rel="stylesheet" href="./${f}">`)
       .join('');
     writeFileSync(
-      join(temporary, 'client/frame.html'),
+      join(buildDirectory, 'client/frame.html'),
       `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${css}</head><body style="background:transparent"><div id="root"></div><script type="module" src="./client.js"></script></body></html>`,
     );
     const manifest: Manifest = {
@@ -351,14 +375,16 @@ async function compileSnapshot(
       }),
       reuse: buildReuse(
         snapshot,
-        temporary,
+        buildDirectory,
         [...clientFiles, 'frame.html']
           .map((file) => 'client/' + file)
-          .concat(files(join(temporary, 'server')).map((file) => relative(temporary, file))),
+          .concat(
+            files(join(buildDirectory, 'server')).map((file) => relative(buildDirectory, file)),
+          ),
         environment,
       ),
     };
-    writeFileSync(join(temporary, 'manifest.json'), JSON.stringify(manifest));
+    writeFileSync(join(buildDirectory, 'manifest.json'), JSON.stringify(manifest));
     rmSync(frameSource, { force: true });
     rmSync(nodeSource, { force: true });
     rmSync(authorCss, { force: true });
@@ -367,12 +393,17 @@ async function compileSnapshot(
     // bundles finished rather than publishing old code under a later source hash.
     snapshot.assertUnchanged(dependencies);
     if (existsSync(directory)) rmSync(directory, { recursive: true, force: true });
-    renameSync(temporary, directory);
+    renameSync(buildDirectory, directory);
     return { manifest, directory };
-  } catch (e) {
-    rmSync(temporary, { recursive: true, force: true });
-    if (e instanceof PaneonError) throw e;
-    throw new PaneonError('BUILD_FAILED', 'Panel compilation failed.', { entryPath: entry });
+  } catch (error) {
+    if (temporary) {
+      try {
+        rmSync(temporary, { recursive: true, force: true });
+      } catch (cleanupError) {
+        console.warn('Could not remove failed panel build output.', cleanupError);
+      }
+    }
+    throw buildError(error, stage, entry);
   }
 }
 async function inspectServer(
@@ -387,41 +418,70 @@ async function inspectServer(
   const { fork } = await import('node:child_process');
   return new Promise((resolvePromise, reject) => {
     const worker = fork(join(PACKAGE_ROOT, 'dist/runtime/worker.js'), [], {
-      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       execArgv: [],
       env: { ...process.env },
     });
+    const stderr = stderrTail();
+    worker.stderr?.on('data', (chunk: Buffer) => stderr.write(chunk));
+    let settled = false;
+    const finish = (error?: unknown, data?: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.kill();
+      if (error) reject(buildError(error, 'metadata'));
+      else resolvePromise(data as never);
+    };
     const killMetadata = () => {
       worker.kill('SIGKILL');
     };
     process.once('exit', killMetadata);
-    worker.once('exit', () => process.off('exit', killMetadata));
-    const timer = setTimeout(() => {
-      worker.kill();
-      reject(new PaneonError('BUILD_FAILED', 'Panel metadata evaluation timed out.'));
-    }, 15000);
-    worker.on('error', () => {
-      clearTimeout(timer);
-      reject(new PaneonError('BUILD_FAILED', 'The panel validation process could not start.'));
+    worker.once('close', (exitCode, signal) => {
+      process.off('exit', killMetadata);
+      if (!settled)
+        finish(
+          new PaneonError(
+            'BUILD_FAILED',
+            'The panel validation process stopped before completing metadata evaluation.',
+            {
+              stage: 'metadata',
+              exitCode,
+              ...(signal ? { signal } : {}),
+              ...stderr.read(),
+            },
+          ),
+        );
     });
+    const timer = setTimeout(
+      () =>
+        finish(
+          new PaneonError('BUILD_FAILED', 'Panel metadata evaluation timed out.', {
+            ...stderr.read(),
+          }),
+        ),
+      15000,
+    );
+    worker.once('error', (error) => finish(error));
     worker.on('message', (message: unknown) => {
-      const m = message as { kind: string; data: never; error?: { code: string; message: string } };
-      if (m.kind === 'ready') {
-        clearTimeout(timer);
-        worker.kill();
-        resolvePromise(m.data);
-      } else if (m.kind === 'error') {
-        clearTimeout(timer);
-        worker.kill();
-        reject(
+      const m = message as {
+        kind: string;
+        data: unknown;
+        error?: import('../shared/types.js').Diagnostic;
+      };
+      if (m.kind === 'ready') finish(undefined, m.data);
+      else if (m.kind === 'error')
+        finish(
           new PaneonError(
             m.error?.code ?? 'BUILD_FAILED',
             m.error?.message ?? 'Panel metadata validation failed.',
+            m.error?.details,
           ),
         );
-      }
     });
-    worker.send({ kind: 'init', serverFile, actions, inspect: true });
+    worker.send({ kind: 'init', serverFile, actions, inspect: true }, (error) => {
+      if (error) finish(error);
+    });
   });
 }
 export function serverUrl(path: string) {

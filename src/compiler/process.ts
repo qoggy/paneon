@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { readdirSync, rmSync, existsSync } from 'node:fs';
 import { PACKAGE_ROOT } from '../shared/paths.js';
 import { PaneonError } from '../shared/types.js';
+import { buildError, stderrTail } from './diagnostics.js';
 import type { Diagnostic, WatchInputs } from '../shared/types.js';
 import type { CompiledPanel } from './index.js';
 
@@ -19,13 +20,15 @@ export class CompilerProcess {
   constructor(entryPath: string, panelRoot: string) {
     this.panelRoot = panelRoot;
     this.child = fork(join(PACKAGE_ROOT, 'dist/compiler/worker.js'), [], {
-      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       execArgv: [],
       // Vite's watch server sets the daemon's NODE_ENV to development. Static
       // panel builds must choose production independently of that inherited value.
       env: { ...process.env, NODE_ENV: 'production' },
     });
     this.result = new Promise((resolve, reject) => {
+      const stderr = stderrTail();
+      this.child.stderr?.on('data', (chunk: Buffer) => stderr.write(chunk));
       let output: CompiledPanel | undefined;
       let failure: Diagnostic | undefined;
       this.child.on('message', (raw: unknown) => {
@@ -39,18 +42,13 @@ export class CompilerProcess {
         if (message.ok && message.data) output = message.data;
         else if (message.error) failure = message.error;
       });
-      this.child.once('error', () =>
-        reject(new PaneonError('BUILD_FAILED', 'The compiler process could not start.')),
-      );
-      this.child.once('exit', (code) => {
+      this.child.once('error', (error) => reject(buildError(error, 'process', entryPath)));
+      this.child.once('close', (code, signal) => {
         if (this.cancelled || failure || code !== 0 || !output) {
           try {
             this.cleanup();
-          } catch {
-            reject(
-              new PaneonError('BUILD_FAILED', 'Temporary build artifacts could not be removed.'),
-            );
-            return;
+          } catch (error) {
+            console.warn('Could not remove failed compiler output.', error);
           }
         }
         if (this.cancelled)
@@ -62,12 +60,18 @@ export class CompilerProcess {
             new PaneonError(
               'BUILD_FAILED',
               'The compiler process stopped before completing the build.',
+              {
+                stage: 'process',
+                entryPath,
+                exitCode: code,
+                ...(signal ? { signal } : {}),
+                ...stderr.read(),
+              },
             ),
           );
       });
       this.child.send({ entryPath, panelRoot }, (error) => {
-        if (error)
-          reject(new PaneonError('BUILD_FAILED', 'The compiler process could not be contacted.'));
+        if (error) reject(buildError(error, 'process', entryPath));
       });
     });
   }

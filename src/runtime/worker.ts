@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { Action, PanelDefinition, ActionContext } from '../sdk/server.js';
 import { diagnostic, jsonValue, PaneonError } from '../shared/types.js';
+import { buildDiagnostic } from '../compiler/diagnostics.js';
 import type { JsonValue } from '../shared/types.js';
 let definition: PanelDefinition;
 let actions: Record<string, Action> = {};
@@ -15,10 +16,13 @@ function stop() {
 }
 process.once('disconnect', stop);
 process.on('message', (raw: unknown) => {
-  void handle(raw).catch(() =>
+  void handle(raw).catch((error: unknown) =>
     send({
       kind: 'error',
-      error: { code: 'BUILD_FAILED', message: 'Panel module evaluation failed.' },
+      error:
+        (raw as { kind?: string })?.kind === 'init'
+          ? buildDiagnostic(error, 'metadata')
+          : { code: 'BUILD_FAILED', message: 'Panel module evaluation failed.' },
     }),
   );
 });

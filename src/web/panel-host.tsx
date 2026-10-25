@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle, Card, CardContent, Spinner } from '../ui';
 import { useUI } from '../ui';
+import { BuildDiagnostic } from './build-diagnostic';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';
 import { isBrowserAction } from '../shared/browser-actions';
@@ -85,13 +86,10 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
         </Alert>
       )}
       {panel?.diagnostic && (
-        <Alert variant="destructive">
-          <AlertTitle>{panel.diagnostic.code}</AlertTitle>
-          <AlertDescription>
-            {panel.diagnostic.message}
-            {panel.status === 'running' && t(' The previous working panel remains available.')}
-          </AlertDescription>
-        </Alert>
+        <BuildDiagnostic
+          diagnostic={panel.diagnostic}
+          previousAvailable={panel.status === 'running'}
+        />
       )}
       {!panel && !error && <Spinner />}
       {panel &&
