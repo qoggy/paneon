@@ -137,6 +137,7 @@ export class Runtime extends EventEmitter {
   private residents: ResourcePool;
   private compilation: ResourcePool;
   private artifacts: Artifacts;
+  private artifactCleanup?: Promise<void>;
   private sources: SourceWatcher;
   home: string;
   constructor(
@@ -186,6 +187,34 @@ export class Runtime extends EventEmitter {
     // Persisted running means logically open, not resident. History and static
     // artifacts are usable without evaluating historical author modules.
   }
+  collectArtifacts() {
+    return (this.artifactCleanup ??= this.sweepArtifacts());
+  }
+  private async sweepArtifacts() {
+    try {
+      for (const id of await this.artifacts.instances()) {
+        if (this.stopping) break;
+        await this.enqueue(id, async () => {
+          if (this.stopping) return;
+          // A concurrent close owns final deletion after its live resources exit.
+          if (this.store.find(id)?.status === 'closed' && this.live.has(id)) return;
+          await this.pruneArtifacts(id, true);
+        });
+      }
+    } catch (err) {
+      this.logger.error({ err }, 'Startup artifact cleanup failed');
+    }
+  }
+  private async pruneArtifacts(id: string, includeClosed = false) {
+    try {
+      const panel = this.store.find(id);
+      const revision =
+        panel && (!includeClosed || panel.status !== 'closed') ? panel.revision : undefined;
+      await this.artifacts.prune(id, revision);
+    } catch (err) {
+      this.logger.error({ err, instanceId: id }, 'Panel artifact cleanup failed');
+    }
+  }
   inspect(id: string) {
     const panel = this.store.get(id);
     const manifest = this.manifest(id);
@@ -204,8 +233,8 @@ export class Runtime extends EventEmitter {
       throw new PaneonError('PANEL_CLOSED', 'The panel instance is closed.');
     return stored ?? panel;
   }
-  private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
-    const promise = (this.builds.get(id) ?? Promise.resolve()).then(task);
+  private enqueue<T>(id: string, task: () => Promise<T>, after?: () => Promise<void>): Promise<T> {
+    const promise = (this.builds.get(id) ?? Promise.resolve()).then(task).finally(after);
     const tail = promise
       .then(
         () => {},
@@ -225,6 +254,7 @@ export class Runtime extends EventEmitter {
     execute: boolean,
     refresh: 'cold' | 'watch' | 'force' = 'cold',
   ): Promise<StoredPanel> {
+    let attemptedBuild = false;
     return this.enqueue(
       panel.instanceId,
       async () => {
@@ -263,6 +293,7 @@ export class Runtime extends EventEmitter {
           compiled.manifest.paneonVersion !== PACKAGE_VERSION ||
           ((refresh === 'watch' || reattachWatch) && !(await this.artifacts.unchanged(compiled)));
         if (rebuild) {
+          attemptedBuild = true;
           const permit = await this.compilation.acquire(current.instanceId, signal);
           try {
             this.assertOpen(current, signal);
@@ -351,6 +382,7 @@ export class Runtime extends EventEmitter {
           }
         }
       },
+      () => (attemptedBuild ? this.pruneArtifacts(panel.instanceId) : Promise.resolve()),
     );
   }
   private watch(panel: StoredPanel, compiled: CompiledPanel, signal: AbortSignal) {
@@ -472,6 +504,7 @@ export class Runtime extends EventEmitter {
       id,
       new PaneonError('PANEL_CLOSED', 'The panel instance is closed.'),
     );
+    await this.enqueue(id, () => this.pruneArtifacts(id, true));
     this.state(id);
     return { status: 'closed' as const, alreadyClosed };
   }
@@ -587,6 +620,7 @@ export class Runtime extends EventEmitter {
     await Promise.all([this.residents.stop(), this.compilation.stop()]);
     await Promise.all([...this.builds.values()]);
     await this.sources.stop();
+    await this.artifactCleanup;
     this.live.clear();
     this.artifacts.clear();
     this.store.close();

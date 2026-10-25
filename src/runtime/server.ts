@@ -439,5 +439,6 @@ async function bootServer(
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
   logging.logger.info({ port: descriptor.port }, 'Runtime ready');
+  void runtime.collectArtifacts();
   return { app, runtime, descriptor, stop };
 }

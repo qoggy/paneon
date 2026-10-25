@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, lstat, readdir, rm, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PACKAGE_VERSION } from '../shared/paths.js';
 import type { Manifest } from '../shared/types.js';
@@ -101,6 +101,47 @@ export class Artifacts {
       this.bytes -= cached.bytes;
       this.cache.delete(directory);
     }
+  }
+  async instances() {
+    const entries = await readdir(join(this.home, 'panels'), { withFileTypes: true }).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+      },
+    );
+    return entries
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          /^instance-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(
+            entry.name,
+          ),
+      )
+      .map((entry) => entry.name);
+  }
+  async prune(id: string, revision?: string) {
+    const root = join(this.home, 'panels', id);
+    const info = await lstat(root).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return;
+      throw error;
+    });
+    if (!info?.isDirectory()) return;
+    const keep = revision?.replace(':', '-');
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+      if (
+        !entry.isDirectory() ||
+        entry.name === keep ||
+        !/^sha256-[a-f0-9]{64}(-build)?$/.test(entry.name)
+      )
+        continue;
+      const directory = join(root, entry.name);
+      await rm(directory, { recursive: true, force: true });
+      this.forget(directory);
+    }
+    if (!keep)
+      await rmdir(root).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY') throw error;
+      });
   }
   clear() {
     this.cache.clear();

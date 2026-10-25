@@ -7,8 +7,13 @@ let definition: PanelDefinition;
 let actions: Record<string, Action> = {};
 const controller = new AbortController();
 function send(message: unknown) {
-  process.send?.(message);
+  if (process.connected) process.send?.(message);
 }
+function stop() {
+  controller.abort();
+  setTimeout(() => process.exit(0), 30).unref();
+}
+process.once('disconnect', stop);
 process.on('message', (raw: unknown) => {
   void handle(raw).catch(() =>
     send({
@@ -85,8 +90,7 @@ async function handle(raw: unknown) {
     return;
   }
   if (m.kind === 'stop') {
-    controller.abort();
-    setTimeout(() => process.exit(0), 30).unref();
+    stop();
     return;
   }
   if (m.kind === 'validate-event') {

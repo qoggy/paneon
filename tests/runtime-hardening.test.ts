@@ -895,10 +895,7 @@ void test(
       await runtime.closePanel(panel.instanceId);
       await assert.rejects(compiling, { code: 'BUILD_CANCELLED' });
       assert.ok(Date.now() - began < 3000);
-      assert.equal(
-        readdirSync(artifacts).some((name) => name.endsWith('-build')),
-        false,
-      );
+      assert.equal(existsSync(artifacts), false);
       await until(
         () => {
           try {
