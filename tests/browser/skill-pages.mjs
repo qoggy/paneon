@@ -37,6 +37,31 @@ try {
   const mine = () => frame.getByLabel('My answer', { exact: true });
   const radio = (name) => frame.getByRole('radio', { name, exact: true });
   const checkbox = (name) => frame.getByRole('checkbox', { name, exact: true });
+  async function checkTextArrowKeys(input, selectedRadio) {
+    const text = await input.inputValue();
+    for (const [key, start, end] of [
+      ['ArrowRight', text.length, text.length],
+      ['ArrowLeft', 0, 0],
+      ['ArrowUp', 0, 0],
+      ['ArrowDown', text.length, text.length],
+      ['ArrowRight', 1, 2],
+      ['ArrowLeft', 2, 1],
+      ['Shift+ArrowLeft', 3, 2],
+    ]) {
+      await input.evaluate((element, start) => element.setSelectionRange(start, start), start);
+      await input.press(key);
+      assert.equal(await radio(selectedRadio).isChecked(), true, `${key} preserves the answer.`);
+      const caret = await input.evaluate((element) => ({
+        focused: element === document.activeElement,
+        start: element.selectionStart,
+        end: element.selectionEnd,
+      }));
+      assert.equal(caret.focused, true, `${key} keeps focus in the textarea.`);
+      if (key === 'Shift+ArrowLeft') assert.deepEqual([caret.start, caret.end], [end, start]);
+      else assert.deepEqual([caret.start, caret.end], [end, end]);
+      assert.equal(await input.inputValue(), text);
+    }
+  }
   const next = () => frame.getByRole('button', { name: 'Next', exact: true }).click();
   const previous = () => frame.getByRole('button', { name: 'Previous', exact: true }).click();
   async function screenshot(name) {
@@ -131,7 +156,7 @@ try {
   await frame.getByRole('heading', { name: 'Delivery', exact: true }).waitFor();
   await next();
   await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
-  await frame.getByText('Answer summary', { exact: true }).waitFor();
+  await frame.getByRole('region', { name: 'Answer summary', exact: true }).waitFor();
   assert.equal(await frame.getByText(/4 \/ 3/).count(), 0);
   const emptySummary = frame.getByRole('region', { name: 'Answer summary' });
   await emptySummary.getByText('0 / 3 answered', { exact: true }).waitFor();
@@ -198,6 +223,12 @@ try {
     border: getComputedStyle(element).borderColor,
   }));
   assert.notDeepEqual(selectedStyle, unselectedStyle, 'A selected choice has a visible state.');
+  await note('SQLite').fill('abc');
+  await checkTextArrowKeys(note('SQLite'), 'SQLite');
+  await radio('SQLite').focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await radio('PostgreSQL').isChecked(), true, 'Radio arrow navigation still works.');
+  await radio('SQLite').check();
   await note('SQLite').fill('  Keep backups 中文🙂  ');
   assert.equal(await radio('SQLite').isChecked(), true, 'Typing a note preserves its selection.');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -216,7 +247,10 @@ try {
   assert.equal(await radio('SQLite').isChecked(), true);
   assert.equal(await note('SQLite').inputValue(), '  Keep backups 中文🙂  ');
   const detailButton = frame.getByRole('button', { name: 'View details: SQLite', exact: true });
-  assert.equal(await detailButton.evaluate((element) => element === document.activeElement), true);
+  await until(
+    () => detailButton.evaluate((element) => element === document.activeElement),
+    'Closing details restores focus after the closing transition.',
+  );
   await detailButton.click();
   await frame
     .getByRole('dialog', { name: 'SQLite', exact: true })
@@ -240,6 +274,7 @@ try {
   await radio('SQLite').check();
   assert.equal(await note('SQLite').inputValue(), '  Keep backups 中文🙂  ');
   await mine().fill('Temporary custom draft');
+  await checkTextArrowKeys(mine(), 'Other');
   assert.equal(await radio('Other').isChecked(), true);
   assert.equal(await radio('SQLite').isChecked(), false, 'Single answers remain exclusive.');
   assert.equal(await note('SQLite').count(), 0);
@@ -670,7 +705,11 @@ try {
     ['switch', 'Optional switch'],
   ]) {
     const control = frame.getByRole(role, { name, exact: true });
-    const label = frame.locator(`label[for="${await control.getAttribute('id')}"]`);
+    // Base UI associates labels with its native input, not necessarily the visual root's id.
+    const label = control
+      .locator('xpath=ancestor::*[@data-slot="field"][1]')
+      .locator('label[data-slot="field-label"]');
+    assert.equal(await label.evaluate((element) => Boolean(element.control)), true);
     await sameRow(control, label, 'Boolean control and label share a row.');
     await label.click();
     assert.equal(await control.isChecked(), true);

@@ -115,9 +115,19 @@ The page SHALL treat a selected custom answer as a peer of supplied selections, 
 
 Optional questionnaire Markdown SHALL be visible on initial display and on review, without a disclosure, truncation, or oversized typography. The compact title/progress row and question-specific description SHALL remain separate. Long content SHALL wrap and remain fully readable on narrow screens.
 
+#### Scenario: Read questionnaire guidance before answering and during review
+
+- **WHEN** a questionnaire includes Markdown guidance and a person opens it or enters review
+- **THEN** the complete guidance remains visible without opening a disclosure, and long content wraps within the page
+
 ### Requirement: Toggle independent option details
 
 Clicking the currently open option's details trigger SHALL close it. Clicking a different option's trigger SHALL switch the detail content. Expanded state and accessible open/close labels SHALL match the visible pane. Wide side panes and narrow dialogs SHALL preserve answer drafts and SHALL NOT emit events.
+
+#### Scenario: Toggle or switch option details without changing answers
+
+- **WHEN** a person activates the open option's details trigger again or opens a different option's details
+- **THEN** the details close or switch respectively, accessible expanded state matches the visible pane, drafts remain intact and no event is emitted
 
 ### Requirement: Review without forced navigation
 

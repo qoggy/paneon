@@ -289,6 +289,9 @@ function ChoosePanel() {
                               placeholder={t('Add an explanation (optional)…')}
                               className="min-h-9 resize-none bg-background text-sm"
                               value={draft.comments[option.id]}
+                              onKeyDown={(event) => {
+                                if (event.key.startsWith('Arrow')) event.stopPropagation();
+                              }}
                               onChange={(event) =>
                                 update({
                                   comments: {
@@ -338,6 +341,9 @@ function ChoosePanel() {
                     placeholder={t('Write your own answer…')}
                     className="min-h-9 min-w-0 resize-none border-0 px-0 text-sm shadow-none focus-visible:ring-0"
                     value={draft.text}
+                    onKeyDown={(event) => {
+                      if (event.key.startsWith('Arrow')) event.stopPropagation();
+                    }}
                     aria-describedby={
                       !draft.customSelected && draft.text
                         ? `custom-description-${index}`
