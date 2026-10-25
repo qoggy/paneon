@@ -42,7 +42,6 @@ export type ActionManifest = {
   id: string;
   kind: 'query' | 'mutation';
   inputSchema: JsonValue;
-  credential?: { label: string; ttlSeconds?: number };
 };
 export type Manifest = {
   inputSchema: JsonValue;

@@ -9,7 +9,7 @@ export type BridgeIdentity = {
 export type BridgeRequest = BridgeIdentity & {
   direction: 'request';
   requestId: string;
-  method: 'action' | 'event' | 'credential' | 'browser';
+  method: 'action' | 'event' | 'browser';
   payload: JsonValue;
 };
 export type BridgeResponse = BridgeIdentity & {
@@ -25,4 +25,3 @@ export type BridgeInit = BridgeIdentity & {
   ui: UIPreferences;
 };
 export type BridgePreferences = BridgeIdentity & { direction: 'preferences'; ui: UIPreferences };
-export type CredentialRef = { ref: string; expiresAt: string; status: 'ready' | 'expired' };

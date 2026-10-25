@@ -6,15 +6,15 @@ void test('host transport declares JSON only when sending a body, so empty DELET
   const fetch = mock.method(globalThis, 'fetch', (_path: unknown, options?: RequestInit) => {
     calls.push(options ?? {});
     return Promise.resolve(
-      new Response(JSON.stringify({ ok: true, data: { revoked: true } }), {
+      new Response(JSON.stringify({ ok: true, data: { closed: true } }), {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
   });
   try {
     await api('/api/panels');
-    await api('/api/credentials/reference', { method: 'DELETE' });
-    await api('/api/credentials', { method: 'POST', body: '{}' });
+    await api('/api/panels/example', { method: 'DELETE' });
+    await api('/api/panels/example/actions/save', { method: 'POST', body: '{}' });
     assert.equal(new Headers(calls[0].headers).has('Content-Type'), false);
     assert.equal(new Headers(calls[1].headers).has('Content-Type'), false);
     assert.equal(new Headers(calls[2].headers).get('Content-Type'), 'application/json');

@@ -12,12 +12,6 @@ const { validateRequirement } = (await import(
 const { Store } = (await import(
   '../dist/' + 'runtime/store.js'
 )) as typeof import('../src/runtime/store.js');
-const { Credentials } = (await import(
-  '../dist/' + 'runtime/credentials.js'
-)) as typeof import('../src/runtime/credentials.js');
-const { assertNoSecrets } = (await import(
-  '../dist/' + 'runtime/secret-boundary.js'
-)) as typeof import('../src/runtime/secret-boundary.js');
 const { jsonValue } = (await import(
   '../dist/' + 'shared/types.js'
 )) as typeof import('../src/shared/types.js');
@@ -152,22 +146,6 @@ void test('JSON boundary rejects cycles, undefined, nonfinite values and nonplai
     text: '中文',
     a: [null, 2, true],
   });
-});
-void test('credential binding and output guard handle unescaped JSON string values and keys', () => {
-  const credentials = new Credentials();
-  const binding = { instanceId: 'i', revision: 'r', actionId: 'a' };
-  const secret = 'dummy-"key\\line\nsecond';
-  const ref = credentials.create(binding, secret);
-  assert.equal(credentials.get(ref.ref, binding), secret);
-  assert.throws(() => credentials.get(ref.ref, { ...binding, actionId: 'other' }), {
-    code: 'CREDENTIAL_BINDING_MISMATCH',
-  });
-  assert.throws(() => credentials.check({ nested: [secret] }), { code: 'SECRET_OUTPUT_BLOCKED' });
-  assert.throws(() => assertNoSecrets({ [secret]: true }, [secret]), {
-    code: 'SECRET_OUTPUT_BLOCKED',
-  });
-  credentials.invalidate('i');
-  assert.throws(() => credentials.get(ref.ref, binding), { code: 'CREDENTIAL_EXPIRED' });
 });
 void test('SQLite events survive reopen and only explicit delivered acknowledgements advance a consumer', () =>
   temporary((root) => {

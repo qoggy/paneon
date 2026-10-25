@@ -14,7 +14,6 @@ import { EVENT_PAYLOAD_LIMIT_CHARACTERS, EVENT_TYPE_LIMIT_CHARACTERS } from '../
 import { PaneonError, diagnostic, jsonValue } from '../shared/types.js';
 import type { StoredPanel, JsonValue, Manifest } from '../shared/types.js';
 import { Store } from './store.js';
-import { Credentials } from './credentials.js';
 class Execution {
   child: ChildProcess;
   private requests = new Map<
@@ -22,8 +21,7 @@ class Execution {
     { resolve: (v: JsonValue) => void; reject: (e: Error) => void }
   >();
   ready: Promise<void>;
-  private usedSecrets = new Map<string, Set<string>>();
-  constructor(compiled: CompiledPanel, panel: StoredPanel, credentials: Credentials) {
+  constructor(compiled: CompiledPanel, panel: StoredPanel) {
     this.child = fork(join(PACKAGE_ROOT, 'dist/runtime/worker.js'), [], {
       cwd: panel.cwd,
       stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
@@ -38,9 +36,6 @@ class Execution {
         const m = raw as {
           kind: string;
           requestId: string;
-          callId: string;
-          ref: string;
-          actionId: string;
           data: JsonValue;
           error?: { code: string; message: string };
         };
@@ -57,51 +52,12 @@ class Execution {
             ),
           );
         }
-        if (m.kind === 'secret') {
-          try {
-            if (!this.requests.has(m.callId))
-              throw new PaneonError(
-                'CREDENTIAL_BINDING_MISMATCH',
-                'The credential call is no longer active.',
-              );
-            const value = credentials.get(m.ref, {
-              instanceId: panel.instanceId,
-              revision: panel.revision,
-              actionId: m.actionId,
-            });
-            const known = this.usedSecrets.get(m.callId) ?? new Set<string>();
-            if (!known.has(value)) {
-              known.add(value);
-              credentials.retain(value);
-              this.usedSecrets.set(m.callId, known);
-            }
-            this.child.send({ kind: 'secret-result', requestId: m.requestId, value });
-          } catch (e) {
-            this.child.send({
-              kind: 'secret-result',
-              requestId: m.requestId,
-              error: diagnostic(e),
-            });
-          }
-        }
         if (m.kind === 'result') {
           const request = this.requests.get(m.requestId);
           if (!request) return;
           this.requests.delete(m.requestId);
-          const release = () => {
-            for (const value of this.usedSecrets.get(m.requestId) ?? []) credentials.release(value);
-            this.usedSecrets.delete(m.requestId);
-          };
           if (m.error) request.reject(new PaneonError(m.error.code, m.error.message));
-          else {
-            try {
-              credentials.check(m.data);
-              request.resolve(m.data);
-            } catch (e) {
-              request.reject(e as Error);
-            }
-          }
-          release();
+          else request.resolve(m.data);
         }
       });
       this.child.on('error', () => {
@@ -121,9 +77,6 @@ class Execution {
             ),
           );
         this.requests.clear();
-        for (const values of this.usedSecrets.values())
-          for (const value of values) credentials.release(value);
-        this.usedSecrets.clear();
       });
     });
     this.child.send({
@@ -167,7 +120,6 @@ class Execution {
 type Live = { compiled: CompiledPanel; execution: Execution; watcher?: ViteDevServer };
 export class Runtime extends EventEmitter {
   store: Store;
-  credentials = new Credentials();
   live = new Map<string, Live>();
   stopping = false;
   private builds = new Map<string, Promise<void>>();
@@ -252,7 +204,7 @@ export class Runtime extends EventEmitter {
       updatedAt: new Date().toISOString(),
     };
     delete next.diagnostic;
-    const execution = new Execution(compiled, next, this.credentials);
+    const execution = new Execution(compiled, next);
     this.initializing.set(panel.instanceId, execution);
     let live: Live | undefined;
     let published = false;
@@ -280,7 +232,6 @@ export class Runtime extends EventEmitter {
       )
         throw new PaneonError('PANEL_CLOSED', 'The panel execution environment was closed.');
       const previous = this.live.get(panel.instanceId);
-      this.credentials.invalidate(panel.instanceId);
       if (previous) {
         await previous.watcher?.close();
         await previous.execution.stop();
@@ -363,7 +314,6 @@ export class Runtime extends EventEmitter {
     p.status = 'closed';
     p.updatedAt = new Date().toISOString();
     this.store.save(p);
-    this.credentials.invalidate(id);
     await this.compilers.get(id)?.stop();
     await this.initializing.get(id)?.stop();
     const live = this.live.get(id);
@@ -410,9 +360,7 @@ export class Runtime extends EventEmitter {
         `The serialized event payload exceeds the ${EVENT_PAYLOAD_LIMIT_CHARACTERS}-character UTF-16 limit.`,
       );
     const live = this.active(id, revision);
-    this.credentials.check(payload);
     const parsed = await live.execution.request('validate-event', { type, payload });
-    this.credentials.check(parsed);
     const result = this.store.append(id, revision, type, jsonValue(parsed));
     this.emit('event', id);
     this.state(id);
@@ -447,27 +395,12 @@ export class Runtime extends EventEmitter {
     result = this.store.read(id, consumer, limit);
     return { ...result, timedOut: result.events.length === 0 };
   }
-  credential(id: string, revision: string, actionId: string, value: string, ttlSeconds?: number) {
-    const live = this.active(id, revision);
-    const action = live.compiled.manifest.actions.find((a) => a.id === actionId);
-    if (!action?.credential)
-      throw new PaneonError(
-        'CREDENTIAL_NOT_DECLARED',
-        'This action has no declared credential purpose.',
-      );
-    return this.credentials.create(
-      { instanceId: id, revision, actionId },
-      value,
-      ttlSeconds ?? action.credential.ttlSeconds ?? 900,
-    );
-  }
   manifest(id: string): Manifest | undefined {
     return this.live.get(id)?.compiled.manifest;
   }
   async stop() {
     this.stopping = true;
     this.emit('stop');
-    this.credentials.invalidate();
     await Promise.all([...this.compilers.values()].map((compiler) => compiler.stop()));
     await Promise.all([...this.initializing.values()].map((execution) => execution.stop()));
     await Promise.allSettled([...this.builds.values()]);

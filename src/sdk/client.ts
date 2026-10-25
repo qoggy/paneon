@@ -1,13 +1,7 @@
 import { applyUI } from './ui-environment.js';
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { Action, PanelDefinition } from './server.js';
-import type {
-  BridgeInit,
-  BridgePreferences,
-  BridgeRequest,
-  BridgeResponse,
-  CredentialRef,
-} from './protocol.js';
+import type { BridgeInit, BridgePreferences, BridgeRequest, BridgeResponse } from './protocol.js';
 import type { JsonValue } from '../shared/types.js';
 export { z } from 'zod';
 export type { ActionContext, Action, PanelDefinition } from './server.js';
@@ -106,10 +100,6 @@ export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<
 }
 export const agent = {
   emit: (type: string, payload: unknown) => request<{ id: number }>('event', { type, payload }),
-};
-export const credentials = {
-  request: (action: { actionId?: string }) =>
-    request<CredentialRef>('credential', { actionId: action.actionId }),
 };
 /** Used by UIProvider to keep browser operations outside the opaque-origin panel. */
 export const panelBrowserAction = (action: BrowserAction) => request<void>('browser', action);

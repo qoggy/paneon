@@ -25,7 +25,6 @@ export type PanelPage = {
 export type ActionManifest = {
   id: string;
   kind: 'query' | 'mutation';
-  credential?: { label: string; ttlSeconds?: number };
 };
 export type PanelDetails = PanelSummary & {
   params: unknown;

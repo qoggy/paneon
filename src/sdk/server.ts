@@ -3,7 +3,6 @@ import { z } from 'zod';
 export { z };
 export type ActionContext = {
   signal: AbortSignal;
-  secrets: { use<T>(ref: string, callback: (value: string) => T | Promise<T>): Promise<T> };
 };
 export type Action<
   I = unknown,
@@ -13,14 +12,12 @@ export type Action<
   kind: K;
   input: z.ZodType<I>;
   handler: (ctx: ActionContext, input: I) => O | Promise<O>;
-  credential?: { label: string; ttlSeconds?: number };
   actionId?: string;
 };
 export function serverAction<I, O, K extends 'query' | 'mutation' = 'mutation'>(options: {
   kind?: K;
   input: z.ZodType<I>;
   handler: (ctx: ActionContext, input: I) => O | Promise<O>;
-  credential?: { label: string; ttlSeconds?: number };
 }): Action<I, O, K> {
   const call = Object.assign(
     (_input: I): Promise<O> =>

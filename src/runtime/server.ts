@@ -263,20 +263,6 @@ async function bootServer(
       integer(b.through, 1, Number.MAX_SAFE_INTEGER),
     );
   });
-  route('POST', '/api/credentials', (request) => {
-    const b = body(request);
-    return runtime.credential(
-      String(b.instanceId),
-      String(b.revision),
-      String(b.actionId),
-      b.value as string,
-      b.ttlSeconds === undefined ? undefined : integer(b.ttlSeconds, 1, 3600),
-    );
-  });
-  route('DELETE', '/api/credentials/:ref', (request) => {
-    runtime.credentials.revoke(params(request).ref);
-    return { revoked: true };
-  });
   const subscriptions = new Map<WebSocket, { instanceId: string; alive: boolean }>();
   const notify = (instanceId: string, data: unknown) => {
     const message = JSON.stringify(data);

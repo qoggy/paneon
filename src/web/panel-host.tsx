@@ -1,45 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Field,
-  FieldLabel,
-  Input,
-  Spinner,
-  Stack,
-  Switch,
-  Textarea,
-} from '../ui';
+import { Alert, AlertDescription, AlertTitle, Card, CardContent, Spinner } from '../ui';
 import { useUI } from '../ui';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';
 import { isBrowserAction } from '../shared/browser-actions';
 import { performBrowserAction } from '../ui/browser-actions';
-
-type Credential = {
-  ref: string;
-  expiresAt: string;
-  status: 'ready' | 'expired' | 'revoked';
-  label: string;
-};
-type Prompt = {
-  actionId: string;
-  label: string;
-  ttlSeconds: number;
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-};
 
 export function PanelHost({ instanceId }: { instanceId: string }) {
   const { t } = useUI();
@@ -151,7 +116,7 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
 }
 
 function Frame({ panel }: { panel: PanelDetails }) {
-  const { theme, language, t } = useUI();
+  const { theme, language } = useUI();
   const ui = useRef({ theme, language });
   useLayoutEffect(() => {
     ui.current = { theme, language };
@@ -169,45 +134,11 @@ function Frame({ panel }: { panel: PanelDetails }) {
       '*',
     );
   }, [theme, language, identity]);
-  const [prompt, setPrompt] = useState<Prompt>();
-  const currentPrompt = useRef<Prompt | undefined>(undefined);
-  const secretInput = useRef<HTMLInputElement>(null);
-  const secretArea = useRef<HTMLTextAreaElement>(null);
-  const [multiline, setMultiline] = useState(false);
-  const bindSecretInput = useCallback((node: HTMLInputElement | null) => {
-    if (!node) return;
-    secretInput.current = node;
-    return () => {
-      node.value = '';
-      secretInput.current = null;
-    };
-  }, []);
-  const bindSecretArea = useCallback((node: HTMLTextAreaElement | null) => {
-    if (!node) return;
-    secretArea.current = node;
-    return () => {
-      node.value = '';
-      secretArea.current = null;
-    };
-  }, []);
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [credentialError, setCredentialError] = useState<string>();
   const endpoint = `/api/panels/${encodeURIComponent(panel.instanceId)}`;
   const latestPanel = useRef(panel);
   useEffect(() => {
     latestPanel.current = panel;
   }, [panel]);
-  const cancel = useCallback(() => {
-    currentPrompt.current?.reject(
-      new ApiError('CREDENTIAL_CANCELLED', 'Credential input was cancelled.'),
-    );
-    currentPrompt.current = undefined;
-    if (secretInput.current) secretInput.current.value = '';
-    if (secretArea.current) secretArea.current.value = '';
-    setPrompt(undefined);
-    setCredentialError(undefined);
-  }, []);
   useEffect(() => {
     const seen = new Set<string>();
     let active = true;
@@ -239,28 +170,6 @@ function Frame({ panel }: { panel: PanelDetails }) {
             payload: payload.payload,
           }),
         });
-      const action = panel.manifest?.actions.find((item) => item.id === payload.actionId);
-      if (!action?.credential)
-        throw new ApiError(
-          'CREDENTIAL_NOT_DECLARED',
-          'This action does not declare credential input.',
-        );
-      const credential = action.credential;
-      if (currentPrompt.current)
-        throw new ApiError('CREDENTIAL_BUSY', 'A credential dialog is already open.');
-      return new Promise<unknown>((resolve, reject) => {
-        const next = {
-          actionId: action.id,
-          label: credential.label,
-          ttlSeconds: Math.min(3600, Math.max(1, credential.ttlSeconds ?? 900)),
-          resolve,
-          reject,
-        };
-        currentPrompt.current = next;
-        setMultiline(false);
-        setPrompt(next);
-        setCredentialError(undefined);
-      });
     }
     const onMessage = (event: MessageEvent<unknown>) => {
       if (!validSource(event.source, frame.current?.contentWindow ?? null)) return;
@@ -328,189 +237,16 @@ function Frame({ panel }: { panel: PanelDetails }) {
     return () => {
       active = false;
       window.removeEventListener('message', onMessage);
-      currentPrompt.current?.reject(
-        new ApiError('PANEL_REVISION_MISMATCH', 'The panel changed. Request a new credential.'),
-      );
-      currentPrompt.current = undefined;
     };
   }, [endpoint, identity]);
-  useEffect(() => {
-    const timer = window.setInterval(
-      () =>
-        setCredentials((current) =>
-          current.map((item) =>
-            item.status === 'ready' && Date.parse(item.expiresAt) <= Date.now()
-              ? { ...item, status: 'expired' }
-              : item,
-          ),
-        ),
-      1000,
-    );
-    return () => window.clearInterval(timer);
-  }, []);
-  async function submit() {
-    const request = currentPrompt.current;
-    const value = multiline ? secretArea.current?.value : secretInput.current?.value;
-    if (!request || !value || submitting) return;
-    setSubmitting(true);
-    setCredentialError(undefined);
-    try {
-      const result = await api<{ ref: string; expiresAt: string; status: 'ready' }>(
-        '/api/credentials',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            instanceId: panel.instanceId,
-            revision: panel.revision,
-            actionId: request.actionId,
-            value,
-            ttlSeconds: request.ttlSeconds,
-          }),
-        },
-      );
-      if (secretInput.current) secretInput.current.value = '';
-      if (secretArea.current) secretArea.current.value = '';
-      setCredentials((current) => [...current, { ...result, label: request.label }]);
-      request.resolve(result);
-      currentPrompt.current = undefined;
-      setPrompt(undefined);
-    } catch (cause) {
-      setCredentialError(errorMessage(cause));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-  async function revoke(ref: string) {
-    try {
-      await api(`/api/credentials/${encodeURIComponent(ref)}`, { method: 'DELETE' });
-      setCredentials((current) =>
-        current.map((item) => (item.ref === ref ? { ...item, status: 'revoked' } : item)),
-      );
-    } catch (cause) {
-      setCredentialError(errorMessage(cause));
-    }
-  }
   return (
-    <>
-      <iframe
-        ref={frame}
-        title={panel.definitionId}
-        sandbox="allow-scripts"
-        referrerPolicy="same-origin"
-        src={`/panels/${encodeURIComponent(panel.instanceId)}/${encodeURIComponent(panel.revision)}/frame.html`}
-        className="block min-h-0 w-full flex-1 border-0 bg-background"
-      />
-      {credentials.length > 0 && (
-        <section aria-label={t('Temporary credentials')} className="space-y-2">
-          <h2 className="text-sm font-medium">{t('Temporary credentials')}</h2>
-          {credentials.map((item) => (
-            <Stack key={item.ref} direction="row" gap={2} className="items-center">
-              <span className="text-sm">{item.label}</span>
-              <Badge variant="outline">{t(item.status)}</Badge>
-              {item.status === 'ready' && (
-                <Button size="sm" variant="outline" onClick={() => void revoke(item.ref)}>
-                  {t('Revoke')}
-                </Button>
-              )}
-            </Stack>
-          ))}
-        </section>
-      )}
-      {credentialError && !prompt && (
-        <Alert variant="destructive">
-          <AlertDescription>{credentialError}</AlertDescription>
-        </Alert>
-      )}
-      <Dialog
-        open={Boolean(prompt)}
-        onOpenChange={(open, details) => {
-          if (submitting) details.cancel();
-          else if (!open) cancel();
-        }}
-      >
-        <DialogContent showCloseButton={!submitting}>
-          <DialogHeader>
-            <DialogTitle>{t('Provide a temporary credential')}</DialogTitle>
-            <DialogDescription>
-              {prompt?.label}.{' '}
-              {t(
-                'The value is given to the declared server function; the panel and agent receive only a reference.',
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <dl className="space-y-1 text-xs text-muted-foreground">
-            <dt>{t('Action')}</dt>
-            <dd className="break-all">{prompt?.actionId}</dd>
-            <dt>{t('Revision')}</dt>
-            <dd className="break-all">{panel.revision}</dd>
-            <dt>{t('Expires after')}</dt>
-            <dd>
-              {(prompt?.ttlSeconds ?? 900) % 60 === 0
-                ? t('{count} minutes', { count: (prompt?.ttlSeconds ?? 900) / 60 })
-                : t('{count} seconds', { count: prompt?.ttlSeconds ?? 900 })}
-            </dd>
-          </dl>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <Field>
-              <FieldLabel htmlFor="paneon-credential">{t('Credential')}</FieldLabel>
-              {multiline ? (
-                <Textarea
-                  ref={bindSecretArea}
-                  id="paneon-credential"
-                  autoComplete="off"
-                  spellCheck={false}
-                  rows={5}
-                  required
-                  disabled={submitting}
-                />
-              ) : (
-                <Input
-                  ref={bindSecretInput}
-                  id="paneon-credential"
-                  type="password"
-                  autoComplete="off"
-                  required
-                  disabled={submitting}
-                />
-              )}
-            </Field>
-            <Field orientation="horizontal" className="mt-3">
-              <Switch
-                id="paneon-multiline"
-                checked={multiline}
-                disabled={submitting}
-                onCheckedChange={(checked) => {
-                  if (secretInput.current) secretInput.current.value = '';
-                  if (secretArea.current) secretArea.current.value = '';
-                  setMultiline(checked);
-                }}
-              />
-              <FieldLabel htmlFor="paneon-multiline">
-                {t('Multiline input (shown as text)')}
-              </FieldLabel>
-            </Field>
-            {credentialError && (
-              <p role="alert" className="mt-2 text-sm text-destructive">
-                {credentialError}
-              </p>
-            )}
-            <DialogFooter className="mt-4">
-              <Button type="button" variant="outline" disabled={submitting} onClick={cancel}>
-                {t('Cancel')}
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Spinner />}
-                {t('Provide')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+    <iframe
+      ref={frame}
+      title={panel.definitionId}
+      sandbox="allow-scripts"
+      referrerPolicy="same-origin"
+      src={`/panels/${encodeURIComponent(panel.instanceId)}/${encodeURIComponent(panel.revision)}/frame.html`}
+      className="block min-h-0 w-full flex-1 border-0 bg-background"
+    />
   );
 }

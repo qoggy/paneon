@@ -43,7 +43,7 @@
     "test:browser:ui": "node tests/browser/ui.mjs",
     "test:acceptance": "node tests/acceptance.mjs",
     "test:pack": "node tests/acceptance-pack.mjs",
-    "test:browser:credentials": "node tests/browser/credentials.mjs",
+    "test:browser:actions": "node tests/browser/action-input.mjs",
     "test:browser:queries": "node tests/browser/query-lifecycle.mjs",
     "test:versions": "node tests/acceptance-versions.mjs",
     "test:browser:production": "node tests/browser/production-runtime.mjs",

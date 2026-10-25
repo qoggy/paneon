@@ -23,7 +23,6 @@ export function validRequest(value: unknown, identity: BridgeIdentity): value is
     return typeof value.payload.actionId === 'string' && Object.hasOwn(value.payload, 'input');
   if (value.method === 'event')
     return typeof value.payload.type === 'string' && Object.hasOwn(value.payload, 'payload');
-  if (value.method === 'credential') return typeof value.payload.actionId === 'string';
   if (value.method === 'browser') return isBrowserAction(value.payload);
   return false;
 }
