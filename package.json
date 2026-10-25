@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Code-first interactive interfaces for agents.",
+  "description": "Let agents build interactive local pages and bring your feedback back.",
   "license": "MIT",
   "author": "qoggy",
   "repository": {

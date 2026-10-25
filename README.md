@@ -7,7 +7,7 @@
 
 **Turn AI answers into pages you can explore.**
 
-Ask your agent to use Paneon. It creates a local page where you can explore an explanation, inspect data, or review code—and bring your feedback back to the conversation.
+Paneon lets your agent build interactive pages on your machine. Explore an explanation, inspect data, or review code, then send your choices and annotations back to the conversation.
 
 > Use Paneon to explain the dining philosophers problem
 
@@ -15,15 +15,21 @@ Ask your agent to use Paneon. It creates a local page where you can explore an e
 
 Watch each philosopher take a fork, then see why everyone gets stuck.
 
-Your agent builds the page around your question, from interactive diagrams and simulations to tools for working with local data.
+## Why not just a web page?
+
+Your agent could write a one-off HTML page. With Paneon:
+
+- **Your feedback reaches the agent.** Answers, form input and annotations on a specific line go straight back to the conversation.
+- **Pages take less to build.** The agent uses ready-made pages and components instead of hand-writing UI, so pages come faster, use fewer tokens and look consistent.
+- **Pages work with your local files.** They can read your repositories, files and command-line tools, and are served only on your machine.
 
 ## Get started
 
-Development preview. Requires **Node.js 24**; a public npm release is not available yet.
-
-From a checkout of this repository:
+Development preview. Requires **Node.js 24**.
 
 ```sh
+git clone https://github.com/qoggy/paneon.git
+cd paneon
 npm ci
 npm run build
 npm install -g .
@@ -35,7 +41,7 @@ In the project where you use your agent, run:
 paneon init
 ```
 
-Choose your agent to install the skill. Then ask it to use Paneon and open the link it gives you. Works with agents that can run local commands, including Claude Code, Codex, and Cursor.
+Choose your agents, such as Claude Code or Codex, to install the skill. Then ask your agent to use Paneon and open the link it gives you.
 
 ## Review code together
 
@@ -45,13 +51,17 @@ Browse the changes and leave feedback directly on the code.
 
 ![Reviewing Git history, a side-by-side diff, and an annotation](docs/readme/git-review.png)
 
-## Try it with your own work
+## More to try
 
 - “Use Paneon to explain how this cache works.”
 - “Use Paneon to analyze these benchmark results.”
 - “Use Paneon to compare these architectures.”
 
-Choices, forms, tables, and document review have ready-made pages. Your agent can also build a custom page for the task.
+Ready-made pages cover choices, forms, tables, document review, Git review and GitHub pull requests. For anything else, your agent builds a custom page.
+
+## Feedback
+
+Report bugs and ideas in [Issues](https://github.com/qoggy/paneon/issues). Release notes are in the [changelog](CHANGELOG.md).
 
 ## License
 

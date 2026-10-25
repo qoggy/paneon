@@ -9,7 +9,7 @@ const packageJson = JSON.parse(
 const program = new Command();
 program
   .name('paneon')
-  .description('Code-first interactive interfaces for agents.')
+  .description('Let agents build interactive local pages and bring your feedback back.')
   .version(packageJson.version)
   .option('--debug', 'Write framework diagnostics to stderr')
   .option('--json', 'Print a machine-readable JSON result')
