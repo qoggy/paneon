@@ -86,7 +86,7 @@ SDK SHALL 关联调用请求与响应，MUST NOT 因断线、超时、重启或�
 
 ### Requirement: Reuse toolchain source updates without custom call preservation
 
-手动和自动 reload SHALL 复用 Vite/React 既有的模块更新/重载能力。Node serverAction SHALL 接入 Vite 既有的模块加载和失效能力，不假设浏览器 HMR 自动管理自定义 RPC/worker。系统 MUST NOT 为热更新额外实现旧 worker/产物保留、在途调用接管或结果迁移，也 MUST NOT 因更新重新调用 mutation。正在执行函数及页面状态的行为 SHALL 按所用工具链实际能力验证和说明，不额外承诺调用完成或结果恢复。
+手动和自动 reload SHALL 复用 Vite 的源码监听与编译能力及现有页面重载流程。Node serverAction SHALL 在隔离 worker 中通过 Node 原生 import 加载已打包的服务端产物，执行和元数据 worker MUST NOT 启动 Vite dev server。主进程 SHALL 在 reload 时沿用现有 worker 替换流程，通过旧进程退出释放模块缓存，不假设浏览器 HMR 自动管理自定义 RPC/worker。系统 MUST NOT 为热更新额外实现旧 worker/产物保留、在途调用接管或结果迁移，也 MUST NOT 因更新重新调用 mutation。正在执行函数及页面状态的行为 SHALL 按所用工具链实际能力验证和说明，不额外承诺调用完成或结果恢复。
 
 #### Scenario: Update source during a function call
 

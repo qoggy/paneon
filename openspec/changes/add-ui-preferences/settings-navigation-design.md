@@ -9,7 +9,7 @@
 - **B1**：设置通过一级导航进入独立内容页，不使用居中设置按钮或设置弹窗。
 - **B2**：采用「面板 / 服务 / 设置」三个管理空间；用户认可 Paneon 体验页展示的布局与样式。顶部导航仍为推荐的设计基线，左侧导航保留为已展示的对照方案。
 
-## 当前事实
+## 实施前事实
 
 仓库：`paneon`；分支：`0.0.x`；调查基线：`dca7156dc1c1f34153ce5d300237858be4b1c1a8`。
 
@@ -89,7 +89,7 @@
 
 ## 已实现的产品文件
 
-以下实现位于独立 worktree，等待主 agent 验收合入：
+以下实现已通过主 agent 验收并合入；原独立 worktree 基线及验证记录见 [settings-navigation-tasks.md](settings-navigation-tasks.md)：
 
 - `src/App.tsx`
 - `src/web/preferences-settings.tsx`
@@ -147,4 +147,4 @@
 
 顶部导航正式实现采用 `/`、`/server`、`/settings`，具体 PanelHost 保持原无导航边界。面板列表保持挂载以保留页码与数据，管理路由保存/恢复滚动；设置内容保持挂载，离开再返回仍能准确显示未完成的保存，避免重复写入。服务内容按访问读取一次真实 health，卸载时取消请求，不后台轮询。
 
-已通过构建、类型检查、涉及文件 ESLint/Prettier、偏好 3 项单测及两组 Chrome 回归。真实 650px 滚动、列表第 2 页和无额外刷新已验证；四组主题/语言 × 两种宽度 × 三页截图在 `/tmp/paneon-management-navigation-evidence/`。验证使用隔离临时 runtime/home，没有写入用户实际偏好或停止用户服务。交付清单与完整命令见 settings-navigation-tasks.md；当前仍未合入、commit 或 push。
+已通过构建、类型检查、涉及文件 ESLint/Prettier、偏好 3 项单测及两组 Chrome 回归。真实 650px 滚动、列表第 2 页和无额外刷新已验证；四组主题/语言 × 两种宽度 × 三页截图在 `/tmp/paneon-management-navigation-evidence/`。验证使用隔离临时 runtime/home，没有写入用户实际偏好或停止用户服务。交付清单与完整命令见 settings-navigation-tasks.md；按任务和主 agent 验收记录，已合入当前分支；这里保留原验证命令与证据，不代表本轮重新测试或推送。

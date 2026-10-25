@@ -19,7 +19,7 @@
 - [x] 2.6 Run appropriate typecheck/build/lint/format and focused tests; record exact commands, logs and screenshots plus failures/limitations in verification.md. Do not add retry/timeout padding just to get green checks.
 - [x] 2.7 Deliver a clean isolated worktree commit with full file list, architecture explanation, props/event examples and unresolved questions. Main agent performs independent CR and browser acceptance before integration.
 
-Implementation evidence is complete; independent main-agent CR/browser acceptance and integration remain outside these executor checkboxes. See verification.md.
+Implementation evidence and independent main-agent acceptance are complete; executor delivery is recorded in verification.md and integrated acceptance is recorded in acceptance.md and task 3.1 below. Historical handoff wording in executor reports describes that earlier stage, not a pending acceptance task.
 
 ## Independent main-agent acceptance
 

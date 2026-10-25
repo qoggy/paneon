@@ -2,7 +2,7 @@
 
 ### Requirement: Supported single-server scenario
 
-The logging mechanism SHALL be designed for normal CLI startup, reuse and shutdown with one running server. It SHALL identify the current log group from runtime context and treat other groups as historical. It MUST NOT add old-PID liveness probing, multiple-writer recovery or special file-tampering defenses for manually modified CLI artifacts, runtime descriptors or log files. Existing authorization and credential boundaries SHALL remain unchanged.
+The logging mechanism SHALL be designed for normal CLI startup, reuse and shutdown with one running server. It SHALL identify the current log group from runtime context and treat other groups as historical. It MUST NOT add old-PID liveness probing, multiple-writer recovery or special file-tampering defenses for manually modified CLI artifacts, runtime descriptors or log files. Existing control authorization SHALL remain unchanged.
 
 #### Scenario: Historical logs are cleaned during a normal server run
 
@@ -40,13 +40,13 @@ The logger SHALL support Error values, preserving type/name, message, stack, cod
 
 ### Requirement: Explicit log data selection
 
-The framework SHALL NOT automatically dump inputs, business results, environment variables, request bodies or author process output. Initial log points MUST avoid explicitly writing credentials. Existing credential output checks SHALL remain unchanged. Generic field redaction and known-secret substitution SHALL NOT be introduced, as confirmed by B3. Error messages and stacks MUST NOT be universally deleted as a substitute for selecting appropriate log content.
+The framework SHALL NOT automatically dump inputs, business results, environment variables, request bodies or author process output. Initial log points MUST avoid explicitly writing credentials. Generic field redaction and known-secret substitution SHALL NOT be introduced, as confirmed by B3. Error messages and stacks MUST NOT be universally deleted as a substitute for selecting appropriate log content.
 
 #### Scenario: Logger is integrated without business payload dumping
 
 - **WHEN** the initial server logger integration records startup, readiness, stopping or framework errors
 - **THEN** it records the selected message and context without automatically adding input bodies or credential objects
-- **AND** existing action/event credential boundaries remain unchanged
+- **AND** existing control authorization remains unchanged
 
 ### Requirement: Startup-scoped levels and early initialization
 

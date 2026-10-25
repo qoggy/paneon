@@ -28,7 +28,7 @@
 
 仓库 `/Users/yuguo/IdeaProjects/paneon`，分支 `0.0.x`，实施基线 `a32404d8d97fef89fa0eb86f3e76bf1c00081aea`。`git.ts:275-303` 的 sessions 保存 snapshots/listings/histories；`readGitFile` 以 listingId/fileId 查 Map；`validateGitFeedback:756` 以 sourceId 查 Map。浏览器 `panel.tsx:131,275` 已存 GitSnapshot。`branches.tsx`、`history.tsx`、`file-tree.tsx` 主要是展示部件；`shared/diff.tsx:35` 已支持字符串但强依赖 sourceId/FeedbackProvider。编译器要求 serverAction 顶层命名导出，封装不能变成在 React render 闭包内动态创建 action。
 
-详细已修正批注契约参考主工作区 `openspec/changes/add-panel-resource-lifecycle/design.md` 的「组件数据归属与后台职责」和「批注携带当时来源与原文」；该文档的 runtime 任务不属于本任务。
+页面持有所见原文、完整请求校验及后台可丢弃边界见本文件 Browser-owned annotation data 和 Implemented API and ownership；资源约束见 [资源生命周期设计](../add-panel-resource-lifecycle/design.md)。旧资源设计中的两个章节已被重整，不再引用不存在的章节；其 runtime 任务仍不属于本 change。
 
 ## Goals / Non-Goals
 
@@ -36,12 +36,13 @@
 
 ## Component contracts
 
-| 能力          | 作者需要提供                                                    | 组件/配套读取层负责                                                                  |
-| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Diff          | 两个字符串；路径/版本/语义 ref 可选；反馈能力按需组合           | 展示、行/字坐标、导航和交互；两个字符串单独使用不必创建 Git session 或整页 Provider  |
-| Git 分支列表  | repositoryPath、selected、onSelect                              | 从显式仓库读取 refs，再复用现有 Branches 展示；无需调用方持有 GitSnapshot 或 session |
-| Git Commit 图 | repositoryPath、branch 或明确 tip、selected、onSelect           | 固定版本读取、分页和图布局；读命令收在组件模块/配套 hook，不要求外层整页协调内部缓存 |
-| Git 改动文件  | repositoryPath、固定 commit/parent 或明确比较范围、onSelectFile | 文件树与状态颜色，按文件点击读取当次内容，回调含足够来源和文本用于 Diff/批注         |
+<!-- prettier-ignore -->
+| 能力 | 作者需要提供 | 组件/配套读取层负责 |
+| --- | --- | --- |
+| Diff | 两个字符串；路径/版本/语义 ref 可选；反馈能力按需组合 | 展示、行/字坐标、导航和交互；两个字符串单独使用不必创建 Git session 或整页 Provider |
+| Git 分支列表 | repositoryPath、selected、onSelect | 从显式仓库读取 refs，再复用现有 Branches 展示；无需调用方持有 GitSnapshot 或 session |
+| Git Commit 图 | repositoryPath、branch 或明确 tip、selected、onSelect | 固定版本读取、分页和图布局；读命令收在组件模块/配套 hook，不要求外层整页协调内部缓存 |
+| Git 改动文件 | repositoryPath、固定 commit/parent 或明确比较范围、onSelectFile | 文件树与状态颜色，按文件点击读取当次内容，回调含足够来源和文本用于 Diff/批注 |
 
 建议在 Git 资源目录新增 `components.tsx` 导出三种读取型包装组件，必要时将命名 action 分离到 `actions.ts`；复用已有图和树展示，不重写绘制算法。props 的业务语义必须符合上表，内部名称可沿现有规范整理。通过一个最小自定义 TSX 例子证明组件能独立复用；不强制现在加入 `paneon/ui` 公共包导出。出现需要改变上述职责的取舍须先报告。
 
@@ -102,7 +103,7 @@
       ],
     },
   },
-  // 可附整体 comment、replacesEventId；每次提交是完整结果。
+  // 可附 replacesEventId；comment 只属于 annotations 条目，每次提交是完整结果。
 }
 ```
 
@@ -150,6 +151,6 @@ The final function signatures are `readGit(params, request, signal?)`, `readGitF
 
 History request `historyContext` contains only `{repositoryId,branch,tip?}` and an explicit `offset`/`pageOnly`. The first result includes `historyRefs/historyDecorations` retained in browser memory. The browser restores those frozen decorations on later pages and selection details; a large catalog is never resent in every read request. This preserves fixed-tip graph/decorations and existing request limits without a required server Map. Explicit refresh discards the context. An optional explicit history `parent` must be an actual parent (null only for a root); the built-in page still uses its first-parent default.
 
-`DiffView` without `sourceId` renders a string/model comparison without calling `useFeedback`. `sourceId` opts into the existing Provider integration, preserving PR callers and the public feedback API. `feedback.ts` builds normalized/de-duplicated sources/evidence in the browser. File-only sources have `evidence:[]`; line evidence stores exact selected complete lines; hunk evidence stores patch and composing old/new fragments. The pure validator checks configured repository association and internal consistency, not client/Git authenticity. Full `comment` and `replacesEventId` participate in the same 65536 UTF-16 event limit. Runtime transport remains 262144 UTF-8 bytes. No Runtime/PR business protocol, persistence or retry behavior is changed.
+`DiffView` without `sourceId` renders a string/model comparison without calling `useAnnotations`. `sourceId` opts into `AnnotationRoot` integration, preserving PR callers and the public annotation API. `feedback.ts` builds normalized/de-duplicated sources/evidence in the browser. File-only sources have `evidence:[]`; line evidence stores exact selected complete lines; hunk evidence stores patch and composing old/new fragments. The pure validator checks configured repository association and internal consistency, not client/Git authenticity. Full `comment` and `replacesEventId` participate in the same 65536 UTF-16 event limit. Runtime transport remains 262144 UTF-8 bytes. No Runtime/PR business protocol, persistence or retry behavior is changed.
 
 Exact examples are in `skills/paneon/references/git-review.md`, including component props, request/file descriptor, result and evidence formats. Verification and all actual changed files are recorded in this change's `verification.md`.

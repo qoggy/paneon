@@ -8,16 +8,9 @@
 
 以 settings-navigation-design.md 为设计依据；体验源为 `/private/tmp/paneon-navigation-review/panel.tsx`，仅参考顶部导航和已精简的文案，不移植评审工具和快照说明。基于 `de40e35e59720f6b90f4bcb24e873a56f47deea2` 创建独立 worktree。
 
-## 任务
+## 任务归属
 
-- [x] 将 src/App.tsx 的管理界面组织为面板 `/`、服务 `/server`、设置 `/settings` 三项顶部导航；保留具体 `/panels/:id` 无永久导航的边界；支持直达、刷新及浏览器前进/后退，不增加路由依赖。
-- [x] 保留现有面板卡片、分页、关闭与局部刷新；切换管理导航保留列表数据、页码和滚动，不能附带关闭、重新创建或无关刷新。
-- [x] 将 src/web/preferences-settings.tsx 从弹窗变成独立设置内容：约 640px 上限、左标签右控件、细分隔线；主题为低强调浅/深分段，语言为选择器。复用现有保存链路，准确显示保存中/已保存/失败状态，不加重复说明或 Save/Cancel。
-- [x] 新增只读服务页，复用 GET /health 真实数据和现有 API 包装，展示运行状态、版本、PID、地址、启动时间及必要的运行实例标识；不加控制、虚构监控、快照文案或后台轮询。加载失败准确提示，不展示虚假 running。
-- [x] 同步 src/ui/locales/en.ts 与 zh-CN.ts；正式页面不带“只读快照”“仅预览”“预览已更新”等体验页说明。只处理当前 UI 文案，不改业务内容。
-- [x] 调整受影响的既有浏览器测试，新增必要的管理导航回归（状态保留、历史导航、直达、健康状态失败、保存失败）；build/typecheck/lint/相关测试通过。
-- [x] 真实浏览器验证 light/dark、英文/中文、宽屏/390px；验证已有 panel 页无导航、跨页分页/滚动保留、保存失败无假成功且真实跨窗口偏好同步；测试用临时 runtime/home，不能改用户实际设置或停止用户服务。提供截图、命令、结果和变动清单。
-- [x] 主 agent 独立验收通过，仅合入本任务代码并本地 commit；交付时归档 worktree，不 push。
+八项导航任务已统一到 [tasks.md](tasks.md#management-navigation-tasks)，本文件仅保留当时的实施与主 agent 验收证据，避免两份任务清单重复统计。
 
 ## 实现与验证记录
 
@@ -35,7 +28,7 @@
 
 Chrome 证据包含：三个 URL 的生产直达/刷新与前进后退、列表第 2 页和真实 650px 滚动恢复且不重取列表、仅 Refresh 发起局部刷新、保存 pending 防重复、保存失败保留确认值、跨窗口同步、health 失败不显示 running 或旧结果、PanelHost 无管理导航、四组主题/语言与 1440px/390px 下三页无溢出。没有创建/关闭 panel 的页面副作用；测试探针只在独立 fixture 中创建。截图在 `/tmp/paneon-management-navigation-evidence/`（24 张），既有主题回归在 `/tmp/paneon-ui-preferences-evidence/`。
 
-## 协作
+## 当时的协作边界
 
 subagent 负责本任务完整实现，禁止向主 checkout 写产品代码。设计/task 文档可在主 checkout 更新，其他已有 tasks.md 和其他 change 不改。实现完成时先报告差异与验证证据，不主动合入或删除 worktree。
 

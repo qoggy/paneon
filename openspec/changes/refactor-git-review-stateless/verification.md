@@ -4,7 +4,6 @@
 
 Main-agent independent acceptance is complete and passed; see [acceptance.md](acceptance.md). The following records the executor handoff and evidence before that acceptance. No push was performed.
 
-
 Implementation is in `/Users/yuguo/.codex/worktrees/git-review-stateless/paneon`, based on `a32404d8d97fef89fa0eb86f3e76bf1c00081aea`. This is executor evidence, not independent CR or user acceptance. The worktree is retained for the main agent's independent review and browser acceptance. No push, merge or worktree archive was performed.
 
 Only Git readers/components, optional shared Diff annotation integration, focused skill documentation/tests and this change are included. No Runtime, shutdown, logging, lifecycle, SQLite business table, memory convention, PR business protocol or public `paneon/ui` export was changed. Tests use temporary fixture runtime directories; they never stop the user's instances, reset `~/.paneon` or modify user runtime data. Installed dependencies are referenced through ignored `node_modules/` links; build outputs remain ignored in this worktree.

@@ -1,8 +1,8 @@
 # Theme and language preferences
 
-## 需要你处理的事项
+## 当前状态
 
-无。用户已授权按本设计开发，并明确派 subagent；采用现有 light/en 默认值及配置、主页设置和实时切换方案。
+主题/语言及后续管理导航已有实现与主 agent 验收记录；见 [verification.md](verification.md)、[settings-navigation-tasks.md](settings-navigation-tasks.md)。本文保留配置与同步设计；旧 Dialog 入口已由 [独立设置页设计](settings-navigation-design.md) 覆盖。任务统一见 [tasks.md](tasks.md)。本轮仅补齐文档，不重新执行历史测试。
 
 ### 已确认结论
 
@@ -27,7 +27,7 @@
 
 CLI 的机器输出字段和英文诊断保持现状；本需求不扩展成整个终端产品的中文化。
 
-## 当前代码事实
+## 实施前代码事实
 
 - `src/ui/styles.css` 已有 light 默认变量、`.dark` 变量和 shadcn dark variant；基础组件已有主题能力。
 - 同文件固定引入 github-markdown-light.css；`CodeBlock` 固定 github-light；Mermaid 没有主题联动；共享 Diff 使用 bg-red-50/bg-green-50。现状不能称完整 dark 支持。
@@ -41,9 +41,7 @@ CLI 的机器输出字段和英文诊断保持现状；本需求不扩展成整�
 
 ## 配置入口和存储
 
-CLI 命令和配置文件位置已获用户认可。主页设置入口仍为推荐设计；两者读写同一份配置，不在 panel 外层恢复固定工具栏。
-
-主页右上角「设置 / Settings」打开 Dialog：
+CLI 命令和配置文件位置已实施。网页通过管理导航的 `/settings` 独立页面进入，不再使用原设计的设置 Dialog；最终布局和导航见 [settings-navigation-design.md](settings-navigation-design.md)。两者读写同一份配置，不在 panel 外层恢复固定工具栏。设置内容为：
 
 ```text
 Settings / 设置
@@ -54,7 +52,7 @@ Language / 语言     [ English      | 简体中文    ]
 
 选择后保存并即时应用，关闭设置无需再提交；保存失败保留原配置并显示错误。无须关闭、刷新或重建已有 panel。设置入口属于 Paneon 主页，不向每个 panel 注入按钮。
 
-CLI 示例（拟定）：
+CLI 示例：
 
 ```sh
 paneon config get
@@ -97,10 +95,11 @@ host 更新自身 UI，并发消息到现有 iframe
 
 接口建议：
 
-| Method / path              | 用途                                                   |
-| -------------------------- | ------------------------------------------------------ |
-| GET /api/preferences       | 读取生效的 UI 偏好                                     |
-| POST /api/preferences      | 合并并保存 UI 偏好，返回生效值                         |
+<!-- prettier-ignore -->
+| Method / path | 用途 |
+| --- | --- |
+| GET /api/preferences | 读取生效的 UI 偏好 |
+| POST /api/preferences | 合并并保存 UI 偏好，返回生效值 |
 | WS /api/preferences/stream | 所有打开页面共享的偏好更新通知；连接建立后发送当前快照 |
 
 请求与响应中的业务值都是 `{ "ui": { "theme": "dark", "language": "zh-CN" } }`，继续使用现有 `{ok,data}` 外层。POST 允许只更新其中一个设置。WS 消息为 `{ "type": "preferences", "ui": { "theme": "dark", "language": "zh-CN" } }`。连接恢复后读当前完整偏好，不回放修改历史。
@@ -125,14 +124,15 @@ iframe 在 init 到来前保持内容未挂载、背景透明；收到 ui 后先
 
 ## 主题适配
 
-| 部分                            | 做法                                                                                                                                    |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 基础组件、页布局、弹层和批注 UI | 复用现有 shadcn CSS 变量，统一根 class，不逐组件传 theme                                                                                |
-| Markdown                        | 使用当前固定版本 github-markdown-css 的 light/dark 配色，局部作用于对应主题的 markdown-body；保持排版，不以 OS 媒体查询覆盖用户显式选择 |
-| CodeBlock / Git 语法高亮        | Shiki 同时提供 github-light/github-dark 颜色，切换使用 CSS token 颜色；不因换主题重新解析整份长代码或替换原文 Text 节点                 |
-| Mermaid                         | 从 UI 偏好选对应主题；主题变化时重渲染图形，保留原 Mermaid 输入；错误和加载提示本地化                                                   |
-| Git Diff / 文件状态 / 图谱      | 将固定浅色背景和状态/轨道配色集中到明暗 CSS 变量，保证两种背景下可读；保留增删改和分支的语义                                            |
-| 原生控件和浏览器选择色          | 根 color-scheme 与主题一致；保留焦点、选中和可访问对比度                                                                                |
+<!-- prettier-ignore -->
+| 部分 | 做法 |
+| --- | --- |
+| 基础组件、页布局、弹层和批注 UI | 复用现有 shadcn CSS 变量，统一根 class，不逐组件传 theme |
+| Markdown | 使用当前固定版本 github-markdown-css 的 light/dark 配色，局部作用于对应主题的 markdown-body；保持排版，不以 OS 媒体查询覆盖用户显式选择 |
+| CodeBlock / Git 语法高亮 | Shiki 同时提供 github-light/github-dark 颜色，切换使用 CSS token 颜色；不因换主题重新解析整份长代码或替换原文 Text 节点 |
+| Mermaid | 从 UI 偏好选对应主题；主题变化时重渲染图形，保留原 Mermaid 输入；错误和加载提示本地化 |
+| Git Diff / 文件状态 / 图谱 | 将固定浅色背景和状态/轨道配色集中到明暗 CSS 变量，保证两种背景下可读；保留增删改和分支的语义 |
+| 原生控件和浏览器选择色 | 根 color-scheme 与主题一致；保留焦点、选中和可访问对比度 |
 
 Markdown 的明暗样式限定在其正文区域，不能覆盖外部问卷字号或颜色。主题变动不得修改 Markdown、代码、Diff 或批注 quote，也不得把主题加入快照内容 hash。
 
@@ -142,13 +142,14 @@ Markdown 的明暗样式限定在其正文区域，不能覆盖外部问卷字�
 
 举例：
 
-| key                | English                         | 简体中文                   |
-| ------------------ | ------------------------------- | -------------------------- |
-| choose.next        | Next                            | 下一题                     |
-| choose.reviewTitle | Review all answers              | 检查全部答案               |
-| feedback.submit    | Submit annotations              | 提交批注                   |
-| diff.sideBySide    | Side by side                    | 左右对比                   |
-| diff.position      | {current} / {total} differences | {current} / {total} 处差异 |
+<!-- prettier-ignore -->
+| key | English | 简体中文 |
+| --- | --- | --- |
+| choose.next | Next | 下一题 |
+| choose.reviewTitle | Review all answers | 检查全部答案 |
+| feedback.submit | Submit annotations | 提交批注 |
+| diff.sideBySide | Side by side | 左右对比 |
+| diff.position | {current} / {total} differences | {current} / {total} 处差异 |
 
 Git 查询中已有的 description/notes 等 Paneon 自带展示文字，改为展示键和参数或由已有结构化范围信息在前端格式化；不能在服务端查询完成时固定语言。展示描述不加入业务快照 hash，技术错误原文不作翻译数据。
 
@@ -160,15 +161,16 @@ Paneon 拥有的验证提示及成功/失败摘要本地化；原有校验时机
 
 ## 页面范围
 
-| 页面                            | 受影响文字                                                                   |
-| ------------------------------- | ---------------------------------------------------------------------------- |
-| 主页及 host 必要通知            | 设置、实例列表/状态、分页、连接/关闭/凭据交互                                |
-| Choose                          | 翻题、汇总、自填、选项说明、详情、未答/错误与提交提示                        |
-| Form                            | 清除、选择占位、必填提示、提交/更正/结果                                     |
-| Table                           | 搜索/筛选/分页、选择及公共批注操作                                           |
-| Review                          | 阅读辅助、公共批注及提交状态                                                 |
-| Git review                      | 分支组名、文件组名、日期、差异导航、批注、加载与错误摘要                     |
-| GitHub PR                       | 列表/详情/检查状态、Diff 和批注操作；PR 内容原样                             |
+<!-- prettier-ignore -->
+| 页面 | 受影响文字 |
+| --- | --- |
+| 主页及 host 必要通知 | 设置、实例列表/状态、分页、连接/关闭/凭据交互 |
+| Choose | 翻题、汇总、自填、选项说明、详情、未答/错误与提交提示 |
+| Form | 清除、选择占位、必填提示、提交/更正/结果 |
+| Table | 搜索/筛选/分页、选择及公共批注操作 |
+| Review | 阅读辅助、公共批注及提交状态 |
+| Git review | 分支组名、文件组名、日期、差异导航、批注、加载与错误摘要 |
+| GitHub PR | 列表/详情/检查状态、Diff 和批注操作；PR 内容原样 |
 | Concurrency / Sentinel examples | 继承主题，公共控件和操作说明跟随语言；固定教学文章、示例数据不是自动翻译对象 |
 
 教学文章是一次性示例源码中的内容，与 agent 传入的文章具有相同内容边界。作者可以使用当前 language 主动选择另一套文章，但本方案不要求每个一次性页面准备双语正文。

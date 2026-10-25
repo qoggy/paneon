@@ -63,7 +63,7 @@
 - [docs/memory/tech-local-browser-access.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-local-browser-access.md)
 - [docs/memory/tech-panel-version-requirements.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-panel-version-requirements.md)
 - [docs/memory/tech-runtime-home.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-runtime-home.md)
-- [docs/memory/tech-source-updates.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-source-updates.md)
+- [源码更新设计（原 tech-source-updates 记忆）](design.md#自动-reload-由-agent-按面板选择)
 - [docs/memory/tech-state-notifications.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-state-notifications.md)
 - [docs/memory/ui-default-styling.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/ui-default-styling.md)
 - [docs/memory/ui-markdown-rendering.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/ui-markdown-rendering.md)

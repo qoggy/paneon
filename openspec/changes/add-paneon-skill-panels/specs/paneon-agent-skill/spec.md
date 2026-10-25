@@ -18,37 +18,29 @@ Agent-facing usage instructions SHALL be maintained only within the product skil
 
 ### Requirement: Supply an interactive data table as a standard panel
 
-The product skill SHALL include a ready-to-run interactive data table panel. The caller SHALL be able to supply task-specific table data without rewriting the panel's TSX. The panel SHALL keep supplied cell data read-only and support selecting rows, columns, and individual cells for feedback. Results SHALL distinguish selection kinds and identify rows by their original zero-based index in the instance's input rows snapshot, columns by column key, and cells by both rather than visible positions. The input SHALL NOT require a rowKey option or a caller-supplied id field. Sorting, filtering, and pagination SHALL preserve that original index. The panel SHALL reuse the common feedback capabilities, allow mixed row, column, cell, and cell-text targets within one submission, and support multiple independent annotations. All selected targets SHALL use annotations entries, with an empty annotation representing selection without a written opinion rather than a separate selected list. Exact validation and location contracts SHALL be finalized in the design before implementation.
+The product skill SHALL include a ready-to-run read-only data table with supplied columns/rows, search, filtering, sorting and pagination. The panel SHALL support native text annotations on original header labels and string cells, overall annotations, saved-annotation navigation and explicit submission. Header sorting SHALL use a separate control. The default table SHALL NOT expose an object-selection mode or row/column/page checkboxes. Existing row/column/cell protocol references SHALL remain valid even though their default selection controls have been removed.
 
-#### Scenario: Present data without authoring a table page
+Results SHALL distinguish header, row, column and cell references. Header text ranges SHALL address the original label by columnKey; string cell ranges SHALL address the original value by original zero-based rowIndex and columnKey. Sorting, filtering and pagination SHALL preserve identity. The input SHALL NOT require rowKey or caller-supplied ids. Multiple independent annotations SHALL use one annotations list with per-entry comment, including empty comments, rather than a separate selected list.
 
-- **WHEN** an agent supplies data matching the standard table's input contract
-- **THEN** the supplied panel can present that data and collect the supported selection/feedback without requiring a new TSX implementation
+#### Scenario: Present records without business identifiers
 
-#### Scenario: Supply records without business identifiers
+- **WHEN** an agent supplies valid rows without ids, including two rows with identical values
+- **THEN** the standard panel displays them without new TSX and retains distinct original rowIndex identities after sorting or pagination
 
-- **WHEN** the caller supplies valid rows without id fields
-- **THEN** the panel can display them and locate feedback by their original zero-based indices without requiring rowKey
+#### Scenario: Annotate a header without sorting
 
-#### Scenario: Distinguish identical rows
+- **WHEN** a person selects part of a header label and explicitly saves an annotation
+- **THEN** its target uses kind header, the columnKey and matching original-label range without changing sort order
 
-- **WHEN** two input records have identical field values and the person selects one
-- **THEN** the result identifies the selected record by its original rowIndex rather than merging the records
+#### Scenario: Annotate a string cell after sorting
 
-#### Scenario: Select a column
+- **WHEN** a person sorts the table and annotates text in a string cell
+- **THEN** the result uses the original rowIndex and columnKey with the exact original quote, and the cell remains unchanged
 
-- **WHEN** a person selects a column and submits feedback
-- **THEN** the result identifies it as a column selection using its column key rather than returning a row identifier
+#### Scenario: Preserve existing object references
 
-#### Scenario: Select a cell after sorting
-
-- **WHEN** a person sorts the data and selects an individual cell
-- **THEN** the selection identifies the original rowIndex and column key without using the sorted display position or modifying the cell value
-
-#### Scenario: Submit mixed targets and independent annotations
-
-- **WHEN** a person selects a column, adds a comparison annotation to two cells, and annotates a word in another cell
-- **THEN** one explicit submission can contain those different target kinds and their independently associated opinions
+- **WHEN** an existing row, column or cell reference is validated against the instance snapshot
+- **THEN** its strict reference validation remains available without restoring default object-selection controls
 
 ### Requirement: Release skill resources with the CLI version
 
@@ -135,7 +127,7 @@ The instance SHALL retain its original input while being reviewed. Results SHALL
 #### Scenario: Submit several opinions together
 
 - **WHEN** a person adds or revises several annotations and explicitly submits
-- **THEN** one review-submitted event contains the current annotations and optional overall opinion, and editing alone does not emit feedback
+- **THEN** one review-submitted event contains the current annotations, with an overall opinion represented by a whole-document target rather than a top-level comment, and editing alone does not emit feedback
 
 ### Requirement: Keep the GitHub PR example read-only and deliver opinions to the agent
 
@@ -155,24 +147,19 @@ Explicit review requests and opinions SHALL be delivered to the current agent th
 
 ### Requirement: Demonstrate a self-contained explanatory page
 
-The skill SHALL include a copyable one-off concurrency-and-queue explanation example. Its topic, title, fixed tasks and durations, and initial concurrency SHALL be defined directly in TSX source rather than supplied through dedicated business input parameters or a task configuration file. Agents SHALL be able to use that source as a reference or modify it to create a one-off explanation for their current task. This example SHALL NOT introduce a general-purpose scheduling service or parameterized standard-panel contract.
+The skill SHALL include a copyable one-off dining-philosophers explanation with its topic, strategies, initial state and program in source rather than dedicated business input. It SHALL compare left-first acquisition, exclusive serial dining and ordered fork acquisition through a deterministic page-local state model. One step SHALL attempt one displayed instruction; blocked acquisition SHALL preserve the program counter and resource ownership. It SHALL NOT introduce an OS-thread simulator, real performance claim or scheduling service.
 
-The example SHALL allow page-local concurrency adjustment, playback, pausing, and replay to explain its fixed scheduling model. Adjusting these controls SHALL NOT require editing instance input or an agent turn. It SHALL preserve the existing generic CLI input contract; any required empty object SHALL carry no topic, task, or concurrency configuration.
+The example SHALL support local playback, pause, stepping, seeking, reset and strategy changes without an agent turn or instance-input edits. It SHALL use empty generic input, SHALL NOT provide annotation controls and SHALL NOT emit business events. Agents SHALL be able to copy or modify the source for another one-off explanation.
 
-#### Scenario: Run the supplied explanation
+#### Scenario: Explore resource contention
 
-- **WHEN** an agent runs the example through the ordinary TSX entry
-- **THEN** the page presents the topic and fixed task data from its source without requiring an external task dataset
+- **WHEN** a person runs the example and steps or changes acquisition strategies
+- **THEN** the displayed program position, held/requested forks and deadlock state follow the same model while browsing emits no event
 
-#### Scenario: Explore the explanation locally
+#### Scenario: Adapt the explanation
 
-- **WHEN** the person changes concurrency or pauses playback
-- **THEN** the page updates its own explanatory state without emitting an agent event for each adjustment or changing instance params
-
-#### Scenario: Adapt the example to another explanation
-
-- **WHEN** an agent needs a different one-off topic or fixed dataset
-- **THEN** the agent can copy or edit the example source rather than having to fit the explanation into a dedicated external input schema
+- **WHEN** an agent needs another one-off teaching page
+- **THEN** it can copy and edit the example source without inventing a dedicated task-input file or standard-panel business contract
 
 ### Requirement: Allow explicit corrections in supplied standard panels
 

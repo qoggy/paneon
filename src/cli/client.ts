@@ -193,7 +193,11 @@ export async function call(
   const runtime = options.start
     ? await ensureRuntime()
     : await discover(options.allowVersionMismatch);
-  if (!runtime) throw new PaneonError('SERVER_NOT_RUNNING', 'The Paneon service is not running.');
+  if (!runtime)
+    throw new PaneonError(
+      'SERVER_NOT_RUNNING',
+      'The Paneon service is not running. Run paneon server start.',
+    );
   let response: Response;
   try {
     response = await fetch(`http://127.0.0.1:${runtime.port}${path}`, {

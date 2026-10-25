@@ -17,5 +17,4 @@
 - [Default UI styling](ui-default-styling.md) — Public components use shadcn defaults; layout helpers provide necessary layout and panels may customize their pages
 - [Desktop page scope](ui-desktop-scope.md) — Default to desktop development and acceptance; mobile-specific adaptation and testing require an explicit task requirement
 - [Shared selection and annotations](ui-selection-feedback.md) — Use 批注 / annotation consistently in UI, guides and APIs; supplied pages retain explicit submission and correction
-- [Source updates](tech-source-updates.md) — Reuse Vite/React update mechanisms without custom old-worker or in-flight-call preservation
 - [Runtime home](tech-runtime-home.md) — PANEON_HOME is an internal constant fixed to ~/.paneon, without a user-facing override

@@ -2,7 +2,7 @@
 
 ### Requirement: Read generic panel input from a JSON file
 
-The panel run command SHALL accept --params-file <path> as an alternative to --params <json>. The caller SHALL provide exactly one of these options. Both standard skill panels and custom TSX panels SHALL use the same interface. The CLI SHALL resolve relative input file paths against its invoking directory, independently of --cwd, read UTF-8 JSON, and use the existing panel input schema validation for the parsed value.
+The panel run command SHALL accept --params-file <path> as an alternative to --params <json>. The caller SHALL NOT provide both options. If neither is supplied, the CLI SHALL preserve its existing empty-object default and validate that object against the panel input schema. Both standard skill panels and custom TSX panels SHALL use the same interface. The CLI SHALL resolve relative input file paths against its invoking directory, independently of --cwd, read UTF-8 JSON, and use the existing panel input schema validation for the parsed value.
 
 #### Scenario: Run a supplied panel with a data file
 
@@ -21,7 +21,7 @@ The panel run command SHALL accept --params-file <path> as an alternative to --p
 
 ### Requirement: Reject invalid input sources before creating an instance
 
-The CLI SHALL fail with a clear diagnostic and SHALL NOT create a panel instance if neither input option is supplied, both are supplied, or the file cannot be read or parsed as JSON. Parsed input SHALL still be rejected by the existing schema validation when it does not match the panel definition.
+The CLI SHALL fail with a clear diagnostic and SHALL NOT create a panel instance if both input options are supplied or the file cannot be read or parsed as JSON. Parsed input SHALL still be rejected by the existing schema validation when it does not match the panel definition.
 
 #### Scenario: Conflicting input options
 
@@ -33,10 +33,10 @@ The CLI SHALL fail with a clear diagnostic and SHALL NOT create a panel instance
 - **WHEN** the supplied file is missing, unreadable, or contains invalid JSON
 - **THEN** the command reports the failure without creating an instance
 
-#### Scenario: Missing input source
+#### Scenario: Preserve default empty input
 
 - **WHEN** neither --params nor --params-file is supplied
-- **THEN** the command reports the missing input source without creating an instance
+- **THEN** the CLI uses an empty object and creates the instance only if that value satisfies the panel input schema
 
 ### Requirement: File input is a creation-time snapshot
 

@@ -1,3 +1,7 @@
+# 任务与阶段记录
+
+当前未完成项仍为 3.5，原勾选和阶段编号保留。已完成条目中的“尚未实现”、旧 Feedback 名称、对象选择入口和 concurrency 示例描述记录的是当时进度；现行契约见 [design.md](design.md)、specs/ 及专题设计，不按历史任务文字复活旧 API 或已删除页面。并发讲解当前为 dining-philosophers；用户亲自体验 Sentinel 不由工程测试替代。
+
 ## 1. Requirement alignment and contract refinement — complete
 
 页面产品对焦及工程契约核对已完成，记录见 design.md 和 review.md。用户已授权在 Mermaid 验收通过后开工；该条件已满足，任务 1.27 完成，不再要求用户重复批准普通技术细节。

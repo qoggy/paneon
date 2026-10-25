@@ -19,7 +19,7 @@
 - **B11**：面板通过 `requires.paneon` 声明依赖的 Paneon 包版本范围；CLI、SDK、组件与服务同包同版本发布，范围不满足时明确拒绝，不自动下载旧 SDK 或改写源码。
 - **B12**：CLI 的帮助、提示、错误说明和框架诊断统一使用英文，用户数据原样保留。
 - **B13**：CLI 提供显式 `--debug`；默认关闭，调试信息写入 stderr，命令结果与 JSON 输出不混入调试文本。
-- **B14**：密钥原文可以交给绑定的服务端函数在内存中使用；该函数属于受信任的作者代码，浏览器组件和 agent 上下文不接收原文。
+- **B14**：不提供内置凭据管理。页面可以用普通输入框收集密钥并作为 server action 参数传递；使用、存储及避免敏感值进入结果、事件和日志由作者代码负责。
 - **B15**：自动 reload 可以重置未提交的页面状态；已保存事件和消费位置保留，页面状态及正在执行函数的更新行为沿用所用工具，不额外承诺调用完成或结果恢复。
 - **B16**：关闭浏览器页面不等于关闭面板；面板和本地服务具有独立于浏览器标签页的生命周期。
 - **B17**：CLI 按对象统一分组，面板操作采用 `paneon panel ...`，服务操作采用 `paneon server ...`；面板创建、列表、检查、重载、关闭、事件读取和确认均归入 panel。
@@ -43,6 +43,8 @@
 
 ## Context
 
+以下描述初版实施前的基线，不能作为当前仓库缺少 SDK/runtime 的判断。后续 UI 偏好、资源驻留、源码监听和产物回收分别由对应 change 扩展，见 [changes 状态与边界](../README.md)。
+
 仓库 `paneon` 当前位于 `0.0.x`，基线为 `9f2685d829d37b655f85a80ecb2533107e8f6782`。工作区在提案开始前干净。
 
 现有 `src/cli/index.ts` 只提供帮助和版本；`src/App.tsx` 是初始化验证页。项目已经采用 Node.js 24、TypeScript 6、React 19、Vite 8、Tailwind CSS 4、Commander 14，并配置了 `node:test`、ESLint、Prettier 和 npm 构建。没有面板 SDK、运行服务、事件库或现有业务规格。
@@ -58,7 +60,6 @@ README 面向使用者且使用英文；本设计及 OpenSpec 规格使用中文
 - 同一份源码支持界面、查询与服务端动作，编译结果严格区分浏览器与 Node 执行入口。
 - 本地服务独立于 agent 进程；本地函数调用和页面交互不依赖模型继续工作。
 - 语义操作事件持久化，读取不等于消费，停止再恢复的 agent 能增量处理。
-- 临时凭据由可信宿主接收，仅在绑定的服务端函数内存中使用，不经普通页面或 agent 上下文传入。
 - 使用普通函数以及作者自行编写的 CLI/HTTP 示例验收，验证 Paneon 的行为不依赖业务后端类型。
 
 **Non-Goals:**
@@ -115,7 +116,7 @@ export default definePanel({
 | 概念 | 类型名称 | ID 来源与用途 |
 | --- | --- | --- |
 | 面板定义 | `PanelDefinition` | `definePanel` 返回的定义对象；其中 `id` 由作者填写，对外通过 `definitionId` 表示，用于标记实例来自哪一个定义 |
-| 面板实例 | `PanelInstance` | 每次 `panel run` 生成一个新的 `instanceId`，用于 inspect/reload/close/events/ack 及消息桥、事件和凭据绑定 |
+| 面板实例 | `PanelInstance` | 每次 `panel run` 生成一个新的 `instanceId`，用于 inspect/reload/close/events/ack 及消息桥和事件绑定 |
 
 同一面板定义可以创建多个实例。例如 `definitionId: 'pr-viewer'` 可以对应 `instanceId: 'instance-a'` 和 `instanceId: 'instance-b'`。命令参数写作 `<instance-id>`；命令分组仍为 `paneon panel`，不新增 definition/instance 命令组。定义内的 `id` 保持原有 SDK 写法，返回结构的 `definitionId` 明确指向该值；它不用于运行实例的去重或操作。
 
@@ -194,11 +195,13 @@ Vite 负责编译与打包；自定义插件使用 TypeScript AST 找到模块�
 
 `paneon panel run` 默认 `watch: true`，`--watch` 显式开启，`--no-watch` 显式关闭；同时指定互斥选项时返回参数错误。模式持久化在实例记录，服务重启时按原设置重建监听，不因重启改变选择。手动 `paneon panel reload <instance-id>` 在两种模式下均执行一次重载，不改变 watch 设置。
 
-源码更新复用 [Vite HMR](https://vite.dev/guide/api-hmr)、React 插件及 Vite 的既有模块加载/失效能力，覆盖入口和可达的本地 TS/TSX、样式及资源依赖；配置排除构建产物、运行目录和无关文件，避免自触发循环。连续修改的调度沿用工具链现有能力，不另写一套热更新、模块替换或旧版本执行管理机制。Node 侧 serverAction 需接入 Vite 的 [Node 模块运行能力](https://vite.dev/guide/api-environment-runtimes)，不假设浏览器 HMR 会自动处理自定义 RPC/worker；实施时验证实际更新行为。
+源码更新复用 Vite 的监听与编译能力，覆盖入口和可达的本地 TS/TSX、样式及资源依赖；配置排除构建产物、运行目录和无关文件，避免自触发循环。连续修改的调度沿用工具链现有能力，不另写一套热更新或旧版本执行管理机制。Node 侧 serverAction 使用已打包的 server.js，由隔离 worker 通过 Node 原生 import 加载；使用 `pathToFileURL` 编码文件路径，避免特殊字符改变导入含义。执行与元数据 worker 内不启动 Vite dev server。主进程的 Vite watcher 触发现有更新检查，需要重建时重新编译并替换已有执行 worker，旧进程退出时释放其模块缓存；不假设 TypeScript 提供 HMR，也不假设浏览器 HMR 会自动处理自定义 RPC/worker，实施时验证实际更新行为。
 
-校验通过后按工具链能力更新模块或重载页面，并同步当前 revision；失败显示具体诊断并保留旧可用面板，修正源码后继续监听。未提交的 React 局部状态能否保留遵循工具链实际行为，宿主显示更新结果；已保存事件和消费进度不受影响，不另行实现页面状态迁移或恢复。revision 仅继续承担请求身份、凭据绑定及构建校验职责，不用于额外维持多个执行版本。
+校验通过后按工具链能力更新模块或重载页面，并同步当前 revision；失败显示具体诊断并保留旧可用面板，修正源码后继续监听。未提交的 React 局部状态能否保留遵循工具链实际行为，宿主显示更新结果；已保存事件和消费进度不受影响，不另行实现页面状态迁移或恢复。revision 仅继续承担请求身份及构建校验职责，不用于额外维持多个执行版本。
 
-运行时不因 reload 自动重新调用 mutation。正在执行的函数能否继续、页面是否还能收到结果，遵循所集成模块更新/运行环境的行为；Paneon 不额外保留旧 worker/产物等待函数完成，不做旧调用接管、结果迁移或跨重启恢复。若业务需要跨页面跟踪，作者自行提供查询和存储。revision 变化仍使旧凭据 ref 禁止后续 use，密钥输入和 SDK 出站检查规则不因采用工具链更新而放宽。
+运行时不因 reload 自动重新调用 mutation。正在执行的函数能否继续、页面是否还能收到结果，遵循所集成模块更新/运行环境的行为；Paneon 不额外保留旧 worker/产物等待函数完成，不做旧调用接管、结果迁移或跨重启恢复。若业务需要跨页面跟踪，作者自行提供查询和存储。
+
+后续实现的细节分别由相关 change 维护：[未变化自动构建的复用](../skip-unchanged-watch-builds/design.md)、[共享源码监听与 UI 打包边界](../reduce-bundles-and-fix-source-watching/design.md)、[有界面板驻留与监听恢复](../add-panel-resource-lifecycle/design.md)。自动更新命中复用时不替换执行环境；只有监听的面板更新后也不因此创建执行 worker。重启后的监听按需恢复，不在服务启动时批量创建。
 
 仅从生成文件看不到服务端代码不是充分证明；验收须检查前端依赖图、产物和真实浏览器请求中均没有 handler、Node 导入及服务端专属数据。
 
@@ -273,13 +276,13 @@ Markdown 接受 Markdown 字符串，提供标题、段落、列表、链接、�
 
 官方主题变量和组件静态样式随产品构建分发，在宿主与面板 iframe 中分别正确加载同一套基线，避免误以为外层 CSS 会跨 iframe 继承。清理初始化验证页的演示配色，防止其覆盖默认主题；组件默认无需面板 CSS，面板作者自己的类名由面板构建处理。agent 指南及示例覆盖上述导出，Tabs 必须能组合出可操作页签，不能只提供名义上的根组件。
 
-宿主页面负责实例导航、连接/版本状态、凭据输入和框架运行状态通知；面板组件在 `sandbox="allow-scripts"` 的 iframe 中运行，SDK 通过 `postMessage` 与宿主建立带随机 channelId 的通信。宿主检查消息的 `source`、instanceId、revision、channelId、requestId 和参数 schema，隔离不同面板。
+宿主页面负责实例导航、连接/版本状态和框架运行状态通知；面板组件在 `sandbox="allow-scripts"` 的 iframe 中运行，SDK 通过 `postMessage` 与宿主建立带随机 channelId 的通信。宿主检查消息的 `source`、instanceId、revision、channelId、requestId 和参数 schema，隔离不同面板。
 
-默认 CSP 限制外联、框架嵌套与导航。外部服务访问通过本地动作完成；组件和依赖打包为本地资源。密钥输入始终由 iframe 外的可信宿主渲染，浏览器中的面板定义脚本拿不到输入 DOM 或原文。
+默认 CSP 限制外联、框架嵌套与导航。外部服务访问通过本地动作完成；组件和依赖打包为本地资源。
 
-静态路由仅开放 manifest 中的浏览器资源白名单，禁止直接挂载整个构建目录；服务端入口、源码映射和运行数据不能被浏览器下载。opaque-origin iframe 的模块加载所需 CORS 只应用于无秘密的浏览器静态资源，不放宽 API 或凭据接口的认证与来源检查。
+静态路由仅开放 manifest 中的浏览器资源白名单，禁止直接挂载整个构建目录；服务端入口、源码映射和运行数据不能被浏览器下载。opaque-origin iframe 的模块加载所需 CORS 只应用于无秘密的浏览器静态资源，不放宽 API 的认证与来源检查。
 
-本次页面包括：宿主实例列表、运行中的面板、可信凭据对话框。演示面板包括环境选择、分支表格、流水线步骤、直接部署/请求 AI/刷新按钮；展示哪些业务信息由示例作者代码决定。另有纯函数和 HTTP 示例，避免把发布场景当成核心契约。
+本次页面包括：宿主实例列表和运行中的面板。演示面板包括环境选择、分支表格、流水线步骤、直接部署/请求 AI/刷新按钮；展示哪些业务信息由示例作者代码决定。另有纯函数和 HTTP 示例，避免把发布场景当成核心契约。
 
 组合示例以可复制修改的本地 TSX 提供，覆盖方案对比、参数表单和表格操作页，并演示加载、空内容、错误、禁用及成功反馈的组合写法。另增加至少一个真实工具接入示例，选用 gh CLI，以仓库/PR 操作面板展示列表、详情和交互动作，实施时核对所用命令能力；示例说明安装、登录等前提、启动方式和可操作功能，同时展示直接调用服务端函数与提交 agent 事件两种绑定方式。CLI/OpenAPI 的调用、数据转换和业务状态由示例模块实现，不新增框架级执行器或监控/日志功能。本次仅记录要求，不执行这些外部工具的业务操作。
 
@@ -303,7 +306,7 @@ paneon server stop [--json] [--debug]
 
 `panel inspect <instance-id>` 返回已有实例信息及当前服务的普通访问 URL。链接可重复打开，不因使用次数或时间到期；服务重启、端口改变后，agent 可再次 inspect 获取当前地址，无需重新 run。instanceId、参数、事件和消费位置不变，不因 inspect 编译/reload、调用业务函数或重新打开已关闭面板；closed/unavailable 实例的链接仅打开相应状态页。
 
-`panel close` 拒绝该实例的新调用并停止其监听/订阅，向在途函数的 `ctx.signal` 发出关闭信号；服务释放该实例的 worker。`server stop` 关闭所有实例的运行资源、清空凭据并退出，不删除交互历史。信号是通用协作机制，不表示外部业务已经取消；作者决定是否使用 signal 及怎样清理自己的进程、连接或远端任务。停止 worker 不能保证撤销已经发生的外部副作用。
+`panel close` 拒绝该实例的新调用并停止其监听/订阅，向在途函数的 `ctx.signal` 发出关闭信号；服务释放该实例的 worker。`server stop` 关闭所有实例的运行资源并退出，不删除交互历史。信号是通用协作机制，不表示外部业务已经取消；作者决定是否使用 signal 及怎样清理自己的进程、连接或远端任务。停止 worker 不能保证撤销已经发生的外部副作用。
 
 重启只恢复面板配置、源码版本所需信息、监听选择、事件及消费位置；面板通过新安装版本的兼容性校验后才重建，失败保留记录并标记 unavailable；不恢复在途函数、业务状态或调用结果，不重新执行 mutation。agent/短命令退出不影响本地服务运行。
 
@@ -321,469 +324,7 @@ paneon server stop [--json] [--debug]
 
 本节定义本次迭代的 CLI 接口。下方路径、ID、时间、事件及访问地址均为示意数据，不是实际执行结果。示例中的 `0.0.0` 仅演示版本字段；运行时返回实际安装/构建版本。
 
-#### 命令总览
-
-<!-- prettier-ignore -->
-| 命令 | 描述 | 成功时 data 的结构 |
-| --- | --- | --- |
-| `panel run` | 加载 TSX 并创建一个独立面板，按需启动本地服务，返回访问链接 | `RunResult` |
-| `panel list` | 列出运行目录中已有面板，包含运行中、已关闭和不可用实例 | `{ panels: PanelInstance[] }` |
-| `panel inspect` | 查看指定面板的信息，并取得新的有效访问链接 | `PanelInstanceAccess` |
-| `panel reload` | 让指定面板加载当前源码，不改变其自动更新开关 | `ReloadResult` |
-| `panel close` | 关闭指定面板的运行资源，保留实例及交互历史 | `CloseResult` |
-| `panel events` | 读取指定 consumer 尚未确认的事件，可有界等待 | `EventsResult` |
-| `panel ack` | 确认该 consumer 已处理到指定事件 | `AckResult` |
-| `server status` | 查询本地服务是否运行及其身份、版本和监听地址 | `ServerStatusResult` |
-| `server stop` | 停止本地服务，保留面板配置及交互历史 | `StopResult` |
-
-表中结构在下文定义。`panel` 和 `server` 本身是命令分组，不单独创建或停止资源。
-
-#### 通用参数、输出与退出码
-
-<!-- prettier-ignore -->
-| 参数 | 适用范围 | 必填/默认 | 含义 |
-| --- | --- | --- | --- |
-| `--json` | 上表全部 9 个操作命令 | 可选，默认 false | stdout 输出一个完整 JSON 结果，适合 agent 解析；不输出进度文本 |
-| `--debug` | 上表全部 9 个操作命令 | 可选，默认 false | 当前 CLI 的英文框架诊断写入 stderr；子命令前后均可使用，不改变命令结果 |
-| `-h, --help` | 根命令、panel/server 分组及每个具体命令 | 可选 | 输出英文帮助后退出，不启动服务或校验业务入参；帮助始终为文本 |
-| `-V, --version` | 根命令 | 可选 | 输出实际 Paneon 包版本字符串及换行后退出；保持现有文本格式 |
-
-不使用 `--json` 时，成功结果以英文摘要、表格或字段形式写入 stdout；用户数据保持原文。人类可读文本不作为机器解析协议。失败时 stdout 为空，英文错误说明写入 stderr。使用 `--json` 时，成功和失败均使用下述 envelope；参数解析失败也返回错误 envelope，不能让 Commander 的默认文本污染 stdout。根帮助/版本不转换为 JSON。
-
-```ts
-type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-
-type CommandResult<T> =
-  | { ok: true; data: T }
-  | {
-      ok: false;
-      error: {
-        code: string;
-        message: string;
-        details?: { [key: string]: JsonValue };
-      };
-    };
-```
-
-正常命令成功、帮助/版本输出、无事件或等待到期均以退出码 `0` 结束。参数、校验、编译、连接或操作失败以退出码 `1` 结束，保留当前 CLI 对未知选项返回 `1` 的行为。文本诊断进入 stderr；`--json` 的结构化错误按上面的 envelope 写入 stdout。`error.details` 只允许非敏感框架信息，不回显原始业务参数、密钥或 handler 异常。
-
-仅 `panel run` 按需启动服务。`server status` 在确认无服务时返回正常的 `running: false`；`server stop` 在确认无服务时返回正常的 `alreadyStopped: true`。其他操作要求服务可用，未启动时返回 `SERVER_NOT_RUNNING`，不借查询或关闭命令隐式创建面板。描述文件存在但服务身份或连通性无法确认时返回错误，不能假装已经停止或误杀其他进程。
-
-#### 完整数据模型与命令返回
-
-```ts
-type PanelInstance = {
-  instanceId: string; // 运行实例 ID，传给 inspect/reload/close/events/ack
-  definitionId: string; // TSX 中 definePanel.id，标记来源；同一定义可创建多个实例
-  status: 'running' | 'closed' | 'unavailable';
-  entryPath: string; // 解析后的绝对源码入口
-  cwd: string; // 该实例的绝对工作目录
-  revision: string; // 最后一次成功构建的源码/依赖/包版本摘要
-  watch: boolean; // 实际生效的自动更新模式
-  createdAt: string; // ISO 8601 UTC 时间
-  updatedAt: string; // ISO 8601 UTC 时间
-};
-
-type PanelInstanceAccess = PanelInstance & {
-  params: JsonValue; // 实例保存的面板输入
-  requires: { paneon: string }; // 当前记录的构建版本要求
-  paneonVersion: string; // 此 revision 的构建包版本，不是服务进程版本
-  url: string; // 当前服务中该实例的普通访问链接，可重复打开，无过期时间
-  diagnostic?: { code: string; message: string }; // 不可用/构建失败等框架诊断
-};
-
-type PanelEvent = {
-  id: number; // 单调递增的事件 ID；ack --through 使用此值
-  instanceId: string;
-  revision: string; // 提交事件时的源码版本
-  type: string; // 作者声明的事件类型
-  payload: JsonValue; // 通过事件 schema 校验的数据
-  createdAt: string;
-};
-```
-
-上述模型保持完整，供实例详情和内部处理使用；不要求每个命令原样返回整个对象。命令返回值主要去掉对入参的重复回显，保留新生成的标识、实际状态、版本、诊断和事件消费信息；不缩写字段名，也不增加额外的精简模式开关。`list`、`inspect`、`server status` 是信息查询，保留各自定义的信息；inspect 有意返回保存的输入与解析后的路径，便于检查实例配置。
-
-`status` 只表示面板运行资源的状态，不表示 CLI/OpenAPI 等外部业务是否成功。源码或版本不兼容时，unavailable 实例保留最后成功的 revision 和构建信息，并由 diagnostic 解释当前问题；不能把旧构建信息说成新源码已经通过校验。closed/unavailable 的 url 只打开相应状态页。URL 不承载控制凭据或业务密钥；它不是登录凭证，不提供过期时间字段。
-
-#### paneon panel run
-
-**用途：** 创建并运行一个面板。即使相同源码已经有运行实例，每次 run 仍创建新的 instanceId；重新打开已有实例应使用 inspect。
-
-```sh
-paneon panel run /work/panels/review-panel.tsx \
-  --cwd /work/project-a \
-  --params '{"topic":"方案评审"}' \
-  --json
-```
-
-<!-- prettier-ignore -->
-| 入参 | 类型 | 必填/默认 | 含义与校验 |
-| --- | --- | --- | --- |
-| `<entry.tsx>` | 文件路径 | 必填 | 本地 TSX 入口，必须存在且可读；相对路径相对于调用 CLI 时的目录解析 |
-| `--cwd <directory>` | 目录路径 | 必填 | 面板服务端代码的默认工作目录，必须存在；相对路径也相对于调用 CLI 时的目录解析 |
-| `--params <json>` | JSON 值 | 必填 | 面板输入，必须是合法 JSON 且满足 definePanel.input；无参数的对象 schema 显式传 `'{}'` |
-| `--watch` | 布尔开关 | 可选，未指定时默认开启 | 自动监听并更新源码；不能与 --no-watch 同传 |
-| `--no-watch` | 布尔开关 | 可选 | 关闭该实例的自动更新，后续只能手动 reload |
-| `--open` | 布尔开关 | 可选，默认 false | 成功创建后请求系统浏览器打开返回链接；未传时只返回链接 |
-
-以上路径由当前 CLI 解析成绝对路径后交给服务，不能使用后台服务启动时的目录解释。cwd 和源码目录相互独立；作者代码可以显式为自己的业务调用指定其他目录。JSON/调试通用选项见前表。
-
-```ts
-type RunResult = Pick<
-  PanelInstanceAccess,
-  'instanceId' | 'definitionId' | 'status' | 'revision' | 'watch' | 'paneonVersion' | 'url'
->;
-```
-
-**出参：** `CommandResult<RunResult>`。不重复输出 entryPath、cwd、params 和源码中的 requires，也不返回创建/更新时间；这些完整信息可通过 inspect 查询。保留新生成的 instanceId、来源 definitionId、实际状态、revision、watch 模式、构建包版本和 URL。成功意味着源码通过校验并生成可访问面板；命令返回后服务继续运行。`--open` 请求失败时不撤销已经创建的面板，仍返回成功结果和 URL，并在 stderr 给出英文警告；这不保证浏览器界面已实际展示。
-
-```json
-{
-  "ok": true,
-  "data": {
-    "instanceId": "instance-example",
-    "definitionId": "review-panel",
-    "status": "running",
-    "revision": "sha256:example",
-    "watch": true,
-    "paneonVersion": "0.0.0",
-    "url": "http://127.0.0.1:42173/panels/instance-example"
-  }
-}
-```
-
-#### paneon panel list
-
-**用途：** 发现已有 instanceId，查看各实例的源码、工作目录、状态和自动更新模式。
-
-```sh
-paneon panel list --json
-```
-
-**入参：** 无位置参数。`--page <number>` 默认为 1，范围 1–2147483647；`--page-size <count>` 默认为 20，范围 1–1000，均须为整数。按 createdAt、instanceId 升序稳定分页，包含 closed/unavailable 实例。数据库使用 LIMIT/OFFSET，HTTP 查询参数为 page、pageSize。
-
-**出参：** `CommandResult<{ panels: PanelInstance[]; page: number; pageSize: number; total: number; totalPages: number }>`。每项字段见完整数据模型，不返回 URL、params 或事件正文。超出末页返回空数组及原请求页码；无实例时 totalPages 为 0：
-
-```json
-{ "ok": true, "data": { "panels": [], "page": 1, "pageSize": 20, "total": 0, "totalPages": 0 } }
-```
-
-浏览器首页复用同一分页接口，初始为第一页、每页 20 条；提供上一页、下一页、页码和总数。首页/末页及加载期间禁用对应翻页控件，Refresh 保持当前页，整页重新打开回到第一页；请求到超过现有总页数的页时回到最后有效页，空列表显示第一页空状态。忽略已过期的分页响应，防止旧请求覆盖当前页。关闭面板期间暂时禁止翻页和 Refresh，避免关闭回执与列表请求交错显示旧状态。
-
-#### paneon panel inspect
-
-**用途：** 获取指定实例完整信息及新的有效访问链接，不创建新实例、不 reload、不调用作者业务函数，也不恢复已经关闭的面板。
-
-```sh
-paneon panel inspect instance-example --json
-```
-
-<!-- prettier-ignore -->
-| 入参 | 类型 | 必填/默认 | 含义与校验 |
-| --- | --- | --- | --- |
-| `<instance-id>` | 字符串 | 必填 | list/run 返回的运行实例 ID；不是 TSX 文件名，也不是 definitionId；不存在时返回 PANEL_NOT_FOUND |
-
-**出参：** `CommandResult<PanelInstanceAccess>`，返回完整实例详情，包括保存的输入、解析后的路径和时间。instanceId、参数、事件和消费位置不变；url 是该实例在当前服务中的普通访问链接，同一服务地址下重复 inspect 可以返回相同 URL，不签发 token 或返回有效期。服务恢复后链接使用当前端口；unavailable 时 paneonVersion 仍指最后成功构建的版本，通过 diagnostic 解释当前错误。
-
-```json
-{
-  "ok": true,
-  "data": {
-    "instanceId": "instance-example",
-    "definitionId": "review-panel",
-    "status": "running",
-    "entryPath": "/work/panels/review-panel.tsx",
-    "cwd": "/work/project-a",
-    "revision": "sha256:example",
-    "watch": true,
-    "createdAt": "2026-10-20T08:00:00.000Z",
-    "updatedAt": "2026-10-20T08:00:00.000Z",
-    "params": { "topic": "方案评审" },
-    "requires": { "paneon": "0.0.0" },
-    "paneonVersion": "0.0.0",
-    "url": "http://127.0.0.1:42173/panels/instance-example"
-  }
-}
-```
-
-#### paneon panel reload
-
-**用途：** 让指定实例重新加载当前源码，在 watch 开启或关闭时都可用，不改变 watch 选择。
-
-```sh
-paneon panel reload instance-example --json
-```
-
-**入参：** 必填 `<instance-id>`，含义与 inspect 一致；其余为通用选项。不接受 entry、cwd、params 或 watch 参数，不通过 reload 修改实例配置。
-
-```ts
-type ReloadResult = {
-  previousRevision: string;
-  revision: string; // 本次成功校验后的版本
-  changed: boolean; // revision 是否实际改变；源码未变也允许成功
-  watch: boolean; // 原模式保持不变
-};
-```
-
-**出参：** `CommandResult<ReloadResult>`。仅在本次校验及更新完成后成功返回；编译/版本校验失败返回错误，保留旧可用 revision。closed 实例返回 `PANEL_CLOSED`；unavailable 实例允许显式 reload 尝试修正后的源码，成功后恢复运行。不会自动重新调用用户之前触发的业务函数。
-
-```json
-{
-  "ok": true,
-  "data": {
-    "previousRevision": "sha256:example",
-    "revision": "sha256:updated-example",
-    "changed": true,
-    "watch": true
-  }
-}
-```
-
-#### paneon panel close
-
-**用途：** 关闭一个面板的运行资源，不删除源码、实例配置、事件或消费位置，不影响其他面板。
-
-```sh
-paneon panel close instance-example --json
-```
-
-**入参：** 必填 `<instance-id>`，含义与 inspect 一致；其余为通用选项。不增加业务任务取消、外部进程清理等选项。
-
-```ts
-type CloseResult = {
-  status: 'closed';
-  alreadyClosed: boolean; // 重复 close 返回 true，不将其当作失败
-};
-```
-
-**出参：** `CommandResult<CloseResult>`。不存在的实例返回 `PANEL_NOT_FOUND`，重复关闭同一实例正常成功。结果只确认框架面板已关闭，不表示作者调用的外部程序或 API 已取消。
-
-```json
-{
-  "ok": true,
-  "data": { "status": "closed", "alreadyClosed": false }
-}
-```
-
-#### paneon panel events
-
-**用途：** 按 consumer 读取尚未确认的语义交互事件。读取不等于已处理；需要另行 ack。
-
-```sh
-paneon panel events instance-example --consumer assistant --wait-ms 30000 --limit 100 --json
-```
-
-<!-- prettier-ignore -->
-| 入参 | 类型 | 必填/默认 | 含义与校验 |
-| --- | --- | --- | --- |
-| `<instance-id>` | 字符串 | 必填 | 要读取的已有实例，closed/unavailable 的持久历史同样可读 |
-| `--consumer <name>` | 非空字符串 | 必填 | 调用方自定的消费名称，例如 assistant；同一面板同名共享位置，不同名称独立，不自动绑定 agent 厂商会话 |
-| `--wait-ms <ms>` | 整数，单位毫秒 | 可选，默认 0，范围 0–60000 | 先读取已有未确认事件；没有时最多等待指定毫秒数，出现事件就返回；0 表示立即读取 |
-| `--limit <count>` | 整数 | 可选，默认 100，范围 1–1000 | 本次最多返回多少条事件，不影响确认位置 |
-
-```ts
-type EventListItem = Omit<PanelEvent, 'instanceId'>;
-
-type EventsResult = {
-  events: EventListItem[]; // 按 id 升序；从 lastAckId 之后开始
-  lastAckId: number; // 当前已确认位置，初始 0
-  lastDeliveredId: number; // 该 consumer 历次最大已交付位置，初始 0
-  hasMore: boolean; // 本次批次之后是否还有未确认事件
-  timedOut: boolean; // 请求了正数等待且等待到期仍无事件时为 true
-};
-```
-
-**出参：** `CommandResult<EventsResult>`。instanceId 和 consumer 已由入参确定，不在结果或每条事件中重复；保留事件 ID、类型、payload、revision、时间，以及确认/交付位置、是否还有事件和超时标识。首次读取创建 consumer；未 ack 的事件下次仍可返回。无事件和等待到期均为正常成功，不生成虚假的交互事件。服务停止或连接失败返回错误，不能当作正常等待到期。
-
-```json
-{
-  "ok": true,
-  "data": {
-    "events": [
-      {
-        "id": 42,
-        "revision": "sha256:example",
-        "type": "feedback-submitted",
-        "payload": { "comment": "请补充方案对比" },
-        "createdAt": "2026-10-20T08:01:00.000Z"
-      }
-    ],
-    "lastAckId": 0,
-    "lastDeliveredId": 42,
-    "hasMore": false,
-    "timedOut": false
-  }
-}
-```
-
-等待到期的示例：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "events": [],
-    "lastAckId": 42,
-    "lastDeliveredId": 42,
-    "hasMore": false,
-    "timedOut": true
-  }
-}
-```
-
-#### paneon panel ack
-
-**用途：** 声明该 consumer 已处理到某个事件，推进后续 events 的起点。不删除事件，也不执行事件中的业务动作。
-
-```sh
-paneon panel ack instance-example --consumer assistant --through 42 --json
-```
-
-<!-- prettier-ignore -->
-| 入参 | 类型 | 必填/默认 | 含义与校验 |
-| --- | --- | --- | --- |
-| `<instance-id>` | 字符串 | 必填 | 要确认的实例 |
-| `--consumer <name>` | 非空字符串 | 必填 | 必须与读取事件时使用的名称一致，消费记录须已存在 |
-| `--through <event-id>` | 正整数 | 必填 | 确认该面板中截至此 ID 的所有事件，不只是单独一条；须属于该面板、已向该 consumer 交付且不使位置回退 |
-
-```ts
-type AckResult = {
-  lastAckId: number; // 成功后的确认位置
-};
-```
-
-**出参：** `CommandResult<AckResult>`。不回显 instanceId、consumer；lastAckId 表示成功后的实际确认位置，作为操作结果保留。重复确认当前 lastAckId 可以成功；回退、跨面板、未交付或不存在的 ID 返回 `INVALID_ACK`，原位置不变。agent 必须处理好整个确认范围后再 ack，不能把“看到事件”当作“已经完成业务”。
-
-```json
-{
-  "ok": true,
-  "data": { "lastAckId": 42 }
-}
-```
-
-#### paneon server status
-
-**用途：** 查询本地服务，不因为查询而启动它。返回的版本是服务进程的包版本，不是某个面板的构建版本。
-
-```sh
-paneon server status --json
-```
-
-**入参：** 无位置参数和专用选项，仅接受通用选项；查询程序固定的 `~/.paneon` 运行目录。
-
-```ts
-type RuntimeInfo = {
-  runtimeId: string;
-  pid: number;
-  host: '127.0.0.1';
-  port: number;
-  paneonVersion: string;
-  protocolVersion: number;
-  startedAt: string;
-};
-
-type ServerStatusResult =
-  { running: true; runtime: RuntimeInfo } | { running: false; runtime: null };
-```
-
-**出参：** `CommandResult<ServerStatusResult>`。服务未启动是正常结果；发现服务但身份、认证、协议或包版本检查失败时返回错误。版本不一致时仍执行既定严格校验，不通过 status 绕过版本限制；安全错误详情可包含预期和实际版本。
-
-```json
-{
-  "ok": true,
-  "data": {
-    "running": true,
-    "runtime": {
-      "runtimeId": "runtime-example",
-      "pid": 12345,
-      "host": "127.0.0.1",
-      "port": 42173,
-      "paneonVersion": "0.0.0",
-      "protocolVersion": 1,
-      "startedAt": "2026-10-20T08:00:00.000Z"
-    }
-  }
-}
-```
-
-服务未启动时：
-
-```json
-{ "ok": true, "data": { "running": false, "runtime": null } }
-```
-
-#### paneon server stop
-
-**用途：** 停止整个本地服务及其面板运行资源，清空临时凭据，保留配置、事件和消费位置。
-
-```sh
-paneon server stop --json
-```
-
-**入参：** 无位置参数和专用选项，仅接受通用选项；不增加 force、业务任务取消或业务日志清理选项。
-
-```ts
-type StopResult = {
-  stopped: true;
-  alreadyStopped: boolean;
-  runtimeId: string | null; // 本次停止的服务；原本未运行时为 null
-};
-```
-
-**出参：** `CommandResult<StopResult>`。确认服务已退出后成功返回，不能只发出停止请求就宣称完成；未运行时正常成功，不启动服务。仅此命令允许在身份、认证和内部协议相容时停止包版本不同的旧服务；无法安全核验时返回错误，不绕过校验杀进程。
-
-```json
-{
-  "ok": true,
-  "data": { "stopped": true, "alreadyStopped": false, "runtimeId": "runtime-example" }
-}
-```
-
-#### 失败返回示例
-
-下表给出本节命令需要区分的主要失败；凭据、桥接和构建的其他细分错误仍按对应章节处理。
-
-<!-- prettier-ignore -->
-| 错误码 | 典型触发条件 |
-| --- | --- |
-| `INVALID_ARGUMENT` | 缺少必填参数、未知选项、JSON 语法错误、watch 冲突、wait-ms/limit/through 格式或范围错误 |
-| `INPUT_VALIDATION_FAILED` | params 不满足面板声明的输入 schema |
-| `PANEL_NOT_FOUND` | instanceId 不存在 |
-| `PANEL_CLOSED` | 对已关闭面板执行 reload 等需要运行实例的操作 |
-| `INVALID_ACK` | 确认了跨面板、未交付、回退或不存在的事件 |
-| `SERVER_NOT_RUNNING` | 需要已有服务的命令在无服务时执行 |
-| `RUNTIME_UNAVAILABLE` | 描述文件存在但服务无法连接或核验为有效实例 |
-| `RUNTIME_VERSION_MISMATCH` | CLI 和服务包版本不一致，且不是符合例外的显式 stop |
-| `INVALID_PANEON_REQUIREMENT` | 源码版本范围声明缺失、非法或动态计算 |
-| `PANEON_VERSION_UNSUPPORTED` | 安装版本不满足面板定义 requires.paneon |
-| `BUILD_FAILED` | 类型检查、源码转换或构建失败；可提供非敏感文件位置和细分错误码 |
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "PANEL_NOT_FOUND",
-    "message": "Panel instance not found.",
-    "details": { "instanceId": "instance-missing" }
-  }
-}
-```
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "PANEON_VERSION_UNSUPPORTED",
-    "message": "The panel requires a different Paneon version.",
-    "details": {
-      "requiredRange": ">=1.4.0 <2.0.0",
-      "currentVersion": "0.0.0",
-      "entryPath": "/work/panels/review-panel.tsx"
-    }
-  }
-}
-```
+完整初版命令表、数据类型、各命令结果和失败示例见 [cli-contract.md](cli-contract.md)。当前命令扩展以 [CLI 使用参考](../../../skills/paneon/references/cli.md) 和各后续 change 为准。
 
 ### CLI 调试输出显式开启
 
@@ -810,7 +351,7 @@ paneon panel close instance-example --json --debug
 }
 ```
 
-调试诊断按元数据白名单构造，不转储参数或响应对象。即使开 debug，也不输出业务密钥、控制 token、外部系统 cookie、带凭据的 URL、完整请求正文、环境变量值、源码正文或业务输入/输出；框架内部异常需过滤后才能展示，handler 原始异常仍按 ACTION_FAILED 契约处理。不能用 debug 绕过临时密钥通道和 SDK 出站检查。
+调试诊断按元数据白名单构造，不转储参数或响应对象。即使开 debug，也不输出业务密钥、控制 token、外部系统 cookie、带凭据的 URL、完整请求正文、环境变量值、源码正文或业务输入/输出；框架内部异常需过滤后才能展示，handler 原始异常仍按 ACTION_FAILED 契约处理。
 
 本次 `--debug` 仅作用于当前命令进程，进程退出即结束，不持久化为面板配置，不改变已运行服务的全局日志级别，也不为新服务永久开启 debug。自动 reload 和浏览器触发的函数调用不会因此获得持续调试日志。本次不新增后台服务调试环境变量、后台日志文件或日志读取命令；编译/连接等必要错误仍走既有框架错误反馈。这样明确当前开关的作用范围，不把一次 CLI 调用误当作后台服务日志配置。
 
@@ -826,7 +367,7 @@ paneon panel close instance-example --json --debug
 - 普通页面导航及 manifest 白名单中的公开静态资源允许浏览器正常 GET 加载，但这些 GET 不调用作者函数或执行状态变更。读取配置、事件及 WebSocket 等非公开 API 仍校验来源：浏览器请求有 Origin 时检查 Origin，没有时检查 Referer 的完整 origin；无法确定可信来源则拒绝，CLI 仍走控制凭据认证。宿主设置 `Referrer-Policy: same-origin`，支持正常同源 GET；POST/DELETE 不以 Referer 代替必需的 Origin。
 - 面板 iframe 继续通过 postMessage 请求可信宿主，再由宿主向本地 API 发请求；不因为 sandbox iframe 的 Origin 可能为 null 就放宽 API 检查。宿主继续验证来源窗口、channelId、instanceId、revision 和声明能力。
 
-上述规则用于拒绝浏览器跨站调用；不将 Origin 当成同机任意程序不可伪造的身份。静态模块为 opaque-origin iframe 所需的无秘密资源 CORS 例外仍按前述白名单执行，不延伸到 API。业务密钥仍通过独立的可信输入通道处理，其内存有效期与本节的普通访问链接无关。
+上述规则用于拒绝浏览器跨站调用；不将 Origin 当成同机任意程序不可伪造的身份。静态模块为 opaque-origin iframe 所需的无秘密资源 CORS 例外仍按前述白名单执行，不延伸到 API。业务密钥由页面和业务代码通过普通动作参数处理。
 
 HTTP 接口清单：
 
@@ -844,8 +385,6 @@ POST   /api/panels/:instanceId/events                    追加语义事件
 GET    /api/panels/:instanceId/events                    按 consumer 增量读取及有界等待
 POST   /api/panels/:instanceId/acks                      显式推进消费位置
 GET    /api/panels/:instanceId/stream                    WebSocket 状态通知，不推进消费位置
-POST   /api/credentials                         可信宿主提交临时凭据
-DELETE /api/credentials/:ref                    可信宿主销毁凭据
 POST   /api/stop                                停止服务
 ```
 
@@ -972,132 +511,11 @@ CREATE TABLE consumers (
 
 这提供至少一次事件交付，不宣称模型处理或外部副作用恰好一次。agent 或面板作者自行核验业务效果；系统不能假装业务副作用与 ack 原子。
 
-Paneon 不创建 `tasks/` 日志目录或 tasks 数据表，不保存动作输入/返回值/错误的业务历史，不提供业务日志接口。作者自行创建的业务文件不属于 Paneon 运行目录规范。已有面板参数及显式事件也必须使用非密钥数据；业务密钥只走下述输入通道。
-
-### 临时密钥供绑定的服务端函数使用
-
-可信宿主在 iframe 外接收密钥，内存凭据容器返回 ref 及 ready/expired 状态。普通页面和 agent 不能读取输入 DOM 或原文；提交 body 不进入框架诊断和持久数据。输入前展示作者声明的用途、动作标识和源码版本，不要求声明 CLI 程序、argv、环境变量或 HTTP 协议。
-
-ref 绑定 instanceId、revision、actionId。服务端函数通过 `ctx.secrets.use(ref, async value => ...)` 在内存回调中使用原文；它可以调用普通库、HTTP API 或外部程序，具体方式由作者代码负责。浏览器 SDK 不提供这一能力，也没有供浏览器或 CLI 通过 RPC 解引用原文的接口。运行时只经内部通道向通过绑定校验的服务端 worker 交付该次回调所需的值，普通消息桥不承载原文。函数中使用原文不等于把值写入 agent 的聊天上下文，但这意味着服务端作者代码必须受信任；不再声称 action worker 接触不到原文。
-
-```ts
-type CredentialPurpose = {
-  instanceId: string;
-  revision: string;
-  actionId: string;
-  label: string;
-  ttlSeconds: number;
-};
-type CredentialRef = { ref: string; expiresAt: string; status: 'ready' | 'expired' };
-
-// 服务端 handler 内的用法；businessClient 由作者自行提供。
-const result = await ctx.secrets.use(input.credential, async (value) => {
-  await businessClient.perform({ token: value });
-  return { done: true }; // 仅返回可展示的非敏感数据
-});
-```
-
-凭据默认有效 15 分钟，声明上限 60 分钟；到期、手动撤销、面板关闭、revision 变更或服务停止时禁止后续 use，并移除供新调用使用的内存值。重启后原 ref 失效，界面要求重新提供，不从数据库恢复原文。
-
-凭据到期或撤销本身不主动中断已进入的 use 回调；若调用仍运行，相关内存检查集合保留至调用返回并完成 SDK 出站检查后释放。源码更新、面板关闭或服务停止对调用的影响遵循对应运行环境，不额外保留旧执行环境来保证回调完成；环境结束时释放框架引用。撤销不能收回作者已经复制的值或已发送给外部程序/API 的值，也不能承诺物理内存擦除；服务关闭时 ctx.signal 的协作规则仍适用。
-
-SDK 在自己的动作响应、事件提交和诊断边界拒绝包含当前已知密钥原文的出站值，返回 `SECRET_OUTPUT_BLOCKED`，且不回显被拒内容。对应值在 use 完成到本次动作返回检查期间仍保留在该调用的内存检查集合；普通持值输入端点不对 iframe 消息桥开放。该检查只防止已知原文经产品通道误传，不承诺识别任意编码或密钥失效后作者保留的副本。
-
-Paneon 不拦截业务代码的 HTTP 请求、子进程、stdout/stderr 或自行保存的文件，不提供通用输出脱敏和业务审计。作者不得把密钥放入动作结果、事件、日志或持久业务数据；框架控制的凭据存储仅在内存。服务端代码拿到原文后如何使用是其责任，不宣称恶意代码、同用户 shell/调试权限、操作系统交换区或任意外传已被隔离。此限制必须出现在使用指南中，不能将这个通道描述为任意作者代码下的绝对保密机制。
+Paneon 不创建 `tasks/` 日志目录或 tasks 数据表，不保存动作输入/返回值/错误的业务历史，不提供业务日志接口。作者自行创建的业务文件不属于 Paneon 运行目录规范。已有面板参数及显式事件也必须使用非密钥数据；业务密钥可通过普通输入框传给 server action，不由框架另行管理。
 
 ### 实际实现文件清单
 
-以下为本次实现的源码、示例、配置及使用文档路径，均相对于仓库根目录。测试文件及验收记录见 `verification.md` 和 `implementation-files.md`。
-
-```text
-AGENTS.md
-README.md
-components.json
-docs/agent-guide.md
-eslint.config.js
-examples/README.md
-examples/business.ts
-examples/components-panel.tsx
-examples/decision-panel.tsx
-examples/demo-http-server.mjs
-examples/demo-release-cli.mjs
-examples/form-panel.tsx
-examples/gh-panel.tsx
-examples/github.ts
-examples/http-panel.tsx
-examples/release-panel.tsx
-examples/table-panel.tsx
-package-lock.json
-package.json
-src/App.tsx
-src/cli/client.ts
-src/cli/index.ts
-src/compiler/action-transform.ts
-src/compiler/index.ts
-src/compiler/process.ts
-src/compiler/source-snapshot.ts
-src/compiler/worker.ts
-src/index.css
-src/runtime/credentials.ts
-src/runtime/index.ts
-src/runtime/lifecycle.ts
-src/runtime/secret-boundary.ts
-src/runtime/server.ts
-src/runtime/store.ts
-src/runtime/worker.ts
-src/sdk/client.ts
-src/sdk/index.ts
-src/sdk/protocol.ts
-src/sdk/server.ts
-src/shared/paths.ts
-src/shared/types.ts
-src/ui/README.md
-src/ui/UPSTREAM-LICENSE.md
-src/ui/accordion.tsx
-src/ui/alert-dialog.tsx
-src/ui/alert.tsx
-src/ui/badge.tsx
-src/ui/button.tsx
-src/ui/card.tsx
-src/ui/checkbox.tsx
-src/ui/code-block.tsx
-src/ui/collapsible.tsx
-src/ui/dialog.tsx
-src/ui/dropdown-menu.tsx
-src/ui/field.tsx
-src/ui/index.ts
-src/ui/input.tsx
-src/ui/label.tsx
-src/ui/layout.tsx
-src/ui/markdown.tsx
-src/ui/pagination.tsx
-src/ui/popover.tsx
-src/ui/radio-group.tsx
-src/ui/select.tsx
-src/ui/separator.tsx
-src/ui/spinner.tsx
-src/ui/styles.css
-src/ui/switch.tsx
-src/ui/table.tsx
-src/ui/tabs.tsx
-src/ui/textarea.tsx
-src/ui/tooltip.tsx
-src/ui/upstream-tailwind.css
-src/ui/upstream.json
-src/ui/utils.ts
-src/web/api.ts
-src/web/bridge.ts
-src/web/panel-host.tsx
-tsconfig.app.json
-tsconfig.cli.json
-tsconfig.examples.json
-tsconfig.json
-tsconfig.node.json
-tsconfig.ui.json
-vite.ui.config.ts
-```
-
-shadcn 源码按组件拆分在 `src/ui/`，上游来源、版本摘要及生成配置见 `src/ui/upstream.json` 和 `components.json`。agent 指南覆盖帮助发现、requires.paneon、运行与复用 TSX、事件读取与 ack、临时凭据及框架职责边界。
+交付路径只在 [implementation-files.md](implementation-files.md) 维护；分批验收和安装包证据见 [verification.md](verification.md)。其中已删除或迁移的路径属于对应交付时点，不是当前源码清单。
 
 ## Risks / Trade-offs
 
@@ -1108,7 +526,6 @@ shadcn 源码按组件拆分在 `src/ui/`，上游来源、版本摘要及生成
 - [业务副作用重复执行或结果未知] → 框架不自动重试 mutation；断线只标注未收到结果。业务幂等、核验和恢复由作者负责。
 - [WebSocket 断开或页面旧版本] → 读取框架状态、校验 revision；业务数据由作者查询，不假装恢复了业务执行结果。
 - [自动更新打断界面阅读或重置未提交输入] → agent 可对实例使用 `--no-watch`；自动模式显示更新状态，并保留持久事件；函数与页面状态的更新沿用工具链行为，不额外保留旧执行环境或保证调用结果恢复。
-- [密钥输入与任意代码共存] → 宿主输入、按动作绑定、仅内存使用及 SDK 出站检查；原文会进入受信任的服务端函数，不宣称保护任意业务输出或恶意代码。
 - [Vite/TypeScript 运行依赖和 SQLite 原生驱动增加分发体积] → 验证 npm pack 后从仓库外独立安装运行，不能只验证源码开发环境。
 
 ## Migration Plan
@@ -1119,7 +536,7 @@ shadcn 源码按组件拆分在 `src/ui/`，上游来源、版本摘要及生成
 
 ## Open Questions
 
-无待拍板的命令命名问题。编译提取规则、密钥生命周期和事件跨进程恢复是必须用验收用例证实的实现约束；不能以静态检查通过替代这些验证。
+无待拍板的命令命名问题。编译提取规则和事件跨进程恢复是必须用验收用例证实的实现约束；不能以静态检查通过替代这些验证。
 
 ## 本次协作开发分工
 

@@ -1,8 +1,6 @@
 # Author custom panels
 
-Use the [built-in pages](../SKILL.md#built-in-pages) first. Standard pages take data without new TSX. Write source when the interaction is genuinely custom, or adapt the [one-off explanatory examples](examples.md). Copy the **complete skill directory** before changing its resources so relative shared imports stay available. Keep unmodified resources from the same CLI release; `requires.paneon` is described in [CLI compatibility](cli.md#declare-compatibility).
-
-## Start with a complete source file
+## Complete source file
 
 ```tsx
 import { useState } from 'react';
@@ -56,33 +54,25 @@ export default definePanel({
 });
 ```
 
-Save this as `review-panel.tsx`, then run:
-
 ```sh
 paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this proposal"}' --json
 ```
 
-The source's `id` becomes `definitionId`. Paneon creates a separate `instanceId`
-for each run. Keep the returned instance ID for later commands. Built-in SDK,
-React, and UI imports resolve from Paneon's installation; the source directory
-does not require npm initialization. Relative TypeScript modules are reusable.
-Other third-party imports must already be resolvable; Paneon never installs them
-implicitly.
+- `paneon/sdk`, `paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
+- `requires.paneon` must be a literal npm semver range. Paneon never widens it; on `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
-## Write local functions, not adapters
+## Deliver events
 
-Declare each `serverAction` as a named top-level export. Use `kind: 'query'` for
-reads and `kind: 'mutation'` for effects; mutation is the default. Inputs and
-results must be JSON serializable. Pass page state explicitly as input; actions
-cannot capture render closures or mutable module state. Explicit imports and
-pure module-level helpers are supported.
+Declare every event type in `events`. `await agent.emit(type, payload)` resolves only after the event is validated and stored; show success only then. It does not wake a stopped agent. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
 
-The compiler separates browser components from Node handlers. A handler may use
-Node's `execFile`, `fetch`, or ordinary libraries. A browser component may not
-import Node modules or access a handler directly. Put tool-specific code in your own modules, using argument arrays for CLI calls and intentional request/response shapes for HTTP calls. Paneon provides no `ctx.exec`, task system,
-CLI adapter protocol, business logs, or business persistence.
+## Server actions
 
-For example, these named actions can live alongside a custom panel. Call them from a click handler or `useQuery`; Node imports remain on the server:
+- Declare each `serverAction` as a named top-level export. Use `kind: 'query'` for reads and `kind: 'mutation'` (the default) for effects. Inputs and results must be JSON serializable.
+- Actions cannot capture render closures or module `let`/`var` bindings; pass page state as input. Imports and pure module-level helpers are fine.
+- The action context has no `params`; pass the panel input an action needs as action input.
+- Handlers run in Node with the instance's `--cwd`; browser components cannot import Node modules. Paneon provides no `ctx.exec`, task system or business persistence: use `execFile` with argument arrays, `fetch` or ordinary libraries.
+- Browser `fetch` works where CORS allows; use a server action for CLI access, server-side credentials or CORS-blocked APIs.
+- For a page that needs a token, use a password `Input` and pass its value as ordinary input to a server action. The page and action own its use and storage. Keep it out of action results, agent events and logs; Paneon does not manage or filter secrets.
 
 ```ts
 import { execFile } from 'node:child_process';
@@ -111,44 +101,33 @@ export const readApi = serverAction({
 });
 ```
 
-`readGitStatus` uses the instance's `--cwd`. The page owns API authorization, allowed endpoints and result validation. Ordinary browser fetch works when the API permits it; use `serverAction` for Node/CLI access, server-side credentials or APIs unavailable to the browser under CORS. JSON OpenAPI calls need no special Paneon integration protocol.
+- `ctx.signal` aborts when the instance closes. Timeouts, retries, logs and storage belong to page code.
+- An unhandled exception reaches the browser as `ACTION_FAILED`, without its stack.
+- Paneon never retries a mutation. A lost connection means the result was not received, not that the operation failed.
 
-`ctx.signal` supports cooperative cleanup when an instance closes. Author code
-owns timeout handling, retries, process cleanup, business status, scheduling,
-monitoring, logs, and storage. Business stdout/stderr is not forwarded as
-framework diagnostics. Return intentional displayable results. Unhandled
-exceptions become `ACTION_FAILED` without exposing original stacks.
+## Execution lifetime
 
-A lost connection means the result was not received, not that the external
-operation failed. Paneon never automatically retries a mutation or promises
-business idempotency. Restart restores panel configuration and events, not an
-in-flight call or its business result.
+- Module-level objects survive between calls only while the panel stays resident. At most ten panels are resident, and idle ones are evicted first; eviction, reload, close and restart discard module state. Keep durable state outside worker memory.
+- Await work whose result matters. Detached timers and child processes are not a background-job service.
+- When capacity is exhausted, a call can fail with `RUNTIME_BUSY`; it is not replayed.
+- Restart restores panel configuration and events, not in-flight calls.
+- Watching covers local imports and `.env`, `.env.local`, `.env.production` and `.env.production.local`. Run `panel reload` after changing installed packages.
 
-## Queries and complete interface states
+## Queries
 
-`useQuery(queryAction, input, { refreshMs })` returns
-`{ data, error, loading, refetch }`. It accepts only query actions, keeps results
-in page memory, avoids overlapping runs for that subscription, and stops timed
-refresh when unsubscribed. Refresh is optional and does not create a business
-monitoring history.
-
-Use ordinary React state and components for loading, empty, error, disabled, and
-success states. Do not invent a separate state protocol:
+`useQuery(queryAction, input, { refreshMs })` returns `{ data, error, loading, refetch }`. It accepts only query actions, avoids overlapping runs, and stops timed refresh on unmount. Build loading, empty, error and success states with ordinary React state:
 
 ```tsx
 // Inside a component; listItems and saveSelection are declared actions.
 const items = useQuery(listItems, { filter });
 const [saving, setSaving] = useState(false);
-const [saved, setSaved] = useState(false);
 const [failure, setFailure] = useState('');
 
 async function save() {
   setSaving(true);
-  setSaved(false);
   setFailure('');
   try {
-    await saveSelection({ ids: selectedIds }); // top-level mutation action
-    setSaved(true);
+    await saveSelection({ ids: selectedIds });
     await items.refetch();
   } catch {
     setFailure('The selection could not be saved.');
@@ -170,159 +149,56 @@ return (
     <Button disabled={saving || selectedIds.length === 0} onClick={() => void save()}>
       Save selection
     </Button>
-    {saved && <p role="status">Selection saved.</p>}
   </Stack>
 );
 ```
 
-For an existing interaction, reuse the [form](form.md), [table](table.md), or [choice](choose.md) page. In custom layouts, label fields, connect descriptions/errors with `aria-describedby`, mark invalid controls with `aria-invalid`, and handle empty results and disabled actions explicitly.
+## Components
 
-## Available components
-
-Import these from `paneon/ui`. Base APIs and composition follow the pinned
-upstream shadcn implementation and its default Neutral theme. You do not need to
-copy component implementations or define another palette, font scale, corner
-radius, or control height. `Page`, `Section`, and `Stack` only supply layout.
-`StatusBadge` reuses `Badge`; it does not inspect business status.
+Prefer the existing components over hand-built ones: pages get built faster and stay consistent in style and experience. Import them from `paneon/ui`. They follow upstream shadcn with its default Neutral theme; do not redefine the palette, font scale, radius or control height. Compound components export their parts with the same prefix, such as `Card` with `CardHeader` and `CardContent`.
 
 <!-- prettier-ignore -->
-| Main component(s) | Companion exports |
+| Component | Purpose |
 | --- | --- |
-| `Page`, `Section`, `Stack` | Page/section title and description; Stack direction, gap, and wrapping |
-| `Button` | Standard button props, variants, size, `render` |
-| `Input`, `Label` | Standard input and label composition |
-| `Field` | `FieldContent`, `FieldLabel`, `FieldTitle`, `FieldDescription`, `FieldError`, `FieldGroup`, `FieldSet`, `FieldLegend`, `FieldSeparator` |
-| `Card` | `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter` |
-| `RadioGroup`, `Checkbox` | `RadioGroupItem`; controlled/uncontrolled values |
-| `Textarea` | Standard multiline input props |
-| `Select` | `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`, `SelectGroup`, `SelectLabel`, `SelectSeparator`; provide `items` for value-to-label display |
-| `Badge`, `StatusBadge` | Same badge variants; author supplies content |
-| `Alert`, `Spinner` | `AlertTitle`, `AlertDescription`; accessible loading label |
-| `Table` | `TableHeader`, `TableBody`, `TableFooter`, `TableRow`, `TableHead`, `TableCell`, `TableCaption` |
-| `Pagination` | `PaginationContent`, `PaginationItem`, `PaginationLink`, `PaginationPrevious`, `PaginationNext`, `PaginationEllipsis` |
-| `Tabs` | `TabsList`, `TabsTrigger`, `TabsContent` |
-| `Dialog` | `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter`, `DialogClose` |
-| `AlertDialog` | `AlertDialogTrigger`, `AlertDialogContent`, `AlertDialogHeader`, `AlertDialogTitle`, `AlertDialogDescription`, `AlertDialogFooter`, `AlertDialogAction`, `AlertDialogCancel` |
-| `Accordion` | `AccordionItem`, `AccordionTrigger`, `AccordionContent`; `multiple` and array values |
-| `Collapsible` | `CollapsibleTrigger`, `CollapsibleContent` |
-| `Tooltip` | `TooltipProvider`, `TooltipTrigger`, `TooltipContent`; provider is also installed in the panel root |
-| `DropdownMenu` | `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuGroup`, `DropdownMenuLabel`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuShortcut`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioGroup`, `DropdownMenuRadioItem`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent` |
-| `Popover` | `PopoverTrigger`, `PopoverContent`; virtual positioning uses the content’s `anchor` prop |
-| `Switch` | Controlled/uncontrolled boolean control |
-| `CodeBlock` | `code: string`, optional `language` |
-| `Markdown` | Markdown string as children, optional `annotationTarget` inside an `AnnotationRoot`, including fenced Mermaid diagrams |
-| `Mermaid` | `code: string`, optional `className` |
+| `Page`, `Section`, `Stack` | Page with title, titled region, row/column spacing |
+| `Button` | Action button |
+| `Input`, `Textarea` | Single-line and multiline text input |
+| `Label`, `Field` | Control label; field with description and error |
+| `Select` | Dropdown choice |
+| `RadioGroup`, `Checkbox`, `Switch` | Single choice, multiple choice, on/off |
+| `Card` | Grouped content block |
+| `Badge`, `StatusBadge` | Short label or status |
+| `Alert` | Inline message |
+| `Empty` | Empty state |
+| `Spinner` | Loading indicator |
+| `toast` | Transient notification: `toast.add({ title, type })` |
+| `Table` | Static table |
+| `Pagination` | Page navigation |
+| `Tabs` | Switch between views |
+| `NavigationMenu` | Navigation bar |
+| `Accordion`, `Collapsible` | Expandable sections |
+| `Dialog`, `AlertDialog` | Modal dialog, confirmation |
+| `Sheet` | Side panel |
+| `Popover`, `Tooltip` | Floating content, hover hint |
+| `DropdownMenu`, `ContextMenu` | Click menu, right-click menu |
+| `Separator` | Divider |
+| `CodeBlock` | Highlighted code |
+| `Markdown` | GFM Markdown, including Mermaid fences |
+| `Mermaid` | Diagram |
+| `DiffView` | Text diff |
+| `AnnotationRoot`, `AnnotationText`, `AnnotationMenu`, `AnnotationSubmitButton` | Annotations; see [annotations](annotations.md) |
 
-Companion exports belong to their main component families. Slider is not included.
+Slider is not included.
 
-For basic layout, use `<Page title="..."><Stack>...</Stack></Page>`, add
-`<Section title="...">` for a region, and use
-`<Stack direction="row" wrap>` for controls. Compose upstream Card and Field
-families for structure. Input values, validation, modal confirmation, and actions
-remain explicit author code. Merely opening a dialog or changing a switch does
-not automatically send events or execute functions.
-
-Label controls and provide dialog titles and descriptions. For reusable selection and annotations, see [Annotations](annotations.md); no fixed header, sidebar or page layout is required.
-
-CodeBlock uses bundled Shiki JavaScript highlighting for javascript/js,
-typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, and diff. Unknown or absent
-languages are plain text. The content is read-only and never executed.
-
-Markdown uses `react-markdown` + `remark-gfm` and the community-maintained
-`github-markdown-css` light stylesheet in a scoped container. It renders GFM
-tables, strikethrough, read-only task lists, and automatic links. Raw HTML parsing
-is disabled by default. It is a read-only renderer. To collect exact document annotations, pass `annotationTarget` inside an existing `AnnotationRoot`; see [annotations](annotations.md#complex-content-adapters). Styles are loaded inside the panel iframe.
-
-Trusted TSX can pass `components` overrides and `rehypePlugins`. They compose with the default renderers; replacing `pre` explicitly also replaces its Mermaid handling. For example:
-
-```tsx
-import { Markdown } from 'paneon/ui';
-
-<Markdown components={{ h2: ({ node: _node, ...props }) => <h2 {...props} data-section="true" /> }}>
-  {'## Options\n\nCompare the tradeoffs.'}
-</Markdown>;
-```
-
-Use `rehypePlugins` for trusted AST transforms such as source mapping; it is not data supplied by a human or agent through JSON params. Raw HTML parsing stays disabled by default.
-
-### Mermaid diagrams
-
-Use `Mermaid` for a standalone diagram, or a `mermaid` fenced block inside
-`Markdown`. Both entry points use the official Mermaid library, bundled locally,
-and keep its default appearance. Do not load Mermaid from a CDN or add a separate
-rendering service.
-
-```tsx
-import { Markdown, Mermaid } from 'paneon/ui';
-
-<Mermaid code={'flowchart LR\n  Question --> Explanation'} />;
-
-<Markdown>{`## Review flow
-
-\`\`\`mermaid
-sequenceDiagram
-  Human->>Agent: Ask a question
-  Agent-->>Human: Explain the options
-\`\`\`
-`}</Markdown>;
-```
-
-The `code` prop is ordinary React state: changing it renders the new source.
-Multiple diagrams can appear in the same document, including lists and quotes.
-While rendering, the component shows a loading state; invalid source displays an
-error in that diagram and can be corrected without reloading the page. Other
-Markdown code blocks, inline code, and GFM content retain their existing behavior.
-Raw HTML parsing stays disabled. The optional `className` is for container layout,
-not a separate diagram theme API.
-
-## Temporary credential input
-
-For a function that needs a temporary credential, declare its purpose and use
-the host's input dialog. Import `credentials` from `paneon/sdk`. The panel and CLI receive only a reference. In this fragment, `businessClient` is your own imported server-side client:
-
-```tsx
-export const authenticate = serverAction({
-  kind: 'mutation',
-  credential: { label: 'Use the token for this operation', ttlSeconds: 900 },
-  input: z.object({ credential: z.string() }),
-  handler: async (ctx, input) =>
-    ctx.secrets.use(input.credential, async (value) => {
-      // Trusted author code uses value with its own library or HTTP client.
-      await businessClient.authenticate(value);
-      return { authenticated: true };
-    }),
-});
-
-// In a click handler, with normal pending/error feedback:
-const reference = await credentials.request(authenticate);
-await authenticate({ credential: reference.ref });
-```
-
-The trusted dialog is outside the panel iframe and shows the declared purpose,
-action, and revision. References are bound to that instance/revision/action.
-Default lifetime is 15 minutes; the maximum is 60 minutes. Expiry, revocation,
-reload, close, or service stop prevents new use. Restart requires fresh input.
-No browser or CLI API dereferences a credential.
-
-The raw value reaches **trusted server-side author code** in its callback. The
-runtime keeps credentials in memory and blocks known raw values in its own
-action-result, event, and diagnostic boundaries (`SECRET_OUTPUT_BLOCKED`). It
-does not identify every possible encoding, control arbitrary code, erase copies
-already made by that code, or intercept business HTTP, child processes, files,
-or logs. The author is responsible for those outputs. Never describe this as
-protection against malicious author code or another program with the same OS
-user's debugging/shell access.
+- `Select` needs `items` to display labels for values.
+- `CodeBlock` highlights javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml and diff; other languages render as plain text.
+- `Markdown` renders GFM with raw HTML disabled. `components` overrides and `rehypePlugins` compose with the defaults; replacing `pre` also drops Mermaid handling.
+- `Mermaid` and Markdown diagrams use the bundled Mermaid library; never load Mermaid from a CDN. Invalid source shows an error in place of that diagram.
+- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).
 
 ## Theme and language
 
-Public UI components inherit user preferences automatically; do not add theme or
-language to the panel input schema. `useUI()` from `paneon/ui` exposes `theme`,
-`language`, and typed public-component translations. Use theme variables for
-custom colors. Author-supplied text and input are preserved. For optional custom
-copy selection and compatibility boundaries, see [interface preferences](preferences.md).
-
-## Reuse Git readers and a string Diff
-
-The skill's [Git component module](../assets/panels/git-review/components.tsx) exports `GitBranches`, `GitCommitGraph`, `GitChangedFiles` and their corresponding hooks. Supply a `repositoryPath`, semantic branch/fixed commit/view, controlled selection and callbacks; the module owns named server-action reads, fixed-tip paging and lazy file contents. See [Git review contracts](git-review.md#independent-git-readers). They are skill assets and do not require a new public package export.
-
-`<DiffView oldText="before\n" newText="after\n" />` from `paneon/ui` works without a repository, Git session, source ID or AnnotationRoot. Supply `sourceId` inside an author-owned Provider to opt into annotations. Keep original displayed versions in browser memory while drafts or corrections reference them; Git's evidence builder creates a complete explicit submission, and its validator needs only that request plus configured repository scope. Closing/reloading a page can discard unsubmitted drafts. Do not silently move an old annotation onto new file content.
+- Public components follow the user's theme and language preference automatically. Never add theme or language to panel input.
+- Use theme variables such as `bg-background`, `text-foreground` and `border-border` for custom colors.
+- Paneon translates only its own controls; text the page supplies stays as written. `useUI()` returns `theme` and `language` (`en` or `zh-CN`).
+- Write a page's own text in the language the human uses with you, not necessarily the one `useUI()` reports: if they asked for Russian, write Russian; if they chat in Japanese, write Japanese. Do not build multilingual copy for a temporary or private page; development time matters more.

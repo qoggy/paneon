@@ -13,6 +13,10 @@ program
   .version(packageJson.version)
   .option('--debug', 'Write framework diagnostics to stderr')
   .option('--json', 'Print a machine-readable JSON result')
+  .addHelpText(
+    'after',
+    '\nJSON output:\n  --json prints one envelope: {"ok":true,"data":...} or {"ok":false,"error":{"code","message","details"?}}.\n  Failures exit with 1; empty reads and wait timeouts succeed.',
+  )
   .exitOverride();
 const panel = program.command('panel').description('Run and manage interactive panel instances');
 const server = program
@@ -71,7 +75,7 @@ const init = program
   .option('--yes', 'Skip prompts and install using supplied options and defaults')
   .addHelpText(
     'after',
-    '\nAgents: codex, cursor, claude-code, opencode, gemini-cli, github-copilot, cline, windsurf, qwen-code, kiro-cli, roo\n\nExamples:\n  paneon init\n  paneon init --agent codex claude-code --project --yes --json\n  paneon init --agent claude-code --global --copy --yes --json',
+    '\nAgents: codex, cursor, claude-code, opencode, gemini-cli, github-copilot, cline, windsurf, qwen-code, kiro-cli, roo\n\n--json requires --yes. Installing replaces existing paneon skill directories, discarding local edits without backup.\n\nExamples:\n  paneon init\n  paneon init --agent codex claude-code --project --yes --json\n  paneon init --agent claude-code --global --copy --yes --json',
   );
 execute(init, async () => {
   const path = import.meta.url.endsWith('.ts')
@@ -88,7 +92,11 @@ const run = panel
   .option('--params-file <path>', 'Read panel input from a UTF-8 JSON file instead of --params')
   .addOption(new Option('--watch', 'Automatically reload source changes (default)'))
   .addOption(new Option('--no-watch', 'Disable automatic source reload'))
-  .option('--open', 'Open the panel in the system browser');
+  .option('--open', 'Open the panel in the system browser')
+  .addHelpText(
+    'after',
+    '\nRelative entry and --params-file paths resolve against the current directory, not --cwd.',
+  );
 execute(run, async () => {
   if (process.argv.includes('--watch') && process.argv.includes('--no-watch'))
     invalid('--watch and --no-watch cannot be used together.');
@@ -174,7 +182,7 @@ for (const name of ['inspect', 'reload', 'close'] as const) {
       name === 'inspect'
         ? 'Inspect complete panel details and its current URL'
         : name === 'reload'
-          ? 'Reload the current source without changing watch mode'
+          ? 'Reload the current source without changing watch mode; a closed instance needs a new panel run'
           : 'Close panel runtime resources and preserve interaction history',
     );
   execute(command, async () => {
@@ -196,7 +204,11 @@ const events = panel
   .description('Read unacknowledged interaction events without acknowledging them')
   .requiredOption('--consumer <name>', 'Persistent consumer name')
   .option('--wait-ms <ms>', 'Maximum wait in milliseconds, 0–60000', '0')
-  .option('--limit <count>', 'Maximum events, 1–1000', '100');
+  .option('--limit <count>', 'Maximum events, 1–1000', '100')
+  .addHelpText(
+    'after',
+    '\nResult: events[] with id, type, payload, revision and createdAt; hasMore means more events are waiting; timedOut means the wait ended without events.\nDelivery is at least once: unacknowledged events are delivered again. A consumer name keeps its position across processes and sessions.',
+  );
 execute(events, async () => {
   const o = events.opts<{ consumer: string; waitMs: string; limit: string }>();
   if (!o.consumer.trim()) invalid('The consumer name must not be empty.');
@@ -208,7 +220,10 @@ const ack = panel
   .command('ack <instance-id>')
   .description('Acknowledge events already handled by this consumer')
   .requiredOption('--consumer <name>', 'Persistent consumer name')
-  .requiredOption('--through <event-id>', 'Acknowledge through this delivered event');
+  .requiredOption(
+    '--through <event-id>',
+    'Acknowledge every delivered event up to and including this ID',
+  );
 execute(ack, async () => {
   const o = ack.opts<{ consumer: string; through: string }>();
   if (!o.consumer.trim()) invalid('The consumer name must not be empty.');

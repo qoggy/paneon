@@ -95,7 +95,7 @@ debug SHALL 仅输出当前 CLI 调用的框架步骤、请求标识、耗时、
 
 #### Scenario: Keep credentials out of debug output
 
-- **WHEN** 框架在持有控制 token 或临时凭据的情况下遇到错误，且 CLI 已开启 --debug
+- **WHEN** 框架在持有控制 token的情况下遇到错误，且 CLI 已开启 --debug
 - **THEN** stderr 只包含允许的框架元数据，不输出原文、原始请求/响应或 handler 异常，stdout 的既定结果不被调试行污染
 
 ### Requirement: Keep the runtime independent of the invoking agent
@@ -170,7 +170,7 @@ debug SHALL 仅输出当前 CLI 调用的框架步骤、请求标识、耗时、
 
 页面导航及公开静态资源 GET SHALL 可以正常加载，但 MUST NOT 调用作者函数或执行状态变更。浏览器配置读取、事件读取、WebSocket 等非公开 GET API SHALL 在有 Origin 时校验 Origin、无 Origin 时校验 Referer 的完整 origin，无法确认来源则拒绝；CLI 的有效控制认证仍适用。宿主 SHALL 设置 Referrer-Policy: same-origin；浏览器操作请求 MUST NOT 以 Referer 绕过必需的 Origin。
 
-面板 iframe 的桥接请求 SHALL 绑定来源窗口、channelId、instanceId 和 revision；API MUST NOT 因 iframe 的 opaque origin 而允许 null。可信宿主输入接口 MUST NOT 作为普通 iframe 能力开放；业务密钥输入仍保留原定隔离与有效期。
+面板 iframe 的桥接请求 SHALL 绑定来源窗口、channelId、instanceId 和 revision；API MUST NOT 因 iframe 的 opaque origin 而允许 null。业务密钥可作为普通动作参数传递，收集、使用和存储由页面代码负责。
 
 #### Scenario: Accept a same-origin browser action
 
@@ -199,8 +199,8 @@ debug SHALL 仅输出当前 CLI 调用的框架步骤、请求标识、耗时、
 
 #### Scenario: Reject another panel's bridge message
 
-- **WHEN** 一个 iframe 试图调用另一实例的动作或可信凭据输入接口
-- **THEN** 宿主和服务拒绝调用，其他实例及凭据状态不变
+- **WHEN** 一个 iframe 试图调用另一实例的动作
+- **THEN** 宿主和服务拒绝调用，其他实例状态不变
 
 ### Requirement: Recover panel configuration and interaction history only
 
