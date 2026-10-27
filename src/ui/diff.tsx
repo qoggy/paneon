@@ -10,35 +10,18 @@ import {
 } from 'react';
 import type { Ref } from 'react';
 import { Button } from './button';
-import { CodeBlock } from './code-block';
+import { CodeText } from './code-text';
 import { useAnnotations } from './annotation-context';
 import { annotationKey } from '../sdk/annotation';
 import type { JsonValue } from '../sdk/annotation';
 import { createDiffModel, diffChanges } from '../shared/diff-model';
-import type { DiffLine, DiffModel, DiffRow } from '../shared/diff-model';
+import type { DiffModel } from '../shared/diff-model';
+import { diffPresentation } from './diff-presentation';
+import type { DiffCell } from './diff-presentation';
 import { DiffToolbar } from './diff-toolbar';
 import { useDiffSplit } from './diff-split';
 import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
 import type { DiffLocation } from './diff-annotation';
-function splitRows(rows: DiffRow[]) {
-  const result: { old?: DiffLine; new?: DiffLine; kind: DiffRow['kind'] }[] = [];
-  for (let i = 0; i < rows.length;) {
-    if (rows[i].kind === 'context') {
-      result.push(rows[i++]);
-      continue;
-    }
-    const removed: DiffLine[] = [],
-      added: DiffLine[] = [];
-    while (i < rows.length && rows[i].kind !== 'context') {
-      if (rows[i].old) removed.push(rows[i].old as DiffLine);
-      if (rows[i].new) added.push(rows[i].new as DiffLine);
-      i++;
-    }
-    for (let j = 0; j < Math.max(removed.length, added.length); j++)
-      result.push({ old: removed[j], new: added[j], kind: 'add' });
-  }
-  return result;
-}
 export type DiffViewHandle = {
   /** Expands the required context and reveals coordinates after the DOM is ready. */
   reveal(location: DiffLocation): Promise<void>;
@@ -60,7 +43,7 @@ export type DiffViewProps<TRef = JsonValue> = {
   /** Opt into a bounded code viewport; ordinary document consumers retain natural flow. */
   layout?: 'document' | 'bounded';
 };
-/** Display needs no provider; supplying side references opts into AnnotationRoot. */
+/** Display needs no provider; supplying side references joins the page annotation session. */
 export function DiffView<TRef = JsonValue>(props: DiffViewProps<TRef>) {
   return props.annotationTargets?.old !== undefined ||
     props.annotationTargets?.new !== undefined ? (
@@ -132,6 +115,10 @@ function StringDiffView<TRef>({
     });
   }
   const { unified, expanded } = view;
+  const tables = useMemo(
+    () => (expanded ? [model.rows] : model.hunks.map((hunk) => hunk.rows)).map(diffPresentation),
+    [model, expanded],
+  );
   // Decide from whole source texts, never from an individual hunk or trimmed content.
   const sides: ('old' | 'new')[] =
     !model.oldText && model.newText
@@ -271,19 +258,17 @@ function StringDiffView<TRef>({
       removers.forEach((remove) => remove());
     };
   }, [targets, model, unified, expanded, registerText]);
-  function code(
-    side: 'old' | 'new',
-    line: DiffLine | undefined,
-    changed: boolean,
-    endingNote: boolean,
-  ) {
-    if (!line)
+  function code(side: 'old' | 'new', cell: DiffCell | undefined, endingNote: boolean) {
+    if (!cell)
       return (
         <td className="bg-muted/30">
           <div className="h-6" />
           {endingNote && <div className="h-5" />}
         </td>
       );
+    const { line, kind, spans } = cell;
+    const changed = kind !== 'context';
+    const background = changed ? `var(--diff-${kind})` : undefined;
     const body = line.text.replace(/\r?\n$/, '');
     const ending = line.text.slice(body.length);
     const extension = (side === 'old' ? oldPath : newPath)?.split('.').at(-1);
@@ -297,12 +282,17 @@ function StringDiffView<TRef>({
         sh: 'bash',
         yaml: 'yaml',
         yml: 'yaml',
+        py: 'python',
+        java: 'java',
+        css: 'css',
+        html: 'html',
+        htm: 'html',
+        md: 'markdown',
+        markdown: 'markdown',
       } as Record<string, string>
     )[extension ?? ''];
     return (
-      <td
-        className={`align-top ${changed ? (side === 'old' ? 'bg-[var(--diff-deletion)]' : 'bg-[var(--diff-addition)]') : ''}`}
-      >
+      <td className="align-top" data-diff-kind={kind} style={{ backgroundColor: background }}>
         <div className="flex h-6 font-mono text-sm leading-6">
           <span
             className={`sticky z-[1] flex shrink-0 items-center bg-background/95 text-muted-foreground select-none ${side === 'old' && !unified ? 'right-0 order-2 border-l' : 'left-0 border-r'}`}
@@ -310,8 +300,7 @@ function StringDiffView<TRef>({
             style={
               changed
                 ? {
-                    backgroundColor:
-                      side === 'old' ? 'var(--diff-deletion)' : 'var(--diff-addition)',
+                    backgroundColor: background,
                   }
                 : undefined
             }
@@ -329,9 +318,10 @@ function StringDiffView<TRef>({
             data-line={line.number}
             className="min-w-max flex-1 px-3 whitespace-pre"
           >
-            <CodeBlock
+            <CodeText
               code={body}
               language={language}
+              spans={spans}
               className="inline max-w-none overflow-visible rounded-none border-0 bg-transparent p-0 leading-6"
             />
             {ending}
@@ -345,10 +335,12 @@ function StringDiffView<TRef>({
       </td>
     );
   }
-  const display = (rows: DiffRow[]) => {
-    const split = splitRows(rows);
-    const hasEndingNote = (row: { old?: DiffLine; new?: DiffLine }) =>
-      !!((row.old && !row.old.text.endsWith('\n')) || (row.new && !row.new.text.endsWith('\n')));
+  const display = ({ split, unified: lines }: ReturnType<typeof diffPresentation>) => {
+    const hasEndingNote = (row: { old?: DiffCell; new?: DiffCell }) =>
+      !!(
+        (row.old && !row.old.line.text.endsWith('\n')) ||
+        (row.new && !row.new.line.text.endsWith('\n'))
+      );
     return unified ? (
       <div
         className="min-w-0 overflow-x-auto"
@@ -358,15 +350,8 @@ function StringDiffView<TRef>({
       >
         <table className="w-max min-w-full border-collapse">
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={index}>
-                {code(
-                  row.kind === 'delete' ? 'old' : 'new',
-                  row.kind === 'delete' ? row.old : row.new,
-                  row.kind !== 'context',
-                  hasEndingNote(row),
-                )}
-              </tr>
+            {lines.map(({ side, cell }, index) => (
+              <tr key={index}>{code(side, cell, !cell.line.text.endsWith('\n'))}</tr>
             ))}
           </tbody>
         </table>
@@ -390,9 +375,7 @@ function StringDiffView<TRef>({
             <table className="w-max min-w-full border-collapse">
               <tbody>
                 {split.map((row, index) => (
-                  <tr key={index}>
-                    {code(side, row[side], row.kind !== 'context', hasEndingNote(row))}
-                  </tr>
+                  <tr key={index}>{code(side, row[side], hasEndingNote(row))}</tr>
                 ))}
               </tbody>
             </table>
@@ -514,7 +497,7 @@ function StringDiffView<TRef>({
             />
           )}
           {expanded ? (
-            <div className="min-w-0 border-b">{display(model.rows)}</div>
+            <div className="min-w-0 border-b">{display(tables[0])}</div>
           ) : (
             model.hunks.map((hunk, index) => (
               <section key={index} data-diff-hunk={index} className="min-w-0 border-b">
@@ -523,7 +506,7 @@ function StringDiffView<TRef>({
                   {t('(changed block)')}
                 </div>
 
-                {display(hunk.rows)}
+                {display(tables[index])}
               </section>
             ))
           )}

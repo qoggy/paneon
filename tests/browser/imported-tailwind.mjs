@@ -103,10 +103,11 @@ export default definePanel({id:'imported-tailwind',requires:{paneon:'${PACKAGE_V
           const style = getComputedStyle(cell);
           return {
             side: element.dataset.codeSide,
+            kind: cell.dataset.diffKind,
             color: style.backgroundColor,
             expected: (() => {
               const probe = document.createElement('span');
-              probe.style.backgroundColor = `var(--diff-${element.dataset.codeSide === 'old' ? 'deletion' : 'addition'})`;
+              probe.style.backgroundColor = `var(--diff-${cell.dataset.diffKind})`;
               document.body.append(probe);
               const color = getComputedStyle(probe).backgroundColor;
               probe.remove();
@@ -117,8 +118,12 @@ export default definePanel({id:'imported-tailwind',requires:{paneon:'${PACKAGE_V
       );
       assert.ok(colors.some((item) => item.side === 'old'));
       assert.ok(colors.some((item) => item.side === 'new'));
-      for (const item of colors) assert.equal(item.color, item.expected, JSON.stringify(item));
-      assert.notEqual(
+      for (const item of colors) {
+        assert.equal(item.kind, 'modify');
+        assert.notEqual(item.color, 'rgba(0, 0, 0, 0)');
+        assert.equal(item.color, item.expected, JSON.stringify(item));
+      }
+      assert.equal(
         colors.find((item) => item.side === 'old').color,
         colors.find((item) => item.side === 'new').color,
       );

@@ -1,4 +1,9 @@
 const en = {
+  'Copy code': 'Copy code',
+  'Unable to copy code.': 'Unable to copy code.',
+  'Enable word wrap': 'Enable word wrap',
+  'Disable word wrap': 'Disable word wrap',
+  'Word wrap': 'Word wrap',
   修改反馈: 'Correct feedback',
   'Show code frame': 'Show code frame',
   'Diagnostic content was truncated.': 'Diagnostic content was truncated.',

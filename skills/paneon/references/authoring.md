@@ -191,7 +191,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 Slider is not included.
 
 - `Select` needs `items` to display labels for values.
-- `CodeBlock` highlights javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml and diff; other languages render as plain text.
+- `CodeBlock` highlights javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, diff, python, java, css, html and markdown; other languages render as plain text.
 - `Markdown` renders GFM with raw HTML disabled. `components` overrides and `rehypePlugins` compose with the defaults; replacing `pre` also drops Mermaid handling.
 - `Mermaid` and Markdown diagrams use the bundled Mermaid library; never load Mermaid from a CDN. Invalid source shows an error in place of that diagram.
 - `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).

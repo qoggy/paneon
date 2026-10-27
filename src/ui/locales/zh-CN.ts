@@ -1,5 +1,10 @@
 import type en from './en';
 const zh: Record<keyof typeof en, string> = {
+  'Copy code': '复制代码',
+  'Unable to copy code.': '无法复制代码。',
+  'Enable word wrap': '启用自动换行',
+  'Disable word wrap': '禁用自动换行',
+  'Word wrap': '自动换行',
   修改反馈: '修改反馈',
   'Show code frame': '查看出错代码',
   'Diagnostic content was truncated.': '错误详情过长，已截断。',

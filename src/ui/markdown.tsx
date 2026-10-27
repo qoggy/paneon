@@ -9,12 +9,15 @@ import {
   useRef,
   type ComponentProps,
   type Ref,
+  type ReactNode,
 } from 'react';
 import type { JsonValue } from '../sdk/annotation';
 import { annotationKey } from '../sdk/annotation';
 import { useAnnotationContext, useAnnotations } from './annotation-context';
 import { sourceMappingPlugin } from './markdown-annotation-mapper';
 import { Mermaid } from './mermaid';
+import { MarkdownCodeBlock } from './markdown-code-block';
+import { markdownCodeText } from './code-highlighting';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 
@@ -22,18 +25,27 @@ const components: Components = {
   pre({ children, node: _node, ...props }) {
     const child = Children.toArray(children)[0];
     if (
-      isValidElement<{ className?: string; children?: string }>(child) &&
-      child.type === 'code' &&
-      child.props.className?.split(/\s+/).includes('language-mermaid')
+      !isValidElement<{ className?: string; children?: ReactNode }>(child) ||
+      child.type !== 'code'
     )
-      return <Mermaid code={String(child.props.children ?? '').replace(/\n$/, '')} />;
-    return <pre {...props}>{children}</pre>;
+      return <pre {...props}>{children}</pre>;
+    const language = child.props.className
+      ?.split(/\s+/)
+      .find((name) => name.startsWith('language-'))
+      ?.slice(9);
+    if (language === 'mermaid')
+      return <Mermaid code={markdownCodeText(child.props.children).replace(/\n$/, '')} />;
+    return (
+      <MarkdownCodeBlock {...props} language={language}>
+        {child}
+      </MarkdownCodeBlock>
+    );
   },
 };
 
 export type MarkdownProps<TRef = JsonValue> = {
   children: string;
-  /** Opt into annotations inside AnnotationRoot; the value is delivered unchanged as target.ref. */
+  /** Opt into the session enabled by usePageAnnotations; the value is delivered unchanged as target.ref. */
   annotationTarget?: TRef;
   className?: string;
   components?: Components;
@@ -93,20 +105,39 @@ function AnnotatedMarkdown<TRef>({
     [source, rehypePlugins],
   );
   useLayoutEffect(() => {
-    if (!root.current) return;
-    const segments = [...root.current.querySelectorAll<HTMLElement>('[data-source-leaf]')].flatMap(
-      (element) => {
-        const node = element.firstChild;
-        if (node?.nodeType !== Node.TEXT_NODE) return [];
-        return [
-          {
-            node: node as Text,
-            sourceOffsets: JSON.parse(element.dataset.sourceOffsets ?? '[]') as (number | null)[],
-          },
-        ];
-      },
-    );
-    return store.registerText({ ref: reference, source, segments });
+    const elementRoot = root.current;
+    if (!elementRoot) return;
+    let unregister: (() => void) | undefined;
+    const register = () => {
+      unregister?.();
+      const segments = [...elementRoot.querySelectorAll<HTMLElement>('[data-source-leaf]')].flatMap(
+        (element) => {
+          const offsets = JSON.parse(element.dataset.sourceOffsets ?? '[]') as (number | null)[];
+          const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+          const mapped = [];
+          let offset = 0;
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const text = node as Text;
+            mapped.push({
+              node: text,
+              sourceOffsets: offsets.slice(offset, offset + text.length + 1),
+            });
+            offset += text.length;
+          }
+          return mapped;
+        },
+      );
+      unregister = store.registerText({ ref: reference, source, segments });
+    };
+    register();
+    // Highlighting replaces Text nodes after tokenization; rebind their original source offsets.
+    const observer = new MutationObserver(register);
+    observer.observe(elementRoot, { childList: true, characterData: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      unregister?.();
+    };
   }, [store, reference, source, props.components, plugins]);
   return (
     <>

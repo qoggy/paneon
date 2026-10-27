@@ -239,6 +239,8 @@ export class AnnotationStore<TRef> {
       this.registryListeners.delete(listener);
     };
   };
+  /** A renderer animation can move text without a resize, scroll or DOM mutation. */
+  refreshGeometry = () => this.registryChanged();
   private registryChanged() {
     this.registryListeners.forEach((listener) => listener());
   }

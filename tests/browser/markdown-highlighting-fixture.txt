@@ -1,0 +1,62 @@
+import { useState } from 'react';
+import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { Button, Markdown, Page, usePageAnnotations } from '@qoggy/paneon/ui';
+
+type HighlightNode = {
+  type: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HighlightNode[];
+};
+
+// An author-supplied rehype plugin with its own markup and colors, without library-specific markers.
+function existingHighlight() {
+  return (tree: HighlightNode) => {
+    function walk(node: HighlightNode) {
+      if (node.tagName === 'code') {
+        node.children = [{
+          type: 'element',
+          tagName: 'span',
+          properties: { className: ['custom-syntax'], style: 'color: rgb(12, 123, 45)' },
+          children: node.children,
+        }];
+        return;
+      }
+      node.children?.forEach(walk);
+    }
+    walk(tree);
+  };
+}
+
+function Panel() {
+  const { source, plainSource, languages } = usePanelInput<{
+    source: string;
+    plainSource: string;
+    languages: [string, string][];
+  }>();
+  const [second, setSecond] = useState(false);
+  usePageAnnotations({ onSubmit: (value) => agent.emit('annotations-submitted', value) });
+  return <Page title="Markdown 高亮验收">
+    <div data-testid="annotated"><Markdown annotationTarget="code">{source}</Markdown></div>
+    <div data-testid="plain"><Markdown>{plainSource}</Markdown></div>
+    <div data-testid="original"><Markdown components={{ pre: ({ node: _node, ...props }) => <pre {...props} /> }}>{plainSource}</Markdown></div>
+    <div data-testid="custom-code"><Markdown components={{ code: ({ node: _node, ...props }) => <code {...props} data-custom-code="" /> }}>{plainSource}</Markdown></div>
+    <div data-testid="plugin"><Markdown rehypePlugins={[existingHighlight]}>{plainSource}</Markdown></div>
+    <div data-testid="inline"><Markdown>{'行内 `const x = 1` 保持原样。'}</Markdown></div>
+    <div data-testid="unknown"><Markdown>{'```unknown\nconst title = "中文🙂";\n```'}</Markdown></div>
+    <div data-testid="untyped"><Markdown>{'```\nconst title = "中文🙂";\n```'}</Markdown></div>
+    <div data-testid="nested"><Markdown>{'> ```ts\n> const title = "中文🙂";\n> ```'}</Markdown></div>
+    <div data-testid="long"><Markdown>{'```ts\nconst long = "' + 'abcdefgh'.repeat(80) + '";\n```'}</Markdown></div>
+    {languages.map(([language, value]) => <div key={language} data-testid={language}><Markdown>{'```' + language + '\n' + value + '\n```'}</Markdown></div>)}
+    <Button onClick={() => setSecond((value) => !value)}>切换代码</Button>
+    <div data-testid="changing"><Markdown>{second ? '```json\n{"next":true}\n```' : plainSource}</Markdown></div>
+    <div data-testid="mermaid"><Markdown>{'```mermaid\nflowchart LR\n A[输入] --> B[输出]\n```'}</Markdown></div>
+  </Page>;
+}
+export default definePanel({
+  id:'markdown-highlighting',
+  requires:{paneon:'>=0.0.1 <0.1.0'},
+  input:z.object({source:z.string(), plainSource:z.string(), languages:z.array(z.tuple([z.string(), z.string()]))}),
+  events:{'annotations-submitted':annotationValueSchema(z.string())},
+  render:Panel,
+});

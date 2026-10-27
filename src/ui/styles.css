@@ -44,8 +44,12 @@
 }
 
 :root {
-  --diff-deletion: #ffebe9;
-  --diff-addition: #dafbe1;
+  --diff-delete: #eeeeee;
+  --diff-add: #e8f7e8;
+  --diff-modify: #e7effa;
+  --diff-delete-text: #cfcfcf;
+  --diff-add-text: #b9e5ba;
+  --diff-modify-text: #b8d2f2;
   --git-lane-0: #7c3aed;
   --git-lane-1: #0891b2;
   --git-lane-2: #16a34a;
@@ -87,8 +91,12 @@
 }
 
 .dark {
-  --diff-deletion: #4b2026;
-  --diff-addition: #183c28;
+  --diff-delete: #303033;
+  --diff-add: #20382a;
+  --diff-modify: #253448;
+  --diff-delete-text: #414147;
+  --diff-add-text: #294730;
+  --diff-modify-text: #2d425f;
   --git-lane-0: #b794f6;
   --git-lane-1: #22d3ee;
   --git-lane-2: #4ade80;
@@ -137,6 +145,30 @@
   }
 }
 
+/* Keep the toolbar outside the code viewport and override GitHub's pre/code defaults. */
+:root .markdown-body [data-slot='markdown-code-block'] {
+  margin-bottom: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--muted) 60%, var(--background));
+}
+
+:root .markdown-body [data-slot='markdown-code-block'] > pre {
+  margin: 0;
+  padding: 0.25rem 1.25rem 1.25rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+:root .markdown-body [data-slot='markdown-code-block'][data-wrap='true'] > pre,
+:root .markdown-body [data-slot='markdown-code-block'][data-wrap='true'] > pre > code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
 [data-shiki-token] {
   color: var(--shiki-light-color);
   font-style: var(--shiki-light-style);
@@ -146,6 +178,16 @@
   color: var(--shiki-dark-color);
   font-style: var(--shiki-dark-style);
   font-weight: var(--shiki-dark-weight);
+}
+
+/* Preserve syntax hues while keeping marked comments and keywords readable
+   against the stronger inline backgrounds in both themes. */
+[data-diff-inline] {
+  color: color-mix(in srgb, currentColor 60%, black);
+}
+
+.dark [data-diff-inline] {
+  color: color-mix(in srgb, currentColor 55%, white);
 }
 
 /* A palette change is atomic; normal control transitions resume after its first paint. */
