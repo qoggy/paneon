@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { FileDiff, FolderTree, ChevronsUpDown, ChevronsDownUp, TreeIcon } from './file-icons.tsx';
 import {
   Button,
+  Tree,
+  TreeRevealError,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -15,12 +17,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@qoggy/paneon/ui';
+import type { TreeHandle } from '@qoggy/paneon/ui';
 import type { GitFile } from './git.ts';
 import {
   areaNames,
   filterFileTree,
   groupFileTrees,
   leafCount,
+  matchesPath,
   selectedAncestors,
   snapshotName,
   snapshotPath,
@@ -66,7 +70,27 @@ export function ChangedFileTree({
     [groups, filter],
   );
   const [collapsed, setCollapsed] = useState<Record<string, Set<string>>>({});
-  const root = useRef<HTMLDivElement>(null);
+  const trees = useRef(new Map<string, TreeHandle>());
+  const reveal = useRef<{
+    id: string;
+    area: string;
+    controller: AbortController;
+    started: boolean;
+  } | null>(null);
+  function cancelReveal() {
+    reveal.current?.controller.abort();
+    reveal.current = null;
+  }
+  function startReveal(area: string, tree: TreeHandle) {
+    const job = reveal.current;
+    if (!job || job.area !== area || job.started || job.controller.signal.aborted) return;
+    job.started = true;
+    void tree.revealItem(job.id, { signal: job.controller.signal }).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof TreeRevealError && error.code === 'TREE_ITEM_FILTERED') return;
+      console.error('Failed to reveal Git file.', error);
+    });
+  }
   const foldKeys = useMemo(() => {
     const keys: string[] = [];
     function directories(nodes: TreeNode<GitFile>[], area: string) {
@@ -84,6 +108,7 @@ export function ChangedFileTree({
     return keys;
   }, [visibleGroups]);
   function setOpen(key: string, open: boolean) {
+    cancelReveal();
     setCollapsed((previous) => {
       const next = new Set(previous[scopeKey]);
       if (open) next.delete(key);
@@ -101,9 +126,12 @@ export function ChangedFileTree({
     snapshots.find((file) => file.id === selectedId) ??
     firstFile(visibleGroups.flatMap(({ nodes }) => nodes));
   useEffect(() => {
+    cancelReveal();
     const selected = snapshots.find((file) => file.id === selectedId);
+    if (!selected) return;
+    const area = selected.source.view.type === 'changes' ? (selected.source.view.area ?? '') : '';
     const ancestors = groups.flatMap(({ area, nodes }) => [
-      ...(area && selected?.source.view.type === 'changes' && selected.source.view.area === area
+      ...(area && selected.source.view.type === 'changes' && selected.source.view.area === area
         ? [`group:${area}`]
         : []),
       ...selectedAncestors(nodes, selectedId).map((path) => `directory:${area}:${path}`),
@@ -116,103 +144,139 @@ export function ChangedFileTree({
         [scopeKey]: new Set([...saved].filter((path) => !ancestors.includes(path))),
       };
     });
+    const job = { id: selected.id, area, controller: new AbortController(), started: false };
+    reveal.current = job;
+    const tree = trees.current.get(area);
+    if (tree) startReveal(area, tree);
+    return () => {
+      job.controller.abort();
+      if (reveal.current === job) reveal.current = null;
+    };
   }, [groups, snapshots, selectedId, scopeKey, revealKey]);
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-      const selected = [
-        ...(root.current?.querySelectorAll<HTMLElement>('[data-file-id]') ?? []),
-      ].find((element) => element.dataset.fileId === selectedId);
-      selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    });
-    return () => cancelAnimationFrame(handle);
-  }, [selectedId, scopeKey, groups, revealKey]);
-  function renderNodes(nodes: TreeNode<GitFile>[], area: string, depth = 0) {
-    return nodes.map((node) => {
-      if (node.kind === 'file') {
-        const snapshot = node.snapshot;
-        const path = snapshotPath(snapshot);
-        const directory = path.slice(0, Math.max(0, path.lastIndexOf('/')));
-        return (
-          <Button
-            key={snapshot.id}
-            data-file-id={snapshot.id}
-            data-file-status={snapshot.status}
-            variant={selectedId === snapshot.id ? 'secondary' : 'ghost'}
-            aria-pressed={selectedId === snapshot.id}
-            aria-label={snapshotName(snapshot, message)}
-            aria-description={snapshotTitle(snapshot, message)}
-            title={snapshotTitle(snapshot, message)}
-            className={`h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(snapshot.status)}`}
-            style={{ paddingLeft: 8 + depth * 12 }}
-            onClick={() => onSelect(snapshot)}
-            onDoubleClick={() => onOpen(snapshot)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSelect(snapshot);
-                onOpen(snapshot);
-              }
-            }}
-          >
-            <TreeIcon kind="file" />
-            <span className="min-w-0 truncate">{node.name}</span>
-            {!byDirectory && directory && (
-              <span
-                className="min-w-0 flex-1 truncate font-normal text-muted-foreground"
-                data-file-parent=""
-              >
-                {directory}
-              </span>
-            )}
-            <span className="ml-auto shrink-0 text-[10px]" aria-hidden="true">
-              {snapshot.status}
-            </span>
-          </Button>
-        );
-      }
-      const key = `directory:${area}:${node.path}`;
-      const open = !!filter || !collapsed[scopeKey]?.has(key);
-      return (
-        <Collapsible
-          key={node.path}
-          open={open}
-          onOpenChange={(value) => setOpen(key, value)}
-          className="min-w-0"
-        >
-          <CollapsibleTrigger
-            render={
-              <Button
-                variant="ghost"
-                data-file-directory={node.path}
-                aria-label={t('Directory {path}', { path: node.path })}
-                title={t('{path} · {count} files', { path: node.path, count: node.count })}
-                className="h-7 w-full min-w-0 justify-start gap-1 px-2 text-left text-xs"
-                style={{ paddingLeft: 4 + depth * 12 }}
-              >
-                <TreeIcon kind={open ? 'down' : 'right'} />
+
+  function directoryKeys(nodes: TreeNode<GitFile>[], area: string): string[] {
+    return nodes.flatMap((node) =>
+      node.kind === 'file'
+        ? []
+        : [`directory:${area}:${node.path}`, ...directoryKeys(node.children, area)],
+    );
+  }
+  function renderTree(area: string, visibleNodes: TreeNode<GitFile>[]) {
+    const nodes = groups.find((group) => group.area === area)?.nodes ?? [];
+    const keys = directoryKeys(nodes, area);
+    const counts = new Map<string, number>();
+    function count(nodes: TreeNode<GitFile>[]) {
+      for (const node of nodes)
+        if (node.kind === 'directory') {
+          counts.set(node.path, node.count);
+          count(node.children);
+        }
+    }
+    count(visibleNodes);
+    return (
+      <Tree
+        ref={(tree) => {
+          if (tree) {
+            trees.current.set(area, tree);
+            startReveal(area, tree);
+          } else trees.current.delete(area);
+        }}
+        items={nodes}
+        getItemId={(node) =>
+          node.kind === 'file' ? node.snapshot.id : `directory:${area}:${node.path}`
+        }
+        getItemLabel={(node) =>
+          node.kind === 'file'
+            ? snapshotName(node.snapshot, message)
+            : t('Directory {path}', { path: node.path })
+        }
+        getItemChildren={(node) => (node.kind === 'directory' ? node.children : undefined)}
+        isItemSelectable={(node) => node.kind === 'file'}
+        selectedId={selectedId ?? null}
+        expandedIds={keys.filter((key) => !collapsed[scopeKey]?.has(key))}
+        onExpandedChange={(ids) =>
+          setCollapsed((previous) => {
+            const next = new Set(previous[scopeKey]);
+            const expanded = new Set(ids);
+            for (const key of keys) {
+              if (expanded.has(key)) next.delete(key);
+              else next.add(key);
+            }
+            return { ...previous, [scopeKey]: next };
+          })
+        }
+        onSelectionChange={(id) => {
+          const file = snapshots.find((file) => file.id === id);
+          if (file) onSelect(file);
+        }}
+        onAction={(node) => {
+          if (node.kind === 'file') onOpen(node.snapshot);
+        }}
+        searchTerm={filter}
+        isItemMatchingSearch={(node, term) =>
+          node.kind === 'file' && matchesPath(node.snapshot, term)
+        }
+        getItemPresentation={(node, state) => {
+          const depth = state.level - 1 + (area ? 1 : 0);
+          if (node.kind === 'file')
+            return {
+              'data-file-id': node.snapshot.id,
+              'data-file-status': node.snapshot.status,
+              title: snapshotTitle(node.snapshot, message),
+              'aria-description': snapshotTitle(node.snapshot, message),
+              className: `h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(node.snapshot.status)}`,
+              style: { paddingLeft: 8 + depth * 12 },
+            };
+          return {
+            'data-file-directory': node.path,
+            title: t('{path} · {count} files', {
+              path: node.path,
+              count: counts.get(node.path) ?? node.count,
+            }),
+            className: 'h-7 w-full min-w-0 justify-start gap-1 px-2 text-left text-xs',
+            style: { paddingLeft: 4 + depth * 12 },
+          };
+        }}
+        renderItemContent={(node, state) => {
+          if (node.kind === 'directory')
+            return (
+              <>
                 <span className="flex text-muted-foreground">
-                  <TreeIcon kind={open ? 'open' : 'folder'} />
+                  <TreeIcon kind={state.expanded ? 'open' : 'folder'} />
                 </span>
                 <span className="min-w-0 truncate">{node.name}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                  {node.count}
+                  {counts.get(node.path) ?? node.count}
                 </span>
-              </Button>
-            }
-          />
-          <CollapsibleContent>
-            {open && renderNodes(node.children, area, depth + 1)}
-          </CollapsibleContent>
-        </Collapsible>
-      );
-    });
+              </>
+            );
+          const path = snapshotPath(node.snapshot);
+          const directory = path.slice(0, Math.max(0, path.lastIndexOf('/')));
+          return (
+            <>
+              <TreeIcon kind="file" />
+              <span className="min-w-0 truncate">{node.name}</span>
+              {!byDirectory && directory && (
+                <span
+                  className="min-w-0 flex-1 truncate font-normal text-muted-foreground"
+                  data-file-parent=""
+                >
+                  {directory}
+                </span>
+              )}
+              <span className="ml-auto shrink-0 text-[10px]" aria-hidden="true">
+                {node.snapshot.status}
+              </span>
+            </>
+          );
+        }}
+        aria-label={t('改动文件')}
+      />
+    );
   }
+
   return (
-    <div
-      ref={root}
-      className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
-      data-file-tree=""
-    >
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden" data-file-tree="">
       {snapshots.length > 0 && (
         <div
           className="flex shrink-0 items-center gap-0.5 border-b px-1 py-0.5 text-muted-foreground"
@@ -250,6 +314,7 @@ export function ChangedFileTree({
                   aria-label={t('按目录分组')}
                   aria-pressed={byDirectory}
                   onClick={() => {
+                    cancelReveal();
                     setGrouping((previous) => ({ ...previous, [scopeKey]: !byDirectory }));
                     onGroupByDirectoryChange?.(!byDirectory);
                   }}
@@ -270,9 +335,10 @@ export function ChangedFileTree({
                   className="size-7"
                   aria-label={t('全部展开')}
                   disabled={!foldKeys.length}
-                  onClick={() =>
-                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set() }))
-                  }
+                  onClick={() => {
+                    cancelReveal();
+                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set() }));
+                  }}
                 >
                   <ChevronsUpDown className="size-4" aria-hidden="true" />
                 </Button>
@@ -289,9 +355,10 @@ export function ChangedFileTree({
                   className="size-7"
                   aria-label={t('全部折叠')}
                   disabled={!foldKeys.length || !!filter}
-                  onClick={() =>
-                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set(foldKeys) }))
-                  }
+                  onClick={() => {
+                    cancelReveal();
+                    setCollapsed((previous) => ({ ...previous, [scopeKey]: new Set(foldKeys) }));
+                  }}
                 >
                   <ChevronsDownUp className="size-4" aria-hidden="true" />
                 </Button>
@@ -352,9 +419,7 @@ export function ChangedFileTree({
                   }
                 />
               )}
-              <CollapsibleContent>
-                {(!area || open) && renderNodes(nodes, area, area ? 1 : 0)}
-              </CollapsibleContent>
+              <CollapsibleContent>{(!area || open) && renderTree(area, nodes)}</CollapsibleContent>
             </Collapsible>
           );
         })}

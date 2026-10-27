@@ -186,6 +186,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Markdown` | GFM Markdown, including Mermaid fences |
 | `Mermaid` | Diagram |
 | `DiffView` | Text diff |
+| `Tree` | Expandable hierarchy, such as a file tree |
 | `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](annotations.md) |
 
 Slider is not included.

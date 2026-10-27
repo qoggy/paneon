@@ -43,3 +43,39 @@ Diff highlighting follows two levels: pale green/gray/blue line backgrounds repr
 `Markdown` accepts optional `annotationTarget`, using the same JSON reference model as `AnnotationText.target`. `<Markdown>{source}</Markdown>` requires no annotation Root. `<Markdown annotationTarget="plan-a">{source}</Markdown>` registers exact original Markdown coordinates inside an existing Root. Independent documents, including identical strings, need distinct stable targets; their targets are delivered unchanged as `ref`. While a target has saved or in-progress annotations, the renderer retains the annotated source instead of silently replacing it after a prop update. Removing those drafts permits the newer source to render. This protection is scoped to the current Root/browser session; it is not cross-reload persistence. Existing component overrides, GFM and Mermaid remain available; diagram interiors and unmappable custom transformations are not selectable text. Do not mount an additional surface or build a second annotation state machine.
 
 Promoted components read the existing `useUI()` and core dictionaries. User content is never translated. The plain source mapper and range checks remain private implementation details; no new public text-range validation API is introduced. Supplied-page correction receipts remain in the skill.
+
+## Tree
+
+`Tree<T>` displays synchronous, fully loaded hierarchies using the caller's original objects. It does not read files, sort paths or require Git fields. Import `Tree`, `TreeProps`, `TreeHandle`, `TreeItemState`, `TreeItemPresentation` and `TreeRevealError` from `@qoggy/paneon/ui`.
+
+```tsx
+type Item = { key: string; name: string; nodes?: Item[] };
+
+<Tree
+  items={items}
+  getItemId={(item: Item) => item.key} // Unique and stable within this instance.
+  getItemLabel={(item) => item.name} // Plain text for accessible naming and default search.
+  getItemChildren={(item) => item.nodes} // undefined = leaf; [] = empty container.
+  defaultExpandedIds={['prompts']}
+  onSelectionChange={(id) => setSelected(id)} // Click selects without opening.
+  onAction={(item) => openItem(item)} // Leaf Enter/double-click returns the original object.
+  searchTerm={search}
+  aria-label="Proposed files"
+/>;
+```
+
+`renderItemContent(item, state)` customizes display content only; keep buttons, links and inputs outside it. State contains `selected`, effective `expanded`, `isBranch` and one-based `level`. `getItemPresentation` sets row `className`, `style`, `title`, `aria-description` and `data-*` values without overriding tree events. `className` styles the root; scrolling and toolbars belong to the containing page.
+
+Selection and expansion are independently controlled with `selectedId` / `onSelectionChange` and `expandedIds` / `onExpandedChange`. Explicit user selection reports intent even when selecting the same ID again; unchanged base expansion does not notify. Undefined chooses internal state; null selection and an empty expansion array are controlled values. Internal defaults are `defaultSelectedId` (null) and `defaultExpandedIds` ([]), read once. Do not switch modes while mounted. Leaves are selectable by default; `isItemSelectable=false` limits selection only, preserving focus, expansion and leaf action. Deleted uncontrolled identities are removed and reported; filtering does not delete selection. Controlled identities remain the parent's responsibility.
+
+Search uses case-insensitive label substring matching unless `isItemMatchingSearch(item, term)` is supplied. Matching nodes keep their ancestor paths; matching a container does not include unrelated descendants. Search temporarily expands matching paths without writing the base expanded IDs. Clearing search restores base expansion. Explicit individual container clicks still request base expansion changes; `expandAll()` expands the complete data, and `collapseAll()` is a no-op during search.
+
+The root is a named group of native buttons. Click selects a leaf; Enter or double-click activates it. Container rows toggle expansion and do not invoke the leaf action. Space retains native click behavior; Tab moves focus without selecting. There is no APG treeview role, roving focus, Arrow/Home/End navigation, multiselect or lazy loader. `loading` marks the tree busy, suppressing the initial empty state while retaining supplied items; it does not cache old items. `emptyState` renders when the visible result is empty and loading is false.
+
+```tsx
+const tree = useRef<TreeHandle>(null);
+const controller = new AbortController(); // Abort on view change or business cancellation.
+await tree.current!.revealItem(id, { signal: controller.signal });
+```
+
+`revealItem` requests ancestor expansion, waits for controlled state to be returned and resolves after the mounted row can be scrolled with non-smooth nearest positioning. It does not select, focus, open or clear search. It waits without an implicit timeout if the parent does not accept; the required signal owns cancellation. Missing or filtered targets reject with `TreeRevealError.code` (`TREE_ITEM_NOT_FOUND` / `TREE_ITEM_FILTERED`). Cancellation, unmount, a new reveal or an intervening expansion command rejects the old call with `AbortError` and releases its listeners and queued scroll. Repeated calls to the same ID reveal again.

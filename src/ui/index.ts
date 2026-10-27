@@ -52,3 +52,7 @@ export type { UIPreferences, UITheme, UILanguage, UIMessage } from './use-ui';
 export { DiffView } from './diff';
 export type { DiffViewProps, DiffViewHandle } from './diff';
 export type { DiffLocation } from './diff-annotation';
+
+export { Tree } from './tree';
+export type { TreeProps, TreeHandle, TreeItemState, TreeItemPresentation } from './tree';
+export { TreeRevealError } from './tree-model';

@@ -63,6 +63,40 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(f.url(panel));
   const frame = page.frameLocator('iframe');
+  // Optional, repeatable extraction evidence: the same scenarios run before and after.
+  async function capture(name) {
+    const directory = process.env.PANEON_TREE_EVIDENCE_DIR;
+    if (!directory) return;
+    await mkdir(directory, { recursive: true });
+    await page.mouse.move(0, 0);
+    const tree = frame.locator('[data-file-tree]');
+    await tree.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    await tree.evaluate(async (root) => {
+      await Promise.allSettled(
+        root.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      );
+    });
+    const geometry = await tree.evaluate((root) => ({
+      bounds: root.getBoundingClientRect().toJSON(),
+      scroll: root.querySelector('[data-file-scroll]').scrollTop,
+      rows: [...root.querySelectorAll('button')].map((row) => ({
+        text: row.textContent,
+        name: row.getAttribute('aria-label'),
+        title: row.getAttribute('title'),
+        pressed: row.getAttribute('aria-pressed'),
+        expanded: row.getAttribute('aria-expanded'),
+        status: row.getAttribute('data-file-status'),
+        bounds: row.getBoundingClientRect().toJSON(),
+        color: getComputedStyle(row).color,
+        padding: getComputedStyle(row).paddingLeft,
+        icons: [...row.querySelectorAll('path')].map((path) => path.getAttribute('d')),
+      })),
+    }));
+    await writeFile(join(directory, `${name}.json`), JSON.stringify(geometry, null, 2));
+    await tree.screenshot({ path: join(directory, `${name}.png`), animations: 'disabled' });
+  }
   const button = (name) => frame.getByRole('button', { name, exact: true });
   const files = frame.locator('[data-file-id]');
   const group = (area) => frame.locator(`[data-file-group="${area}"]`);
@@ -77,6 +111,7 @@ try {
   assert.equal(await group('unstaged').locator('[data-file-id]').count(), 1);
   assert.equal(await group('untracked').locator('[data-file-id]').count(), 1);
   assert.equal(await button('按目录分组').getAttribute('aria-pressed'), 'false');
+  await capture('changes-flat');
   await button('按目录分组').click();
   const stagedRoot = directory('staged', prefix);
   await stagedRoot.waitFor();
@@ -95,6 +130,36 @@ try {
     await unstaged.getAttribute('data-file-id'),
   );
   assert.equal(await staged.getAttribute('aria-pressed'), 'true');
+  await capture('changes-tree');
+  if (process.env.PANEON_TREE_EVIDENCE_DIR) {
+    for (const theme of ['light', 'dark'])
+      for (const language of ['en', 'zh-CN']) {
+        await f.service.app.inject({
+          method: 'POST',
+          url: '/api/preferences',
+          headers: {
+            host: `127.0.0.1:${f.service.descriptor.port}`,
+            authorization: `Bearer ${f.service.descriptor.controlToken}`,
+          },
+          payload: { ui: { theme, language } },
+        });
+        await frame.locator(`html[data-theme="${theme}"][data-language="${language}"]`).waitFor();
+        await capture(`changes-${theme}-${language}`);
+      }
+    await f.service.app.inject({
+      method: 'POST',
+      url: '/api/preferences',
+      headers: {
+        host: `127.0.0.1:${f.service.descriptor.port}`,
+        authorization: `Bearer ${f.service.descriptor.controlToken}`,
+      },
+      payload: { ui: { theme: 'light', language: 'zh-CN' } },
+    });
+    await frame.locator('html[data-theme="light"][data-language="zh-CN"]').waitFor();
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await capture('changes-desktop-1100');
+    await page.setViewportSize({ width: 1440, height: 960 });
+  }
   for (const [name, color, status] of [
     [`已暂存 · M ${modified}`, 'text-blue', 'M'],
     [`已暂存 · A ${added}`, 'text-green', 'A'],
@@ -118,6 +183,25 @@ try {
       `old 原名.ts → ${renamed}`,
     ),
   );
+  const rootFile = button('已暂存 · M root.ts');
+  await rootFile.click();
+  assert.equal(await rootFile.getAttribute('aria-pressed'), 'true');
+  await rootFile.press('Tab');
+  assert.equal(
+    await rootFile.getAttribute('aria-pressed'),
+    'true',
+    'Tab does not change selection',
+  );
+  await rootFile.press('Enter');
+  await frame
+    .locator('[data-diff-source-headers]')
+    .getByText('root.ts', { exact: true })
+    .first()
+    .waitFor();
+  await stagedRoot.press('Enter');
+  assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'false');
+  await stagedRoot.press('Enter');
+  await staged.waitFor();
   await button(`已暂存 · D ${deleted}`).dblclick();
   await frame
     .locator('[data-code-side="old"][data-line="2"]')
@@ -138,7 +222,28 @@ try {
     `已暂存 · M ${special}`,
   );
   await staged.dblclick();
-  const comments = annotationTools(frame, page);
+  const annotation = annotationTools(frame, page);
+  // Hover can briefly open the directory. Explicit keyboard activation pins it,
+  // so the helper does not mistake a pending hover-close for an open directory.
+  async function pinDirectory() {
+    await page.mouse.move(0, 0);
+    const launcher = frame.getByRole('button', { name: /^批注 \(\d+\)$/ });
+    await launcher.focus();
+    await launcher.press('Escape');
+    await launcher.press('Enter');
+    await frame.getByRole('dialog', { name: '批注目录', exact: true }).waitFor();
+  }
+  const comments = {
+    ...annotation,
+    async locate(number) {
+      await pinDirectory();
+      await annotation.locate(number);
+    },
+    async text(number) {
+      await pinDirectory();
+      return annotation.text(number);
+    },
+  };
 
   await selectDiffLines(frame, 'new', 2);
   await comments.write('目录树切换保留批注');
@@ -228,6 +333,7 @@ try {
       .locator('[data-code-side="old"][data-line="2"]')
       .filter({ hasText: 'value = 1' })
       .waitFor();
+    await capture(initialView.type);
   }
   assert.deepEqual(errors, []);
   assert.equal((await f.events(panel)).length, 0);
@@ -245,6 +351,25 @@ try {
   );
 } catch (error) {
   await page?.screenshot({ path: '/private/tmp/paneon-git-file-tree-failure.png', fullPage: true });
+  if (page && process.env.PANEON_TREE_EVIDENCE_DIR)
+    await writeFile(
+      join(process.env.PANEON_TREE_EVIDENCE_DIR, 'failure-dom.json'),
+      JSON.stringify(
+        await page
+          .frameLocator('iframe')
+          .locator('body')
+          .evaluate((body) => ({
+            popovers: [...body.querySelectorAll('[data-slot="popover-content"]')].map((node) => ({
+              html: node.outerHTML,
+              bounds: node.getBoundingClientRect().toJSON(),
+              parent: node.parentElement.outerHTML.slice(0, 1500),
+            })),
+            controls: body.querySelector('[data-annotation-launcher]')?.outerHTML,
+          })),
+        null,
+        2,
+      ),
+    );
   throw error;
 } finally {
   await browser?.close();
