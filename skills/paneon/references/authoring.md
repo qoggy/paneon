@@ -187,6 +187,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Mermaid` | Diagram |
 | `DiffView` | Text diff |
 | `Tree` | Expandable hierarchy, such as a file tree |
+| `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` | Resizable split layout |
 | `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](annotations.md) |
 
 Slider is not included.

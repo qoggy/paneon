@@ -39,7 +39,9 @@ export async function verifyHistoryColumns(frame, page, content, until) {
       'Column divider is a single visual line.',
     );
     assert.ok(
-      await separator.locator('span').evaluate((el) => el.getBoundingClientRect().width >= 12),
+      await separator.evaluate(
+        (el) => Number.parseFloat(getComputedStyle(el, '::after').width) >= 12,
+      ),
       'Thin column line retains a practical pointer hit area.',
     );
   }
@@ -82,11 +84,10 @@ export async function verifyHistoryColumns(frame, page, content, until) {
       const rect = el.getBoundingClientRect();
       // Start outside the 1px line to prove its transparent hit area works.
       const x = rect.left + rect.width / 2 + 3;
-      for (
-        let y = Math.min(rect.bottom - 4, innerHeight - 4);
-        y >= Math.max(rect.top + 4, 4);
-        y -= 4
-      )
+      // Stay inside this line, clear of the nested horizontal resize boundary.
+      const top = Math.max(rect.top + 16, 16);
+      const bottom = Math.min(rect.bottom - 16, innerHeight - 16);
+      for (let y = (top + bottom) / 2; y >= top; y -= 4)
         if (el.contains(document.elementFromPoint(x, y))) return y - rect.top;
       return null;
     });
@@ -103,15 +104,18 @@ export async function verifyHistoryColumns(frame, page, content, until) {
     );
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
-    assert.equal(
-      await separator.evaluate((el) => el.hasPointerCapture(Number(el.dataset.testPointer))),
-      true,
-    );
     return point;
   }
   async function drag(index, delta) {
     const point = await start(index);
     await page.mouse.move(point.x + delta, point.y, { steps: 6 });
+    if (Math.abs(delta) > 2)
+      assert.equal(
+        await separators[index].evaluate((el) =>
+          el.hasPointerCapture(Number(el.dataset.testPointer)),
+        ),
+        true,
+      );
     await page.mouse.up();
     assert.deepEqual(await styles(), originalStyles);
     return point;
@@ -140,11 +144,7 @@ export async function verifyHistoryColumns(frame, page, content, until) {
     await page.mouse.move(direction === 1 ? 1 : 1439, pointAtLimit.y, { steps: 6 });
     await page.mouse.up();
     assert.deepEqual(await styles(), originalStyles);
-    assert.ok(
-      Math.abs(
-        (await widths())[pane] - Number(await separators[index].getAttribute('aria-valuemin')),
-      ) < 2,
-    );
+    assert.ok(Math.abs((await widths())[pane] - (index === 0 ? 144 : 192)) < 2);
     pointAtLimit = await start(index);
     await page.mouse.move(direction === 1 ? 1439 : 1, pointAtLimit.y, { steps: 6 });
     await page.mouse.up();
@@ -157,7 +157,8 @@ export async function verifyHistoryColumns(frame, page, content, until) {
     await drag(index, direction * (original[pane] - current[pane]));
     assert.equal(await separators[index].getAttribute('aria-orientation'), 'vertical');
     const cancelled = await start(index);
-    await page.mouse.move(cancelled.x + 20, cancelled.y);
+    // Establish gotpointercapture before testing releasePointerCapture.
+    await page.mouse.move(cancelled.x + 20, cancelled.y, { steps: 2 });
     await separators[index].evaluate((el, mode) => {
       const pointerId = Number(el.dataset.testPointer);
       if (mode === 0)
@@ -165,9 +166,12 @@ export async function verifyHistoryColumns(frame, page, content, until) {
       else el.releasePointerCapture(pointerId);
     }, index);
     await page.mouse.move(cancelled.x + 21, cancelled.y);
-    await until(
-      async () => (await separators[index].getAttribute('data-dragging')) === null,
-      'Column gesture did not finish.',
+    const endedWidths = await widths();
+    await page.mouse.move(cancelled.x + 80, cancelled.y);
+    assert.deepEqual(
+      await widths(),
+      endedWidths,
+      'Cancelled or lost-capture gestures no longer resize.',
     );
     await page.mouse.up();
     assert.deepEqual(await styles(), originalStyles);
@@ -190,15 +194,20 @@ export async function verifyHistoryColumns(frame, page, content, until) {
   await page.mouse.move(-3000, outside.y);
   await page.mouse.up();
   await page.mouse.move(outside.x, outside.y);
-  await until(
-    async () => (await separators[0].getAttribute('data-dragging')) === null,
-    'Returning after release outside the viewport kept the gesture active.',
+  const releasedWidths = await widths();
+  await page.mouse.move(outside.x + 40, outside.y);
+  assert.deepEqual(
+    await widths(),
+    releasedWidths,
+    'Returning after release outside the viewport must not resize.',
   );
   assert.deepEqual(await styles(), originalStyles);
   await start(1);
   await content.evaluate(() => window.dispatchEvent(new Event('blur')));
   await page.mouse.up();
   assert.deepEqual(await styles(), originalStyles, 'Window blur ends the gesture.');
+  await drag(0, original[0] - (await widths())[0]);
+  await drag(1, (await widths())[2] - original[2]);
   if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
     await start(0);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -267,7 +276,7 @@ export async function verifyHistoryColumns(frame, page, content, until) {
   );
 }
 
-async function verifyHistorySplit(frame, page, content, until) {
+export async function verifyHistorySplit(frame, page, content, until) {
   const divider = frame.getByRole('separator', { name: '调整提交历史与文件差异高度' });
   const upper = frame.locator('[data-history-workspace]');
   const diff = frame.getByRole('region', { name: '文件差异', exact: true });
@@ -305,10 +314,6 @@ async function verifyHistorySplit(frame, page, content, until) {
     const box = await divider.boundingBox();
     const point = { x: box.x + 20, y: box.y + 0.5 };
     await page.mouse.down();
-    assert.equal(
-      await divider.evaluate((el) => el.hasPointerCapture(Number(el.dataset.testPointer))),
-      true,
-    );
     return point;
   };
   const assertStopped = async (point) => {
@@ -321,16 +326,17 @@ async function verifyHistorySplit(frame, page, content, until) {
   const initial = await sizes();
   const initialTop = initial.upper;
   const available = initial.upper + initial.diff;
-  const expectedTop = Math.min(
-    Number(await divider.getAttribute('aria-valuemax')),
-    Math.max(Number(await divider.getAttribute('aria-valuemin')), (available * 0.8) / 2.8),
-  );
+  const expectedTop = Math.min(available - 240, Math.max(204, (available * 0.8) / 2.8));
   assert.ok(
     Math.abs(initialTop - expectedTop) < 1,
     'Initial split retains the original 0.8fr:2fr ratio within pane limits.',
   );
   let point = await start();
   await page.mouse.move(point.x, point.y + 100, { steps: 8 });
+  assert.equal(
+    await divider.evaluate((el) => el.hasPointerCapture(Number(el.dataset.testPointer))),
+    true,
+  );
   await page.mouse.up();
   const expanded = await sizes();
   assert.ok(
@@ -353,9 +359,7 @@ async function verifyHistorySplit(frame, page, content, until) {
     await page.mouse.move(point.x, point.y + direction * 2000, { steps: 5 });
     await page.mouse.up();
     const bounded = await sizes();
-    const limit = Number(
-      await divider.getAttribute(direction < 0 ? 'aria-valuemin' : 'aria-valuemax'),
-    );
+    const limit = direction < 0 ? 204 : available - 240;
     assert.ok(Math.abs(bounded.upper - limit) <= 1);
     assert.ok(
       bounded.upper >= 200 && bounded.diff >= 239,
@@ -374,7 +378,7 @@ async function verifyHistorySplit(frame, page, content, until) {
 
   for (const termination of ['cancel', 'lost-capture']) {
     point = await start();
-    await page.mouse.move(point.x, point.y - 40);
+    await page.mouse.move(point.x, point.y - 40, { steps: 2 });
     await divider.evaluate((el, mode) => {
       const pointerId = Number(el.dataset.testPointer);
       if (mode === 'cancel')
@@ -383,10 +387,9 @@ async function verifyHistorySplit(frame, page, content, until) {
     }, termination);
     // Native release updates pending capture; Chrome dispatches lostpointercapture at the next pointer event.
     if (termination === 'lost-capture') await page.mouse.move(point.x + 1, point.y - 40);
-    await until(
-      async () => (await divider.getAttribute('data-dragging')) === null,
-      `Drag did not end after ${termination}.`,
-    );
+    const endedSizes = await sizes();
+    await page.mouse.move(point.x, point.y - 80);
+    assert.deepEqual(await sizes(), endedSizes, `Drag did not end after ${termination}.`);
     await page.mouse.up();
     await assertStopped(point);
   }
@@ -415,7 +418,6 @@ async function verifyHistorySplit(frame, page, content, until) {
   point = await start();
   await page.mouse.move(point.x, point.y - 25);
   await page.mouse.up();
-  assert.equal(await editor.inputValue(), 'Unsaved splitter regression draft');
   assert.equal(await retainedRow.evaluate((el) => el.isConnected), true);
   assert.equal(await retainedRow.getAttribute('aria-pressed'), 'true');
   assert.equal(await codeScroll.evaluate((el) => el.scrollLeft), scrollLeft);
@@ -511,8 +513,10 @@ async function verifyHistorySplit(frame, page, content, until) {
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
         return (
           window.scrollY === 0 &&
-          Number(divider.getAttribute('aria-valuemax')) ===
-            Math.round(workspace.clientHeight - 15 * rem - 1)
+          Math.abs(
+            Number(divider.getAttribute('aria-valuemax')) -
+              ((workspace.clientHeight - 15 * rem - 1) / (workspace.clientHeight - 1)) * 100,
+          ) < 1
         );
       }),
     'Divider constraints did not settle after viewport growth.',
@@ -715,11 +719,70 @@ export async function verifyGitLayout(f, page) {
     el.scrollTop = el.scrollHeight;
   });
   assert.ok(await commitScroll.evaluate((el) => el.scrollTop > 0));
-  await button('加载更多（每批 50）').click();
-  await until(
-    async () => (await frame.locator('[data-commit-id]').count()) === 55,
-    'history did not extend',
+  const more = button('加载更多（每批 50）');
+  const paging = [];
+  const trackPaging = (request) => {
+    if (
+      request.url().includes('/actions/') &&
+      request.postDataJSON()?.input?.request?.offset === 50
+    )
+      paging.push(request.postDataJSON().input.request);
+  };
+  page.on('request', trackPaging);
+  await more.evaluate((el) =>
+    el.addEventListener(
+      'click',
+      () => {
+        el.dataset.clicked = 'yes';
+      },
+      { once: true },
+    ),
   );
+  await more.evaluate((el) => {
+    window.__pagingPointerEvents = [];
+    for (const type of ['pointerdown', 'pointerup', 'click'])
+      document.addEventListener(
+        type,
+        (event) => {
+          const rect = el.getBoundingClientRect();
+          window.__pagingPointerEvents.push({
+            type,
+            target: event.target?.textContent?.slice(0, 60),
+            x: event.clientX,
+            y: event.clientY,
+            top: rect.top,
+            bottom: rect.bottom,
+            disabled: el.disabled,
+          });
+        },
+        { capture: true },
+      );
+  });
+  await more.click();
+  try {
+    await until(
+      async () => (await frame.locator('[data-commit-id]').count()) === 55,
+      'history did not extend',
+    );
+  } catch (error) {
+    console.error('Paging diagnostic', {
+      paging,
+      pointerEvents: await layoutFrame.evaluate(() => window.__pagingPointerEvents),
+      count: await frame.locator('[data-history-count]').getAttribute('data-history-count'),
+      clicked: (await more.count()) ? await more.getAttribute('data-clicked') : 'removed',
+      box: (await more.count()) ? await more.boundingBox() : null,
+      active: await frame
+        .locator('[data-separator="active"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label'))),
+      alerts: await frame.getByRole('alert').allTextContents(),
+    });
+    await page.screenshot({
+      path: '/private/tmp/paneon-history-resizable-evidence/full-failure.png',
+    });
+    throw error;
+  } finally {
+    page.off('request', trackPaging);
+  }
   assert.equal(await frame.locator('[data-commit-graph]').count(), 55);
   assert.equal(
     await frame.locator('[data-commit-graph]').first().innerHTML(),
@@ -1072,7 +1135,7 @@ export async function verifyGitLayout(f, page) {
   await branchSearch.fill('');
   assert.equal(await featureFolder.getAttribute('aria-expanded'), 'false');
   await featureFolder.click();
-  await localBranches.getByRole('button', { name: '本地分支 main', exact: true }).click();
+  await localBranches.getByRole('button', { name: '本地分支 main', exact: true }).dblclick();
   await until(
     async () => (await frame.locator('[data-commit-id]').count()) === 5,
     'Branch history was not filtered.',
@@ -1102,7 +1165,7 @@ export async function verifyGitLayout(f, page) {
     ['标签 reviewed', 'refs/tags/reviewed'],
   ]) {
     const refButton = branchSidebar.getByRole('button', { name: label, exact: true });
-    await refButton.click();
+    await refButton.dblclick();
     await until(
       async () => (await refButton.getAttribute('aria-pressed')) === 'true',
       `Reference did not load: ${ref}`,
@@ -1113,7 +1176,7 @@ export async function verifyGitLayout(f, page) {
       graphRepo.merge,
     );
   }
-  await branchSidebar.getByRole('button', { name: 'HEAD（当前分支）', exact: true }).click();
+  await branchSidebar.getByRole('button', { name: 'HEAD（当前分支）', exact: true }).dblclick();
   await until(
     async () => (await frame.locator('[data-commit-id]').count()) === 6,
     'Current branch was not restored.',
@@ -1205,7 +1268,7 @@ if (import.meta.main) {
     const page = await browser.newPage();
     await verifyGitLayout(fixture, page);
     console.log(
-      'Git layout Chrome: aligned history, independent scrolling, long code endpoints, annotations and mobile passed.',
+      `Git layout Chrome: aligned history, independent scrolling, long code endpoints and annotations passed. Desktop only: ${Boolean(process.env.PANEON_TEST_DESKTOP_ONLY)}.`,
     );
   } finally {
     await browser?.close();

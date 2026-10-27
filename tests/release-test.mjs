@@ -67,6 +67,7 @@ const browserScripts = [
   'git-review-loading',
   'git-review-empty',
   'git-review-layout',
+  'git-history-resizable',
   'git-file-tree',
   'tree',
   'git-file-toolbar',

@@ -312,6 +312,17 @@
       "dependencies": ["cn", "class-variance-authority"],
       "registryDependencies": [],
       "adaptations": ["Use local utils import and project formatting."]
+    },
+    {
+      "name": "resizable",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/resizable.json",
+      "sha256": "7415e497f342485720b6c878c81604eda0aa8b479a2211e4355c324de89a1672",
+      "retrievedAt": "2026-10-26",
+      "dependencies": ["cn", "react-resizable-panels"],
+      "registryDependencies": [],
+      "adaptations": [
+        "Use the local utils import and project formatting; export the group imperative-handle type for panel composition."
+      ]
     }
   ],
   "theme": {

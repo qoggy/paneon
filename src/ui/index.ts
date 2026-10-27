@@ -56,3 +56,6 @@ export type { DiffLocation } from './diff-annotation';
 export { Tree } from './tree';
 export type { TreeProps, TreeHandle, TreeItemState, TreeItemPresentation } from './tree';
 export { TreeRevealError } from './tree-model';
+
+export { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './resizable';
+export type { ResizablePanelGroupHandle } from './resizable';

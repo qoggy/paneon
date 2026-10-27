@@ -39,9 +39,10 @@ import { useGitReader } from './components.tsx';
 import { CommitDetails, HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
 import { Branches } from './branches.tsx';
-import { useHistorySplit } from './history-split.ts';
-import { useHistoryColumns } from './history-columns.ts';
-import { useFileSplit } from './file-split.ts';
+import { HistoryWorkspace } from './history-workspace';
+import type { HistoryLayout } from './history-workspace';
+import { FileReviewSplit } from '../../shared/file-review-split';
+import type { FileReviewLayout } from '../../shared/file-review-split';
 import type { GitFile, GitListing, GitRequest, GitSnapshot, GitRevision } from './git.ts';
 import { gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
 import type { GitRef, GitReviewParams } from './schema.ts';
@@ -62,7 +63,7 @@ function Review() {
   const reader = useGitReader(params);
   const first = initialRequest(params);
   const [view, setView] = useState<ViewState>({ request: first });
-  const historyColumns = useHistoryColumns(view.request.type === 'history');
+  const historyLayout = useRef<HistoryLayout>({});
   const views = useRef(new Map<string, ViewState>());
   const snapshots = useRef(new Map<string, GitSnapshot>());
   const fileSnapshots = useRef(new Map<string, GitSnapshot>());
@@ -294,13 +295,8 @@ function Review() {
   }
   const selected = oldSnapshot ?? snapshots.current.get(view.selected ?? '');
   const historyDiff = view.request.type === 'history' && !!selected && !collapsed;
-  const historySplit = useHistorySplit(historyDiff);
   const fileDiff = view.request.type !== 'history' && !!selected && !collapsed;
-  const fileDivider = useFileSplit(
-    historySplit.workspaceRef,
-    fileDiff,
-    t('调整文件列表与差异宽度'),
-  );
+  const fileLayout = useRef<FileReviewLayout | undefined>(undefined);
   const listing = view.listing,
     request = view.request;
   const fileList = (
@@ -346,6 +342,197 @@ function Review() {
         />
       </div>
     </aside>
+  );
+  const historyBranches = (
+    <Branches
+      key={request.repositoryId}
+      refs={listing?.historyRefs ?? []}
+      selected={request.branch}
+      currentBranch={listing?.currentBranch}
+      onCompare={compareWithCurrentBranch}
+      onSelect={(branch) => {
+        const {
+          area: _area,
+          historyContext: _historyContext,
+          tip: _tip,
+          commit: _commit,
+          offset: _offset,
+          file: _file,
+          branch: _branch,
+          ...next
+        } = request;
+        void load({ ...next, ...(branch === 'HEAD' ? {} : { branch }) });
+      }}
+    />
+  );
+  const historyCommits = (
+    <section
+      aria-label={t('提交历史')}
+      className="flex max-h-72 min-h-0 min-w-0 flex-col md:max-h-none"
+    >
+      <div className="min-h-0 overflow-auto" data-commit-scroll="">
+        {listing?.history?.commits.length === 0 && (
+          <Empty className="flex-none px-3 py-10">
+            <EmptyHeader>
+              <EmptyDescription>{t('没有提交记录。')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+        <HistoryRows
+          key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
+          commits={listing?.history?.commits ?? []}
+          selected={request.commit ?? listing?.history?.selectedCommit?.oid}
+          onCompare={compareWithCurrentBranch}
+          onSelect={(commit) =>
+            void load({
+              ...request,
+              offset: 0,
+              file: undefined,
+              area: undefined,
+              commit: commit.oid,
+            })
+          }
+        />
+        {listing?.history?.hasMore && (
+          <Button
+            disabled={pending}
+            variant="ghost"
+            className="w-full"
+            onClick={() =>
+              void load({ ...request, offset: listing.history?.commits.length ?? 0 }, true)
+            }
+          >
+            {t('加载更多（每批 50）')}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+  const historyFiles = (
+    <div data-history-files="" className="flex min-h-0 min-w-0 flex-col gap-1">
+      {fileList}
+      <CommitDetails commit={listing?.history?.selectedCommit} />
+    </div>
+  );
+  const diffPane = selected && (
+    <section
+      aria-label={t('文件差异')}
+      className="flex h-[70dvh] min-h-0 min-w-0 flex-col overflow-hidden rounded-md border md:h-auto"
+      data-git-diff-scroll=""
+      hidden={collapsed}
+      inert={collapsed}
+      style={{ display: collapsed ? 'none' : undefined }}
+    >
+      {oldSnapshot && (
+        <div
+          role="note"
+          className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs"
+        >
+          <strong>{t('回看保留快照')}</strong>
+          <span className="min-w-0 flex-1 truncate" title={JSON.stringify(oldSnapshot.source.view)}>
+            {t('仓库')} {oldSnapshot.source.repositoryId} ·{' '}
+            {oldSnapshot.source.view.type === 'history'
+              ? t('Commit {commit}', {
+                  commit: oldSnapshot.source.view.commit.slice(0, 10),
+                })
+              : oldSnapshot.source.view.type === 'changes'
+                ? {
+                    staged: t('已暂存改动'),
+                    unstaged: t('未暂存改动'),
+                    untracked: t('未跟踪文件'),
+                  }[oldSnapshot.source.view.area]
+                : `${oldSnapshot.source.view.baseCommit.slice(0, 10)} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
+            {t('· 批注仍指向原内容')}
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setOldSnapshot(undefined)}>
+            {t('返回当前浏览')}
+          </Button>
+        </div>
+      )}
+      {selected && (
+        <>
+          {selected.notesUI.map((note) => (
+            <p key={note.key} className="text-sm text-muted-foreground">
+              {message(note.key, note.params)}
+            </p>
+          ))}
+          {selected.source.old?.type === 'binary' || selected.source.new?.type === 'binary' ? (
+            <FileDiffNotice
+              onCollapse={collapseDiff}
+              oldPath={selected.source.old?.path}
+              newPath={selected.source.new?.path}
+              oldRevision={
+                !selected.source.old
+                  ? undefined
+                  : selected.source.view.type === 'history'
+                    ? selected.source.view.parent?.slice(0, 8)
+                    : selected.source.view.type === 'compare'
+                      ? (
+                          selected.source.view.mergeBaseCommit ?? selected.source.view.baseCommit
+                        ).slice(0, 8)
+                      : selected.source.view.area === 'staged'
+                        ? selected.source.view.headCommit?.slice(0, 8)
+                        : t('暂存区')
+              }
+              newRevision={
+                !selected.source.new
+                  ? undefined
+                  : selected.source.view.type === 'history'
+                    ? selected.source.view.commit.slice(0, 8)
+                    : selected.source.view.type === 'compare'
+                      ? selected.source.view.headCommit.slice(0, 8)
+                      : selected.source.view.area === 'staged'
+                        ? t('暂存区')
+                        : t('工作区')
+              }
+            />
+          ) : (
+            <DiffView
+              key={selected.id}
+              ref={(handle) => {
+                diffView.current = handle;
+                mountedDiff.current = handle ? selected.id : undefined;
+              }}
+              annotationTargets={diffAnnotationTargets(selected.model, selected.id)}
+              model={selected.model}
+              defaultExpanded
+              layout="bounded"
+              onCollapse={collapseDiff}
+              oldPath={selected.source.old?.path}
+              newPath={selected.source.new?.path}
+              oldRevision={
+                !selected.source.old
+                  ? undefined
+                  : selected.source.view.type === 'history'
+                    ? selected.source.view.parent?.slice(0, 8)
+                    : selected.source.view.type === 'compare'
+                      ? (
+                          selected.source.view.mergeBaseCommit ?? selected.source.view.baseCommit
+                        ).slice(0, 8)
+                      : selected.source.view.area === 'staged'
+                        ? selected.source.view.headCommit?.slice(0, 8)
+                        : t('暂存区')
+              }
+              newRevision={
+                !selected.source.new
+                  ? undefined
+                  : selected.source.view.type === 'history'
+                    ? selected.source.view.commit.slice(0, 8)
+                    : selected.source.view.type === 'compare'
+                      ? selected.source.view.headCommit.slice(0, 8)
+                      : selected.source.view.area === 'staged'
+                        ? t('暂存区')
+                        : t('工作区')
+              }
+            />
+          )}
+        </>
+      )}
+
+      {!selected && !pending && (
+        <p className="text-sm text-muted-foreground">{t('选择文件查看差异。')}</p>
+      )}
+    </section>
   );
   usePageAnnotations<GitRef>({
     disabled: submission.pending,
@@ -562,255 +749,27 @@ function Review() {
                 </div>
               )}
               <div
-                ref={historySplit.workspaceRef}
-                style={historySplit.workspaceStyle}
                 data-git-workspace=""
-                className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(27.75rem+1px)] md:grid-rows-[var(--history-rows)] md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-[var(--file-columns,13rem_1px_minmax(0,1fr))] md:gap-x-0' : 'md:grid-cols-1'}`}
+                className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(27.75rem+1px)] md:grid-rows-1 md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-1 md:gap-x-0' : 'md:grid-cols-1'}`}
               >
                 {request.type === 'history' ? (
-                  <div
-                    data-history-workspace=""
-                    ref={historyColumns.workspaceRef}
-                    style={historyColumns.workspaceStyle}
-                    className="grid min-h-0 gap-3 md:grid-cols-[var(--history-columns)] md:gap-y-0"
-                  >
-                    <Branches
-                      key={request.repositoryId}
-                      refs={listing?.historyRefs ?? []}
-                      selected={request.branch}
-                      currentBranch={listing?.currentBranch}
-                      onCompare={compareWithCurrentBranch}
-                      onSelect={(branch) => {
-                        const {
-                          area: _area,
-                          historyContext: _historyContext,
-                          tip: _tip,
-                          commit: _commit,
-                          offset: _offset,
-                          file: _file,
-                          branch: _branch,
-                          ...next
-                        } = request;
-                        void load({ ...next, ...(branch === 'HEAD' ? {} : { branch }) });
-                      }}
-                    />
-                    <div
-                      {...historyColumns.dividerProps[0]}
-                      className="relative hidden bg-border outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground md:block"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize touch-none hover:bg-muted-foreground/15"
-                      />
-                    </div>
-                    <section
-                      aria-label={t('提交历史')}
-                      className="flex max-h-72 min-h-0 min-w-0 flex-col md:max-h-none"
-                    >
-                      <div className="min-h-0 overflow-auto" data-commit-scroll="">
-                        {listing?.history?.commits.length === 0 && (
-                          <p className="p-3 text-sm">{t('没有提交记录。')}</p>
-                        )}
-                        <HistoryRows
-                          key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
-                          commits={listing?.history?.commits ?? []}
-                          selected={request.commit ?? listing?.history?.selectedCommit?.oid}
-                          onCompare={compareWithCurrentBranch}
-                          onSelect={(commit) =>
-                            void load({
-                              ...request,
-                              offset: 0,
-                              file: undefined,
-                              area: undefined,
-                              commit: commit.oid,
-                            })
-                          }
-                        />
-                        {listing?.history?.hasMore && (
-                          <Button
-                            disabled={pending}
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() =>
-                              void load(
-                                { ...request, offset: listing.history?.commits.length ?? 0 },
-                                true,
-                              )
-                            }
-                          >
-                            {t('加载更多（每批 50）')}
-                          </Button>
-                        )}
-                      </div>
-                    </section>
-                    <div
-                      {...historyColumns.dividerProps[1]}
-                      className="relative hidden bg-border outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground md:block"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize touch-none hover:bg-muted-foreground/15"
-                      />
-                    </div>
-                    <div data-history-files="" className="flex min-h-0 min-w-0 flex-col gap-1">
-                      {fileList}
-                      <CommitDetails commit={listing?.history?.selectedCommit} />
-                    </div>
-                  </div>
+                  <HistoryWorkspace
+                    branches={historyBranches}
+                    commits={historyCommits}
+                    files={historyFiles}
+                    diff={diffPane}
+                    showDiff={historyDiff}
+                    layoutRef={historyLayout}
+                  />
                 ) : (
-                  fileList
-                )}
-                {fileDiff && (
-                  <div
-                    {...fileDivider}
-                    className="relative hidden bg-border outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground md:block"
+                  <FileReviewSplit
+                    sidebar={fileList}
+                    showContent={fileDiff}
+                    layoutRef={fileLayout}
+                    separatorLabel={t('调整文件列表与差异宽度')}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize touch-none hover:bg-muted-foreground/15"
-                    />
-                  </div>
-                )}
-                {historyDiff && (
-                  <div
-                    {...historySplit.dividerProps}
-                    className="relative hidden bg-border outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground md:block"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-0 -top-1.5 z-10 h-3 cursor-row-resize touch-none hover:bg-muted-foreground/15"
-                    />
-                  </div>
-                )}
-                {selected && (
-                  <section
-                    aria-label={t('文件差异')}
-                    className="flex h-[70dvh] min-h-0 min-w-0 flex-col overflow-hidden rounded-md border md:h-auto"
-                    data-git-diff-scroll=""
-                    hidden={collapsed}
-                    inert={collapsed}
-                    style={{ display: collapsed ? 'none' : undefined }}
-                  >
-                    {oldSnapshot && (
-                      <div
-                        role="note"
-                        className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs"
-                      >
-                        <strong>{t('回看保留快照')}</strong>
-                        <span
-                          className="min-w-0 flex-1 truncate"
-                          title={JSON.stringify(oldSnapshot.source.view)}
-                        >
-                          {t('仓库')} {oldSnapshot.source.repositoryId} ·{' '}
-                          {oldSnapshot.source.view.type === 'history'
-                            ? t('Commit {commit}', {
-                                commit: oldSnapshot.source.view.commit.slice(0, 10),
-                              })
-                            : oldSnapshot.source.view.type === 'changes'
-                              ? {
-                                  staged: t('已暂存改动'),
-                                  unstaged: t('未暂存改动'),
-                                  untracked: t('未跟踪文件'),
-                                }[oldSnapshot.source.view.area]
-                              : `${oldSnapshot.source.view.baseCommit.slice(0, 10)} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
-                          {t('· 批注仍指向原内容')}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setOldSnapshot(undefined)}
-                        >
-                          {t('返回当前浏览')}
-                        </Button>
-                      </div>
-                    )}
-                    {selected && (
-                      <>
-                        {selected.notesUI.map((note) => (
-                          <p key={note.key} className="text-sm text-muted-foreground">
-                            {message(note.key, note.params)}
-                          </p>
-                        ))}
-                        {selected.source.old?.type === 'binary' ||
-                        selected.source.new?.type === 'binary' ? (
-                          <FileDiffNotice
-                            onCollapse={collapseDiff}
-                            oldPath={selected.source.old?.path}
-                            newPath={selected.source.new?.path}
-                            oldRevision={
-                              !selected.source.old
-                                ? undefined
-                                : selected.source.view.type === 'history'
-                                  ? selected.source.view.parent?.slice(0, 8)
-                                  : selected.source.view.type === 'compare'
-                                    ? (
-                                        selected.source.view.mergeBaseCommit ??
-                                        selected.source.view.baseCommit
-                                      ).slice(0, 8)
-                                    : selected.source.view.area === 'staged'
-                                      ? selected.source.view.headCommit?.slice(0, 8)
-                                      : t('暂存区')
-                            }
-                            newRevision={
-                              !selected.source.new
-                                ? undefined
-                                : selected.source.view.type === 'history'
-                                  ? selected.source.view.commit.slice(0, 8)
-                                  : selected.source.view.type === 'compare'
-                                    ? selected.source.view.headCommit.slice(0, 8)
-                                    : selected.source.view.area === 'staged'
-                                      ? t('暂存区')
-                                      : t('工作区')
-                            }
-                          />
-                        ) : (
-                          <DiffView
-                            key={selected.id}
-                            ref={(handle) => {
-                              diffView.current = handle;
-                              mountedDiff.current = handle ? selected.id : undefined;
-                            }}
-                            annotationTargets={diffAnnotationTargets(selected.model, selected.id)}
-                            model={selected.model}
-                            defaultExpanded
-                            layout="bounded"
-                            onCollapse={collapseDiff}
-                            oldPath={selected.source.old?.path}
-                            newPath={selected.source.new?.path}
-                            oldRevision={
-                              !selected.source.old
-                                ? undefined
-                                : selected.source.view.type === 'history'
-                                  ? selected.source.view.parent?.slice(0, 8)
-                                  : selected.source.view.type === 'compare'
-                                    ? (
-                                        selected.source.view.mergeBaseCommit ??
-                                        selected.source.view.baseCommit
-                                      ).slice(0, 8)
-                                    : selected.source.view.area === 'staged'
-                                      ? selected.source.view.headCommit?.slice(0, 8)
-                                      : t('暂存区')
-                            }
-                            newRevision={
-                              !selected.source.new
-                                ? undefined
-                                : selected.source.view.type === 'history'
-                                  ? selected.source.view.commit.slice(0, 8)
-                                  : selected.source.view.type === 'compare'
-                                    ? selected.source.view.headCommit.slice(0, 8)
-                                    : selected.source.view.area === 'staged'
-                                      ? t('暂存区')
-                                      : t('工作区')
-                            }
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {!selected && !pending && (
-                      <p className="text-sm text-muted-foreground">{t('选择文件查看差异。')}</p>
-                    )}
-                  </section>
+                    {diffPane}
+                  </FileReviewSplit>
                 )}
               </div>
               {submission.message && (

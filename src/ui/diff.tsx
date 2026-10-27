@@ -19,7 +19,7 @@ import type { DiffModel } from '../shared/diff-model';
 import { diffPresentation } from './diff-presentation';
 import type { DiffCell } from './diff-presentation';
 import { DiffToolbar } from './diff-toolbar';
-import { useDiffSplit } from './diff-split';
+import { DiffColumns } from './diff-columns';
 import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
 import type { DiffLocation } from './diff-annotation';
 export type DiffViewHandle = {
@@ -130,15 +130,7 @@ function StringDiffView<TRef>({
   const columns = sideBySide ? 'var(--diff-columns, 50% 50%)' : 'minmax(0,1fr)';
   const setUnified = (value: boolean) => setView((current) => ({ ...current, unified: value }));
   const setExpanded = (value: boolean) => setView((current) => ({ ...current, expanded: value }));
-  const splitLayout = useDiffSplit(sideBySide, t('调整差异两侧宽度'));
-  const attachSplitRoot = splitLayout.attachRoot;
-  const attachRoot = useCallback(
-    (element: HTMLDivElement | null) => {
-      root.current = element;
-      attachSplitRoot(element);
-    },
-    [attachSplitRoot],
-  );
+  const columnLayout = useRef<Record<string, number> | undefined>(undefined);
   const initialLocation = useRef<DiffModel | null>(null);
   const pendingReveal = useRef<{ location: DiffLocation; resolve: () => void } | null>(null);
   const cancelHighlight = useRef<(() => void) | undefined>(undefined);
@@ -386,7 +378,7 @@ function StringDiffView<TRef>({
   };
   return (
     <div
-      ref={attachRoot}
+      ref={root}
       data-diff-source={sourceId}
       className={
         layout === 'bounded' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'min-w-0'
@@ -489,11 +481,11 @@ function StringDiffView<TRef>({
           data-annotation-clip-top={headerId}
         >
           {sideBySide && (
-            <div
-              {...splitLayout.separatorProps}
-              data-diff-divider=""
-              className="absolute inset-y-0 z-[5] w-2 -translate-x-1/2 cursor-col-resize touch-none outline-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-border hover:bg-muted-foreground/10 focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-muted-foreground/15"
-              style={{ left: 'var(--diff-left, 50%)' }}
+            <DiffColumns
+              idPrefix={sourceId}
+              source={root}
+              layoutRef={columnLayout}
+              label={t('调整差异两侧宽度')}
             />
           )}
           {expanded ? (

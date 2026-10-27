@@ -79,3 +79,23 @@ await tree.current!.revealItem(id, { signal: controller.signal });
 ```
 
 `revealItem` requests ancestor expansion, waits for controlled state to be returned and resolves after the mounted row can be scrolled with non-smooth nearest positioning. It does not select, focus, open or clear search. It waits without an implicit timeout if the parent does not accept; the required signal owns cancellation. Missing or filtered targets reject with `TreeRevealError.code` (`TREE_ITEM_NOT_FOUND` / `TREE_ITEM_FILTERED`). Cancellation, unmount, a new reveal or an intervening expansion command rejects the old call with `AbortError` and releases its listeners and queued scroll. Repeated calls to the same ID reveal again.
+
+### Resizable
+
+`ResizablePanelGroup`, `ResizablePanel` and `ResizableHandle` follow [shadcn Resizable](https://ui.shadcn.com/docs/components/base/resizable), backed by `react-resizable-panels` v4. Use `orientation="horizontal"` or `"vertical"`; sizes accept explicit strings such as `"20%"`, `"9rem"` and `"320px"`. Numeric sizes mean pixels. A handle is a narrow separator by default; `withHandle` adds a visible grip. The library owns pointer resizing, size constraints and separator accessibility. `groupRef` accepts the exported `ResizablePanelGroupHandle` for imperative layout operations.
+
+```tsx
+<ResizablePanelGroup orientation="horizontal">
+  <ResizablePanel defaultSize="20%" minSize="9rem">
+    {fileTree}
+  </ResizablePanel>
+  <ResizableHandle aria-label="Resize file list and diff" />
+  <ResizablePanel minSize="20rem">{diffView}</ResizablePanel>
+</ResizablePanelGroup>
+```
+
+The built-in Git Review and Diff Review panels compose these primitives through `assets/shared/file-review-split.tsx`. That panel layer retains the 1px line, 12px mouse target, existing pixel keyboard steps, Escape cancellation and session-local layout memory; it does not put Git or diff data into the public primitives.
+
+Git Review's history layout uses nested horizontal/vertical groups in `assets/panels/git-review/history-workspace.tsx`. It retains adaptive defaults, minimum widths/heights and session proportions; the opposite outer column is disabled only during a column gesture so reaching the commit-list minimum does not resize that other column.
+
+DiffView's internal old/new divider uses the same Resizable primitives through `diff-columns.tsx`. One sizing track drives the path headers and all hunk tables, retaining aligned rows, independent horizontal scrolling and the original text DOM. The ratio survives unified/side-by-side switching; whole-file additions and deletions remain full-width without a divider. Internal separator ARIA values use the library's percentage units.

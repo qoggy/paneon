@@ -19,7 +19,7 @@ void test('public UI owns rich renderers without depending on installed skill as
     'validSourceRange',
     'MarkdownAnnotation',
     'DiffToolbar',
-    'useDiffSplit',
+    'DiffColumns',
   ])
     assert.equal(names.includes(name), false, name + ' stays private');
   assert.equal(

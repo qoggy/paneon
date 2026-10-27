@@ -99,6 +99,16 @@ try {
   await frame.getByRole('alert').waitFor();
   assert.equal(await empty.count(), 0, 'A failed comparison is not an empty result');
   assert.equal(await toolbar.count(), 0);
+  const unborn = await fixture.run({
+    repositories: [{ id: 'empty', path: './empty' }],
+    initialView: { repositoryId: 'empty', type: 'history' },
+  });
+  await page.goto(fixture.url(unborn));
+  await frame
+    .getByRole('region', { name: '提交历史', exact: true })
+    .locator('[data-slot="empty"]')
+    .getByText('没有提交记录。', { exact: true })
+    .waitFor();
   await git(fixture.empty, 'commit', '--allow-empty', '-qm', 'Empty commit');
   const params = {
     title: 'Git review empty states',
@@ -125,6 +135,7 @@ try {
         'differences',
         'error',
         'clean',
+        'no commits',
         'empty commit',
       ],
       initialVariants: 3,
