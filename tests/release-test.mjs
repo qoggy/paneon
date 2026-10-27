@@ -146,7 +146,8 @@ const commands = [
     command: process.execPath,
     args: [
       '--test',
-      '--test-concurrency=1',
+      // Keep in sync with the npm test script; test files isolate HOME, ports and temp roots.
+      '--test-concurrency=6',
       ...(options.has('--coverage')
         ? [
             '--experimental-test-coverage',

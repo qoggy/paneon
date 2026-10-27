@@ -71,18 +71,37 @@ void test(
       first++;
       return Promise.resolve();
     });
+    const deadline = Date.now() + 10000;
+    let writes = 0;
+    // Native registration is asynchronous. Verify that subscriptions stay live,
+    // without requiring the first write after subscribe() to be delivered.
+    async function writeUntilNotified(check: () => boolean, message: string) {
+      while (Date.now() < deadline) {
+        writeFileSync(file, `update-${writes++}`);
+        const nextWrite = Math.min(Date.now() + 250, deadline);
+        while (!check() && Date.now() < nextWrite) await delay(20);
+        if (check()) return;
+      }
+      assert.fail(message);
+    }
     try {
       await parent.close();
-      writeFileSync(file, 'two');
-      await until(() => first === 1);
+      const beforeFirst = first;
+      await writeUntilNotified(
+        () => first > beforeFirst,
+        'Closing the ancestor subscription stopped notifications for its child',
+      );
       await child.close();
       const next = await watcher.subscribe({ files: {}, paths: { [file]: 'file' } }, () => {
         later++;
         return Promise.resolve();
       });
       try {
-        writeFileSync(file, 'three');
-        await until(() => later === 1);
+        const beforeLater = later;
+        await writeUntilNotified(
+          () => later > beforeLater,
+          'A new subscription could not receive notifications from the retired subtree',
+        );
       } finally {
         await next.close();
       }

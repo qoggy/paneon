@@ -20,7 +20,8 @@ for (const [name, entry] of Object.entries(entries)) {
     const result = spawnSync(process.execPath, [fileURLToPath(entry), ...args], {
       cwd: tmpdir(),
       encoding: 'utf8',
-      timeout: 5_000,
+      // Hang guard only: source-mode startup can exceed 5s while other test files load the CPU.
+      timeout: 30_000,
     });
 
     assert.ifError(result.error);

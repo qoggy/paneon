@@ -32,7 +32,7 @@
     "build:cli": "tsc -p tsconfig.cli.json && node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
     "build:web": "vite build",
     "prepack": "npm run build",
-    "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=1 tests/*.test.ts",
+    "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=6 tests/*.test.ts",
     "test:release": "node tests/release-test.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.examples.json",
     "lint": "eslint .",
