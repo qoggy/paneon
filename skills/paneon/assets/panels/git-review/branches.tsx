@@ -46,10 +46,10 @@ function RefIcon({
       stroke="currentColor"
       strokeWidth="1.3"
       className={`size-3.5 shrink-0 ${mainline || current ? 'text-amber-500 dark:text-amber-400' : 'text-muted-foreground'}`}
-      data-ref-icon={mainline ? 'mainline' : current ? 'current' : tag ? 'tag' : 'branch'}
+      data-ref-icon={current ? 'current' : mainline ? 'mainline' : tag ? 'tag' : 'branch'}
       aria-hidden="true"
     >
-      {mainline ? (
+      {mainline && !current ? (
         <path d="m8 1.5 2 4.2 4.6.6-3.3 3.2.8 4.5L8 11.8l-4.1 2.2.8-4.5L1.4 6.3l4.6-.6Z" />
       ) : tag || current ? (
         <path d="m2 8 6-6h6v6l-6 6-6-6ZM11 5h.01" />
@@ -70,15 +70,19 @@ export function Branches({
   selected,
   currentBranch,
   onSelect,
+  onOpen,
   onCompare,
 }: {
   refs: HistoryRef[];
   selected?: string;
   currentBranch?: string;
   onSelect: (ref: string) => void;
+  onOpen?: (ref: string) => void;
   onCompare?: (ref: string) => void;
 }) {
   const { t } = useLocale();
+  const headLabel =
+    refs.length > 0 && !currentBranch ? t('HEAD (detached)') : t('HEAD（当前分支）');
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const needle = filter.trim().toLocaleLowerCase();
@@ -115,6 +119,14 @@ export function Branches({
                 className="h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-xs font-normal"
                 style={{ paddingLeft: 8 + depth * 12 }}
                 onClick={() => onSelect(entry.ref)}
+                onContextMenu={() => onSelect(entry.ref)}
+                onDoubleClick={() => onOpen?.(entry.ref)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || !onOpen) return;
+                  event.preventDefault();
+                  onSelect(entry.ref);
+                  onOpen(entry.ref);
+                }}
               >
                 <RefIcon tag={kind === 'tag'} mainline={entry.mainline} current={current} />
                 <span className="min-w-0 truncate">{node.name}</span>
@@ -175,11 +187,19 @@ export function Branches({
           <Button
             variant={!selected || selected === 'HEAD' ? 'secondary' : 'ghost'}
             aria-pressed={!selected || selected === 'HEAD'}
-            aria-label={t('HEAD（当前分支）')}
+            aria-label={headLabel}
             className="h-7 w-full justify-start px-2 text-xs font-normal"
             onClick={() => onSelect('HEAD')}
+            onContextMenu={() => onSelect('HEAD')}
+            onDoubleClick={() => onOpen?.('HEAD')}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || !onOpen) return;
+              event.preventDefault();
+              onSelect('HEAD');
+              onOpen('HEAD');
+            }}
           >
-            {t('HEAD（当前分支）')}
+            {headLabel}
           </Button>
         </RevisionContextMenu>
         {(['branch', 'remote', 'tag'] as const).map((kind) => {

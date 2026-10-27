@@ -106,7 +106,7 @@ try {
     ['远程分支 origin/main', graph.merge],
     ['标签 releases/v1', graph.tip],
   ]) {
-    await button(label).click();
+    await button(label).dblclick();
     await frame
       .locator(`[data-commit-id=${JSON.stringify(selectedTip)}][aria-pressed=true]`)
       .waitFor();
@@ -116,7 +116,7 @@ try {
       'Browsing references never checks out a branch',
     );
   }
-  await button('HEAD（当前分支）').click();
+  await button('HEAD（当前分支）').dblclick();
   await frame.locator(`[data-commit-id=${JSON.stringify(many)}][aria-pressed=true]`).waitFor();
   await page.screenshot({ path: join(artifacts, 'branches.png'), fullPage: true });
   // A one-file commit still reserves a small reading area above the message.

@@ -635,6 +635,7 @@ const en = {
   全部折叠: 'Collapse all',
   主干分支: 'Mainline branch',
   当前分支: 'Current branch',
+  'HEAD (detached)': 'HEAD (detached)',
   'Reading file…': 'Reading file…',
   'Could not read file.': 'Could not read file.',
   'The file has no content.': 'The file has no content.',

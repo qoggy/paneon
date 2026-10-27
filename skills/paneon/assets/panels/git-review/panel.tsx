@@ -63,6 +63,7 @@ function Review() {
   const reader = useGitReader(params);
   const first = initialRequest(params);
   const [view, setView] = useState<ViewState>({ request: first });
+  const [historySelections, setHistorySelections] = useState<Record<string, string>>({});
   const historyLayout = useRef<HistoryLayout>({});
   const views = useRef(new Map<string, ViewState>());
   const snapshots = useRef(new Map<string, GitSnapshot>());
@@ -347,10 +348,20 @@ function Review() {
     <Branches
       key={request.repositoryId}
       refs={listing?.historyRefs ?? []}
-      selected={request.branch}
+      selected={historySelections[request.repositoryId] ?? request.branch}
       currentBranch={listing?.currentBranch}
       onCompare={compareWithCurrentBranch}
       onSelect={(branch) => {
+        setHistorySelections((previous) => ({
+          ...previous,
+          [request.repositoryId]: branch,
+        }));
+      }}
+      onOpen={(branch) => {
+        setHistorySelections((previous) => ({
+          ...previous,
+          [request.repositoryId]: branch,
+        }));
         const {
           area: _area,
           historyContext: _historyContext,

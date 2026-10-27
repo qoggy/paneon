@@ -616,6 +616,7 @@ const zh: Record<keyof typeof en, string> = {
   全部折叠: '全部折叠',
   主干分支: '主干分支',
   当前分支: '当前分支',
+  'HEAD (detached)': 'HEAD（游离状态）',
   'Save at least one annotation before submitting.': '请先保存至少一条批注后再提交。',
   'Reading file…': '正在读取文件…',
   'Could not read file.': '读取文件失败。',

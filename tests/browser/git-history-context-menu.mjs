@@ -26,29 +26,36 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
   const comparisons = [];
+  const historyRequests = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => {
     if (!request.url().includes('/actions/')) return;
     const input = request.postDataJSON()?.input?.request;
     if (input?.type === 'compare') comparisons.push(input);
+    if (input?.type === 'history') historyRequests.push(input);
   });
   await page.goto(fixture.url(panel));
   const frame = page.frameLocator('iframe');
   const tab = (name) => frame.getByRole('tab', { name, exact: true, includeHidden: true });
-  const button = (name) => frame.getByRole('button', { name, exact: true });
+  const button = (name) => frame.getByRole('button', { name, exact: true, includeHidden: true });
   const item = () => frame.getByRole('menuitem', { name: '与当前分支比较', exact: true });
   const row = (oid) => frame.locator(`[data-commit-id="${oid}"]`);
   const selected = () => frame.locator('[data-commit-id][aria-pressed=true]');
   await row(graph.tip).waitFor();
   const before = await selected().getAttribute('data-commit-id');
+  const beforeHistoryRequests = historyRequests.length;
   await button('本地分支 main').click({ button: 'right' });
   await item().waitFor();
+  assert.equal(await button('本地分支 main').getAttribute('aria-pressed'), 'true');
+  assert.equal(await button('本地分支 main').getAttribute('data-variant'), 'secondary');
+  assert.equal(historyRequests.length, beforeHistoryRequests, 'Right-click only selects the row.');
   assert.equal(await selected().getAttribute('data-commit-id'), before);
   assert.equal(await tab('提交记录').getAttribute('aria-selected'), 'true');
   assert.equal(comparisons.length, 0, 'Opening the menu does not perform a comparison.');
   await page.screenshot({ path: `${artifacts}/branch-menu.png` });
   await page.keyboard.press('Escape');
   await item().waitFor({ state: 'hidden' });
+  assert.equal(await button('本地分支 main').getAttribute('aria-pressed'), 'true');
   assert.equal(await selected().getAttribute('data-commit-id'), before);
   assert.equal(comparisons.length, 0);
 
@@ -61,6 +68,10 @@ try {
     const selection = await selected().getAttribute('data-commit-id');
     await target.click({ button: 'right' });
     await item().waitFor();
+    if (await target.getAttribute('data-history-ref')) {
+      assert.equal(await target.getAttribute('aria-pressed'), 'true');
+      assert.equal(await target.getAttribute('data-variant'), 'secondary');
+    }
     assert.equal(await frame.getByRole('menu').count(), 1, 'Nested ref menus open only once.');
     assert.equal(await selected().getAttribute('data-commit-id'), selection);
     if (keyboard) {
@@ -110,11 +121,11 @@ try {
   await page.screenshot({ path: `${artifacts}/comparison.png` });
 
   await history();
-  await button('本地分支 feature/cache').click();
+  await button('本地分支 feature/cache').dblclick();
   await frame.locator('[data-file-scroll][aria-busy=false]').waitFor();
   await compare(button('远程分支 origin/main'), 'refs/remotes/origin/main', { keyboard: true });
   await history();
-  await button('HEAD（当前分支）').click();
+  await button('HEAD（当前分支）').dblclick();
   await row(graph.tip).waitFor();
   await frame.locator('[data-file-scroll][aria-busy=false]').waitFor();
   await compare(button('标签 reviewed'), 'refs/tags/reviewed');
