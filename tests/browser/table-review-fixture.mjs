@@ -72,11 +72,15 @@ export async function startTableReviewFixture() {
       );
     }
     const table = await run('table', tableInput);
+    const markdownFilePath = join(root, '审阅 方案.md');
+    await writeFile(markdownFilePath, markdown);
     return {
       root,
       service,
       table,
-      runReview: () => run('review', { title: 'Markdown review acceptance', markdown }),
+      markdownFilePath,
+      runReview: (path = '审阅 方案.md') =>
+        run('review', { title: 'Markdown review acceptance', markdownFilePath: path }),
       cli,
       url: (panel) => `http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`,
       async events(panel) {

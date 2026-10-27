@@ -1,7 +1,7 @@
 import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { markdown, startTableReviewFixture } from './table-review-fixture.mjs';
@@ -350,6 +350,7 @@ try {
     await comments.write('fenced code');
     await comments.save();
     assert.equal(await frame.getByRole('button', { name: '选择对象', exact: true }).count(), 0);
+    await writeFile(fixture.markdownFilePath, '# Changed after reading\n');
     await submitAnnotations(frame);
     await waitForSubmitted();
     const result = (await fixture.events(review))[0];
@@ -364,6 +365,7 @@ try {
     });
     assert.equal(inline.targets[0].text.quote, 'a  b');
     assert.equal(fenced.targets[0].text.quote, 'const x = 1;\n');
+    await unlink(fixture.markdownFilePath);
     for (const entry of result.payload.annotations)
       for (const target of entry.targets)
         if (target.text)
@@ -406,6 +408,31 @@ try {
       annotations: [],
       replacesEventId: result.id,
     });
+
+    await writeFile(fixture.markdownFilePath, markdown);
+    const absoluteReview = await fixture.runReview(fixture.markdownFilePath);
+    await page.goto(fixture.url(absoluteReview));
+    await frame.locator('pre code [data-source-leaf]').waitFor();
+    assert.equal(await frame.getByRole('alert').count(), 0);
+    await writeFile(fixture.markdownFilePath, '');
+    const emptyReview = await fixture.runReview(fixture.markdownFilePath);
+    await page.goto(fixture.url(emptyReview));
+    await frame
+      .locator('main [data-slot="empty"]')
+      .getByText('文件没有内容。', { exact: true })
+      .waitFor();
+    assert.equal(await frame.locator('[data-markdown-annotation]').count(), 0);
+    assert.equal(await frame.getByRole('alert').count(), 0);
+    assert.equal(await frame.locator('[data-source-leaf]').count(), 0);
+    await unlink(fixture.markdownFilePath);
+    const missingReview = await fixture.runReview(fixture.markdownFilePath);
+    await page.goto(fixture.url(missingReview));
+    await frame.getByRole('alert').filter({ hasText: '读取文件失败。' }).waitFor();
+    assert.equal(await frame.locator('[data-markdown-annotation]').count(), 0);
+    assert.equal((await fixture.events(missingReview)).length, 0);
+    console.log(
+      'Review file input: relative/absolute Unicode paths, empty/missing files, snapshot submission after file changes, locate and clearing after deletion passed.',
+    );
   }
   if (process.env.PANEON_TEST_ARTIFACTS) {
     await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });

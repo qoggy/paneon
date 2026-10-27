@@ -617,5 +617,8 @@ const zh: Record<keyof typeof en, string> = {
   主干分支: '主干分支',
   当前分支: '当前分支',
   'Save at least one annotation before submitting.': '请先保存至少一条批注后再提交。',
+  'Reading file…': '正在读取文件…',
+  'Could not read file.': '读取文件失败。',
+  'The file has no content.': '文件没有内容。',
 };
 export default zh;

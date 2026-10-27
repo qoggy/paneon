@@ -38,6 +38,7 @@ const browserScripts = [
   'annotation-editor',
   'annotation-popover',
   'annotation-drag',
+  'annotation-submission-toast',
   'promoted-ui',
   'ui',
   'imported-tailwind',
