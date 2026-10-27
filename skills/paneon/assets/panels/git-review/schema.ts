@@ -59,6 +59,35 @@ export const gitReviewParamsSchema = z
   });
 export type GitReviewParams = z.infer<typeof gitReviewParamsSchema>;
 const oid = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
+export const gitCheckoutTargetSchema = z
+  .object({ kind: z.enum(['branch', 'remote', 'tag']), ref: nonempty, commit: oid })
+  .strict()
+  .refine(
+    ({ kind, ref }) =>
+      ref.startsWith({ branch: 'refs/heads/', remote: 'refs/remotes/', tag: 'refs/tags/' }[kind]) &&
+      !/[\0\r\n]/.test(ref),
+    'Checkout requires a full reference matching its kind.',
+  );
+export const gitHeadStateSchema = z.object({ branch: nonempty.nullable(), commit: oid }).strict();
+export const gitCheckoutInputSchema = z
+  .object({
+    params: gitReviewParamsSchema,
+    repositoryId: nonempty,
+    target: gitCheckoutTargetSchema,
+    expectedHead: gitHeadStateSchema,
+  })
+  .strict();
+export const gitCheckoutCompletedSchema = z
+  .object({
+    operationId: z.string().uuid(),
+    repositoryId: nonempty,
+    repositoryPath: nonempty,
+    target: gitCheckoutTargetSchema,
+    before: gitHeadStateSchema,
+    after: gitHeadStateSchema,
+  })
+  .strict();
+export type GitCheckoutInput = z.infer<typeof gitCheckoutInputSchema>;
 export const gitSourceViewSchema = z.discriminatedUnion('type', [
   z
     .object({

@@ -616,7 +616,29 @@ const zh: Record<keyof typeof en, string> = {
   全部折叠: '全部折叠',
   主干分支: '主干分支',
   当前分支: '当前分支',
+  Checkout: 'Checkout',
+  'Checking out…': '正在切换…',
   'HEAD (detached)': 'HEAD（游离状态）',
+  'Checkout cancelled. Refresh the history and try again.': '已取消切换，请刷新提交记录后重试。',
+  'Checkout cancelled. Commit, stash or remove local changes and untracked files first.':
+    '已取消切换，请先处理本地改动和未跟踪文件。',
+  'Checkout cancelled. Finish the Git operation or release the repository lock first.':
+    '已取消切换，仓库中有进行中的 Git 操作或锁。',
+  'Checkout cancelled. HEAD or the target reference changed. Refresh the history first.':
+    '已取消切换，HEAD 或目标引用已变化，请先刷新提交记录。',
+  'Checkout cancelled. This branch is already checked out.': '已取消切换，该分支已是当前分支。',
+  'Checkout cancelled. A local branch with this name already exists.':
+    '已取消切换，已存在同名本地分支。',
+  'Checkout cancelled. Select a concrete remote branch.': '已取消切换，请选择具体的远程分支。',
+  'Checkout cancelled. The remote branch does not match a unique configured remote.':
+    '已取消切换，无法确定该分支所属的远程仓库。',
+  'Checkout could not be verified. Refresh and check the repository state.':
+    '无法确认切换结果，请刷新并检查仓库状态。',
+  'Checkout could not be confirmed. Check the Git error and refresh the repository.':
+    '无法确认切换完成，请查看 Git 错误并刷新仓库状态。',
+  'Checked out {name}.': '已切换到 {name}。',
+  'Checked out {name} (detached HEAD).': '已检出 {name}，当前为游离 HEAD。',
+  'Checkout succeeded, but the agent notification failed.': '切换已成功，但通知 agent 失败。',
   'Save at least one annotation before submitting.': '请先保存至少一条批注后再提交。',
   'Reading file…': '正在读取文件…',
   'Could not read file.': '读取文件失败。',

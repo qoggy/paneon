@@ -72,6 +72,7 @@ export function Branches({
   onSelect,
   onOpen,
   onCompare,
+  onCheckout,
 }: {
   refs: HistoryRef[];
   selected?: string;
@@ -79,6 +80,7 @@ export function Branches({
   onSelect: (ref: string) => void;
   onOpen?: (ref: string) => void;
   onCompare?: (ref: string) => void;
+  onCheckout?: (entry: HistoryRef) => void;
 }) {
   const { t } = useLocale();
   const headLabel =
@@ -102,7 +104,12 @@ export function Branches({
           const active = selected === entry.ref || selected === entry.name;
           const current = currentNode(node);
           return (
-            <RevisionContextMenu key={entry.ref} revision={entry.ref} onCompare={onCompare}>
+            <RevisionContextMenu
+              key={entry.ref}
+              revision={entry.ref}
+              onCompare={onCompare}
+              onCheckout={!current && onCheckout ? () => onCheckout(entry) : undefined}
+            >
               <Button
                 variant={active ? 'secondary' : 'ghost'}
                 aria-label={`${{ branch: t('本地分支'), remote: t('远程分支'), tag: t('标签') }[kind]} ${entry.name}`}

@@ -62,6 +62,7 @@ const browserScripts = [
   'markdown-frontmatter',
   'diff-toolbar',
   'git-review',
+  'git-review-checkout',
   'git-review-chrome',
   'git-review-navigation',
   'git-review-loading',

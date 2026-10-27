@@ -1,12 +1,19 @@
 import { serverAction, z } from '@qoggy/paneon/sdk';
 import { readGit, readGitFile, readGitBranches, readGitRevisions } from './git.ts';
 import { validateGitFeedback } from './feedback.ts';
+import { checkoutGit } from './checkout.ts';
 import {
   gitFileSchema,
+  gitCheckoutInputSchema,
   gitRequestSchema,
   gitReviewParamsSchema,
   gitReviewSubmittedSchema,
 } from './schema.ts';
+export const checkoutGitRef = serverAction({
+  kind: 'mutation',
+  input: gitCheckoutInputSchema,
+  handler: (ctx, input) => checkoutGit(input, ctx.signal),
+});
 export const queryGit = serverAction({
   kind: 'query',
   input: z.object({ params: gitReviewParamsSchema, request: gitRequestSchema }).strict(),

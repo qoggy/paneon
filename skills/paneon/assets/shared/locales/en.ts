@@ -635,7 +635,33 @@ const en = {
   全部折叠: 'Collapse all',
   主干分支: 'Mainline branch',
   当前分支: 'Current branch',
+  Checkout: 'Checkout',
+  'Checking out…': 'Checking out…',
   'HEAD (detached)': 'HEAD (detached)',
+  'Checkout cancelled. Refresh the history and try again.':
+    'Checkout cancelled. Refresh the history and try again.',
+  'Checkout cancelled. Commit, stash or remove local changes and untracked files first.':
+    'Checkout cancelled. Commit, stash or remove local changes and untracked files first.',
+  'Checkout cancelled. Finish the Git operation or release the repository lock first.':
+    'Checkout cancelled. Finish the Git operation or release the repository lock first.',
+  'Checkout cancelled. HEAD or the target reference changed. Refresh the history first.':
+    'Checkout cancelled. HEAD or the target reference changed. Refresh the history first.',
+  'Checkout cancelled. This branch is already checked out.':
+    'Checkout cancelled. This branch is already checked out.',
+  'Checkout cancelled. A local branch with this name already exists.':
+    'Checkout cancelled. A local branch with this name already exists.',
+  'Checkout cancelled. Select a concrete remote branch.':
+    'Checkout cancelled. Select a concrete remote branch.',
+  'Checkout cancelled. The remote branch does not match a unique configured remote.':
+    'Checkout cancelled. The remote branch does not match a unique configured remote.',
+  'Checkout could not be verified. Refresh and check the repository state.':
+    'Checkout could not be verified. Refresh and check the repository state.',
+  'Checkout could not be confirmed. Check the Git error and refresh the repository.':
+    'Checkout could not be confirmed. Check the Git error and refresh the repository.',
+  'Checked out {name}.': 'Checked out {name}.',
+  'Checked out {name} (detached HEAD).': 'Checked out {name} (detached HEAD).',
+  'Checkout succeeded, but the agent notification failed.':
+    'Checkout succeeded, but the agent notification failed.',
   'Reading file…': 'Reading file…',
   'Could not read file.': 'Could not read file.',
   'The file has no content.': 'The file has no content.',

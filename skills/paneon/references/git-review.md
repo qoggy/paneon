@@ -1,6 +1,6 @@
 # Git review
 
-Run `<skill>/assets/panels/git-review/panel.tsx`. The human browses working changes, commit history and branch/version comparisons of the configured repositories, double-clicks a file to open its diff, annotates text, lines, hunks or whole files, and submits all annotations together. The page is read-only: it never stages, commits or pushes.
+Run `<skill>/assets/panels/git-review/panel.tsx`. The human browses working changes, commit history and branch/version comparisons of the configured repositories, double-clicks a file to open its diff, annotates text, lines, hunks or whole files, and submits all annotations together. The page also offers explicit local Git checkout from the history sidebar's context menus. It never stages, commits or pushes.
 
 ```json
 {
@@ -30,6 +30,32 @@ Input:
 - `history` defaults to `HEAD`.
 - `compare` requires `base`; `head` defaults to `HEAD` and `mode` to `commits`. `branch` compares the merge base with head (three-dot); `commits` compares the two endpoints directly.
 - Optional `file` is repository-relative and must be in that view's changed files; a `history` file also requires `commit`.
+
+## Checkout
+
+The human can check out a local branch, remote branch or tag from the history sidebar's context menu. A remote branch creates a local branch tracking it; a tag checks out a detached HEAD. Checkout refuses to run with local changes, ongoing Git operations or Git errors, and never stashes, forces or rolls back.
+
+A successful checkout emits `git-checkout-completed`:
+
+```json
+{
+  "operationId": "2d9e5487-4990-46c0-a2ad-c03a67d66878",
+  "repositoryId": "web",
+  "repositoryPath": "/work/web",
+  "target": {
+    "kind": "remote",
+    "ref": "refs/remotes/origin/feature",
+    "commit": "complete-target-commit-oid"
+  },
+  "before": { "branch": "main", "commit": "complete-previous-commit-oid" },
+  "after": { "branch": "feature", "commit": "complete-target-commit-oid" }
+}
+```
+
+- `target.kind` is `branch`, `remote` or `tag`. `before.branch` and `after.branch` are local branch names, or `null` for a detached HEAD. Commit IDs are complete.
+- The event reports a completed checkout, not a request. Recheck the repository before writing to it; a failed checkout emits nothing.
+
+## Annotation submission
 
 `git-review-submitted` contains the complete set of annotations and the sources they reference:
 

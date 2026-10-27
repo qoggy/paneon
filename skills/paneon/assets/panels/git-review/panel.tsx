@@ -22,6 +22,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  useToastManager,
   usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
@@ -32,7 +33,7 @@ import {
   diffTargetText,
 } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
-import { checkFeedback, queryGitRevisions } from './actions.ts';
+import { checkFeedback, checkoutGitRef, queryGitRevisions } from './actions.ts';
 import { RevisionPicker } from './revision-picker.tsx';
 import { buildGitFeedback } from './feedback.ts';
 import { useGitReader } from './components.tsx';
@@ -43,8 +44,20 @@ import { HistoryWorkspace } from './history-workspace';
 import type { HistoryLayout } from './history-workspace';
 import { FileReviewSplit } from '../../shared/file-review-split';
 import type { FileReviewLayout } from '../../shared/file-review-split';
-import type { GitFile, GitListing, GitRequest, GitSnapshot, GitRevision } from './git.ts';
-import { gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
+import type {
+  GitFile,
+  GitListing,
+  GitRequest,
+  GitSnapshot,
+  GitRevision,
+  HistoryRef,
+} from './git.ts';
+import {
+  gitReviewParamsSchema,
+  gitReviewSubmittedSchema,
+  gitCheckoutCompletedSchema,
+} from './schema.ts';
+import type { CheckoutReason } from './checkout.ts';
 import type { GitRef, GitReviewParams } from './schema.ts';
 
 type ViewState = {
@@ -59,6 +72,9 @@ function initialRequest(params: GitReviewParams): GitRequest {
 const keyOf = (request: GitRequest) => `${request.repositoryId}:${request.type}`;
 function Review() {
   const { t, message } = useLocale();
+  const toast = useToastManager();
+  const checkoutBusy = useRef(false);
+  const [checkingOut, setCheckingOut] = useState(false);
   const params = usePanelInput<GitReviewParams>();
   const reader = useGitReader(params);
   const first = initialRequest(params);
@@ -294,6 +310,98 @@ function Review() {
       mode: 'commits',
     });
   }
+  async function checkout(entry: HistoryRef) {
+    if (checkoutBusy.current || pending || submission.pending) return;
+    const listing = view.listing;
+    const decorations = Object.entries(listing?.historyDecorations ?? {});
+    const headCommit = decorations.find(([, refs]) => refs.some((ref) => ref.kind === 'head'))?.[0];
+    const targetCommit = decorations.find(([, refs]) =>
+      refs.some((ref) => ref.kind === entry.kind && ref.name === entry.name),
+    )?.[0];
+    if (!headCommit || !targetCommit) {
+      toast.add({
+        title: t('Checkout cancelled. Refresh the history and try again.'),
+        type: 'error',
+      });
+      return;
+    }
+    checkoutBusy.current = true;
+    setCheckingOut(true);
+    serial.current++;
+    locating.current++;
+    try {
+      const result = await checkoutGitRef({
+        params,
+        repositoryId: view.request.repositoryId,
+        target: { kind: entry.kind, ref: entry.ref, commit: targetCommit },
+        expectedHead: { branch: listing?.currentBranch ?? null, commit: headCommit },
+      });
+      if (!result.ok) {
+        const reasons: Record<CheckoutReason, string> = {
+          dirty: t(
+            'Checkout cancelled. Commit, stash or remove local changes and untracked files first.',
+          ),
+          'in-progress': t(
+            'Checkout cancelled. Finish the Git operation or release the repository lock first.',
+          ),
+          stale: t(
+            'Checkout cancelled. HEAD or the target reference changed. Refresh the history first.',
+          ),
+          current: t('Checkout cancelled. This branch is already checked out.'),
+          'local-exists': t('Checkout cancelled. A local branch with this name already exists.'),
+          'symbolic-remote': t('Checkout cancelled. Select a concrete remote branch.'),
+          'remote-unavailable': t(
+            'Checkout cancelled. The remote branch does not match a unique configured remote.',
+          ),
+          'verification-failed': t(
+            'Checkout could not be verified. Refresh and check the repository state.',
+          ),
+          'git-error': t(
+            'Checkout could not be confirmed. Check the Git error and refresh the repository.',
+          ),
+        };
+        toast.add({
+          title: reasons[result.reason],
+          description: result.message || undefined,
+          type: 'error',
+        });
+        return;
+      }
+      // Invalidate mutable views, retaining the original snapshots backing annotations.
+      for (const type of ['changes', 'history', 'compare'] as const)
+        views.current.delete(`${result.data.repositoryId}:${type}`);
+      fileSnapshots.current.clear();
+      setHistorySelections((previous) => ({ ...previous, [result.data.repositoryId]: 'HEAD' }));
+      setRevisionRefresh((value) => value + 1);
+      try {
+        await agent.emit('git-checkout-completed', result.data);
+        toast.add({
+          title: result.data.after.branch
+            ? t('Checked out {name}.', { name: result.data.after.branch })
+            : t('Checked out {name} (detached HEAD).', { name: entry.name }),
+          type: 'success',
+        });
+      } catch (failure) {
+        toast.add({
+          title: t('Checkout succeeded, but the agent notification failed.'),
+          description: failure instanceof Error ? failure.message : String(failure),
+          type: 'warning',
+        });
+      }
+      await load({ repositoryId: result.data.repositoryId, type: 'history' });
+    } catch (failure) {
+      toast.add({
+        title: t(
+          'Checkout could not be confirmed. Check the Git error and refresh the repository.',
+        ),
+        description: failure instanceof Error ? failure.message : String(failure),
+        type: 'error',
+      });
+    } finally {
+      checkoutBusy.current = false;
+      setCheckingOut(false);
+    }
+  }
   const selected = oldSnapshot ?? snapshots.current.get(view.selected ?? '');
   const historyDiff = view.request.type === 'history' && !!selected && !collapsed;
   const fileDiff = view.request.type !== 'history' && !!selected && !collapsed;
@@ -350,6 +458,7 @@ function Review() {
       refs={listing?.historyRefs ?? []}
       selected={historySelections[request.repositoryId] ?? request.branch}
       currentBranch={listing?.currentBranch}
+      onCheckout={!pending && !submission.pending ? (entry) => void checkout(entry) : undefined}
       onCompare={compareWithCurrentBranch}
       onSelect={(branch) => {
         setHistorySelections((previous) => ({
@@ -546,7 +655,7 @@ function Review() {
     </section>
   );
   usePageAnnotations<GitRef>({
-    disabled: submission.pending,
+    disabled: submission.pending || checkingOut,
     onSubmit: (feedback) => submission.submit(feedback),
     adapter: {
       resolve(target) {
@@ -593,6 +702,8 @@ function Review() {
         onValueChange={(type) => navigate(request.repositoryId, type as GitRequest['type'])}
         render={
           <main
+            inert={checkingOut || undefined}
+            aria-busy={checkingOut || undefined}
             className="flex min-h-[34rem] flex-col gap-3 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4"
             data-git-workbench=""
           >
@@ -603,6 +714,15 @@ function Review() {
               >
                 {params.title ?? t('Git 审阅')}
               </h1>
+              {checkingOut && (
+                <span
+                  role="status"
+                  className="flex items-center gap-2 text-sm text-muted-foreground"
+                >
+                  <Spinner aria-hidden="true" />
+                  {t('Checking out…')}
+                </span>
+              )}
             </header>
             <div
               className="flex flex-wrap items-center gap-2 border-b pb-3"
@@ -799,6 +919,9 @@ export default definePanel({
   id: 'git-review',
   requires: { paneon: '>=0.0.1 <0.1.0' },
   input: gitReviewParamsSchema,
-  events: { 'git-review-submitted': gitReviewSubmittedSchema },
+  events: {
+    'git-review-submitted': gitReviewSubmittedSchema,
+    'git-checkout-completed': gitCheckoutCompletedSchema,
+  },
   render: Review,
 });

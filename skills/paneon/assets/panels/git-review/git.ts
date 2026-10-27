@@ -50,7 +50,7 @@ async function headOID(path: string, signal?: AbortSignal) {
   if (!branch) throw new Error('HEAD cannot be resolved.');
   return undefined;
 }
-async function repository(params: GitReviewParams, id: string, signal?: AbortSignal) {
+export async function repository(params: GitReviewParams, id: string, signal?: AbortSignal) {
   const repo = params.repositories.find((r) => r.id === id);
   if (!repo) throw new Error('Unknown repository.');
   const configured = resolve(process.cwd(), repo.path);
