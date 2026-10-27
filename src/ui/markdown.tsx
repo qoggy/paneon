@@ -1,7 +1,12 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
 import {
   Children,
+  createContext,
+  useContext,
+  useId,
+  useImperativeHandle,
   isValidElement,
   memo,
   useLayoutEffect,
@@ -23,7 +28,31 @@ import { MarkdownFrontmatter } from './markdown-frontmatter-view';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 
+const FileLinkContext = createContext<{ revealAnchor: (href: string) => boolean } | null>(null);
+function MarkdownLink({
+  node: _node,
+  href = '',
+  children,
+  ...props
+}: ComponentProps<'a'> & { node?: unknown }) {
+  const context = useContext(FileLinkContext);
+  return (
+    <a
+      {...props}
+      href={href}
+      onClick={(event) => {
+        props.onClick?.(event);
+        if (!event.defaultPrevented && href.startsWith('#') && context?.revealAnchor(href))
+          event.preventDefault();
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const components: Components = {
+  a: MarkdownLink,
   pre({ children, node: _node, ...props }) {
     const child = Children.toArray(children)[0];
     if (
@@ -68,25 +97,56 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   annotated,
   frontmatter = 'auto',
 }: RenderProps) {
+  const root = useRef<HTMLDivElement>(null);
+  useImperativeHandle<HTMLDivElement | null, HTMLDivElement | null>(
+    rootRef,
+    () => root.current,
+    [],
+  );
+  const anchorPrefix = `paneon-md-${useId()}-`;
   const metadata = useMemo(
     () => (frontmatter === 'off' ? null : parseFrontmatter(children)),
     [children, frontmatter],
   );
+  const linkContext = useMemo(
+    () => ({
+      revealAnchor(href: string) {
+        let fragment: string;
+        try {
+          fragment = decodeURIComponent(href.slice(1));
+        } catch (error) {
+          console.warn('Invalid Markdown anchor.', error);
+          return false;
+        }
+        if (!fragment) return false;
+        // Generated IDs are instance-scoped; author-supplied IDs keep their original spelling.
+        const target =
+          root.current?.querySelector<HTMLElement>(`#${CSS.escape(anchorPrefix + fragment)}`) ??
+          root.current?.querySelector<HTMLElement>(`#${CSS.escape(fragment)}`);
+        if (!target) return false;
+        target.scrollIntoView({ block: 'start' });
+        return true;
+      },
+    }),
+    [anchorPrefix],
+  );
   return (
-    <div
-      ref={rootRef}
-      className={cn('markdown-body min-w-0 overflow-x-auto', className)}
-      data-markdown-annotation={annotated ? '' : undefined}
-    >
-      {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={rehypePlugins}
-        components={{ ...components, ...overrides }}
+    <FileLinkContext.Provider value={linkContext}>
+      <div
+        ref={root}
+        className={cn('markdown-body min-w-0 overflow-x-auto', className)}
+        data-markdown-annotation={annotated ? '' : undefined}
       >
-        {metadata?.markdown ?? children}
-      </ReactMarkdown>
-    </div>
+        {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[...(rehypePlugins ?? []), [rehypeSlug, { prefix: anchorPrefix }]]}
+          components={{ ...components, ...overrides }}
+        >
+          {metadata?.markdown ?? children}
+        </ReactMarkdown>
+      </div>
+    </FileLinkContext.Provider>
   );
 });
 function AnnotatedMarkdown<TRef>({

@@ -1,0 +1,49 @@
+import { useState } from 'react';
+import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { Button, Markdown, Page, usePageAnnotations } from '@qoggy/paneon/ui';
+
+function existingHeadingId() {
+  return (tree: { children: { tagName?: string; properties: Record<string, unknown> }[] }) => {
+    for (const node of tree.children)
+      if (node.tagName === 'h2') node.properties.id = 'author-heading';
+  };
+}
+
+function Panel() {
+  const { source } = usePanelInput<{ source: string }>();
+  const [updated, setUpdated] = useState(false);
+  const [customClicked, setCustomClicked] = useState(false);
+  usePageAnnotations({ onSubmit: (value) => agent.emit('annotations-submitted', value) });
+  const markdown = source + (updated ? '\n\n## Later heading\n\nUpdated content.' : '');
+  return <Page title="Markdown 目录跳转验收">
+    <input aria-label="State marker" defaultValue="retained" />
+    <Button onClick={() => setUpdated(true)}>更新文档</Button>
+    <div className="grid grid-cols-2 gap-6">
+      <div data-testid="first" style={{ height: 400, overflowY: 'auto' }}>
+        <Markdown>{markdown}</Markdown>
+      </div>
+      <div data-testid="second" style={{ height: 400, overflowY: 'auto' }}>
+        <Markdown annotationTarget="second">{markdown}</Markdown>
+      </div>
+    </div>
+    <div data-testid="author-id">
+      <Markdown rehypePlugins={[existingHeadingId]} components={{ h2: ({ node: _node, ...props }) => <h2 {...props} data-custom-heading="" /> }}>
+        {'[作者锚点](#author-heading)\n\n## Author heading'}
+      </Markdown>
+    </div>
+    <div data-testid="custom-link">
+      <Markdown components={{ a: ({ children }) => <button onClick={() => setCustomClicked(true)}>{children}</button> }}>
+        {'[自定义链接](#custom)\n\n## Custom'}
+      </Markdown>
+      {customClicked && <output>Custom link clicked</output>}
+    </div>
+  </Page>;
+}
+
+export default definePanel({
+  id: 'markdown-anchors',
+  requires: { paneon: '>=0.0.1 <0.1.0' },
+  input: z.object({ source: z.string() }),
+  events: { 'annotations-submitted': annotationValueSchema(z.string()) },
+  render: Panel,
+});
