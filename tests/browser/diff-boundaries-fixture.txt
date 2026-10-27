@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { definePanel, z } from '@qoggy/paneon/sdk';
-import { AnnotationRoot, AnnotationMenu } from '@qoggy/paneon/ui';
+import { usePageAnnotations } from '@qoggy/paneon/ui';
 import type { GitRef } from './shared/diff-schema.ts';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
@@ -14,17 +14,18 @@ const modified = original
 function Panel() {
   const diff = useRef<DiffViewHandle>(null);
   const model = useMemo(() => createDiffModel(original, modified), []);
+  usePageAnnotations<GitRef>({
+    onSubmit: async () => {},
+    adapter: {
+      resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
+      targetRanges: (target) => diff.current?.getRanges(diffTargetLocation(model, target)) ?? [],
+      locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
+    },
+  });
   return (
-    <AnnotationRoot<GitRef>
-      onSubmit={async () => {}}
-      adapter={{
-        resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-        targetRanges: (target) => diff.current?.getRanges(diffTargetLocation(model, target)) ?? [],
-        locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
-      }}
-    >
+    <>
       <div className="h-32 p-4">History outside the diff viewport</div>
-      <AnnotationMenu />
+
       <div data-boundary-viewport className="h-[28rem] overflow-auto border">
         <DiffView
           ref={diff}
@@ -36,7 +37,7 @@ function Panel() {
         />
       </div>
       <div className="h-96">Page outside the diff viewport</div>
-    </AnnotationRoot>
+    </>
   );
 }
 export default definePanel({

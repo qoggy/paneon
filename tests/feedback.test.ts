@@ -207,7 +207,11 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   const secondId = store.getSnapshot().value.annotations[1].id;
   store.openAnnotation(saved.id);
   store.deleteEditor();
-  assert.equal(store.numberFor(secondId), 2, 'Deletion must not renumber another annotation.');
+  assert.equal(
+    store.numberFor(secondId),
+    1,
+    'Deletion keeps visible annotation numbers contiguous.',
+  );
   assert.equal(store.getSnapshot().value.annotations.length, 1);
   await store.submit();
   assert.equal(delivered.length, 1);

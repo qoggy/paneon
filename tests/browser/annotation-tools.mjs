@@ -67,7 +67,7 @@ export function annotationTools(frame, page) {
     async text(number) {
       await this.edit(number);
       const value = await frame.getByLabel('批注内容', { exact: true }).inputValue();
-      await button('取消').click();
+      await frame.getByLabel('批注内容', { exact: true }).press('Escape');
       return value;
     },
     async assertNoLegacySection() {

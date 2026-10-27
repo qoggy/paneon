@@ -42,8 +42,58 @@ const { AnnotationStore } = (await import(
       onSubmit(value: AnnotationValue): Promise<unknown>;
       disabled?: boolean;
     }): void;
+    numberFor(id: string): number;
   };
 };
+
+void test('annotation numbers follow the current list while ids and submitted snapshots stay stable', async () => {
+  const delivered: AnnotationValue[] = [];
+  const store = new AnnotationStore({
+    adapter: { resolve: () => Promise.resolve({ status: 'ready' }), locate: async () => {} },
+    onSubmit: (value) => {
+      delivered.push(value);
+      return Promise.resolve();
+    },
+  });
+  const api = store.getSnapshot();
+  const ids = ['one', 'two', 'three'].map((ref) => api.createAnnotation([{ ref }], ref));
+  assert.deepEqual(
+    ids.map((id) => store.numberFor(id)),
+    [1, 2, 3],
+  );
+  await api.submit();
+  api.removeAnnotation(ids[1]);
+  assert.deepEqual(
+    ids.map((id) => store.numberFor(id)),
+    [1, 0, 2],
+  );
+  assert.deepEqual(
+    store.getSnapshot().value.annotations.map((entry) => entry.id),
+    [ids[0], ids[2]],
+  );
+  await api.submit();
+  assert.deepEqual(
+    delivered[0].annotations.map((entry) => entry.id),
+    ids,
+  );
+  assert.deepEqual(
+    delivered[1].annotations.map((entry) => entry.id),
+    [ids[0], ids[2]],
+  );
+  assert.deepEqual(
+    delivered[1].annotations.map((entry) => entry.comment),
+    ['one', 'three'],
+  );
+  assert.equal(
+    delivered[1].annotations.some((entry) => 'number' in entry),
+    false,
+  );
+  const fourth = api.createAnnotation([{ ref: 'four' }]);
+  assert.equal(store.numberFor(fourth), 3);
+  for (const id of [ids[0], ids[2], fourth]) api.removeAnnotation(id);
+  const fresh = api.createAnnotation([{ ref: 'fresh' }]);
+  assert.equal(store.numberFor(fresh), 1);
+});
 
 void test('controller does not expose the removed object-selection mode', () => {
   const api = new AnnotationStore({ onSubmit: async () => {} }).getSnapshot();

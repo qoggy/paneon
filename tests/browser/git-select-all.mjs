@@ -113,7 +113,7 @@ try {
   assert.equal(await comments.count(), 1);
   await comments.edit(1);
   await frame.getByLabel('批注内容', { exact: true }).fill('Discard this edit');
-  await button('取消').click();
+  await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   assert.equal(await comments.text(1), 'Review both complete sources');
   await button('收起上下文').click();
   // Re-registering syntax DOM for unified/expanded/select modes preserves saved coordinates.
@@ -167,10 +167,7 @@ try {
   await comments.write('Review the emoji');
   await comments.save();
   await submitAnnotations(frame);
-  await frame
-    .getByRole('status')
-    .filter({ hasText: /已保存为事件/ })
-    .waitFor();
+  await frame.locator('[data-slot="toast-title"]').filter({ hasText: '批注已提交。' }).waitFor();
   const events = await f.events(panel);
   assert.equal(events.length, 1);
   assert.equal(events[0].payload.annotations.length, 1);

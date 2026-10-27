@@ -1,4 +1,5 @@
 const en = {
+  修改反馈: 'Correct feedback',
   'Show code frame': 'Show code frame',
   'Diagnostic content was truncated.': 'Diagnostic content was truncated.',
   'Showing the version being annotated. Remove its draft annotations to display the updated content.':
@@ -89,11 +90,17 @@ const en = {
   Cancel: 'Cancel',
   取消: 'Cancel',
   保存: 'Save',
+  换行: 'New line',
   'Submitting…': 'Submitting…',
   '提交中…': 'Submitting…',
   'Submit annotations': 'Submit annotations',
   提交批注: 'Submit annotations',
   Annotations: 'Annotations',
+  '{count} annotation': '{count} annotation',
+  '{count} annotations': '{count} annotations',
+  'No annotations yet': 'No annotations yet',
+  'Select text on the page, then click “Annotation” to add one.':
+    'Select text on the page, then click “Annotation” to add one.',
   批注目录: 'Annotation directory',
   'Selected text:': 'Selected text:',
   'User annotation:': 'User annotation:',

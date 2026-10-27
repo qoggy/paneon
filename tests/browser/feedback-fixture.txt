@@ -4,12 +4,11 @@ import type { AnnotationTarget as Target, AnnotationValue } from '@qoggy/paneon/
 import {
   Button,
   Card,
-  AnnotationRoot,
   AnnotationText,
-  AnnotationMenu,
   Input,
   Page,
   useAnnotations,
+  usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
@@ -116,9 +115,20 @@ function Contents({
   const [changed, setChanged] = useState(false);
   const [shifted, setShifted] = useState(false);
   const [hookError, setHookError] = useState('');
+  const submit = feedback.submit;
+  useLayoutEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && event.shiftKey && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        event.stopPropagation();
+        void submit().catch(() => {});
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [submit]);
   return (
     <>
-      <AnnotationMenu />
       <div className="flex flex-wrap gap-2">
         <Button
           onClick={() => {
@@ -355,15 +365,16 @@ function Panel() {
     setSnapshot(JSON.stringify(value));
     setLocated(`event:${receipt.id}`);
   }
+  usePageAnnotations<Ref>({ onSubmit: submit, adapter: adapt ? adapter : undefined });
   return (
     <Page title="Annotation acceptance">
       <Button onClick={() => setFail(!fail)}>Failure {fail ? 'on' : 'off'}</Button>
       <Button onClick={() => setAdapt(!adapt)}>Adapter enabled {adapt ? 'yes' : 'no'}</Button>
       <output data-testid="attempts">{attempts}</output>
       <output data-testid="located">{located}</output>
-      <AnnotationRoot<Ref> onSubmit={submit} adapter={adapt ? adapter : undefined}>
+      <>
         <Contents snapshot={snapshot} adapterMode={adapterMode} setAdapterMode={setAdapterMode} />
-      </AnnotationRoot>
+      </>
     </Page>
   );
 }

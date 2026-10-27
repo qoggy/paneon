@@ -1,5 +1,6 @@
 import type en from './en';
 const zh: Record<keyof typeof en, string> = {
+  修改反馈: '修改反馈',
   'Show code frame': '查看出错代码',
   'Diagnostic content was truncated.': '错误详情过长，已截断。',
   'Showing the version being annotated. Remove its draft annotations to display the updated content.':
@@ -87,11 +88,17 @@ const zh: Record<keyof typeof en, string> = {
   Cancel: '取消',
   取消: '取消',
   保存: '保存',
+  换行: '换行',
   'Submitting…': '提交中…',
   '提交中…': '提交中…',
   'Submit annotations': '提交批注',
   提交批注: '提交批注',
   Annotations: '批注',
+  '{count} annotation': '{count} 条批注',
+  '{count} annotations': '{count} 条批注',
+  'No annotations yet': '暂无批注',
+  'Select text on the page, then click “Annotation” to add one.':
+    '划选页面文字，点击「批注」即可添加。',
   批注目录: '批注目录',
   'Selected text:': '所选文本：',
   'User annotation:': '用户批注：',

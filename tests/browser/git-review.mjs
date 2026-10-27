@@ -1,4 +1,4 @@
-import { submitAnnotations } from './annotation-tools.mjs';
+import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines } from './annotation-tools.mjs';
 import { verifyGitLayout } from './git-review-layout.mjs';
 import { annotationTools } from './annotation-tools.mjs';
@@ -70,8 +70,10 @@ try {
     await frame.locator('[data-diff-source]').waitFor();
   };
   assert.equal((await f.events()).length, 0);
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: '请先保存至少一条批注' }).waitFor();
+  await openAnnotationDirectory(frame);
+  await frame.locator('[data-slot="empty"]').waitFor();
+  assert.equal(await frame.locator('[data-annotation-submit]').count(), 0);
+  await page.keyboard.press('Escape');
   assert.equal((await f.events()).length, 0);
   // Browse-mode native selection and copy remain ordinary.
   await frame.locator('[data-code-side="new"][data-line="1"] [style*="color"]').first().waitFor();
@@ -208,7 +210,7 @@ try {
   await comments.write('');
   await comments.save();
   await submitAnnotations(frame);
-  await frame.getByRole('status').filter({ hasText: '已保存为事件' }).waitFor();
+  await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
   const first = (await f.events())[0];
   assert.equal(first.type, 'git-review-submitted');
   assert.equal(first.payload.annotations.length, 4);

@@ -5,6 +5,7 @@ import { Toast as ToastPrimitive } from '@base-ui/react/toast';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 import { toast } from './toast-manager';
+import { AnnotationEnabledContext } from './annotation-environment';
 
 import { Button } from './button';
 import {
@@ -24,7 +25,8 @@ function ToastPortal({ ...props }: ToastPrimitive.Portal.Props) {
   return <ToastPrimitive.Portal data-slot="toast-portal" {...props} />;
 }
 
-function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
+function ToastViewport({ className, style, ...props }: ToastPrimitive.Viewport.Props) {
+  const annotationsEnabled = React.useContext(AnnotationEnabledContext);
   return (
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
@@ -32,6 +34,7 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
         'pointer-events-none fixed inset-x-4 bottom-4 z-[100] mx-auto w-auto max-w-sm outline-none sm:right-4 sm:left-auto sm:mx-0 sm:w-full',
         className,
       )}
+      style={{ bottom: annotationsEnabled ? '4rem' : undefined, ...style }}
       {...props}
     />
   );

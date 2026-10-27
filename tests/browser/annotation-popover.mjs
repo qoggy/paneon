@@ -35,12 +35,59 @@ try {
   await frame.getByRole('button', { name: 'Annotation', exact: true }).click();
   const editor = frame.locator('[data-annotation-editor]');
   const input = frame.getByRole('textbox', { name: 'Annotation text', exact: true });
-  await input.fill('Unsaved text survives outside interaction and scrolling');
+  const draft = async () => JSON.parse(await frame.getByTestId('draft').textContent());
+  const marker = frame.locator('[data-annotation-marker]');
+  const save = frame.getByRole('button', { name: 'Save', exact: true });
+  await editor.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  const oneLine = await input.boundingBox();
+  assert.ok(oneLine.height <= 34, `Single-line height: ${oneLine.height}`);
+  assert.ok((await editor.boundingBox()).height <= 50);
+  assert.equal(await input.getAttribute('rows'), '1');
+  assert.equal(await frame.getByRole('button', { name: 'Cancel', exact: true }).count(), 0);
+  assert.equal((await save.textContent()).trim(), '');
+  await marker.waitFor();
+  const previewId = await marker.getAttribute('data-annotation-marker');
+  const previewNumber = await marker.getAttribute('data-annotation-number');
+  assert.equal(previewNumber, '1');
+  assert.equal((await draft()).annotations.length, 0, 'Preview is not a saved annotation');
+  assert.ok(await frame.locator('[data-annotation-highlight]').count());
+  const editorBox = await editor.boundingBox();
+  const markerBox = await marker.boundingBox();
+  assert.ok(editorBox.y + editorBox.height <= markerBox.y, 'Editor leaves preview number visible');
+  const targetBox = await target.boundingBox();
+  await page.screenshot({
+    path: '/tmp/paneon-annotation-editor-preview.png',
+    clip: {
+      x: 16,
+      y: editorBox.y - 8,
+      width: 450,
+      height: targetBox.y + targetBox.height - editorBox.y + 16,
+    },
+  });
+  await input.fill('First line');
+  await input.press('Shift+Enter');
+  await input.press('x');
+  assert.equal(await input.inputValue(), 'First line\nx');
+  assert.ok((await input.boundingBox()).height > oneLine.height);
+  await input.fill('x'.repeat(160));
+  assert.ok((await input.boundingBox()).height > oneLine.height, 'Soft wrapping grows input');
+  await input.fill('Short again');
+  assert.equal((await input.boundingBox()).height, oneLine.height, 'Shrinks back to one line');
+  await input.evaluate((element) =>
+    element.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        isComposing: true,
+      }),
+    ),
+  );
+  assert.equal(await editor.isVisible(), true, 'IME confirmation must not save');
+  await input.fill('Unsaved text survives scrolling');
   assert.equal(await editor.getAttribute('data-slot'), 'popover-content');
   assert.notEqual(await editor.getAttribute('aria-modal'), 'true');
-  await frame.getByRole('button', { name: 'Toolbar child', exact: true }).click();
-  assert.equal(await editor.isVisible(), true);
-  assert.equal(await input.inputValue(), 'Unsaved text survives outside interaction and scrolling');
   await editor.evaluate((element) =>
     Promise.all(element.getAnimations().map((animation) => animation.finished)),
   );
@@ -54,14 +101,44 @@ try {
       ) < 3,
     before.y - 80,
   );
-  assert.equal(await input.inputValue(), 'Unsaved text survives outside interaction and scrolling');
+  assert.equal(await input.inputValue(), 'Unsaved text survives scrolling');
+  await content.waitForFunction(() => {
+    const text = document.querySelector('[data-annotation-text]');
+    const range = document.createRange();
+    range.setStart(text.firstChild, 0);
+    range.setEnd(text.firstChild, 6);
+    const highlight = document.querySelector('[data-annotation-highlight]');
+    return Math.abs(highlight.getBoundingClientRect().top - range.getBoundingClientRect().top) < 2;
+  });
   await page.screenshot({ path: '/tmp/paneon-annotation-popover-scroll.png', fullPage: true });
-  await input.press('Escape');
+  await target.click({ position: { x: 500, y: 20 } });
   await editor.waitFor({ state: 'hidden' });
+  assert.equal((await draft()).annotations[0].comment, '', 'Outside saves an empty comment');
+  assert.equal((await draft()).annotations[0].id, previewId);
+  assert.equal(await marker.getAttribute('data-annotation-number'), previewNumber);
+  await marker.click();
+  await input.fill('Saved with check');
+  await editor.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  const scrollBeforeSave = await content.evaluate(() => scrollY);
+  const saveBox = await save.boundingBox();
+  await page.mouse.click(saveBox.x + saveBox.width / 2, saveBox.y + saveBox.height / 2);
+  await editor.waitFor({ state: 'hidden' });
+  assert.equal(await content.evaluate(() => scrollY), scrollBeforeSave);
+  assert.equal((await draft()).annotations[0].comment, 'Saved with check');
+  await marker.click();
+  await input.fill('Discard outside edit');
+  await target.click({ position: { x: 500, y: 20 } });
+  await editor.waitFor({ state: 'hidden' });
+  assert.equal((await draft()).annotations[0].comment, 'Saved with check');
+  await marker.click();
+  await frame.getByRole('button', { name: 'Delete annotation', exact: true }).click();
+  assert.equal((await draft()).annotations.length, 0);
   await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
   await frame.getByRole('button', { name: 'Annotation', exact: true }).click();
   await input.fill('Keep original source mapping');
-  await input.press('ControlOrMeta+Enter');
+  await input.press('Enter');
   await editor.waitFor({ state: 'hidden' });
   assert.equal(
     (await service.runtime.events(panel.instanceId, 'popover-acceptance', 100, 0)).events.length,
@@ -76,9 +153,70 @@ try {
     end: 6,
     quote: 'Shared',
   });
+  // Visible numbers follow the current list, independently of event reads.
+  for (const comment of ['Second annotation', 'Third annotation']) {
+    await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
+    await frame.getByRole('button', { name: 'Annotation', exact: true }).click();
+    await input.fill(comment);
+    await input.press('Enter');
+    await editor.waitFor({ state: 'hidden' });
+  }
+  const [first, second, third] = (await draft()).annotations;
+  await frame.getByRole('button', { name: 'Annotations (3)', exact: true }).click();
+  await frame.getByRole('button', { name: 'Delete annotation 2', exact: true }).click();
+  await frame
+    .locator(`[data-annotation-marker="${third.id}"][data-annotation-number="2"]`)
+    .waitFor();
+  assert.deepEqual(
+    (await draft()).annotations.map((entry) => entry.id),
+    [first.id, third.id],
+  );
+  assert.equal(
+    await frame.getByRole('button', { name: 'Edit annotation 2', exact: true }).count(),
+    1,
+  );
+  assert.equal(
+    await frame.getByRole('button', { name: 'Edit annotation 3', exact: true }).count(),
+    0,
+  );
+  assert.equal(await frame.locator(`[data-annotation-marker="${second.id}"]`).count(), 0);
+  await page.keyboard.press('Escape');
+  const previewThree = frame.locator('[data-annotation-marker][data-annotation-number="3"]');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
+    await frame.getByRole('button', { name: 'Annotation', exact: true }).click();
+    await previewThree.waitFor();
+    assert.equal((await draft()).annotations.length, 2);
+    await input.fill('Cancel without consuming a number');
+    await input.press('Escape');
+    await previewThree.waitFor({ state: 'detached' });
+  }
+  await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
+  await frame.getByRole('button', { name: 'Annotation', exact: true }).click();
+  await previewThree.waitFor();
+  const finalPreviewId = await previewThree.getAttribute('data-annotation-marker');
+  await input.fill('Saved as annotation 3');
+  await input.press('Enter');
+  await editor.waitFor({ state: 'hidden' });
+  assert.equal((await draft()).annotations[2].id, finalPreviewId);
+  await frame
+    .locator(`[data-annotation-marker="${finalPreviewId}"][data-annotation-number="3"]`)
+    .waitFor();
+  await submitAnnotations(frame);
+  const resubmitted = await service.runtime.events(panel.instanceId, 'popover-acceptance', 100, 0);
+  assert.equal(resubmitted.events.length, 2);
+  assert.deepEqual(resubmitted.events[0].payload, result.events[0].payload);
+  assert.deepEqual(
+    resubmitted.events[1].payload.annotations.map((entry) => entry.id),
+    [first.id, third.id, finalPreviewId],
+  );
+  assert.equal(
+    resubmitted.events[1].payload.annotations.some((entry) => 'number' in entry),
+    false,
+  );
   assert.deepEqual(errors, []);
   console.log(
-    'PASS annotation Popover: nonmodal, outside interaction preserves edits, scrolling follows source, Escape/save, exact text mapping and explicit submit.',
+    'PASS compact annotation editor: auto rows, check/Enter save, Shift+Enter, IME, preview highlight/number, outside empty save, scrolling, contiguous numbers after deletion/cancel, exact mapping and unchanged event history.',
   );
 } finally {
   await browser?.close();

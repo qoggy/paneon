@@ -24,14 +24,25 @@ function PopoverContent({
   alignOffset = 0,
   anchor,
   collisionPadding,
+  positionMethod,
+  container,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Popup> &
   Pick<
     PopoverPrimitive.Positioner.Props,
-    'align' | 'side' | 'sideOffset' | 'alignOffset' | 'anchor' | 'collisionPadding'
-  > & { className?: string }) {
+    | 'align'
+    | 'side'
+    | 'sideOffset'
+    | 'alignOffset'
+    | 'anchor'
+    | 'collisionPadding'
+    | 'positionMethod'
+  > & {
+    className?: string;
+    container?: React.ComponentProps<typeof PopoverPrimitive.Portal>['container'];
+  }) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Positioner
         align={align}
         side={side}
@@ -39,6 +50,7 @@ function PopoverContent({
         alignOffset={alignOffset}
         anchor={anchor}
         collisionPadding={collisionPadding}
+        positionMethod={positionMethod}
         className="pointer-events-none isolate z-50"
       >
         <PopoverPrimitive.Popup

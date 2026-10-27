@@ -1,4 +1,4 @@
-import { submitAnnotations } from './annotation-tools.mjs';
+import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -21,13 +21,28 @@ try {
   await page.goto(fixture.url(fixture.table));
   const frame = page.frameLocator('iframe');
   const comments = annotationTools(frame, page);
+  async function waitForSubmitted() {
+    const toast = frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' });
+    await toast.waitFor();
+    await toast.locator('[data-slot="toast-close"]').click();
+    await toast.waitFor({ state: 'detached' });
+  }
   await frame.getByRole('heading', { name: 'Table review acceptance', exact: true }).waitFor();
   await comments.assertNoLegacySection();
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').waitFor();
+  await openAnnotationDirectory(frame);
+  await frame.locator('[data-slot="empty"]').waitFor();
+  assert.equal(await frame.locator('[data-annotation-submit]').count(), 0);
+  await page.keyboard.press('Escape');
   assert.equal((await fixture.events(fixture.table)).length, 0);
   assert.equal(await frame.getByRole('button', { name: '重置视图', exact: true }).count(), 0);
   assert.equal(await frame.getByRole('button', { name: '选择帮助', exact: true }).count(), 0);
+  await frame.getByLabel('搜索全表', { exact: true }).fill('no-matching-row');
+  await frame
+    .locator('tbody [data-slot="empty"]')
+    .getByText('没有匹配结果。', { exact: true })
+    .waitFor();
+  assert.equal(await frame.locator('[data-row-index]').count(), 0);
+  await frame.getByRole('button', { name: '清除搜索', exact: true }).click();
   assert.equal(await frame.getByLabel('筛选 说明', { exact: true }).count(), 0);
   await frame.getByRole('button', { name: '筛选列', exact: true }).click();
   await frame.getByLabel('筛选 Number', { exact: true }).fill('10');
@@ -112,10 +127,9 @@ try {
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '说明');
   assert.equal(await frame.locator('[data-column-key="name"]').getAttribute('aria-sort'), 'none');
   await comments.write('这个列名需要说明');
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
-  assert.equal((await fixture.events(fixture.table)).length, 0, 'unsaved editor blocks submission');
+  assert.equal((await fixture.events(fixture.table)).length, 0, 'editing does not submit');
   await comments.save();
+  assert.equal((await fixture.events(fixture.table)).length, 0, 'saving retains a local draft');
   await frame.getByRole('button', { name: '排序 Number', exact: true }).click();
   await frame.getByRole('button', { name: '下一页', exact: true }).click();
   const rowsBeforeLocate = await frame
@@ -146,7 +160,7 @@ try {
   await comments.save();
   await selectText(textCell, 12, 18, 'repeat');
   await comments.write('discarded');
-  await frame.getByRole('button', { name: '取消', exact: true }).click();
+  await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   assert.equal(await comments.count(), 2);
   await selectText(textCell, 12, 18, 'repeat');
   await comments.write('第二个repeat');
@@ -192,10 +206,10 @@ try {
   const saving = frame.getByRole('button', { name: /^批注 \(\d+\)$/ });
   assert.equal(await saving.isDisabled(), true);
   await saving.evaluate((button) => button.click());
-  assert.equal(await frame.getByRole('status').count(), 0);
+  assert.equal(await frame.locator('[data-slot="toast"]').count(), 0);
   assert.equal(eventRequests, 1);
   releaseEvent();
-  await frame.getByRole('status').waitFor();
+  await waitForSubmitted();
   await page.unroute(eventUrl);
   const first = (await fixture.events(fixture.table))[0];
   assert.equal(first.type, 'table-submitted');
@@ -224,10 +238,11 @@ try {
       fullPage: true,
     });
   }
+  await openAnnotationDirectory(frame);
   await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
   for (let number = 3; number >= 1; number--) await comments.remove(number);
   await submitAnnotations(frame);
-  await frame.getByRole('status').waitFor();
+  await waitForSubmitted();
   const revisions = await fixture.events(fixture.table);
   assert.equal(revisions.length, 2);
   assert.deepEqual(revisions[1].payload, {
@@ -336,7 +351,7 @@ try {
     await comments.save();
     assert.equal(await frame.getByRole('button', { name: '选择对象', exact: true }).count(), 0);
     await submitAnnotations(frame);
-    await frame.getByRole('status').waitFor();
+    await waitForSubmitted();
     const result = (await fixture.events(review))[0];
     assert.equal(result.payload.annotations.length, 4);
     assert.equal('comment' in result.payload, false);
@@ -381,6 +396,16 @@ try {
         .evaluate(() => document.getSelection().toString()),
       'repeat and linked 中文🙂 & * escaped.',
     );
+    await openAnnotationDirectory(frame);
+    await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
+    for (let number = 4; number >= 1; number--) await comments.remove(number);
+    await submitAnnotations(frame);
+    await waitForSubmitted();
+    const reviewEvents = await fixture.events(review);
+    assert.deepEqual(reviewEvents[1].payload, {
+      annotations: [],
+      replacesEventId: result.id,
+    });
   }
   if (process.env.PANEON_TEST_ARTIFACTS) {
     await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });

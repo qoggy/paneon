@@ -3,7 +3,7 @@ import { annotationKey, annotationTargetKey, annotationValueSchema } from '../sd
 import type { AnnotationValue, AnnotationTarget } from '../sdk/annotation.js';
 import type {
   AnnotationController,
-  AnnotationRootProps,
+  PageAnnotationOptions,
   AnnotationTextRegistration,
   AnnotationTargetResolution,
   AnnotationUI,
@@ -34,17 +34,16 @@ export class AnnotationStore<TRef> {
   >();
   private sources = new Map<string, string>();
   private locating = 0;
-  private options: Omit<AnnotationRootProps<TRef>, 'children'>;
+  private options: PageAnnotationOptions<TRef> | undefined;
   private state: AnnotationController<TRef> & AnnotationUI<TRef>;
   private surfaceCount = 0;
   private numbers = new Map<string, number>();
-  private nextNumber = 1;
   private stagedSources = new Map<string, string>();
   private editorSources = new Map<string, string>();
   private registryListeners = new Set<() => void>();
   private measurementRanges = new WeakMap<Document, Range>();
 
-  constructor(options: Omit<AnnotationRootProps<TRef>, 'children'>) {
+  constructor(options?: PageAnnotationOptions<TRef>) {
     this.options = options;
     this.state = {
       pending: [],
@@ -71,11 +70,22 @@ export class AnnotationStore<TRef> {
       this.listeners.delete(listener);
     };
   };
-  setOptions = (options: Omit<AnnotationRootProps<TRef>, 'children'>) => {
+  setOptions = (options: PageAnnotationOptions<TRef> | undefined) => {
+    const previous = this.options;
     this.options = options;
+    if (
+      !!previous !== !!options ||
+      previous?.disabled !== options?.disabled ||
+      previous?.allowEmptySubmit !== options?.allowEmptySubmit ||
+      !!previous?.onRequestEdit !== !!options?.onRequestEdit
+    )
+      this.publish({});
   };
+  get configuration() {
+    return this.options;
+  }
   get disabled() {
-    return this.options.disabled === true || this.state.submitting;
+    return !this.options || this.options.disabled === true || this.state.submitting;
   }
   private publish(patch: Partial<AnnotationController<TRef> & AnnotationUI<TRef>>) {
     const next = { ...this.state, ...patch };
@@ -98,8 +108,9 @@ export class AnnotationStore<TRef> {
       value.annotations.flatMap((entry) => entry.targets.map(annotationTargetKey)),
     );
     for (const key of this.sources.keys()) if (!retained.has(key)) this.sources.delete(key);
-    for (const annotation of value.annotations)
-      if (!this.numbers.has(annotation.id)) this.numbers.set(annotation.id, this.nextNumber++);
+    this.numbers = new Map(
+      value.annotations.map((annotation, index) => [annotation.id, index + 1]),
+    );
     this.publish({ value: frozen(copy(value)), activeAnnotationId, error: null });
   }
   private remember(targets: AnnotationTarget<TRef>[]) {
@@ -241,7 +252,11 @@ export class AnnotationStore<TRef> {
         ),
       ]),
     ].filter((element) => element?.isConnected);
-  numberFor = (id: string) => this.numbers.get(id) ?? 0;
+  numberFor = (id: string) =>
+    this.numbers.get(id) ??
+    (this.state.editor && !this.state.editor.id && this.state.editor.draftId === id
+      ? this.state.value.annotations.length + 1
+      : 0);
   private stageSources(targets: AnnotationTarget<TRef>[]) {
     this.stagedSources.clear();
     for (const target of targets) {
@@ -267,12 +282,14 @@ export class AnnotationStore<TRef> {
     const targets = annotation?.targets ?? this.state.pending;
     if (!targets.length) return;
     this.editorSources = new Map(id ? [] : this.stagedSources);
+    const draftId = id ?? crypto.randomUUID();
     this.publish({
       pending: [],
       activeAnnotationId: id ?? null,
       uiError: null,
       editor: {
         id,
+        draftId,
         targets: copy(targets),
         comment: annotation?.comment ?? '',
       },
@@ -299,7 +316,17 @@ export class AnnotationStore<TRef> {
     }
     if (editor.id)
       this.updateAnnotation(editor.id, { targets: editor.targets, comment: editor.comment });
-    else this.createAnnotation(editor.targets, editor.comment);
+    else
+      this.save(
+        {
+          ...this.state.value,
+          annotations: [
+            ...this.state.value.annotations,
+            { id: editor.draftId, targets: editor.targets, comment: editor.comment },
+          ],
+        },
+        editor.draftId,
+      );
     for (const target of editor.targets) {
       const source = this.editorSources.get(annotationTargetKey(target));
       if (source !== undefined) this.sources.set(annotationTargetKey(target), source);
@@ -368,7 +395,7 @@ export class AnnotationStore<TRef> {
   private adapterRects(target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] {
     const rects: ClippedRect[] = [];
     const clipRect = createRectClipper();
-    for (const range of this.options.adapter?.targetRanges?.(target) ?? []) {
+    for (const range of this.options?.adapter?.targetRanges?.(target) ?? []) {
       if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
       const element =
         range.startContainer.nodeType === 1
@@ -387,7 +414,7 @@ export class AnnotationStore<TRef> {
   }
 
   private async resolve(target: AnnotationTarget<TRef>): Promise<AnnotationTargetResolution> {
-    if (this.options.adapter) return this.options.adapter.resolve(target);
+    if (this.options?.adapter) return this.options?.adapter.resolve(target);
     const key = annotationKey(target.ref);
     const texts = [...this.texts.values()].filter(
       (item) =>
@@ -429,7 +456,7 @@ export class AnnotationStore<TRef> {
       this.checkResolution(target, resolution);
       const source = resolution.status === 'ready' ? resolution.text : undefined;
       if (request !== this.locating) return;
-      if (this.options.adapter) await this.options.adapter.locate(copy(target));
+      if (this.options?.adapter) await this.options?.adapter.locate(copy(target));
       if (request !== this.locating) return;
       const key = annotationKey(target.ref);
       const registration = [...this.texts.values()].find(
@@ -487,7 +514,8 @@ export class AnnotationStore<TRef> {
     selection?.addRange(range);
   }
   submit: AnnotationController<TRef>['submit'] = async () => {
-    if (this.disabled) return;
+    const options = this.options;
+    if (!options || this.disabled) return;
     if (this.state.editor) {
       this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
       return;
@@ -507,7 +535,7 @@ export class AnnotationStore<TRef> {
             );
           }
         }
-      await this.options.onSubmit(value);
+      await options.onSubmit(value);
     } catch (error) {
       this.publish({ error: error instanceof Error ? error.message : String(error) });
       throw error;

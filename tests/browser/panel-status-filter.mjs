@@ -133,9 +133,12 @@ try {
   assert.equal(queries.at(-1).has('status'), false);
 
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.getByRole('radio', { name: 'Dark', exact: true }).click();
   await page.getByText('Saved', { exact: true }).waitFor();
-  await page.getByLabel('Language', { exact: true }).selectOption('zh-CN');
+  await page.locator('[data-slot=toast-close]').click();
+  await page.locator('[data-slot=toast]').waitFor({ state: 'detached' });
+  await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+  await page.getByRole('option', { name: '简体中文', exact: true }).click();
   await page.getByText('已保存', { exact: true }).waitFor();
   await page.getByRole('link', { name: '面板', exact: true }).click();
   await page.getByRole('tablist', { name: '面板状态', exact: true }).waitFor();

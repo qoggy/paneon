@@ -121,7 +121,7 @@ try {
   assert.equal(await source.getAttribute('data-diff-source'), sourceId);
   assert.equal(requests, 0, 'Resizing neither queries Git nor submits annotations.');
   page.off('request', listener);
-  await frame.getByRole('button', { name: '取消', exact: true }).click();
+  await editor.press('Escape');
   const remembered = await width();
   await frame.getByRole('button', { name: '收起文件差异', exact: true }).click();
   assert.equal(await separator.count(), 0);

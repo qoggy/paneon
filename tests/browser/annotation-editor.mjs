@@ -1,4 +1,8 @@
-import { selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
+import {
+  openAnnotationDirectory,
+  selectAnnotationText,
+  submitAnnotations,
+} from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -28,14 +32,14 @@ try {
   await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`);
   const frame = page.frameLocator('iframe');
   await frame.getByRole('heading', { name: 'Annotation editor acceptance' }).waitFor();
-  // Every Root owns its only contextual surface; menus never mount one.
+  // Rerendering a configured page keeps exactly one built-in surface and entry.
   assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
   const button = (name) => frame.getByRole('button', { name, exact: true });
-  await button('Toggle extra menu').click();
-  assert.equal(await frame.getByRole('button', { name: /^(Annotations|批注) \(0\)$/ }).count(), 2);
-  assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
-  await button('Toggle extra menu').click();
-  assert.equal(await frame.getByRole('button', { name: /^(Annotations|批注) \(0\)$/ }).count(), 1);
+  for (let i = 0; i < 3; i++) {
+    await button(`Rerender page ${i}`).click();
+    assert.equal(await frame.locator('[data-annotation-launcher]').count(), 1);
+    assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
+  }
   const editor = frame.locator('[data-annotation-editor]');
   const draft = async () => JSON.parse(await frame.getByTestId('draft').textContent());
   const locateCount = async () =>
@@ -116,7 +120,21 @@ try {
     assert.equal(await button(t.submit).isVisible(), false);
     await menuTrigger.hover();
     await menu.waitFor();
-    assert.equal(await button(t.submit).isVisible(), true);
+    assert.equal(await button(t.submit).count(), 0);
+    await menu.locator('[data-slot="empty"]').waitFor();
+    assert.equal(
+      await menu
+        .getByText(language === 'en' ? 'No annotations yet' : '暂无批注', { exact: true })
+        .isVisible(),
+      true,
+    );
+    await menu.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
+    const emptyBox = await menu.boundingBox();
+    assert.equal(emptyBox.width, 336);
+    assert.ok(emptyBox.height < 120, `Compact empty state height: ${emptyBox.height}`);
+    await menu.screenshot({ path: join(evidence, `empty-${theme}-${language}.png`) });
     assert.equal((await events()).events.length, 0);
     await menu.hover();
     assert.equal(await menu.isVisible(), true);
@@ -134,13 +152,37 @@ try {
     await page.mouse.down();
     await page.mouse.move(rect.x + rect.width, rect.y + rect.height / 2, { steps: 12 });
     await page.mouse.up();
+    const scrollBeforeEditor = await text.evaluate(() => window.scrollY);
     await button(t.annotate).click();
+    await input.and(frame.locator(':focus')).waitFor();
+    assert.equal(
+      await text.evaluate(() => window.scrollY),
+      scrollBeforeEditor,
+      'Focusing the editor does not scroll away from the selected source',
+    );
     assert.equal(await editor.locator(':scope > div.text-sm').count(), 0);
     assert.equal(
       await editor.getByText(/Selected .* locations|已选.*位置|已选择.*位置/).count(),
       0,
     );
     assert.equal(await editor.getByRole('button', { name: t.del, exact: true }).count(), 0);
+    const saveTooltip = frame.locator('[data-slot="tooltip-content"]').filter({
+      has: frame.locator('kbd[aria-label="Shift+Enter"]'),
+    });
+    await input.and(frame.locator(':focus')).waitFor();
+    await button(t.save).hover();
+    await saveTooltip.and(frame.locator('[data-open]')).waitFor();
+    assert.equal(await saveTooltip.getByText(t.save, { exact: true }).count(), 1);
+    assert.equal(
+      await saveTooltip.getByText(language === 'en' ? 'New line' : '换行', { exact: true }).count(),
+      1,
+    );
+    assert.equal(await saveTooltip.locator('kbd[aria-label="Enter"]').count(), 1);
+    await saveTooltip.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
+    await page.screenshot({ path: join(evidence, `save-tooltip-${theme}-${language}.png`) });
+    await input.click();
     await input.fill('whole paragraph');
     await button(t.save).click();
     await editor.waitFor({ state: 'hidden' });
@@ -170,6 +212,36 @@ try {
       name: language === 'en' ? `Locate annotation ${number}` : `定位批注 ${number}`,
       exact: true,
     });
+    await directory.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
+    const submitAction = directory.locator('[data-annotation-submit] button');
+    assert.equal(await submitAction.getAttribute('data-variant'), 'ghost');
+    assert.equal(
+      await submitAction
+        .getByText(language === 'en' ? '1 annotation' : '1 条批注', { exact: true })
+        .count(),
+      1,
+    );
+    const actionBox = await submitAction.boundingBox();
+    const rowBox = await row.boundingBox();
+    assert.ok(actionBox.y >= rowBox.y + rowBox.height, 'Submit action is below the list');
+    assert.ok(
+      actionBox.width >= (await directory.boundingBox()).width - 12,
+      'The whole footer row is clickable',
+    );
+    const idleBackground = await submitAction.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await submitAction.hover();
+    await submitAction.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
+    assert.notEqual(
+      await submitAction.evaluate((element) => getComputedStyle(element).backgroundColor),
+      idleBackground,
+    );
+    await directory.screenshot({ path: join(evidence, `submit-action-${theme}-${language}.png`) });
     assert.equal(await row.getByRole('button').count(), 0);
     assert.equal(
       await row
@@ -228,17 +300,52 @@ try {
     await editor.waitFor();
     await waitForLocate(++calls);
     assert.equal(await input.inputValue(), 'whole paragraph');
-    await button(t.cancel).click();
+    await input.and(frame.locator(':focus')).waitFor();
+    assert.deepEqual(
+      await input.evaluate((element) => [element.selectionStart, element.selectionEnd]),
+      ['whole paragraph'.length, 'whole paragraph'.length],
+    );
+    await input.press('!');
+    assert.equal(await input.inputValue(), 'whole paragraph!');
+    await input.press('Escape');
     const marker = frame.locator(`[data-annotation-marker="${paragraph.id}"]`);
     await marker.click();
+    await input.and(frame.locator(':focus')).waitFor();
+    assert.deepEqual(
+      await input.evaluate((element) => [element.selectionStart, element.selectionEnd]),
+      ['whole paragraph'.length, 'whole paragraph'.length],
+    );
+    await input.press('Home');
+    await input.press('X');
+    assert.equal(await input.inputValue(), 'Xwhole paragraph');
+    assert.equal(
+      await input.evaluate((element) => element.selectionStart),
+      1,
+      'Typing must preserve a manually moved caret',
+    );
     await input.fill('discard this edit');
-    await button(t.cancel).click();
+    await input.press('Escape');
     assert.equal((await draft()).annotations[0].comment, 'whole paragraph');
     await marker.click();
     await input.fill('');
     await button(t.save).click();
     assert.equal((await draft()).annotations[0].comment, '');
     assert.equal((await draft()).annotations[0].id, paragraph.id);
+    await directoryButton.click();
+    await directory.waitFor();
+    assert.equal(
+      await row
+        .getByText(language === 'en' ? 'User annotation:' : '用户批注：', { exact: true })
+        .count(),
+      0,
+    );
+    assert.equal(
+      await row.getByText('Shared annotation target', { exact: true }).isVisible(),
+      true,
+    );
+    assert.equal(await item.getByRole('button').count(), 3);
+    await page.keyboard.press('Escape');
+    await directory.waitFor({ state: 'hidden' });
     await marker.click();
     await page.screenshot({ path: join(evidence, `paragraph-${theme}-${language}.png`) });
     const del = editor.getByRole('button', { name: t.del, exact: true });
@@ -255,7 +362,7 @@ try {
     assert.equal(await del.getAttribute('data-size'), 'icon-sm');
     assert.equal(await del.getAttribute('data-variant'), 'ghost');
     await input.fill(`draft-${theme}-${language}`);
-    await button(t.cancel).click();
+    await input.press('Escape');
     await editor.waitFor({ state: 'hidden' });
     await marker.and(frame.locator(':focus')).waitFor();
     assert.equal(await marker.evaluate((element) => element === document.activeElement), true);
@@ -268,19 +375,16 @@ try {
     assert.equal((await draft()).annotations[0].comment, '');
     await marker.click();
     await input.fill(`saved-${theme}-${language}`);
-    await page.keyboard.press('ControlOrMeta+Enter');
+    await page.keyboard.press('Enter');
     await editor.waitFor({ state: 'hidden' });
     assert.equal((await draft()).annotations[0].comment, `saved-${theme}-${language}`);
     assert.equal((await events()).events.length, 0);
-    await marker.click();
     await button('Disabled no').focus();
     await page.keyboard.press('Enter');
-    assert.equal(await del.isDisabled(), true);
-    assert.equal(await button(t.save).isDisabled(), true);
-    assert.equal(await button(t.cancel).isDisabled(), true);
-    assert.equal(await input.isDisabled(), true);
+    assert.equal(await marker.isDisabled(), true);
     await button('Disabled yes').focus();
     await page.keyboard.press('Enter');
+    await marker.click();
     await page.screenshot({ path: join(evidence, `${theme}-${language}.png`) });
     await del.focus();
     await page.keyboard.press('Enter');
@@ -291,19 +395,14 @@ try {
       theme,
       language,
       compactAccessibleEditor: true,
-      cancelEscapeSaveDelete: true,
+      shortcutTooltip: true,
+      editCaretAtEnd: true,
+      escapeSaveDelete: true,
     });
   }
   const t = terms['zh-CN'];
-  // Move submission out of the menu without changing the Root or its drafts.
-  await button('Split toolbar off').click();
   assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
-  assert.equal(await button(t.submit).isVisible(), true);
-  await frame.getByRole('button', { name: /^批注 \(\d+\)$/ }).click();
-  assert.equal(await frame.locator('[data-annotation-footer]').count(), 0);
-  await page.keyboard.press('Escape');
-  assert.equal(await button(t.select).count(), 0);
-  assert.equal(await button(t.finish).count(), 0);
+  assert.equal(await button(t.submit).isVisible(), false);
   const targetText = frame.locator('[data-testid=target] [data-annotation-text]');
   const targetRect = await targetText.boundingBox();
   await page.mouse.move(targetRect.x, targetRect.y + targetRect.height / 2);
@@ -324,7 +423,6 @@ try {
   await button(t.save).click();
   await editor.waitFor({ state: 'hidden' });
   const second = (await draft()).annotations[1];
-  await button('Split toolbar on').click();
   assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
   assert.equal(await button(t.select).count(), 0);
   assert.equal(await button(t.finish).count(), 0);
@@ -350,7 +448,7 @@ try {
   await button(`编辑批注 ${objectNumber}`).click();
   assert.equal(await editor.getByText(/^批注 \d+$/).count(), 0);
   assert.equal((await draft()).annotations[0].id, first.id);
-  await button(t.cancel).click();
+  await frame.getByRole('textbox', { name: t.input, exact: true }).press('Escape');
   await editor.waitFor({ state: 'hidden' });
   await catalog.click();
   const beforeDeleteLocate = await locateCount();
@@ -383,17 +481,55 @@ try {
   await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
   await button(t.annotate).click();
   await frame.getByRole('textbox', { name: t.input, exact: true }).fill('saved independently');
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').waitFor();
-  assert.equal((await events()).events.length, 0);
   await button(t.save).click();
   assert.equal((await events()).events.length, 0);
   const submitted = page.waitForResponse(
     (response) => response.url().includes('/events') && response.request().method() === 'POST',
   );
-  await submitAnnotations(frame);
+  await openAnnotationDirectory(frame);
+  const finalSubmit = frame.locator('[data-annotation-submit] button');
+  const finalSubmitBox = await finalSubmit.boundingBox();
+  await finalSubmit.click({
+    position: { x: finalSubmitBox.width - 8, y: finalSubmitBox.height / 2 },
+  });
   await submitted;
   assert.equal((await events()).events.length, 1);
+  const launcher = frame.locator('[data-annotation-launcher]');
+  const beforeScroll = await launcher.boundingBox();
+  await frame.locator('main').evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await frame
+    .locator('main')
+    .evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  assert.deepEqual(
+    await launcher.boundingBox(),
+    beforeScroll,
+    'Entry stays fixed while the document scrolls',
+  );
+  await openAnnotationDirectory(frame);
+  const floatingDirectory = frame.getByRole('dialog', { name: '批注目录', exact: true });
+  await floatingDirectory.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  const floatingBox = await floatingDirectory.boundingBox();
+  assert.ok(
+    floatingBox.y + floatingBox.height <= beforeScroll.y,
+    'Directory opens above the entry',
+  );
+  await page.screenshot({ path: join(evidence, 'floating-directory-scrolled.png') });
+  await page.keyboard.press('Escape');
+  await floatingDirectory.waitFor({ state: 'hidden' });
+  const savedBeforeConfigurationChange = await draft();
+  await button('Annotations enabled yes').click();
+  assert.equal(await launcher.count(), 0);
+  assert.equal(await frame.locator('[data-annotation-surface]').count(), 0);
+  await button('Annotations enabled no').click();
+  assert.equal(await launcher.count(), 1);
+  assert.equal(await frame.locator('[data-annotation-surface]').count(), 1);
+  assert.deepEqual(
+    await draft(),
+    savedBeforeConfigurationChange,
+    'Re-enabling uses the same page session',
+  );
   assert.deepEqual(errors, []);
   const result = {
     ok: true,
@@ -402,7 +538,8 @@ try {
     objectSelectionRemoved: true,
     wholeParagraphExactOffsets: true,
     emptyAnnotationRetainsId: true,
-    toolbarCompositionsRetainCatalog: true,
+    singleFloatingEntry: true,
+    configurationLifecycle: true,
     stableAnnotationNumber: true,
     nativeTextSelection: true,
     saveSubmitIsolation: true,

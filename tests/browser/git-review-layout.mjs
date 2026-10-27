@@ -1,4 +1,3 @@
-import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,7 +9,12 @@ import {
   startGitReviewFixture,
 } from './git-review-fixture.mjs';
 import { annotationTools, selectDiffLines } from './annotation-tools.mjs';
-async function verifyHistoryColumns(frame, page, content, until) {
+async function submitAnnotations(frame) {
+  const trigger = frame.getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/ });
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.press('Enter');
+  await frame.getByRole('button', { name: /^(提交批注|Submit annotations)$/ }).press('Enter');
+}
+export async function verifyHistoryColumns(frame, page, content, until) {
   const separators = ['调整分支栏宽度', '调整文件区宽度'].map((name) =>
     frame.getByRole('separator', { name }),
   );
@@ -57,6 +61,10 @@ async function verifyHistoryColumns(frame, page, content, until) {
   await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved column sizing draft');
+  await separators[0].press('ArrowRight');
+  assert.equal(await editor.inputValue(), 'Unsaved column sizing draft');
+  await separators[0].press('ArrowLeft');
+  await editor.press('Escape');
   const history = frame.locator('[data-commit-scroll]');
   await history.evaluate((el) => {
     el.scrollTop = 40;
@@ -176,8 +184,6 @@ async function verifyHistoryColumns(frame, page, content, until) {
     count,
   );
   assert.equal(await history.evaluate((el) => el.scrollTop), scrollTop);
-  assert.equal(await editor.inputValue(), 'Unsaved column sizing draft');
-  await frame.getByRole('button', { name: '取消', exact: true }).click();
   assert.equal(requests, 0, 'Column resizing must not query Git or submit annotations.');
   page.off('request', observe);
   const outside = await start(0);
@@ -393,6 +399,10 @@ async function verifyHistorySplit(frame, page, content, until) {
   await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Unsaved splitter regression draft');
+  await divider.press('ArrowUp');
+  assert.equal(await editor.inputValue(), 'Unsaved splitter regression draft');
+  await divider.press('ArrowDown');
+  await editor.press('Escape');
   await history.evaluate((el) => {
     el.scrollTop = 40;
   });
@@ -415,7 +425,6 @@ async function verifyHistorySplit(frame, page, content, until) {
     count,
   );
   assert.equal(await history.evaluate((el) => el.scrollTop), scrollTop);
-  await frame.getByRole('button', { name: '取消', exact: true }).click();
   assert.equal(requests, 0, 'Splitter interactions must not read Git or submit feedback.');
   page.off('request', observe);
 
@@ -831,7 +840,10 @@ export async function verifyGitLayout(f, page) {
   await marker.waitFor();
   await marker.click();
   await comments.write('Temporary edit to cancel');
-  await button('取消').click();
+  await frame.getByLabel('批注内容', { exact: true }).press('Escape');
+  const annotationDirectory = frame.getByRole('button', { name: /^批注 \(\d+\)$/ });
+  if ((await annotationDirectory.getAttribute('aria-expanded')) !== 'true')
+    await annotationDirectory.press('Enter');
   assert.equal(await comments.text(1), 'Long line endpoint annotation');
   assert.equal((await f.events(layoutPanel)).length, 0);
   await oldViewport.evaluate((element) => {
@@ -894,7 +906,7 @@ export async function verifyGitLayout(f, page) {
       await frame.getByLabel('批注内容', { exact: true }).inputValue(),
       `${side}侧第三行批注`,
     );
-    await button('取消').click();
+    await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   }
   await selectDiffLines(frame, 'new', 2, 3);
   await comments.write('连续行文字批注');
@@ -905,7 +917,7 @@ export async function verifyGitLayout(f, page) {
   );
   await frame.getByRole('button', { name: '批注 5', exact: true }).first().click();
   assert.equal(await frame.getByLabel('批注内容', { exact: true }).inputValue(), '连续行文字批注');
-  await button('取消').click();
+  await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   assert.equal((await f.events(layoutPanel)).length, 0);
   const layoutArtifacts = process.env.PANEON_TEST_ARTIFACTS;
   if (layoutArtifacts) {
@@ -937,8 +949,12 @@ export async function verifyGitLayout(f, page) {
   await frame.getByRole('button', { name: `M ${layout.filename}`, exact: true }).waitFor();
   assert.equal(await frame.locator('[data-diff-source]').count(), 0);
   // Restore the target's exact old snapshot through the compact catalog.
+  if ((await annotationDirectory.getAttribute('aria-expanded')) !== 'true')
+    await annotationDirectory.press('Enter');
   await comments.locate(2);
   await frame.getByRole('button', { name: '批注 2', exact: true }).waitFor();
+  if ((await annotationDirectory.getAttribute('aria-expanded')) !== 'true')
+    await annotationDirectory.press('Enter');
   await comments.locate(1);
   await frame.getByText('回看保留快照', { exact: true }).waitFor();
   await marker.waitFor();

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { definePanel, z } from '@qoggy/paneon/sdk';
-import { Button, AnnotationRoot, AnnotationMenu, useAnnotations } from '@qoggy/paneon/ui';
+import { Button, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
@@ -62,18 +62,19 @@ function Panel() {
     });
     return () => cancelAnimationFrame(frame);
   }, [target, model]);
+  usePageAnnotations<GitRef>({
+    onSubmit: async () => {},
+    adapter: {
+      resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
+      targetRanges: (target) =>
+        target.ref.sourceId === kind
+          ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
+          : [],
+      locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
+    },
+  });
   return (
-    <AnnotationRoot<GitRef>
-      onSubmit={async () => {}}
-      adapter={{
-        resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-        targetRanges: (target) =>
-          target.ref.sourceId === kind
-            ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
-            : [],
-        locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
-      }}
-    >
+    <>
       <Draft />
       <div className="h-24 p-3">Diff reading acceptance</div>
       <div className="flex flex-wrap gap-1 p-2">
@@ -89,7 +90,6 @@ function Panel() {
           </Button>
         ))}
         <Button onClick={() => setCollapsed(false)}>Reopen</Button>
-        <AnnotationMenu />
       </div>
       <div
         data-reading-kind={kind}
@@ -112,7 +112,7 @@ function Panel() {
         />
       </div>
       <div className="h-[60rem]" />
-    </AnnotationRoot>
+    </>
   );
 }
 export default definePanel({

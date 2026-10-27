@@ -39,16 +39,18 @@ try {
   const button = (name) => frame.getByRole('button', { name, exact: true });
   const plain = frame.getByTestId('plain');
   const diff = frame.getByTestId('annotated');
+  await diff.locator('[data-diff-column-layout]').waitFor();
+  const panelIds = await frame
+    .locator('[data-diff-column-layout] [data-panel]')
+    .evaluateAll((panels) => panels.map((panel) => panel.id));
+  assert.equal(
+    new Set(panelIds).size,
+    panelIds.length,
+    'Multiple diff controllers have distinct panel IDs.',
+  );
   const draft = async () => JSON.parse(await frame.locator('[data-diff-draft]').textContent());
   const annotations = annotationTools(frame, page);
-  assert.match(
-    await frame.locator('[data-expected-error]').nth(0).textContent(),
-    /inside AnnotationRoot/,
-  );
-  assert.match(
-    await frame.locator('[data-expected-error]').nth(1).textContent(),
-    /must be different/,
-  );
+  assert.match(await frame.locator('[data-expected-error]').textContent(), /must be different/);
 
   // Both diffs contain identical text: reveal and DOM ranges must stay within their own instance.
   assert.equal(await diff.locator('[data-line="12"]').count(), 0);

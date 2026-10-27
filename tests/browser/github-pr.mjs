@@ -1,4 +1,4 @@
-import { submitAnnotations } from './annotation-tools.mjs';
+import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines, selectAnnotationText } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
@@ -61,11 +61,10 @@ async function completeAcceptance() {
     await frame.getByRole('combobox', { name: 'PR 状态', exact: true }).click();
     await frame.getByRole('option', { name: '开放中', exact: true }).click();
     await frame.getByText('正在加载 PR…', { exact: true }).waitFor({ state: 'hidden' });
-    await submitAnnotations(frame);
-    await frame
-      .getByRole('alert')
-      .filter({ hasText: 'Save at least one annotation before submitting.' })
-      .waitFor();
+    await openAnnotationDirectory(frame);
+    await frame.locator('[data-slot="empty"]').waitFor();
+    assert.equal(await frame.locator('[data-annotation-submit]').count(), 0);
+    await page.keyboard.press('Escape');
     assert.equal((await f.events()).length, 0);
     // Native mouse text selection/copy through rendered Markdown.
     const leaf = frame
@@ -299,7 +298,7 @@ async function completeAcceptance() {
     assert.equal(await comments.count(), 4);
     await page.unroute(eventURL);
     await submitAnnotations(frame);
-    await frame.getByRole('status').filter({ hasText: '批注已发送给当前 AI。' }).waitFor();
+    await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
     assert.equal(first.payload.annotations.length, 4);
@@ -505,7 +504,7 @@ await test('independent PR delivery, old sources, transport limits and failures'
     assert.equal((await f.events()).length, 1);
     await page.unroute(eventURL);
     await submitAnnotations(frame);
-    await frame.getByRole('status').filter({ hasText: '批注已发送给当前 AI。' }).waitFor();
+    await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
     assert.equal(first.payload.annotations.length, 3);

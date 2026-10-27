@@ -8,7 +8,7 @@ Provide reusable semantic selection and annotation controls with editable drafts
 
 ### Requirement: Provide reusable selection and annotation SDK and UI
 
-Paneon SHALL provide opt-in public SDK/UI capabilities for selection and annotations. Standard panels, scene examples, and custom TSX panels SHALL be able to reuse the same implementation. The product skill SHALL document integration rather than require custom authors to copy a separate implementation. The SDK SHALL export AnnotationValue, Annotation, AnnotationTarget, AnnotationTextRange and annotationValueSchema through both Node and browser entries. The UI SHALL export AnnotationRoot, AnnotationText, AnnotationMenu, AnnotationSubmitButton and useAnnotations. AnnotationTarget SHALL be an SDK data type, not a UI component. These APIs SHALL compose contextual editing and explicit submission without requiring an independent editor/list section or legacy-name aliases.
+Paneon SHALL provide opt-in public SDK/UI capabilities for selection and annotations. Standard panels, scene examples, and custom TSX panels SHALL be able to reuse the same implementation. The product skill SHALL document integration rather than require custom authors to copy a separate implementation. The SDK SHALL export AnnotationValue, Annotation, AnnotationTarget, AnnotationTextRange and annotationValueSchema through both Node and browser entries. The UI SHALL export usePageAnnotations, AnnotationText and useAnnotations. Paneon SHALL own one internal annotation Root per page environment. Root, Menu and SubmitButton SHALL NOT be public composition APIs. Pages SHALL enable the feature and provide onSubmit, optional adapter/disabled, and optional empty-correction and unlock callbacks through usePageAnnotations. AnnotationTarget SHALL be an SDK data type, not a UI component. These APIs SHALL compose contextual editing and explicit submission without requiring an independent editor/list section or legacy-name aliases.
 
 #### Scenario: Integrate feedback in a custom panel
 
@@ -17,17 +17,22 @@ Paneon SHALL provide opt-in public SDK/UI capabilities for selection and annotat
 
 ### Requirement: Preserve normal interactions and author-controlled layout
 
-The common UI SHALL allow registered text to be selected during normal browsing, presenting a contextual Annotation action before creating an annotation draft. Explicit object-selection controls MAY be composed for multi-object selection. It SHALL operate on registered content, preserve ordinary buttons, links, form input, and text copying, and SHALL NOT treat business actions or form answers as annotation submissions. Authors SHALL be able to place or compose controls without a mandatory fixed header or sidebar. Supporting original-element composition SHALL NOT introduce invalid table wrappers.
+The common UI SHALL allow registered text to be selected during normal browsing, presenting a contextual Annotation action before creating an annotation draft. Explicit object-selection controls MAY be composed for multi-object selection. It SHALL operate on registered content, preserve ordinary buttons, links, form input, and text copying, and SHALL NOT treat business actions or form answers as annotation submissions. Enabled pages SHALL show one floating annotation directory at the panel viewport bottom right, opening upward without consuming document layout space. Pages without usePageAnnotations SHALL show no annotation controls. Toasts SHALL appear above the floating entry. Supporting original-element composition SHALL NOT introduce invalid table wrappers.
 
 #### Scenario: Browse normally before selecting
 
 - **WHEN** a person uses a registered panel in normal mode
 - **THEN** ordinary controls retain their meaning and are not intercepted as feedback target selections
 
-#### Scenario: Place controls in a custom layout
+#### Scenario: Use the built-in floating directory
 
-- **WHEN** an author places feedback controls below the content or composes a custom layout
-- **THEN** the common state remains reusable without injecting a fixed host header or sidebar
+- **WHEN** an author enables annotations with usePageAnnotations and the person scrolls the page
+- **THEN** exactly one floating entry remains at the panel viewport bottom right, with an upward-opening directory and internally scrolling list
+
+#### Scenario: Correct locked feedback
+
+- **WHEN** a page supplies disabled and onRequestEdit after successful submission
+- **THEN** the directory offers Correct feedback to invoke the page callback, while retained annotations remain readable and locatable
 
 ### Requirement: Identify semantic objects and selected text
 

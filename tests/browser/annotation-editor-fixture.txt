@@ -1,54 +1,33 @@
 import { useMemo, useState } from 'react';
 import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
-import type { AnnotationValue } from '@qoggy/paneon/sdk';
-import {
-  Button,
-  AnnotationRoot,
-  AnnotationMenu,
-  AnnotationSubmitButton,
-  AnnotationText,
-  useAnnotations,
-} from '@qoggy/paneon/ui';
+import { Button, AnnotationText, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
 import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
 type Ref = string;
 const text = 'Shared annotation target';
-function Contents({ separate }: { separate: boolean }) {
-  const feedback = useAnnotations<Ref>();
-  const [extraMenu, setExtraMenu] = useState(false);
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-2">
-        {separate ? (
-          <>
-            <AnnotationMenu showSubmit={false} />
-            <AnnotationSubmitButton />
-          </>
-        ) : (
-          <AnnotationMenu />
-        )}
-        <Button variant="outline">Toolbar child</Button>
-        <Button variant="outline" onClick={() => setExtraMenu(!extraMenu)}>
-          Toggle extra menu
-        </Button>
-        {extraMenu && <AnnotationMenu showSubmit={false} />}
-      </div>
-
-      <p data-testid="target" className="mt-6 rounded-md border p-4">
-        <AnnotationText target="shared">{text}</AnnotationText>
-      </p>
-
-      <output hidden data-testid="draft">
-        {JSON.stringify(feedback.value)}
-      </output>
-    </>
-  );
+function Configuration({
+  disabled,
+  adapter,
+}: {
+  disabled: boolean;
+  adapter: AnnotationAdapter<Ref>;
+}) {
+  usePageAnnotations<Ref>({
+    disabled,
+    adapter,
+    onSubmit: async (value) => {
+      await agent.emit('feedback', value);
+    },
+  });
+  return null;
 }
 function Panel() {
-  const [separate, setSeparate] = useState(false);
+  const feedback = useAnnotations<Ref>();
+  const [enabled, setEnabled] = useState(true);
   const [disabled, setDisabled] = useState(false);
   const [located, setLocated] = useState('');
   const [locateCount, setLocateCount] = useState(0);
+  const [renders, setRenders] = useState(0);
   const adapter = useMemo<AnnotationAdapter<Ref>>(
     () => ({
       resolve: () => ({ status: 'ready', text }),
@@ -62,26 +41,29 @@ function Panel() {
   return (
     <main className="space-y-4 p-4">
       <h1 className="text-lg font-semibold">Annotation editor acceptance</h1>
-      <AnnotationRoot<Ref>
-        disabled={disabled}
-        adapter={adapter}
-        onSubmit={async (value: AnnotationValue<Ref>) => {
-          await agent.emit('feedback', value);
-        }}
-      >
-        <Contents separate={separate} />
-      </AnnotationRoot>
+      {enabled && <Configuration disabled={disabled} adapter={adapter} />}
       <div className="flex flex-wrap gap-2" data-annotation-controls="">
-        <Button variant="outline" onClick={() => setSeparate(!separate)}>
-          Split toolbar {separate ? 'on' : 'off'}
+        <Button variant="outline">Toolbar child</Button>
+        <Button variant="outline" onClick={() => setRenders(renders + 1)}>
+          Rerender page {renders}
+        </Button>
+        <Button variant="outline" onClick={() => setEnabled(!enabled)}>
+          Annotations enabled {enabled ? 'yes' : 'no'}
         </Button>
         <Button variant="outline" onClick={() => setDisabled(!disabled)}>
           Disabled {disabled ? 'yes' : 'no'}
         </Button>
       </div>
+      <p data-testid="target" className="mt-6 rounded-md border p-4">
+        <AnnotationText target="shared">{text}</AnnotationText>
+      </p>
+      <output hidden data-testid="draft">
+        {JSON.stringify(feedback.value)}
+      </output>
       <output data-testid="located" data-locate-count={locateCount}>
         {located}
       </output>
+      <div className="h-[1200px]" aria-hidden="true" />
     </main>
   );
 }

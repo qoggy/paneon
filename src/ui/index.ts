@@ -33,13 +33,13 @@ export * from './markdown';
 export * from './mermaid';
 export * from './toast';
 export * from './toast-manager';
-export { AnnotationRoot } from './annotation-root';
-export { AnnotationText, AnnotationSubmitButton, AnnotationMenu } from './annotation';
+export { AnnotationText } from './annotation';
 export { useAnnotations } from './annotation-context';
+export { usePageAnnotations } from './page-annotations';
 export type {
   AnnotationTargetResolution,
   AnnotationAdapter,
-  AnnotationRootProps,
+  PageAnnotationOptions,
   AnnotationTextProps,
   AnnotationTextRegistration,
   AnnotationController,

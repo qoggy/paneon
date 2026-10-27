@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 const root = await mkdtemp(join(tmpdir(), 'paneon-diff-reading-'));
 let service, browser, debugPage;
-const evidence = '/tmp/paneon-diff-reading-evidence';
+const evidence = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-diff-reading-evidence';
 try {
   const { startServer } = await import(
     process.env.PANEON_TEST_RUNTIME_ENTRY ??
@@ -53,6 +53,10 @@ try {
     .waitForEvent('framenavigated', { timeout: 100 })
     .catch(() => page.frames().find((f) => f.url().endsWith('/frame.html')));
   await frame.locator('[data-code-side="new"][data-line="250"]').waitFor();
+  assert.equal(
+    await frame.locator('[data-diff-column-layout][data-slot="resizable-panel-group"]').count(),
+    1,
+  );
   await page.waitForTimeout(100);
   assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
   assert.equal(await frame.locator('[data-code-side="new"]').count(), 340);
@@ -97,12 +101,12 @@ try {
     const max = Number(await divider.getAttribute('aria-valuemax'));
     const width = await source.evaluate((e) => e.clientWidth);
     assert.ok(
-      Math.abs(now - (await left())) <= 1,
-      'separator ARIA uses actual pixel width after render',
+      Math.abs(((width - 1) * now) / 100 + 0.5 - (await left())) <= 1,
+      'separator percentage matches the shared table column width',
     );
     assert.ok(
-      min >= 1 && min <= now && now <= max && max <= width,
-      'ARIA min/current/max share pixel units',
+      min > 0 && min <= now && now <= max && max <= 100,
+      'ARIA min/current/max share library percentage units',
     );
   };
   const initial = await left();
@@ -136,7 +140,9 @@ try {
     0,
     'no syntax mutation on drag',
   );
-  assert.equal(await divider.evaluate((e) => getComputedStyle(e).cursor), 'col-resize');
+  assert.ok(
+    ['col-resize', 'ew-resize'].includes(await divider.evaluate((e) => getComputedStyle(e).cursor)),
+  );
   await assertSeparatorGeometry();
   const moved = await left();
   await divider.focus();
@@ -225,7 +231,8 @@ try {
     },
     async edit(number) {
       if ((await catalogButton.getAttribute('aria-expanded')) !== 'true')
-        await catalogButton.click();
+        await catalogButton.press('Enter');
+      await frame.getByLabel(/^(?:批注|评论)目录$/).waitFor({ state: 'visible' });
       await frame
         .getByRole('button', { name: new RegExp(`^编辑(?:批注|评论) ${number}$`) })
         .click();
@@ -235,7 +242,7 @@ try {
     async text(number) {
       await this.edit(number);
       const value = await input.inputValue();
-      await button('取消').click();
+      await input.press('Escape');
       return value;
     },
   };
@@ -269,7 +276,7 @@ try {
   await page.mouse.up();
   await button('上一个差异').click();
   await annotations.edit(1);
-  await button('取消').click();
+  await input.press('Escape');
   await button('定位当前差异').click();
   await content.evaluate(() => document.getSelection()?.removeAllRanges());
   await mkdir(evidence, { recursive: true });

@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type {
   AnnotationValue,
   Annotation,
@@ -16,11 +15,13 @@ export type AnnotationAdapter<TRef = JsonValue> = {
   /** Optional synchronous source-to-DOM bridge for references represented by another registration. */
   targetRanges?(target: AnnotationTarget<TRef>): readonly Range[];
 };
-export type AnnotationRootProps<TRef = JsonValue> = {
-  children: ReactNode;
+export type PageAnnotationOptions<TRef = JsonValue> = {
   onSubmit: (value: AnnotationValue<TRef>) => Promise<unknown>;
   adapter?: AnnotationAdapter<TRef>;
   disabled?: boolean;
+  allowEmptySubmit?: boolean;
+  /** Re-enable editing after a page has locked its submitted feedback. */
+  onRequestEdit?: () => void;
 };
 export type AnnotationTextProps<TRef = JsonValue> = {
   target: TRef;
@@ -51,6 +52,7 @@ export type AnnotationController<TRef = JsonValue> = {
 /** Internal UI drafts never enter the SDK feedback payload until Save. */
 export type AnnotationEditor<TRef> = {
   id?: string;
+  draftId: string;
   targets: AnnotationTarget<TRef>[];
   comment: string;
 };

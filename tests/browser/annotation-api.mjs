@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -9,12 +9,10 @@ import { selectAnnotationText, submitAnnotations } from './annotation-tools.mjs'
 const root = await mkdtemp(join(tmpdir(), 'paneon-annotation-api-'));
 let service, browser;
 try {
+  const entry = join(root, 'panel.tsx');
+  await writeFile(entry, await readFile(new URL('./annotation-api-fixture.txt', import.meta.url)));
   service = await startServer(join(root, 'data'));
-  const entry = new URL(
-    '../../skills/paneon/assets/examples/annotations/panel.tsx',
-    import.meta.url,
-  ).pathname;
-  const panel = await service.runtime.run(entry, process.cwd(), {}, false);
+  const panel = await service.runtime.run(entry, root, {}, false);
   browser = await chromium.launch({
     headless: true,
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
@@ -44,10 +42,7 @@ try {
   await frame.getByRole('button', { name: /^(Save|保存)$/, exact: true }).click();
   assert.equal((await read()).length, 0, 'Save must not send an event');
   await submitAnnotations(frame);
-  await frame
-    .getByRole('status')
-    .filter({ hasText: /^Saved as event / })
-    .waitFor();
+  await frame.getByText(/^Saved as event \d+\.$/).waitFor();
   const events = await read();
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'annotations-submitted');
@@ -60,7 +55,7 @@ try {
   ]);
   assert.deepEqual(errors, []);
   console.log(
-    'Annotation example passed: native selection → Save → explicit submit → validated event consumption.',
+    'Annotation example passed: native selection → Save → explicit submit → event consumption.',
   );
 } finally {
   await browser?.close();

@@ -8,8 +8,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  AnnotationMenu,
-  AnnotationRoot,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -24,6 +22,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
@@ -113,6 +112,7 @@ function Review() {
       const checked = result.data;
       return agent.emit('git-review-submitted', checked);
     },
+    { successToast: 'Annotations submitted.' },
   );
   function save(next: ViewState) {
     views.current.set(keyOf(next.request), next);
@@ -347,47 +347,49 @@ function Review() {
       </div>
     </aside>
   );
+  usePageAnnotations<GitRef>({
+    disabled: submission.pending,
+    onSubmit: (feedback) => submission.submit(feedback),
+    adapter: {
+      resolve(target) {
+        const snapshot = snapshots.current.get(target.ref.sourceId);
+        if (!snapshot) return { status: 'missing', message: '原始快照已丢失，草稿保留。' };
+        try {
+          const text = diffTargetText(snapshot.model, target);
+          return { status: 'ready', ...(text === undefined ? {} : { text }) };
+        } catch (failure) {
+          return {
+            status: 'stale',
+            message: failure instanceof Error ? failure.message : String(failure),
+          };
+        }
+      },
+      targetRanges(target) {
+        const snapshot = snapshots.current.get(target.ref.sourceId);
+        return snapshot && mountedDiff.current === snapshot.id
+          ? (diffView.current?.getRanges(diffTargetLocation(snapshot.model, target)) ?? [])
+          : [];
+      },
+      async locate(target) {
+        const serial = ++locating.current;
+        const snapshot = snapshots.current.get(target.ref.sourceId);
+        if (snapshot) {
+          setOldSnapshot(snapshot);
+          setOldFileSelected(true);
+          setCollapsed(false);
+          setFileReveal((value) => value + 1);
+          await new Promise<void>((done) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => done())),
+          );
+          if (serial !== locating.current || mountedDiff.current !== snapshot.id) return;
+          await diffView.current?.reveal(diffTargetLocation(snapshot.model, target));
+        }
+      },
+    },
+    allowEmptySubmit: submission.hasReceipt,
+  });
   return (
-    <AnnotationRoot<GitRef>
-      disabled={submission.pending}
-      onSubmit={(feedback) => submission.submit(feedback)}
-      adapter={{
-        resolve(target) {
-          const snapshot = snapshots.current.get(target.ref.sourceId);
-          if (!snapshot) return { status: 'missing', message: '原始快照已丢失，草稿保留。' };
-          try {
-            const text = diffTargetText(snapshot.model, target);
-            return { status: 'ready', ...(text === undefined ? {} : { text }) };
-          } catch (failure) {
-            return {
-              status: 'stale',
-              message: failure instanceof Error ? failure.message : String(failure),
-            };
-          }
-        },
-        targetRanges(target) {
-          const snapshot = snapshots.current.get(target.ref.sourceId);
-          return snapshot && mountedDiff.current === snapshot.id
-            ? (diffView.current?.getRanges(diffTargetLocation(snapshot.model, target)) ?? [])
-            : [];
-        },
-        async locate(target) {
-          const serial = ++locating.current;
-          const snapshot = snapshots.current.get(target.ref.sourceId);
-          if (snapshot) {
-            setOldSnapshot(snapshot);
-            setOldFileSelected(true);
-            setCollapsed(false);
-            setFileReveal((value) => value + 1);
-            await new Promise<void>((done) =>
-              requestAnimationFrame(() => requestAnimationFrame(() => done())),
-            );
-            if (serial !== locating.current || mountedDiff.current !== snapshot.id) return;
-            await diffView.current?.reveal(diffTargetLocation(snapshot.model, target));
-          }
-        },
-      }}
-    >
+    <>
       <Tabs
         value={request.type}
         onValueChange={(type) => navigate(request.repositoryId, type as GitRequest['type'])}
@@ -473,7 +475,6 @@ function Review() {
                 >
                   {t('刷新')}
                 </Button>
-                <AnnotationMenu />
               </div>
             </div>
             <TabsContent value={request.type} className="flex min-h-0 flex-1 flex-col gap-3">
@@ -821,7 +822,7 @@ function Review() {
           </main>
         }
       />
-    </AnnotationRoot>
+    </>
   );
 }
 export default definePanel({

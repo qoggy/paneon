@@ -186,6 +186,7 @@ const en = {
   提交更正后的表单: 'Submit corrected form',
   'Submit form': 'Submit form',
   提交表单: 'Submit form',
+  'Annotations submitted.': 'Annotations submitted.',
   'Saved as event {id}. Edit and explicitly submit again to save a correction.':
     'Saved as event {id}. Edit and explicitly submit again to save a correction.',
   '已保存为事件 {id}。修改后请再次明确提交以保存更正。':

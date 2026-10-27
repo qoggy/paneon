@@ -4,9 +4,10 @@ import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneo
 import type { AnnotationValue, AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Button,
-  AnnotationMenu,
-  AnnotationRoot,
   AnnotationText,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
   Input,
   Markdown,
   Page,
@@ -22,6 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import {
@@ -242,7 +244,13 @@ function DataTable({
                   colSpan={params.columns.length + 1}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  {params.rows.length ? t('没有匹配结果。') : t('表格没有数据。')}
+                  <Empty className="flex-none py-6">
+                    <EmptyHeader>
+                      <EmptyDescription>
+                        {params.rows.length ? t('没有匹配结果。') : t('表格没有数据。')}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 </TableCell>
               </TableRow>
             )}
@@ -300,12 +308,15 @@ function TablePanel() {
     [page, setPage] = useState(0),
     [locked, setLocked] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const submission = useSubmission<AnnotationValue<TableRef>>(async (feedback) => {
-    const validated = await validateTable({ snapshot: params, feedback });
-    const receipt = await agent.emit('table-submitted', validated);
-    setLocked(true);
-    return receipt;
-  });
+  const submission = useSubmission<AnnotationValue<TableRef>>(
+    async (feedback) => {
+      const validated = await validateTable({ snapshot: params, feedback });
+      const receipt = await agent.emit('table-submitted', validated);
+      setLocked(true);
+      return receipt;
+    },
+    { successToast: 'Annotations submitted.' },
+  );
   const adapter = useMemo(
     () => ({
       resolve(target: Target<TableRef>) {
@@ -353,19 +364,22 @@ function TablePanel() {
     }),
     [params],
   );
+  usePageAnnotations<TableRef>({
+    adapter: adapter,
+    disabled: locked,
+    onSubmit: async (feedback) => {
+      if (!submission.hasReceipt && !feedback.annotations.length) {
+        submission.reject('Save at least one annotation before submitting.');
+        return;
+      }
+      await submission.submit(feedback);
+    },
+    onRequestEdit: locked ? () => setLocked(false) : undefined,
+    allowEmptySubmit: submission.hasReceipt,
+  });
   return (
     <Page className="min-w-0 space-y-4">
-      <AnnotationRoot<TableRef>
-        adapter={adapter}
-        disabled={locked}
-        onSubmit={async (feedback) => {
-          if (!submission.hasReceipt && !feedback.annotations.length) {
-            submission.reject('Save at least one annotation before submitting.');
-            return;
-          }
-          await submission.submit(feedback);
-        }}
-      >
+      <>
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">{params.title}</h1>
@@ -395,14 +409,6 @@ function TablePanel() {
               </Popover>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2" aria-label={t('批注操作')}>
-            <AnnotationMenu />
-            {locked && (
-              <Button type="button" onClick={() => setLocked(false)}>
-                {t('修改反馈')}
-              </Button>
-            )}
-          </div>
         </header>
         <DataTable
           params={params}
@@ -415,7 +421,7 @@ function TablePanel() {
         {submission.message && (
           <p role={submission.failed ? 'alert' : 'status'}>{submission.message}</p>
         )}
-      </AnnotationRoot>
+      </>
     </Page>
   );
 }

@@ -63,7 +63,10 @@ try {
           .fill(`header ${theme}/${language}/${width}`);
         await frame.getByRole('button', { name: zh ? '保存' : 'Save', exact: true }).click();
         await submitAnnotations(frame);
-        await frame.getByRole('status').waitFor();
+        await frame
+          .locator('[data-slot="toast-title"]')
+          .filter({ hasText: zh ? '批注已提交。' : 'Annotations submitted.' })
+          .waitFor();
         const event = (await fixture.events(fixture.table)).at(-1);
         assert.deepEqual(event.payload.annotations[0].targets[0], {
           ref: { kind: 'header', columnKey: 'name' },

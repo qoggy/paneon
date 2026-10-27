@@ -168,7 +168,7 @@ try {
   assert.equal((await fixture.events()).length, 0);
   await page.screenshot({ path: join(artifacts, 'pr-overview.png'), fullPage: true });
   await submitAnnotations(frame);
-  await frame.getByRole('status').filter({ hasText: '批注已发送给当前 AI。' }).waitFor();
+  await frame.locator('[data-slot="toast-title"]').filter({ hasText: '批注已提交。' }).waitFor();
   assert.equal(
     (await fixture.events()).filter((event) => event.type === 'pr-feedback-submitted').length,
     1,

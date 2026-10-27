@@ -1,8 +1,8 @@
 import { useUI } from './use-ui';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { Check, ChevronUp, MessageSquareText, Pencil, Send, Trash2 } from 'lucide-react';
 import { annotationTargetKey } from '../sdk/annotation.js';
 import { useAnnotations, useAnnotationContext } from './annotation-context';
 import { floatingPosition, markerPosition } from './annotation-geometry';
@@ -11,6 +11,8 @@ import { Textarea } from './textarea';
 import { cn } from './utils';
 import { Popover, PopoverTrigger, PopoverContent } from './popover';
 import { Tooltip, TooltipTrigger, TooltipContent } from './tooltip';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './empty';
+import { Spinner } from './spinner';
 
 type Marker = { id: string; number: number; target: string; rect: DOMRect };
 type Geometry = {
@@ -30,7 +32,6 @@ export function AnnotationSurface() {
   const input = useRef<HTMLTextAreaElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const blocked = disabled || state.submitting;
-  const editing = state.editor !== null;
   const editorAnchor = useMemo(
     () => ({
       current: {
@@ -56,7 +57,10 @@ export function AnnotationSurface() {
       const highlights: DOMRect[] = [];
       const placed: DOMRect[] = [];
       const snapshot = store.getSnapshot();
-      for (const annotation of snapshot.value.annotations) {
+      const annotations = [...snapshot.value.annotations];
+      if (snapshot.editor && !snapshot.editor.id)
+        annotations.push({ ...snapshot.editor, id: snapshot.editor.draftId });
+      for (const annotation of annotations) {
         for (const target of annotation.targets) {
           const rects = store.targetRects(target);
           highlights.push(...rects.map((item) => item.rect));
@@ -113,7 +117,7 @@ export function AnnotationSurface() {
     });
     const unregister = store.subscribeRegistry(observe);
     const unsubscribe = store.subscribe(schedule);
-    observe();
+    measure();
     document.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);
     window.visualViewport?.addEventListener('resize', schedule);
@@ -129,11 +133,7 @@ export function AnnotationSurface() {
       window.visualViewport?.removeEventListener('resize', schedule);
       window.visualViewport?.removeEventListener('scroll', schedule);
     };
-  }, [store, state.editor?.id]);
-  useEffect(() => {
-    if (!editing) return;
-    input.current?.focus();
-  }, [editing, state.editor?.id]);
+  }, [store, state.editor?.draftId]);
   const close = () => {
     store.cancelEditor();
   };
@@ -147,6 +147,7 @@ export function AnnotationSurface() {
         {geometry.highlights.map((rect, index) => (
           <div
             key={index}
+            data-annotation-highlight=""
             className="absolute bg-primary/10"
             style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
           />
@@ -163,7 +164,10 @@ export function AnnotationSurface() {
           disabled={blocked}
           className="pointer-events-auto absolute rounded-full transition-colors"
           style={{ left: marker.rect.left, top: marker.rect.top }}
-          onClick={() => store.openAnnotation(marker.id)}
+          onClick={() => {
+            if (state.editor?.draftId === marker.id) input.current?.focus({ preventScroll: true });
+            else store.openAnnotation(marker.id);
+          }}
         >
           {marker.number}
         </Button>
@@ -190,7 +194,7 @@ export function AnnotationSurface() {
       {!state.editor && (state.uiError || state.error) && (
         <p
           role="alert"
-          className="pointer-events-auto absolute right-2 bottom-2 max-w-[calc(100%-16px)] rounded-md border bg-popover p-3 text-sm text-destructive shadow-md"
+          className="pointer-events-auto absolute right-4 bottom-16 max-w-[calc(100%-32px)] rounded-md border bg-popover p-3 text-sm text-destructive shadow-md"
         >
           {state.uiError ? message(state.uiError) : state.error}
         </p>
@@ -200,7 +204,18 @@ export function AnnotationSurface() {
           open
           modal={false}
           onOpenChange={(open, details) => {
-            if (!open && details.reason === 'escape-key' && !blocked) close();
+            if (open) return;
+            if (blocked) {
+              details.cancel();
+              return;
+            }
+            if (details.reason === 'escape-key') close();
+            else if (details.reason === 'outside-press') {
+              if (!state.editor?.id) {
+                store.changeEditor('');
+                store.saveEditor();
+              } else close();
+            } else details.cancel();
           }}
         >
           <PopoverContent
@@ -208,38 +223,40 @@ export function AnnotationSurface() {
             data-annotation-editor=""
             aria-label={t('编辑批注')}
             side="top"
+            positionMethod="fixed"
             align="start"
-            sideOffset={8}
+            sideOffset={28}
             collisionPadding={8}
             anchor={editorAnchor.current}
-            className="pointer-events-auto max-h-[min(calc(100dvh-16px),var(--available-height))] w-[min(22.5rem,calc(100vw-1rem))] space-y-3 overflow-auto p-3"
+            className="pointer-events-auto max-h-[min(calc(100dvh-16px),var(--available-height))] w-[min(22.5rem,calc(100vw-1rem))] overflow-auto rounded-2xl p-1.5 focus-within:border-ring"
             initialFocus={() => {
               returnFocus.current =
                 document.activeElement instanceof HTMLElement ? document.activeElement : null;
-              return input.current;
+              const textarea = input.current;
+              textarea?.focus({ preventScroll: true });
+              textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
+              return false;
             }}
             finalFocus={returnFocus}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-                event.preventDefault();
-                if (!blocked) store.saveEditor();
-              }
-            }}
           >
-            <Textarea
-              ref={input}
-              aria-label={t('批注内容')}
-              placeholder={t('添加批注（可留空）')}
-              disabled={blocked}
-              value={state.editor.comment}
-              onChange={(event) => store.changeEditor(event.target.value)}
-            />
-            {state.uiError && (
-              <p role="alert" className="text-sm text-destructive">
-                {message(state.uiError)}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
+            <div className="flex items-end gap-1">
+              <Textarea
+                ref={input}
+                rows={1}
+                className="min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 leading-5 shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent"
+                aria-label={t('批注内容')}
+                placeholder={t('添加批注（可留空）')}
+                disabled={blocked}
+                value={state.editor.comment}
+                onChange={(event) => store.changeEditor(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!blocked) store.saveEditor();
+                  }
+                }}
+              />
               {state.editor.id && (
                 <Tooltip>
                   <TooltipTrigger
@@ -248,7 +265,7 @@ export function AnnotationSurface() {
                         type="button"
                         size="icon-sm"
                         variant="ghost"
-                        className="mr-auto text-muted-foreground"
+                        className="shrink-0 rounded-full text-muted-foreground"
                         aria-label={t('删除批注')}
                         disabled={blocked}
                         onClick={() => store.deleteEditor()}
@@ -260,13 +277,47 @@ export function AnnotationSurface() {
                   <TooltipContent>{t('删除批注')}</TooltipContent>
                 </Tooltip>
               )}
-              <Button type="button" size="sm" variant="outline" disabled={blocked} onClick={close}>
-                {t('取消')}
-              </Button>
-              <Button type="button" size="sm" disabled={blocked} onClick={() => store.saveEditor()}>
-                {t('保存')}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      className="shrink-0 rounded-full"
+                      aria-label={t('保存')}
+                      disabled={blocked}
+                      onClick={() => store.saveEditor()}
+                    >
+                      <Check aria-hidden="true" />
+                    </Button>
+                  }
+                />
+                <TooltipContent
+                  sideOffset={6}
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 py-2"
+                >
+                  <span>{t('保存')}</span>
+                  <kbd
+                    aria-label="Enter"
+                    className="rounded bg-background/15 px-1.5 text-center font-sans"
+                  >
+                    ↵
+                  </kbd>
+                  <span>{t('换行')}</span>
+                  <kbd
+                    aria-label="Shift+Enter"
+                    className="rounded bg-background/15 px-1.5 text-center font-sans"
+                  >
+                    ⇧↵
+                  </kbd>
+                </TooltipContent>
+              </Tooltip>
             </div>
+            {state.uiError && (
+              <p role="alert" className="px-2 py-1 text-sm text-destructive">
+                {message(state.uiError)}
+              </p>
+            )}
           </PopoverContent>
         </Popover>
       )}
@@ -275,12 +326,14 @@ export function AnnotationSurface() {
   );
 }
 
-export function AnnotationSubmitButton({
+function AnnotationSubmitButton({
   className,
   children,
+  variant,
 }: {
   className?: string;
   children?: ReactNode;
+  variant?: ComponentProps<typeof Button>['variant'];
 }) {
   const { t } = useUI();
   const feedback = useAnnotations();
@@ -289,29 +342,53 @@ export function AnnotationSubmitButton({
     <Button
       type="button"
       className={className}
+      variant={variant}
       disabled={disabled || feedback.submitting}
       onClick={() => {
         void feedback.submit().catch(() => {});
       }}
     >
-      {feedback.submitting ? t('提交中…') : (children ?? t('提交批注'))}
+      {feedback.submitting ? (
+        <>
+          <Spinner aria-hidden="true" />
+          {t('提交中…')}
+        </>
+      ) : (
+        (children ?? t('提交批注'))
+      )}
     </Button>
   );
 }
 
-/** Annotation directory with a default submit action; page layout belongs to its author. */
-export function AnnotationMenu({
-  className,
-  showSubmit = true,
-}: {
-  className?: string;
-  showSubmit?: boolean;
-}) {
+type LauncherPosition = { left: number; top: number };
+
+function clampLauncherPosition(element: HTMLElement, position: LauncherPosition): LauncherPosition {
+  return {
+    left: Math.max(16, Math.min(position.left, window.innerWidth - element.offsetWidth - 16)),
+    top: Math.max(16, Math.min(position.top, window.innerHeight - element.offsetHeight - 16)),
+  };
+}
+
+/** Internal: the page's single floating annotation directory. */
+export function AnnotationMenu() {
   const { t } = useUI();
   const { store, disabled } = useAnnotationContext();
   const feedback = useAnnotations();
+  const { allowEmptySubmit = false, onRequestEdit } = store.configuration ?? {};
+  const empty = feedback.value.annotations.length === 0;
   const blocked = disabled || feedback.submitting;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [position, setPosition] = useState<LauncherPosition | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const launcher = useRef<HTMLDivElement>(null);
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    origin: LauncherPosition;
+  } | null>(null);
+  const suppressClick = useRef(false);
+  const suppressHover = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pinned = useRef(false);
   const hoverOpened = useRef(false);
@@ -329,8 +406,36 @@ export function AnnotationMenu({
     }, 180);
   };
   useEffect(() => () => clearTimeout(closeTimer.current), []);
-  return (
-    <div data-annotation-controls="" className={cn('flex flex-wrap items-center gap-2', className)}>
+  useLayoutEffect(() => {
+    const element = launcher.current;
+    if (!element) return;
+    const constrain = () => {
+      setPosition((current) => {
+        if (!current) return current;
+        const next = clampLauncherPosition(element, current);
+        return next.left === current.left && next.top === current.top ? current : next;
+      });
+    };
+    const observer = new ResizeObserver(constrain);
+    observer.observe(element);
+    window.addEventListener('resize', constrain);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', constrain);
+    };
+  }, []);
+  const finishDrag = () => {
+    drag.current = null;
+    setDragging(false);
+  };
+  return createPortal(
+    <div
+      ref={launcher}
+      data-annotation-controls=""
+      data-annotation-launcher=""
+      className="pointer-events-auto fixed right-4 bottom-4 z-50"
+      style={position ? { ...position, right: 'auto', bottom: 'auto' } : undefined}
+    >
       <Popover
         open={menuOpen}
         onOpenChange={(open) => {
@@ -343,18 +448,71 @@ export function AnnotationMenu({
             <Button
               type="button"
               variant="outline"
+              className={cn(
+                'touch-none rounded-full bg-popover text-popover-foreground shadow-md select-none dark:bg-popover',
+                dragging ? 'cursor-grabbing' : 'cursor-grab',
+              )}
               disabled={feedback.submitting}
+              onPointerDown={(event) => {
+                const element = launcher.current;
+                if (event.button !== 0 || !event.isPrimary || !element) return;
+                const rect = element.getBoundingClientRect();
+                suppressClick.current = false;
+                drag.current = {
+                  pointerId: event.pointerId,
+                  x: event.clientX,
+                  y: event.clientY,
+                  origin: { left: rect.left, top: rect.top },
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const current = drag.current;
+                const element = launcher.current;
+                if (!current || current.pointerId !== event.pointerId || !element) return;
+                if ((event.buttons & 1) === 0) {
+                  if (event.currentTarget.hasPointerCapture(event.pointerId))
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  finishDrag();
+                  return;
+                }
+                const dx = event.clientX - current.x;
+                const dy = event.clientY - current.y;
+                if (!suppressClick.current) {
+                  if (Math.hypot(dx, dy) < 4) return;
+                  suppressClick.current = true;
+                  suppressHover.current = true;
+                  setDragging(true);
+                  close();
+                }
+                setPosition(
+                  clampLauncherPosition(element, {
+                    left: current.origin.left + dx,
+                    top: current.origin.top + dy,
+                  }),
+                );
+              }}
+              onPointerUp={finishDrag}
+              onPointerCancel={finishDrag}
+              onLostPointerCapture={finishDrag}
               onMouseMove={(event) => {
-                if (event.buttons !== 0) return;
+                if (event.buttons !== 0 || drag.current || suppressHover.current) return;
                 cancelClose();
                 if (menuOpen) return;
                 hoverOpened.current = true;
                 setMenuOpen(true);
               }}
-              onMouseLeave={scheduleClose}
+              onMouseLeave={() => {
+                suppressHover.current = false;
+                scheduleClose();
+              }}
               onClick={(event) => {
                 event.preventDefault();
                 event.preventBaseUIHandler();
+                if (suppressClick.current && event.detail !== 0) {
+                  suppressClick.current = false;
+                  return;
+                }
                 cancelClose();
                 if (pinned.current) close();
                 else {
@@ -365,20 +523,40 @@ export function AnnotationMenu({
               }}
             >
               {t('Annotations')} ({feedback.value.annotations.length})
-              <ChevronDown aria-hidden="true" />
+              <ChevronUp aria-hidden="true" />
             </Button>
           }
         />
         <PopoverContent
           ref={content}
           align="end"
-          className="flex max-h-[min(32rem,var(--available-height))] w-[28rem] flex-col overflow-hidden p-0"
+          side="top"
+          positionMethod="fixed"
+          sideOffset={8}
+          collisionPadding={16}
+          className={cn(
+            'flex max-h-[min(32rem,var(--available-height))] w-[28rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0',
+            empty && 'w-[21rem]',
+          )}
           data-annotation-controls=""
           aria-label={t('批注目录')}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           initialFocus={() => !hoverOpened.current}
         >
+          {empty && (
+            <Empty className="flex-none flex-row items-start justify-start gap-3 rounded-none p-4 text-left text-wrap">
+              <EmptyMedia variant="icon" className="mb-0 text-muted-foreground">
+                <MessageSquareText aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyHeader className="min-w-0 items-start gap-1">
+                <EmptyTitle>{t('No annotations yet')}</EmptyTitle>
+                <EmptyDescription className="text-xs leading-5">
+                  {t('Select text on the page, then click “Annotation” to add one.')}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
           <div className="min-h-0 overflow-y-auto overscroll-contain">
             {feedback.value.annotations.map((entry) => (
               <div
@@ -413,12 +591,14 @@ export function AnnotationMenu({
                         </span>
                       ))}
                     </span>
-                    <span className="block space-y-1">
-                      <span className="block text-muted-foreground">{t('User annotation:')}</span>
-                      <span className="block min-h-5 wrap-anywhere whitespace-pre-wrap">
-                        {entry.comment}
+                    {entry.comment !== '' && (
+                      <span className="block space-y-1">
+                        <span className="block text-muted-foreground">{t('User annotation:')}</span>
+                        <span className="block min-h-5 wrap-anywhere whitespace-pre-wrap">
+                          {entry.comment}
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </span>
                 </button>
                 <div className="absolute top-3 right-3 flex items-start gap-1">
@@ -468,17 +648,48 @@ export function AnnotationMenu({
               </div>
             ))}
           </div>
-          {showSubmit && (
-            <div
-              className="flex shrink-0 justify-end border-t p-3"
-              data-annotation-footer=""
-              onClick={close}
-            >
-              <AnnotationSubmitButton />
+          {disabled && onRequestEdit ? (
+            <div className="shrink-0 border-t p-1" data-annotation-correction="">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2.5 rounded-sm"
+                disabled={feedback.submitting}
+                onClick={() => {
+                  close();
+                  store.configuration?.onRequestEdit?.();
+                }}
+              >
+                <Pencil aria-hidden="true" className="text-muted-foreground" />
+                {t('修改反馈')}
+              </Button>
             </div>
+          ) : (
+            (!empty || allowEmptySubmit) && (
+              <div className="shrink-0 border-t p-1" data-annotation-submit="" onClick={close}>
+                <AnnotationSubmitButton
+                  variant="ghost"
+                  className="w-full justify-start gap-2.5 rounded-sm"
+                >
+                  <Send aria-hidden="true" className="text-muted-foreground" />
+                  <span>{t('提交批注')}</span>
+                  <span
+                    aria-hidden="true"
+                    className="ml-auto text-xs font-normal text-muted-foreground tabular-nums"
+                  >
+                    {t(
+                      feedback.value.annotations.length === 1
+                        ? '{count} annotation'
+                        : '{count} annotations',
+                      { count: feedback.value.annotations.length },
+                    )}
+                  </span>
+                </AnnotationSubmitButton>
+              </div>
+            )
           )}
         </PopoverContent>
       </Popover>
-    </div>
+    </div>,
+    document.body,
   );
 }

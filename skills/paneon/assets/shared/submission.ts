@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useToastManager } from '@qoggy/paneon/ui';
 import { useLocale } from './i18n';
 import type en from './locales/en';
 type MessageKey = keyof typeof en;
@@ -12,8 +13,10 @@ export class SubmissionError extends Error {
 // Supplied-page policy: append complete revisions after a successful receipt.
 export function useSubmission<T extends object>(
   emit: (value: T & { replacesEventId?: number }) => Promise<{ id: number }>,
+  options: { successToast?: MessageKey } = {},
 ) {
   const { t } = useLocale();
+  const toast = useToastManager();
   const receipt = useRef<number | undefined>(undefined);
   const busy = useRef(false);
   const [pending, setPending] = useState(false);
@@ -30,6 +33,7 @@ export function useSubmission<T extends object>(
       });
       receipt.current = next.id;
       setResult(next);
+      if (options.successToast) toast.add({ title: t(options.successToast), type: 'success' });
     } catch (error) {
       setResult({
         error: error instanceof Error ? error.message : 'Submission failed.',
@@ -48,9 +52,11 @@ export function useSubmission<T extends object>(
   const message = !result
     ? ''
     : 'id' in result
-      ? t('Saved as event {id}. Edit and explicitly submit again to save a correction.', {
-          id: result.id,
-        })
+      ? options.successToast
+        ? ''
+        : t('Saved as event {id}. Edit and explicitly submit again to save a correction.', {
+            id: result.id,
+          })
       : t('Not saved. {error} The draft is still available.', {
           error: result.key ? t(result.key) : result.error,
         });

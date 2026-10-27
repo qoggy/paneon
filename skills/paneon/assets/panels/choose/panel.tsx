@@ -13,6 +13,7 @@ import {
   Sheet,
   SheetContent,
   SheetTitle,
+  Spinner,
   Markdown,
   RadioGroup,
   RadioGroupItem,
@@ -506,6 +507,7 @@ function ChoosePanel() {
             )}
             {reviewing ? (
               <Button disabled={submission.pending} onClick={submit}>
+                {submission.pending && <Spinner aria-hidden="true" />}
                 {submission.pending
                   ? t('Saving…')
                   : submission.hasReceipt

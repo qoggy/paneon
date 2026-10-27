@@ -6,6 +6,8 @@ import { BrowserActionContext } from './browser-action-context';
 import type { BrowserAction } from '../shared/browser-actions';
 import { performBrowserAction } from './browser-actions';
 import { Toaster } from './toast';
+import { AnnotationRoot } from './annotation-root';
+import { TooltipProvider } from './tooltip';
 export function UIProvider({
   ui,
   children,
@@ -20,7 +22,11 @@ export function UIProvider({
   return (
     <UIContext.Provider value={value}>
       <BrowserActionContext.Provider value={onBrowserAction}>
-        <Toaster>{children}</Toaster>
+        <TooltipProvider>
+          <AnnotationRoot>
+            <Toaster>{children}</Toaster>
+          </AnnotationRoot>
+        </TooltipProvider>
       </BrowserActionContext.Provider>
     </UIContext.Provider>
   );

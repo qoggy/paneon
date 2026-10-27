@@ -1,12 +1,11 @@
 import { Component, useRef, useState, type ReactNode } from 'react';
 import { agent, annotationValueSchema, definePanel, z } from '@qoggy/paneon/sdk';
 import {
-  AnnotationMenu,
-  AnnotationRoot,
   Button,
   DiffView,
   useAnnotations,
   type DiffViewHandle,
+  usePageAnnotations,
 } from '@qoggy/paneon/ui';
 
 type Ref = { documentId: string; version: string } | boolean | null;
@@ -51,13 +50,13 @@ function Annotated() {
   const [onlyNew, setOnlyNew] = useState(false);
   const [updated, setUpdated] = useState(false);
   const [geometry, setGeometry] = useState('');
+  usePageAnnotations<Ref>({
+    onSubmit: async (value) => {
+      await agent.emit('annotations-submitted', value);
+    },
+  });
   return (
-    <AnnotationRoot<Ref>
-      onSubmit={async (value) => {
-        await agent.emit('annotations-submitted', value);
-      }}
-    >
-      <AnnotationMenu />
+    <>
       <Draft />
       <Button onClick={() => setOnlyNew(true)}>Only new</Button>
       <Button onClick={() => setUpdated(true)}>Refresh source</Button>
@@ -109,7 +108,7 @@ function Annotated() {
           annotationTargets={{ old: false, new: null }}
         />
       </div>
-    </AnnotationRoot>
+    </>
   );
 }
 function Panel() {
@@ -134,10 +133,7 @@ function Panel() {
         />
       </div>
       <Annotated />
-      <Boundary>
-        <DiffView oldText="a" newText="b" annotationTargets={{ new: 'missing-root' }} />
-      </Boundary>
-      <AnnotationRoot onSubmit={async () => {}}>
+      <>
         <Boundary>
           <DiffView
             oldText="same"
@@ -145,7 +141,7 @@ function Panel() {
             annotationTargets={{ old: 'duplicate', new: 'duplicate' }}
           />
         </Boundary>
-      </AnnotationRoot>
+      </>
     </main>
   );
 }

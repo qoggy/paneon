@@ -1,7 +1,7 @@
 import { FileDiffNotice } from './shared/file-diff-notice';
 import { useMemo, useRef, useState } from 'react';
 import { definePanel, z } from '@qoggy/paneon/sdk';
-import { Button, AnnotationRoot, AnnotationMenu } from '@qoggy/paneon/ui';
+import { Button, usePageAnnotations } from '@qoggy/paneon/ui';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
@@ -23,23 +23,23 @@ function Panel() {
     () => createDiffModel(original, kind === 'same' ? original : modified),
     [kind],
   );
+  usePageAnnotations<GitRef>({
+    onSubmit: async () => {},
+    adapter: {
+      resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
+      targetRanges: (target) =>
+        target.ref.sourceId === kind
+          ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
+          : [],
+      locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
+    },
+  });
   return (
-    <AnnotationRoot<GitRef>
-      onSubmit={async () => {}}
-      adapter={{
-        resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-        targetRanges: (target) =>
-          target.ref.sourceId === kind
-            ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
-            : [],
-        locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
-      }}
-    >
+    <>
       <div className="flex flex-wrap items-center gap-2 p-2">
         <Button onClick={() => setKind('changed')}>Changed source</Button>
         <Button onClick={() => setKind('same')}>Same source</Button>
         <Button onClick={() => setKind('binary')}>Binary source</Button>
-        <AnnotationMenu />
       </div>
       <div data-toolbar-viewport className="h-[32rem] min-w-0 overflow-y-auto border">
         {kind === 'binary' ? (
@@ -55,7 +55,7 @@ function Panel() {
           />
         )}
       </div>
-    </AnnotationRoot>
+    </>
   );
 }
 export default definePanel({

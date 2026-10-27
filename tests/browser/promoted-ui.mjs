@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { submitAnnotations } from './annotation-tools.mjs';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -91,12 +92,12 @@ try {
   await f.getByRole('button', { name: 'Change source', exact: true }).click();
   await f.getByTestId('doc-a').getByRole('heading', { name: 'Review', exact: true }).waitFor();
   await f.getByTestId('doc-a').locator('[data-markdown-retained]').waitFor();
-  await f.getByRole('button', { name: 'Submit annotations', exact: true }).click();
+  await submitAnnotations(f);
   await f.getByTestId('delivery-error').waitFor();
   assert.deepEqual(await draft(), before);
   assert.deepEqual(JSON.parse(await f.getByTestId('receipts').textContent()), []);
   await f.getByRole('button', { name: 'Allow delivery', exact: true }).click();
-  await f.getByRole('button', { name: 'Submit annotations', exact: true }).click();
+  await submitAnnotations(f);
   await f.getByTestId('receipts').filter({ hasText: 'A only' }).waitFor();
   assert.deepEqual(JSON.parse(await f.getByTestId('receipts').textContent())[0], before);
   await f.getByRole('button', { name: 'Remove drafts', exact: true }).click();

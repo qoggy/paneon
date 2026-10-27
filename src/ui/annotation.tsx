@@ -33,5 +33,3 @@ export function AnnotationText<TRef = JsonValue>({
     </span>
   );
 }
-
-export { AnnotationSubmitButton, AnnotationMenu } from './annotation-surface';

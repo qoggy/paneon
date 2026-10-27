@@ -1,4 +1,4 @@
-import { Markdown } from '@qoggy/paneon/ui';
+import { Markdown, usePageAnnotations } from '@qoggy/paneon/ui';
 import { FileDiffNotice } from '../../shared/file-diff-notice';
 import { usePRCopy } from './copy';
 import {
@@ -26,8 +26,6 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  AnnotationMenu,
-  AnnotationRoot,
   Input,
   Select,
   SelectContent,
@@ -42,6 +40,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  useToastManager,
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
@@ -193,8 +192,8 @@ function GithubPR() {
     [tabError, setTabError] = useState<string | { filename: string; error: string }>(''),
     [fileFilter, setFileFilter] = useState('');
   const [requestLoading, setRequestLoading] = useState(false),
-    [requestMessage, setRequestMessage] = useState<{ id?: number; error?: string }>(),
-    [saved, setSaved] = useState<number>();
+    [requestMessage, setRequestMessage] = useState<{ id?: number; error?: string }>();
+  const toast = useToastManager();
   const snapshots = useRef(new Map<string, PRSnapshot>()),
     details = useRef(new Map<string, PRDetail>());
   const comparisons = useRef(new Map<string, PRComparison>()),
@@ -447,110 +446,105 @@ function GithubPR() {
       setRequestLoading(false);
     }
   }
-  return (
-    <AnnotationRoot<PRRef>
-      onSubmit={async (feedback) => {
-        setSaved(undefined);
-        const ids = new Set(
-          feedback.annotations.flatMap((annotation) =>
-            annotation.targets.map((target) => target.ref.sourceId),
-          ),
-        );
-        const evidence = [...ids].map((id) => {
-          const snapshot = snapshots.current.get(id);
-          if (!snapshot) throw new Error('Original PR source is missing. Draft retained.');
+  usePageAnnotations<PRRef>({
+    onSubmit: async (feedback) => {
+      const ids = new Set(
+        feedback.annotations.flatMap((annotation) =>
+          annotation.targets.map((target) => target.ref.sourceId),
+        ),
+      );
+      const evidence = [...ids].map((id) => {
+        const snapshot = snapshots.current.get(id);
+        if (!snapshot) throw new Error('Original PR source is missing. Draft retained.');
+        return {
+          id: snapshot.id,
+          source: snapshot.source,
+          detailId: snapshot.detailId,
+          ...(snapshot.identity ? { identity: snapshot.identity } : {}),
+          ...(snapshot.body === undefined ? {} : { body: snapshot.body }),
+          ...(snapshot.model
+            ? {
+                model: {
+                  ...(snapshot.model.oldText === undefined
+                    ? {}
+                    : { oldText: snapshot.model.oldText }),
+                  ...(snapshot.model.newText === undefined
+                    ? {}
+                    : { newText: snapshot.model.newText }),
+                },
+              }
+            : {}),
+        };
+      });
+      const result = await checkFeedback({ ...session, feedback, snapshots: evidence });
+      if (!result.ok) throw new Error(result.message);
+      await agent.emit('pr-feedback-submitted', result.data);
+      toast.add({ title: t('Annotations submitted.'), type: 'success' });
+    },
+    adapter: {
+      resolve(target) {
+        const snapshot = snapshots.current.get(target.ref.sourceId);
+        if (!snapshot) return { status: 'missing', message: t('Original content is unavailable.') };
+        try {
+          const text = resolvePRTarget(snapshot, target);
+          return { status: 'ready', ...(text === undefined ? {} : { text }) };
+        } catch (error) {
           return {
-            id: snapshot.id,
-            source: snapshot.source,
-            detailId: snapshot.detailId,
-            ...(snapshot.identity ? { identity: snapshot.identity } : {}),
-            ...(snapshot.body === undefined ? {} : { body: snapshot.body }),
-            ...(snapshot.model
-              ? {
-                  model: {
-                    ...(snapshot.model.oldText === undefined
-                      ? {}
-                      : { oldText: snapshot.model.oldText }),
-                    ...(snapshot.model.newText === undefined
-                      ? {}
-                      : { newText: snapshot.model.newText }),
-                  },
-                }
-              : {}),
+            status: 'stale',
+            message: error instanceof Error ? error.message : String(error),
           };
-        });
-        const result = await checkFeedback({ ...session, feedback, snapshots: evidence });
-        if (!result.ok) throw new Error(result.message);
-        const receipt = await agent.emit('pr-feedback-submitted', result.data);
-        setSaved(receipt.id);
-      }}
-      adapter={{
-        resolve(target) {
-          const snapshot = snapshots.current.get(target.ref.sourceId);
-          if (!snapshot)
-            return { status: 'missing', message: t('Original content is unavailable.') };
-          try {
-            const text = resolvePRTarget(snapshot, target);
-            return { status: 'ready', ...(text === undefined ? {} : { text }) };
-          } catch (error) {
-            return {
-              status: 'stale',
-              message: error instanceof Error ? error.message : String(error),
-            };
-          }
-        },
-        targetRanges(target: Target<PRRef>) {
-          const snapshot = snapshots.current.get(target.ref.sourceId);
-          if (
-            !snapshot?.model ||
-            mountedDiff.current !== snapshot.id ||
-            (target.ref.kind !== 'file' &&
-              target.ref.kind !== 'hunk' &&
-              target.ref.kind !== 'lines')
-          )
-            return [];
-          return (
-            diffView.current?.getRanges(
-              diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
-            ) ?? []
+        }
+      },
+      targetRanges(target: Target<PRRef>) {
+        const snapshot = snapshots.current.get(target.ref.sourceId);
+        if (
+          !snapshot?.model ||
+          mountedDiff.current !== snapshot.id ||
+          (target.ref.kind !== 'file' && target.ref.kind !== 'hunk' && target.ref.kind !== 'lines')
+        )
+          return [];
+        return (
+          diffView.current?.getRanges(
+            diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
+          ) ?? []
+        );
+      },
+      async locate(target) {
+        const serial = ++locating.current,
+          snapshot = snapshots.current.get(target.ref.sourceId);
+        if (!snapshot) return;
+        setOld(snapshot);
+        setTab(
+          snapshot.source.kind === 'diff'
+            ? 'files'
+            : snapshot.source.kind === 'check'
+              ? 'checks'
+              : 'overview',
+        );
+        await new Promise<void>((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => done())),
+        );
+        if (serial !== locating.current) return;
+        if (snapshot.source.kind === 'description') {
+          const root = document.querySelector<HTMLElement>(
+            `[data-pr-body-source="${CSS.escape(snapshot.id)}"]`,
           );
-        },
-        async locate(target) {
-          const serial = ++locating.current,
-            snapshot = snapshots.current.get(target.ref.sourceId);
-          if (!snapshot) return;
-          setOld(snapshot);
-          setTab(
-            snapshot.source.kind === 'diff'
-              ? 'files'
-              : snapshot.source.kind === 'check'
-                ? 'checks'
-                : 'overview',
+          if (root) locateMarkdownAnnotation(root, target.text);
+        }
+        if (
+          snapshot.model &&
+          (target.ref.kind === 'file' || target.ref.kind === 'hunk' || target.ref.kind === 'lines')
+        ) {
+          if (mountedDiff.current !== snapshot.id) return;
+          await diffView.current?.reveal(
+            diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
           );
-          await new Promise<void>((done) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => done())),
-          );
-          if (serial !== locating.current) return;
-          if (snapshot.source.kind === 'description') {
-            const root = document.querySelector<HTMLElement>(
-              `[data-pr-body-source="${CSS.escape(snapshot.id)}"]`,
-            );
-            if (root) locateMarkdownAnnotation(root, target.text);
-          }
-          if (
-            snapshot.model &&
-            (target.ref.kind === 'file' ||
-              target.ref.kind === 'hunk' ||
-              target.ref.kind === 'lines')
-          ) {
-            if (mountedDiff.current !== snapshot.id) return;
-            await diffView.current?.reveal(
-              diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
-            );
-          }
-        },
-      }}
-    >
+        }
+      },
+    },
+  });
+  return (
+    <>
       <div className="mx-auto w-full max-w-[1600px] p-6 text-sm" data-pr-page="">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
@@ -560,7 +554,6 @@ function GithubPR() {
             </h1>
             <span className="shrink-0">/ {t('Pull requests')}</span>
           </div>
-          <AnnotationMenu />
         </header>
         <div className="grid grid-cols-[260px_minmax(0,1fr)] gap-6">
           <aside
@@ -1191,13 +1184,8 @@ function GithubPR() {
             )}
           </main>
         </div>
-        {saved && (
-          <p role="status" className="mt-4 text-sm text-muted-foreground">
-            {t('Annotations sent to your AI.')}
-          </p>
-        )}
       </div>
-    </AnnotationRoot>
+    </>
   );
 }
 export default definePanel({

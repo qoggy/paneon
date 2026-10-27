@@ -182,6 +182,7 @@ const zh: Record<keyof typeof en, string> = {
   提交更正后的表单: '提交更正后的表单',
   'Submit form': '提交表单',
   提交表单: '提交表单',
+  'Annotations submitted.': '批注已提交。',
   'Saved as event {id}. Edit and explicitly submit again to save a correction.':
     '已保存为事件 {id}。修改后请再次明确提交以保存更正。',
   '已保存为事件 {id}。修改后请再次明确提交以保存更正。':

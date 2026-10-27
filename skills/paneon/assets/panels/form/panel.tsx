@@ -23,6 +23,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
   Switch,
   Textarea,
 } from '@qoggy/paneon/ui';
@@ -283,6 +284,7 @@ function FormPanel() {
             })}
             <div className="flex items-center gap-2">
               <Button type="button" disabled={submission.pending} onClick={submit}>
+                {submission.pending && <Spinner aria-hidden="true" />}
                 {submission.pending
                   ? t('Saving…')
                   : submission.hasReceipt

@@ -119,7 +119,7 @@ try {
     await frame.getByLabel('批注内容', { exact: true }).inputValue(),
     'Preserved across collapse',
   );
-  await button('取消').click();
+  await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   // Delay an older response, then request another commit. Intent/highlight/loading paint first.
   const queryUrl = `**/api/panels/${panel.instanceId}/actions/*`;
   let release, started;

@@ -58,7 +58,7 @@ const zh = {
   'Filter files…': '筛选文件…',
   'No matching files.': '没有匹配的文件。',
   'No file changes.': '没有文件改动。',
-  'Annotations sent to your AI.': '批注已发送给当前 AI。',
+  'Annotations submitted.': '批注已提交。',
   Approved: '已批准',
   'Changes requested': '需要修改',
   'Review required': '等待审阅',

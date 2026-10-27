@@ -1,4 +1,4 @@
-import { submitAnnotations } from './annotation-tools.mjs';
+import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -26,6 +26,12 @@ try {
     page.on('pageerror', (error) => errors.push(error.message));
     const frame = page.frameLocator('iframe');
     const button = (name) => frame.getByRole('button', { name, exact: true });
+    const waitForSubmission = async () => {
+      const toast = frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' });
+      await toast.waitFor();
+      await toast.locator('[data-slot="toast-close"]').click();
+      await toast.waitFor({ state: 'detached' });
+    };
     const screenshot = async (name) => {
       if (artifacts)
         await page.screenshot({
@@ -166,17 +172,18 @@ try {
     );
     assert.equal(await comments.text(1), '列名说明');
     await submitAnnotations(frame);
-    await frame.getByRole('status').waitFor();
+    await waitForSubmission();
     const first = (await fixture.events(fixture.normal)).at(-1);
     assert.deepEqual(first.payload.annotations[0].targets, [
       { ref: { kind: 'header', columnKey: 'note' }, text: { start: 0, end: 2, quote: '说明' } },
     ]);
+    await openAnnotationDirectory(frame);
     await button('修改反馈').click();
     await comments.edit(1);
     await frame.getByLabel('批注内容', { exact: true }).fill('列名更正');
     await comments.save();
     await submitAnnotations(frame);
-    await frame.getByRole('status').waitFor();
+    await waitForSubmission();
     const correction = (await fixture.events(fixture.normal)).at(-1);
     assert.equal(correction.payload.replacesEventId, first.id);
     assert.equal(correction.payload.annotations[0].comment, '列名更正');
@@ -221,7 +228,7 @@ try {
     await longComments.write('原文坐标');
     await longComments.save();
     await submitAnnotations(frame);
-    await frame.getByRole('status').waitFor();
+    await waitForSubmission();
     const event = (await fixture.events(fixture.long)).at(-1);
     assert.deepEqual(event.payload.annotations[0].targets[0], {
       ref: { kind: 'cell', rowIndex: 0, columnKey: 'note' },
