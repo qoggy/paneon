@@ -195,7 +195,12 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
       /65536/,
     );
     await assert.rejects(
-      readGit(params, { repositoryId: 'web', type: 'changes', file: 'missing.txt' }),
+      readGit(params, {
+        repositoryId: 'web',
+        type: 'history',
+        commit: f.rootCommit,
+        file: 'missing.txt',
+      }),
       /not present/,
     );
     await mkdir(join(f.repo, 'deleted-dir'));
@@ -204,6 +209,41 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
     await git(f.repo, 'commit', '-qm', 'directory');
     await rm(join(f.repo, 'deleted-dir'), { recursive: true });
     await readGit(params, { repositoryId: 'web', type: 'changes' });
+  } finally {
+    await f.close();
+  }
+});
+void test('changes refresh clears a vanished selection after staging or committing', async () => {
+  const f = await fixture();
+  try {
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
+    const initial = { repositoryId: 'web', type: 'changes' as const, file: 'a.ts' };
+    const request = { ...initial, area: 'unstaged' as const };
+    const before = await readGitListing(params, request);
+    assert.equal(before.snapshots.length, 1);
+    assert.equal(before.snapshots[0].source.view.type, 'changes');
+
+    await git(f.repo, 'add', '--', 'a.ts');
+    const staged = await readGitListing(params, request);
+    assert.ok(staged.files.some((file) => file.source.new?.path === 'a.ts'));
+    assert.deepEqual(staged.snapshots, [], 'Do not select the same path in a different area');
+    assert.equal((await readGitListing(params, initial)).snapshots.length, 1);
+
+    await git(f.repo, 'commit', '-qm', 'Commit selected changes');
+    for (const input of [request, initial]) {
+      const partial = await readGitListing(params, input);
+      assert.ok(partial.files.length > 0, 'Keep the remaining changes visible');
+      assert.ok(partial.files.every((file) => file.source.new?.path !== 'a.ts'));
+      assert.deepEqual(partial.snapshots, []);
+    }
+
+    await git(f.repo, 'add', '-A');
+    await git(f.repo, 'commit', '-qm', 'Commit remaining changes');
+    for (const input of [request, initial]) {
+      const clean = await readGitListing(params, input);
+      assert.deepEqual(clean.files, []);
+      assert.deepEqual(clean.snapshots, []);
+    }
   } finally {
     await f.close();
   }

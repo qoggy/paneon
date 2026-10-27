@@ -652,8 +652,10 @@ export async function readGit(
         (!request.area ||
           (item.source.view.type === 'changes' && item.source.view.area === request.area)),
     );
-    if (!file) throw new Error(`Initial file is not present in this view: ${request.file}`);
-    snapshots.push(await readGitFile(params, file, signal));
+    // Working changes are mutable: staging or committing can remove the selected entry.
+    if (!file && request.type !== 'changes')
+      throw new Error(`Initial file is not present in this view: ${request.file}`);
+    if (file) snapshots.push(await readGitFile(params, file, signal));
   }
   return {
     listingId,

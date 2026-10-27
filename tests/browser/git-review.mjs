@@ -297,7 +297,7 @@ try {
     (await cli('events', f.panel.instanceId, '--consumer', 'git-browser')).events.length,
     0,
   );
-  // Agent-specified history/root, compare and invalid file initial locations.
+  // Agent-specified history/root, compare and missing file initial locations.
   for (const initialView of [
     { repositoryId: 'web', type: 'history' },
     { repositoryId: 'web', type: 'history', commit: f.rootCommit, file: 'a.ts' },
@@ -311,12 +311,28 @@ try {
     else await next.locator('[data-diff-source]').waitFor();
   }
   await verifyGitLayout(f, page);
-  const invalid = await f.run({
+  const missing = await f.run({
     ...f.params,
     initialView: { repositoryId: 'web', type: 'changes', file: 'missing.ts' },
   });
-  await page.goto(f.url(invalid));
-  await page.frameLocator('iframe').getByRole('alert').filter({ hasText: 'not present' }).waitFor();
+  await page.goto(f.url(missing));
+  const missingFrame = page.frameLocator('iframe');
+  await missingFrame.locator('[data-file-scroll][aria-busy=false]').waitFor();
+  assert.ok((await missingFrame.locator('[data-file-id]').count()) > 0);
+  assert.equal(await missingFrame.locator('[data-diff-source]').count(), 0);
+  assert.equal(await missingFrame.getByRole('alert').count(), 0);
+  for (const initialView of [
+    { repositoryId: 'web', type: 'history', commit: f.rootCommit, file: 'missing.ts' },
+    { repositoryId: 'web', type: 'compare', base: 'base', file: 'missing.ts' },
+  ]) {
+    const invalid = await f.run({ ...f.params, initialView });
+    await page.goto(f.url(invalid));
+    await page
+      .frameLocator('iframe')
+      .getByRole('alert')
+      .filter({ hasText: 'not present' })
+      .waitFor();
+  }
   const artifact = process.env.PANEON_TEST_ARTIFACTS;
   if (artifact) {
     await mkdir(artifact, { recursive: true });
