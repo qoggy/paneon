@@ -14,14 +14,88 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import pino from 'pino';
+import type { ResourcePool } from '../src/runtime/resource-pool.js';
 const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
 )) as typeof import('../src/runtime/lifecycle.js');
 const logger = pino({ level: 'silent' });
 
-function source(marker: string, label = 'original') {
+void test(
+  'compilation waiting outlives resident wait limits and is cancelled on close or stop',
+  { timeout: 60000 },
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'paneon-compile-wait-'));
+    const entry = join(root, 'panel.tsx');
+    writeFileSync(entry, source(join(root, 'boots')));
+    const runtime = new Runtime(join(root, 'data'), logger, { waitMs: 25 });
+    const pool = (runtime as unknown as { compilation: ResourcePool }).compilation;
+    try {
+      const panel = await runtime.run(entry, root, {}, false);
+      const held = await pool.acquire('held');
+      const reload = runtime.reload(panel.instanceId);
+      await until(() => pool.queued === 1);
+      await delay(75);
+      assert.equal(pool.queued, 1);
+      held.release();
+      await reload;
+      assert.equal(runtime.resourceUsage.compiling, 0);
+
+      const blocked = await pool.acquire('blocked');
+      const closing = assert.rejects(runtime.reload(panel.instanceId), { code: 'PANEL_CLOSED' });
+      await until(() => pool.queued === 1);
+      await runtime.closePanel(panel.instanceId);
+      await closing;
+      assert.equal(pool.queued, 0);
+      const stopped = assert.rejects(pool.acquire('stop-waiter'), { code: 'RUNTIME_UNAVAILABLE' });
+      await runtime.stop();
+      await stopped;
+      blocked.release();
+    } finally {
+      if (!runtime.stopping) await runtime.stop();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'a real compilation timeout preserves the previous revision and permits recovery',
+  { timeout: 60000 },
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'paneon-compile-recovery-'));
+    const entry = join(root, 'panel.tsx');
+    const marker = join(root, 'metadata-pid');
+    const original = source(join(root, 'boots'));
+    writeFileSync(entry, original);
+    const runtime = new Runtime(join(root, 'data'), logger);
+    try {
+      const panel = await runtime.run(entry, root, {}, false);
+      const previous = runtime.live.get(panel.instanceId)?.execution;
+      // Only the deliberately failing build uses a short deadline. Normal warmup
+      // and recovery retain the production limit, including on busy CI machines.
+      Object.assign(runtime, { compilerTimeoutMs: 1000 });
+      writeFileSync(entry, source(marker, 'stalled', true));
+      await assert.rejects(runtime.reload(panel.instanceId), { code: 'BUILD_TIMEOUT' });
+      assert.equal(runtime.inspect(panel.instanceId).revision, panel.revision);
+      assert.equal(runtime.inspect(panel.instanceId).diagnostic?.code, 'BUILD_TIMEOUT');
+      assert.equal(runtime.live.get(panel.instanceId)?.execution, previous);
+      assert.equal(previous?.alive, true);
+      assert.equal(runtime.resourceUsage.compiling, 0);
+      assert.equal(runtime.resourceUsage.queuedBuilds, 0);
+      Object.assign(runtime, { compilerTimeoutMs: undefined });
+      writeFileSync(entry, original);
+      await runtime.reload(panel.instanceId);
+      assert.equal(runtime.inspect(panel.instanceId).diagnostic, undefined);
+      assert.equal(runtime.resourceUsage.compiling, 0);
+    } finally {
+      await runtime.stop();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+function source(marker: string, label = 'original', stalled = false) {
   return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{appendFileSync}from'node:fs';
-const boot=(appendFileSync(${JSON.stringify(marker)},'boot\\n'),true);const state={count:0};
+const boot=(appendFileSync(${JSON.stringify(marker)},'boot\\n'),${stalled ? '(()=>{while(true){}})()' : 'true'});const state={count:0};
 export const read=serverAction({input:z.object({delay:z.number().optional()}),handler:async(_ctx,input)=>{await new Promise(resolve=>setTimeout(resolve,input.delay??0));return{count:++state.count,boot,label:${JSON.stringify(label)},cwd:process.cwd()};}});
 function Panel(){return <div>${label}</div>}
 export default definePanel({id:'resource',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{done:z.object({text:z.string().refine(text=>text!=='blocked')})},render:Panel});`;
@@ -226,7 +300,7 @@ void test(
     const entry = join(root, 'panel.tsx');
     writeFileSync(entry, source(join(root, 'boots')));
     const home = join(root, 'data');
-    const runtime = new Runtime(home, logger, { maxPanels: 3 });
+    const runtime = new Runtime(home, logger, { maxPanels: 3, waitMs: 60000 });
     try {
       const pending = Array.from({ length: 3 }, () => runtime.run(entry, root, {}, false));
       let maximumBuilds = 0;

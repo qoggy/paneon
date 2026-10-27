@@ -114,3 +114,43 @@ void test('nonresident permits serialize compilation and drain releases without 
   assert.equal(maximum, 1);
   assert.deepEqual(errors, []);
 });
+
+void test('untimed compilation waiting stays bounded, cancellable and FIFO', async () => {
+  const pool = new ResourcePool(
+    1,
+    async () => {},
+    (error) => assert.ifError(error),
+    3,
+    null,
+    false,
+  );
+  const busy = await pool.acquire('busy');
+  const controller = new AbortController();
+  const cancelled = assert.rejects(pool.acquire('cancelled', controller.signal), {
+    code: 'PANEL_CLOSED',
+  });
+  const order: string[] = [];
+  const next = pool.acquire('next').then((lease) => {
+    order.push('next');
+    return lease;
+  });
+  const last = pool.acquire('last').then((lease) => {
+    order.push('last');
+    return lease;
+  });
+  await assert.rejects(pool.acquire('overflow'), { code: 'RUNTIME_BUSY' });
+  controller.abort(Object.assign(new Error('closed'), { code: 'PANEL_CLOSED' }));
+  await cancelled;
+  await delay(30);
+  assert.equal(pool.queued, 2);
+  assert.deepEqual(order, []);
+  busy.release();
+  (await next).release();
+  (await last).release();
+  assert.deepEqual(order, ['next', 'last']);
+  const held = await pool.acquire('held');
+  const stopped = assert.rejects(pool.acquire('stopped'), { code: 'RUNTIME_UNAVAILABLE' });
+  await pool.stop();
+  await stopped;
+  held.release();
+});

@@ -125,7 +125,12 @@ class Execution {
   }
 }
 type Live = { compiled: CompiledPanel; execution?: Execution; watcher?: SourceSubscription };
-export type RuntimeResourceOptions = { maxPanels?: number; maxWaiting?: number; waitMs?: number };
+export type RuntimeResourceOptions = {
+  maxPanels?: number;
+  maxWaiting?: number;
+  waitMs?: number;
+  compilerTimeoutMs?: number;
+};
 export class Runtime extends EventEmitter {
   store: Store;
   live = new Map<string, Live>();
@@ -136,6 +141,7 @@ export class Runtime extends EventEmitter {
   private initializing = new Map<string, Execution>();
   private residents: ResourcePool;
   private compilation: ResourcePool;
+  private compilerTimeoutMs: number | undefined;
   private artifacts: Artifacts;
   private artifactCleanup?: Promise<void>;
   private sources: SourceWatcher;
@@ -148,6 +154,7 @@ export class Runtime extends EventEmitter {
     super();
     this.logger = logger;
     this.home = home;
+    this.compilerTimeoutMs = options.compilerTimeoutMs;
     this.store = new Store(home);
     this.artifacts = new Artifacts(home);
     this.sources = new SourceWatcher((err) => this.logger.error({ err }, 'Source watcher failed'));
@@ -167,7 +174,7 @@ export class Runtime extends EventEmitter {
       },
       onError,
       options.maxWaiting ?? 32,
-      options.waitMs ?? 10000,
+      null,
       false,
     );
   }
@@ -302,6 +309,7 @@ export class Runtime extends EventEmitter {
             const compiler = new CompilerProcess(
               current.entryPath,
               join(this.home, 'panels', current.instanceId),
+              this.compilerTimeoutMs,
             );
             this.compilers.set(current.instanceId, compiler);
             try {

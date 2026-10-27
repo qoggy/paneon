@@ -34,11 +34,7 @@ export function BuildDiagnostic({
           <p className="max-h-24 overflow-auto font-mono text-xs break-all">{location}</p>
         )}
         {previousAvailable && (
-          <p>
-            {t(
-              'The new code failed to compile. The page still shows the version from before your changes.',
-            )}
-          </p>
+          <p>{t('The page still shows the last successfully built version.')}</p>
         )}
         {frame && (
           <details className="w-full min-w-0">

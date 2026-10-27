@@ -28,14 +28,14 @@ export class ResourcePool {
   private dispose: (key: string) => Promise<void>;
   private onError: (error: unknown) => void;
   private maxWaiting: number;
-  private waitMs: number;
+  private waitMs: number | null;
   private retainIdle: boolean;
   constructor(
     limit: number,
     dispose: (key: string) => Promise<void>,
     onError: (error: unknown) => void,
     maxWaiting = 32,
-    waitMs = 10000,
+    waitMs: number | null = 10000,
     retainIdle = true,
   ) {
     this.limit = limit;
@@ -68,10 +68,14 @@ export class ResourcePool {
         this.pump();
       };
       const abort = () => cancel(signal ? this.abortError(signal) : this.unavailable());
-      const timer = setTimeout(
-        () => cancel(new PaneonError('RUNTIME_BUSY', 'Waiting for runtime capacity timed out.')),
-        this.waitMs,
-      );
+      const timer =
+        this.waitMs === null
+          ? undefined
+          : setTimeout(
+              () =>
+                cancel(new PaneonError('RUNTIME_BUSY', 'Waiting for runtime capacity timed out.')),
+              this.waitMs,
+            );
       const waiter: Waiting = {
         key,
         resolve,

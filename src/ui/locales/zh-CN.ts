@@ -69,8 +69,7 @@ const zh: Record<keyof typeof en, string> = {
   closed: '已关闭',
   'Reconnecting to Paneon…': '正在重新连接 Paneon…',
   'Runtime connection': '运行时连接',
-  'The new code failed to compile. The page still shows the version from before your changes.':
-    '新代码编译失败，当前仍显示修改前的页面。',
+  'The page still shows the last successfully built version.': '当前仍显示上次成功构建的页面。',
   'This panel has been closed. Interaction history is retained.': '面板已关闭，交互历史已保留。',
   'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.':
     '面板不可用。请让 agent 检查诊断并修正源码。',

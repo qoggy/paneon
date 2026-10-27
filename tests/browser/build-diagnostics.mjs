@@ -100,7 +100,7 @@ try {
     if (!response.ok) throw new Error('Could not change test UI preferences');
   });
   await page.getByText('查看出错代码', { exact: true }).waitFor();
-  await page.getByText('新代码编译失败，当前仍显示修改前的页面。', { exact: true }).waitFor();
+  await page.getByText('当前仍显示上次成功构建的页面。', { exact: true }).waitFor();
   await page.getByText(diagnostic.message, { exact: true }).waitFor();
   assert.equal(await page.locator('iframe').getAttribute('src'), oldSrc);
   await frame.getByRole('button', { name: 'Count 1', exact: true }).waitFor();

@@ -69,8 +69,8 @@ const en = {
   closed: 'closed',
   'Reconnecting to Paneon…': 'Reconnecting to Paneon…',
   'Runtime connection': 'Runtime connection',
-  'The new code failed to compile. The page still shows the version from before your changes.':
-    'The new code failed to compile. The page still shows the version from before your changes.',
+  'The page still shows the last successfully built version.':
+    'The page still shows the last successfully built version.',
   'This panel has been closed. Interaction history is retained.':
     'This panel has been closed. Interaction history is retained.',
   'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.':
