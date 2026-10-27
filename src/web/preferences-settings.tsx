@@ -1,14 +1,32 @@
 import { useRef, useState } from 'react';
-import { Button, useUI } from '../ui';
+import {
+  Label,
+  RadioGroup,
+  RadioGroupItem,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  useToastManager,
+  useUI,
+} from '../ui';
 import { cn } from '../ui/utils';
 import { useSavePreferences } from './preferences-state';
 import { errorMessage } from './api';
 import type { UIPreferences } from '../shared/preferences';
+
+function SavedToastTitle() {
+  const { t } = useUI();
+  return t('Saved');
+}
+
 export function PreferencesSettings() {
   const { theme, language, t } = useUI();
+  const toast = useToastManager();
   const save = useSavePreferences();
   const saving = useRef(false);
-  const [status, setStatus] = useState<'idle' | 'pending' | 'saved' | 'failed'>('idle');
+  const [status, setStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
   const [error, setError] = useState('');
   const pending = status === 'pending';
   async function update(patch: Partial<UIPreferences>) {
@@ -18,7 +36,8 @@ export function PreferencesSettings() {
     setError('');
     try {
       await save(patch);
-      setStatus('saved');
+      setStatus('idle');
+      toast.add({ title: <SavedToastTitle />, type: 'success' });
     } catch (cause) {
       setError(errorMessage(cause));
       setStatus('failed');
@@ -35,60 +54,48 @@ export function PreferencesSettings() {
         <span className="text-sm font-medium" id="appearance-label">
           {t('Appearance')}
         </span>
-        <div
-          className="flex rounded-lg border bg-muted p-1"
-          role="group"
+        <RadioGroup
+          className="flex gap-4"
           aria-labelledby="appearance-label"
+          value={theme}
+          disabled={pending}
+          onValueChange={(value) => {
+            if (value !== theme) void update({ theme: value as UIPreferences['theme'] });
+          }}
         >
           {(['light', 'dark'] as const).map((value) => (
-            <Button
-              key={value}
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'flex-1 text-muted-foreground',
-                theme === value && 'bg-background text-foreground shadow-sm hover:bg-background',
-              )}
-              aria-pressed={theme === value}
-              disabled={pending}
-              onClick={() => {
-                if (theme !== value) void update({ theme: value });
-              }}
-            >
+            <Label key={value}>
+              <RadioGroupItem value={value} />
               {t(value === 'light' ? 'Light' : 'Dark')}
-            </Button>
+            </Label>
           ))}
-        </div>
+        </RadioGroup>
       </div>
       <div className="grid items-center gap-4 border-t py-6 sm:grid-cols-[1fr_auto]">
-        <label className="text-sm font-medium" htmlFor="interface-language">
-          {t('Language')}
-        </label>
-        <select
-          id="interface-language"
+        <Label htmlFor="interface-language">{t('Language')}</Label>
+        <Select
           value={language}
+          items={{ en: 'English', 'zh-CN': '简体中文' }}
           disabled={pending}
-          className="h-9 min-w-40 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:outline-ring/50 disabled:opacity-50"
-          onChange={(event) =>
-            void update({ language: event.target.value as UIPreferences['language'] })
-          }
+          onValueChange={(value) => {
+            if (value !== null && value !== language) void update({ language: value });
+          }}
         >
-          <option value="en">English</option>
-          <option value="zh-CN">简体中文</option>
-        </select>
+          <SelectTrigger id="interface-language" className="min-w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="zh-CN">简体中文</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div
         role="status"
         aria-live="polite"
         className={cn('text-sm text-muted-foreground', status === 'failed' && 'text-destructive')}
       >
-        {pending
-          ? t('Saving…')
-          : status === 'saved'
-            ? t('Saved')
-            : status === 'failed'
-              ? t('Save failed. {error}', { error })
-              : null}
+        {pending ? t('Saving…') : status === 'failed' ? t('Save failed. {error}', { error }) : null}
       </div>
     </section>
   );

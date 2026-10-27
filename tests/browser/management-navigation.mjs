@@ -146,19 +146,23 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VE
     }
     await route.continue();
   });
-  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.getByRole('radio', { name: 'Dark', exact: true }).click();
   await page.getByRole('status').getByText('Saving…', { exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Light', exact: true }).isDisabled(), true);
-  assert.equal(await page.getByRole('button', { name: 'Dark', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('radio', { name: 'Light', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('radio', { name: 'Dark', exact: true }).isDisabled(), true);
   assert.equal(await page.getByLabel('Language', { exact: true }).isDisabled(), true);
   await page.getByRole('link', { name: 'Server', exact: true }).click();
   await page.getByRole('heading', { name: 'Local Paneon service', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('status').getByText('Saving…', { exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Dark', exact: true }).isDisabled(), true);
-  await page.getByRole('button', { name: 'Dark', exact: true }).dispatchEvent('click');
+  assert.equal(await page.getByRole('radio', { name: 'Dark', exact: true }).isDisabled(), true);
+  await page.getByRole('radio', { name: 'Dark', exact: true }).dispatchEvent('click');
   release();
-  await page.getByRole('status').getByText('Saved', { exact: true }).waitFor();
+  const savedToast = page.locator('[data-slot=toast]').filter({ hasText: 'Saved' });
+  await savedToast.waitFor();
+  assert.equal(await page.locator('main').getByText('Saved', { exact: true }).count(), 0);
+  await savedToast.locator('[data-slot=toast-close]').click();
+  await savedToast.waitFor({ state: 'detached' });
   await second.locator('html.dark').waitFor();
   assert.equal(saves, 1, 'A pending save must not accept duplicate writes.');
   await page.unroute('**/api/preferences');
@@ -173,16 +177,23 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VE
         })
       : route.continue(),
   );
-  await page.getByRole('button', { name: 'Light', exact: true }).click();
+  await page.getByRole('radio', { name: 'Light', exact: true }).click();
   await page.getByText('Save failed. Disk unavailable', { exact: true }).waitFor();
   assert.equal(
-    await page.getByRole('button', { name: 'Dark', exact: true }).getAttribute('aria-pressed'),
+    await page.getByRole('radio', { name: 'Dark', exact: true }).getAttribute('aria-checked'),
     'true',
   );
   assert.equal(await page.getByRole('status').getByText('Saved', { exact: true }).count(), 0);
-  await page.getByLabel('Language', { exact: true }).selectOption('zh-CN');
+  await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+  await page.getByRole('option', { name: '简体中文', exact: true }).click();
   await page.getByText('Save failed. Disk unavailable', { exact: true }).waitFor();
-  assert.equal(await page.getByLabel('Language', { exact: true }).inputValue(), 'en');
+  assert.equal(
+    await page
+      .getByRole('combobox', { name: 'Language', exact: true })
+      .locator('[data-slot=select-value]')
+      .textContent(),
+    'English',
+  );
   await page.unroute('**/api/preferences');
 
   await page.getByRole('link', { name: 'Server', exact: true }).click();
@@ -215,7 +226,7 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VE
     const oldTheme = await page.locator('html').getAttribute('data-theme');
     if (theme !== oldTheme)
       await page
-        .getByRole('button', {
+        .getByRole('radio', {
           name:
             theme === 'light'
               ? oldLanguage === 'en'
@@ -229,8 +240,11 @@ export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VE
         .click();
     await page.locator(`html[data-theme="${theme}"]`).waitFor();
     await page
-      .getByLabel(oldLanguage === 'en' ? 'Language' : '语言', { exact: true })
-      .selectOption(language);
+      .getByRole('combobox', { name: oldLanguage === 'en' ? 'Language' : '语言', exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: language === 'en' ? 'English' : '简体中文', exact: true })
+      .click();
     await page.locator(`html[lang="${language}"]`).waitFor();
     await second.locator(`html[data-theme="${theme}"][lang="${language}"]`).waitFor();
     for (const width of widths) {

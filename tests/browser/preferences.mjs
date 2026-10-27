@@ -175,10 +175,10 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
       });
     return route.continue();
   });
-  await home.getByRole('button', { name: '浅色', exact: true }).click();
+  await home.getByRole('radio', { name: '浅色', exact: true }).click();
   await home.getByText('保存失败。Disk unavailable', { exact: true }).waitFor();
   assert.equal(
-    await home.getByRole('button', { name: '深色', exact: true }).getAttribute('aria-pressed'),
+    await home.getByRole('radio', { name: '深色', exact: true }).getAttribute('aria-checked'),
     'true',
   );
   await home.unroute('**/api/preferences');
@@ -186,7 +186,8 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
   await home2.goto(origin);
   assert.equal(await home2.locator('html').getAttribute('class'), 'dark');
   await home2.getByRole('link', { name: '设置', exact: true }).click();
-  await home2.getByLabel('语言', { exact: true }).selectOption('en');
+  await home2.getByRole('combobox', { name: '语言', exact: true }).click();
+  await home2.getByRole('option', { name: 'English', exact: true }).click();
   await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).waitFor();
   assert.equal(
     await pf.getByRole('textbox', { name: 'Annotation text', exact: true }).inputValue(),
@@ -201,7 +202,8 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
   );
   await ff.getByRole('button', { name: 'Submit corrected form', exact: true }).click();
   await ff.getByText('Not saved. Save The draft is still available.', { exact: true }).waitFor();
-  await home2.getByLabel('Language', { exact: true }).selectOption('zh-CN');
+  await home2.getByRole('combobox', { name: 'Language', exact: true }).click();
+  await home2.getByRole('option', { name: '简体中文', exact: true }).click();
   await ff.getByText('未保存。Save 草稿仍可使用。', { exact: true }).waitFor();
   await form.unroute('**/api/panels/*/events');
   const firstDark = await context.newPage();
