@@ -3,9 +3,8 @@
 ## Complete source file
 
 ```tsx
-import { useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
-import { Button, Page, Stack } from '@qoggy/paneon/ui';
+import { Button, Page, Stack, toast } from '@qoggy/paneon/ui';
 
 export const calculate = serverAction({
   kind: 'query',
@@ -15,21 +14,20 @@ export const calculate = serverAction({
 
 function Review() {
   const { topic } = usePanelInput<{ topic: string }>();
-  const [message, setMessage] = useState('');
   async function runCalculation() {
     try {
       const result = await calculate({ value: 21 });
-      setMessage(`Result: ${result.doubled}`);
+      toast.add({ title: `Result: ${result.doubled}`, type: 'success' });
     } catch {
-      setMessage('Calculation failed.');
+      toast.add({ title: 'Calculation failed.', type: 'error' });
     }
   }
   async function askAgent() {
     try {
       await agent.emit('review-requested', { topic });
-      setMessage('Submitted to AI.');
+      toast.add({ title: 'Submitted to AI.', type: 'success' });
     } catch {
-      setMessage('The request was not saved.');
+      toast.add({ title: 'The request was not saved.', type: 'error' });
     }
   }
   return (
@@ -39,7 +37,6 @@ function Review() {
         <Button variant="outline" onClick={() => void askAgent()}>
           Ask AI to review
         </Button>
-        <p role="status">{message}</p>
       </Stack>
     </Page>
   );
@@ -59,11 +56,11 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 ```
 
 - `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
-- `requires.paneon` must be a literal npm semver range. For example, `>=0.0.1 <0.1.0` declares a minimum supported version and accepts later patches in that range; it does not need to match the current release. Change it when the panel's compatibility requirements change. Paneon never widens it; on `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
+- `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.0.1 <0.1.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
 ## Deliver events
 
-Declare every event type in `events`. `await agent.emit(type, payload)` resolves only after the event is validated and stored; show success only then. It does not wake a stopped agent. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
+Declare every event type in `events`. `await agent.emit(type, payload)` resolves only after the event is validated and stored; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
 
 ## Server actions
 
@@ -110,12 +107,11 @@ export const readApi = serverAction({
 - Module-level objects survive between calls only while the panel stays resident. At most ten panels are resident, and idle ones are evicted first; eviction, reload, close and restart discard module state. Keep durable state outside worker memory.
 - Await work whose result matters. Detached timers and child processes are not a background-job service.
 - When capacity is exhausted, a call can fail with `RUNTIME_BUSY`; it is not replayed.
-- Restart restores panel configuration and events, not in-flight calls.
-- Watching covers local imports and `.env`, `.env.local`, `.env.production` and `.env.production.local`. Run `panel reload` after changing installed packages.
+- Source watching covers local imports and `.env` files; run `panel reload` after changing installed packages.
 
 ## Queries
 
-`useQuery(queryAction, input, { refreshMs })` returns `{ data, error, loading, refetch }`. It accepts only query actions, avoids overlapping runs, and stops timed refresh on unmount. Build loading, empty, error and success states with ordinary React state:
+`useQuery(queryAction, input, { refreshMs })` returns `{ data, error, loading, refetch }`. It runs on mount and when `input` changes, never overlaps runs, and accepts only query actions, so automatic refresh never repeats a side effect:
 
 ```tsx
 // Inside a component; listItems and saveSelection are declared actions.
@@ -145,7 +141,13 @@ return (
         <AlertDescription>{failure || 'Unable to read items.'}</AlertDescription>
       </Alert>
     )}
-    {items.data?.length === 0 && <p>No matching items.</p>}
+    {items.data?.length === 0 && (
+      <Empty>
+        <EmptyHeader>
+          <EmptyDescription>No matching items.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )}
     <Button disabled={saving || selectedIds.length === 0} onClick={() => void save()}>
       Save selection
     </Button>
@@ -186,23 +188,182 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Markdown` | GFM Markdown, including Mermaid fences |
 | `Mermaid` | Diagram |
 | `DiffView` | Text diff |
-| `Tree` | Expandable hierarchy, such as a file tree |
 | `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` | Resizable split layout |
-| `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](annotations.md) |
-
-Slider is not included.
+| `Tree` | Expandable hierarchy, such as a file tree |
+| `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](#annotations) |
 
 - `Select` needs `items` to display labels for values.
-- `CodeBlock` highlights javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, diff, python, java, css, html and markdown; other languages render as plain text.
-- `Markdown` renders GFM with raw HTML disabled. `components` overrides and `rehypePlugins` compose with the defaults; replacing `pre` also drops Mermaid handling.
-- `Mermaid` and Markdown diagrams use the bundled Mermaid library; never load Mermaid from a CDN. Invalid source shows an error in place of that diagram.
-- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).
-
+- `CodeBlock` takes `code` and `language`: javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, diff, python, java, css, html or markdown. Other languages render as plain text.
+- `Markdown` renders GFM without raw HTML. Replacing `pre` through `components` also drops Mermaid rendering.
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
+- `Mermaid` is bundled; never load Mermaid from a CDN.
+- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [Markdown and DiffView](#markdown-and-diffview).
 
 ## Theme and language
 
 - Public components follow the user's theme and language preference automatically. Never add theme or language to panel input.
 - Use theme variables such as `bg-background`, `text-foreground` and `border-border` for custom colors.
-- Paneon translates only its own controls; text the page supplies stays as written. `useUI()` returns `theme` and `language` (`en` or `zh-CN`).
+- `useUI()` returns `theme` and `language` (`en` or `zh-CN`).
 - Write a page's own text in the language the human uses with you, not necessarily the one `useUI()` reports: if they asked for Russian, write Russian; if they chat in Japanese, write Japanese. Do not build multilingual copy for a temporary or private page; development time matters more.
+
+## Annotations
+
+Import `annotationValueSchema` and data types from `@qoggy/paneon/sdk`; import components, `useAnnotations` and `AnnotationAdapter` from `@qoggy/paneon/ui`. Call the feature 批注 in Chinese copy and annotation in English copy.
+
+### Complete annotation panel
+
+```tsx
+import { useMemo, useRef } from 'react';
+import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { Card, AnnotationText, toast, usePageAnnotations } from '@qoggy/paneon/ui';
+import type { AnnotationAdapter } from '@qoggy/paneon/ui';
+
+const source = 'Use Redis for shared cache storage.';
+const refSchema = z.literal('redis-plan');
+type Ref = z.infer<typeof refSchema>;
+const resultSchema = annotationValueSchema(refSchema);
+
+function Panel() {
+  const card = useRef<HTMLDivElement>(null);
+  const adapter = useMemo<AnnotationAdapter<Ref>>(
+    () => ({
+      resolve(target) {
+        return refSchema.safeParse(target.ref).success
+          ? { status: 'ready', text: source }
+          : { status: 'missing', message: 'Unknown plan.' };
+      },
+      locate() {
+        card.current?.scrollIntoView({ block: 'center' });
+      },
+    }),
+    [],
+  );
+  usePageAnnotations<Ref>({
+    adapter,
+    onSubmit: async (value) => {
+      await agent.emit('annotations-submitted', value);
+      toast.add({ title: 'Annotations submitted.', type: 'success' });
+    },
+  });
+  return (
+    <Card ref={card} className="p-4">
+      <AnnotationText target="redis-plan">{source}</AnnotationText>
+    </Card>
+  );
+}
+
+export default definePanel({
+  id: 'custom-annotations',
+  requires: { paneon: '>=0.0.1 <0.1.0' },
+  input: z.object({}).strict(),
+  events: { 'annotations-submitted': resultSchema },
+  render: Panel,
+});
+```
+
+### Result data
+
+- A result is `{annotations: [{id, targets, comment}]}`; there is no page-level comment. A target is `{ref, sourceRef?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
+- Do not build a separate page-level comment editor; an opinion about a whole document is an annotation on its heading.
+- `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`.
+- `ref` is any finite JSON value. For ordinary content use a stable string: `target="redis-plan"` is delivered as `ref: "redis-plan"`. For dynamic content include the source version. Functions, DOM elements and screen coordinates are not references.
+- `annotationValueSchema(refSchema)` checks structure only.
+
+### File annotations
+
+When an annotatable `Markdown` links to a local file, the human can annotate the opened file too. Its targets keep that Markdown's `ref` and add `sourceRef: {path, snapshotId}`, with offsets into the file as displayed rather than into the Markdown. Wherever the page checks or maps offsets against its own content, such as an event schema refinement, skip targets with `target.sourceRef !== undefined`.
+
+`sourceRef` is optional JSON; the SDK does not prescribe its structure. `annotationValueSchema(refSchema)` accepts it without widening `refSchema`. Hand-written strict target schemas need to accept the optional field.
+
+### Annotation components
+
+- `usePageAnnotations<TRef>({ onSubmit, adapter?, disabled?, allowEmptySubmit?, onRequestEdit? })` turns on annotations for the page: Paneon supplies the editor and a floating annotation list with the submit action. Call it once in the page component; nested components read the state with `useAnnotations`. Without it the page has no annotation controls.
+- `onSubmit` receives the complete annotation list; the page emits the event itself.
+- `adapter` is needed only for paginated, virtualized or versioned content; see [adapters](#adapters).
+- `disabled` blocks editing and submission while saved annotations stay readable. To lock feedback after a successful submission, set `disabled` and pass `onRequestEdit`, which the list offers as a correction action that should unlock editing.
+- `allowEmptySubmit` (default `false`) permits submitting an empty list, such as a correction that withdraws all feedback.
+- `AnnotationText` takes `target`, plain-string `children` and optional `className`. JSX children are not supported. Unregistered DOM and graphics cannot be annotated.
+
+### Controller
+
+`useAnnotations<TRef>()` exposes:
+
+- `value`, `activeAnnotationId`, `selectionTargets`, `submitting`, `error`.
+- `createAnnotation(targets, comment?)`, `editAnnotation(id | null)`, `updateAnnotation(id, {targets, comment})`, `removeAnnotation(id)`. These change the draft immediately; keep target sets nonempty and IDs stable.
+- Async `locate(target)` and `submit()`; handle their rejections in custom controls.
+- `registerText({ref, sourceRef?, source, segments})`, returning an unregister function for effect cleanup.
+
+### Adapters
+
+Registered plain strings resolve and locate without an adapter. Paginated, virtualized or versioned content needs one:
+
+```ts
+type AnnotationAdapter<TRef> = {
+  resolve(
+    target: AnnotationTarget<TRef>,
+  ):
+    | { status: 'ready'; text?: string }
+    | { status: 'missing' | 'stale'; message: string }
+    | Promise<
+        { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string }
+      >;
+  locate(target: AnnotationTarget<TRef>): void | Promise<void>;
+  targetRanges?(target: AnnotationTarget<TRef>): readonly Range[];
+};
+```
+
+- `resolve` returns the exact original string for a target with `text`, or `missing` / `stale`, which keeps the draft. Retain old snapshots while annotations refer to them; never apply old offsets to newly fetched text.
+- `locate` restores the right page or view before highlighting. Ignore obsolete async responses.
+- `targetRanges` positions highlights for references that do not equal a registration, such as a line range within one diff side. Return `[]` when the source is not mounted; never search for the first matching quote.
+
+### Markdown and DiffView
+
+- `<Markdown annotationTarget="plan-a">{source}</Markdown>` registers the document; the target becomes `ref` unchanged. Give each document its own target, even when texts are identical. Offsets address the Markdown source, so a quote can include Markdown syntax, and a selection across separate source fragments becomes several targets.
+- `<DiffView oldText="before" newText="after" annotationTargets={{ old: refA, new: refB }} />` registers each side; its reference becomes `ref` unchanged. The two sides need different references. Omit a side to disable annotations on it. Offsets address that side's complete original string.
+- A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
+- For another renderer, pass `registerText` `segments: {node: Text, sourceOffsets: (number | null)[]}[]`. Each array has `node.data.length + 1` UTF-16 boundaries into one `source`; use `null` for an unmappable boundary.
+
+### Submission
+
+- Paneon checks each target's range against its original text through the adapter or registration before calling `onSubmit`; if either fails, the draft stays.
+- Paneon does not clear the draft, generate `replacesEventId` or choose a correction policy. Built-in pages submit each correction as a complete result with `replacesEventId` pointing to the previous one; follow that pattern when a correction should replace an earlier result.
+- Drafts live in browser memory, so a reload can lose them. [Event limits](#deliver-events) apply.
+
+## Examples
+
+Each example is a complete custom page. Run it as-is, or read its source to borrow a technique; write new pages on `@qoggy/paneon/sdk` and `@qoggy/paneon/ui` rather than importing from the example. `<skill>` is the absolute path of this skill directory.
+
+### Dining philosophers
+
+[Source](../assets/examples/dining-philosophers/panel.tsx). Compares three fork-acquisition strategies for the dining philosophers problem, one instruction per step.
+
+```sh
+paneon panel run <skill>/assets/examples/dining-philosophers/panel.tsx --cwd /work/project --json
+```
+
+Borrow: a deterministic page-local state model in plain TypeScript, play/pause/step/timeline controls, an SVG diagram derived from the same state. No input, no events.
+
+### Sentinel LeapArray
+
+[Source](../assets/examples/sentinel-leap-array/panel.tsx). Explains Sentinel's sliding-window `LeapArray` at a pinned commit, replaying requests through its buckets.
+
+```sh
+paneon panel run <skill>/assets/examples/sentinel-leap-array/panel.tsx --cwd /work/project --json
+```
+
+Borrow: links to real source at a fixed commit, editable scenario parameters validated before applying, a recorded trace replayed with a time slider. No input, no events.
+
+### GitHub PR
+
+[Source](../assets/examples/github-pr/panel.tsx). A read-only workspace for a PR's description, fixed-version diff and checks. Requires an installed and authenticated `gh`.
+
+```sh
+paneon panel run <skill>/assets/examples/github-pr/panel.tsx \
+  --cwd /work/project --params '{"repository":"cli/cli","initialPullRequest":14768}' --json
+```
+
+Input is `{repository: "owner/repo", initialPullRequest?: number}`; without a number it opens the open-PR list. It never publishes to GitHub. It emits `review-requested` (the viewed PR and its fixed base/head commits) and `pr-feedback-submitted` (annotations with their sources); the schemas are in its source.
+
+Borrow: server actions that call a local CLI, list/detail browsing with Tabs, annotations on `Markdown` and `DiffView`, several declared event types.
+
+These examples ship with Chinese and English copy because they are distributed with Paneon; a one-off page usually needs only one language (see [theme and language](#theme-and-language)).

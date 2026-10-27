@@ -24,7 +24,7 @@ Agent-facing usage instructions SHALL be maintained only within the product skil
 
 ### Requirement: Supply an interactive data table as a standard panel
 
-The product skill SHALL include a ready-to-run read-only data table with supplied columns/rows, search, filtering, sorting and pagination. The panel SHALL support native text annotations on original header labels and string cells, overall annotations, saved-annotation navigation and explicit submission. Header sorting SHALL use a separate control. The default table SHALL NOT expose an object-selection mode or row/column/page checkboxes. Existing row/column/cell protocol references SHALL remain valid even though their default selection controls have been removed.
+The product skill SHALL include a ready-to-run read-only data table with supplied columns/rows, search, filtering, sorting and pagination. The panel SHALL support native text annotations on original header labels and string cells, saved-annotation navigation and explicit submission. Header sorting SHALL use a separate control. The default table SHALL NOT expose an object-selection mode, row/column/page checkboxes or a page-level annotation editor. Existing row/column/cell protocol references SHALL remain valid even though their default selection controls have been removed.
 
 Results SHALL distinguish header, row, column and cell references. Header text ranges SHALL address the original label by columnKey; string cell ranges SHALL address the original value by original zero-based rowIndex and columnKey. Sorting, filtering and pagination SHALL preserve identity. The input SHALL NOT require rowKey or caller-supplied ids. Multiple independent annotations SHALL use one annotations list with per-entry comment, including empty comments, rather than a separate selected list.
 
@@ -109,21 +109,38 @@ The panel SHALL emit form-submitted with a values object keyed by field name, wi
 
 ### Requirement: Review a complete Markdown document with precise feedback
 
-The skill SHALL provide a content-review panel accepting title and a complete markdown string without requiring callers to split the document into sections or assign paragraph identifiers. The panel SHALL render that document using the existing Markdown presentation and allow feedback on the whole document, body paragraphs, and selected body words or phrases. It SHALL preserve ordinary reading and text copying and allow editing or deleting feedback drafts before explicit submission.
+The skill SHALL provide a content-review panel accepting a nonblank title and markdownFilePath for a local UTF-8 Markdown file without requiring callers to pass inline content, split the document into sections or assign paragraph identifiers. Absolute paths SHALL be accepted; relative paths SHALL resolve against the panel's working directory. Inline markdown and extra input fields SHALL be rejected. The panel SHALL render that document using the existing Markdown presentation and allow annotations on selected heading text, body paragraphs, words or phrases. A person MAY express an opinion about the whole document by selecting its heading text and annotating it. The panel SHALL NOT provide a separate action or editor for commenting without selecting text. It SHALL preserve ordinary reading and text copying and allow editing or deleting feedback drafts before explicit submission.
 
-The panel SHALL use the common annotations structure, including empty annotations for selection without an opinion, and SHALL emit review-submitted only on explicit submission. Whole-document targets SHALL use a document reference without a text range. Paragraph and phrase targets SHALL retain source Markdown UTF-16 offsets and an exact quote matching the saved input substring. A Markdown-specific adapter SHALL map rendered selections to their original source ranges rather than treating display offsets as source offsets. A discontiguous source mapping SHALL use multiple targets in the same entry without silently dropping selected content. This requirement SHALL NOT imply selecting arbitrary internal coordinates of rendered diagrams.
+The panel SHALL use the common annotations structure, including empty annotations for selection without an opinion, and SHALL emit review-submitted only on explicit submission. Targets created from text selection SHALL use a document reference with source Markdown UTF-16 offsets and an exact quote matching the saved file snapshot substring, including when a selected heading carries an opinion about the whole document. A Markdown-specific adapter SHALL map rendered selections to their original source ranges rather than treating display offsets as source offsets. A discontiguous source mapping SHALL use multiple targets in the same entry without silently dropping selected content. This requirement SHALL NOT imply selecting arbitrary internal coordinates of rendered diagrams.
 
-The instance SHALL retain its original input while being reviewed. Results SHALL NOT duplicate the complete Markdown. Event-saving failures SHALL preserve feedback drafts and SHALL NOT be shown as successful submissions. The page SHALL collect opinions while leaving edits to the document itself to the agent.
+The page SHALL read the file on load and retain the resulting content snapshot while being reviewed. Later file changes or deletion SHALL NOT change the open document or cause submission or annotation location to reread the file. Reloading the page SHALL read the current file. Results SHALL NOT duplicate the complete Markdown. Event-saving failures SHALL preserve feedback drafts and SHALL NOT be shown as successful submissions. The page SHALL collect opinions while leaving edits to the document itself to the agent.
 
 #### Scenario: Open a document without splitting it
 
-- **WHEN** an agent supplies a title and complete Markdown document
-- **THEN** the panel can display it for review without requiring sections or paragraph identifiers
+- **WHEN** an agent supplies a title and markdownFilePath pointing to a readable Markdown file
+- **THEN** the panel reads the file as UTF-8 and displays it for review without requiring inline content, sections or paragraph identifiers
+
+#### Scenario: Read an empty or unavailable file
+
+- **WHEN** the file is empty
+- **THEN** the panel displays an empty document without a read error
+- **WHEN** the file is missing or unreadable
+- **THEN** the panel shows the read error without rendering a reviewable document or emitting feedback
+
+#### Scenario: Preserve the reviewed snapshot
+
+- **WHEN** the file changes or is deleted after it has been read
+- **THEN** the open page still displays the original snapshot and validates, locates and submits annotations against that snapshot
 
 #### Scenario: Annotate a body phrase
 
 - **WHEN** a person selects a phrase in the rendered body and writes an opinion
 - **THEN** the feedback identifies the corresponding original Markdown range and exact quote rather than an unrelated DOM character offset
+
+#### Scenario: Express an opinion about the whole document
+
+- **WHEN** a person selects heading text in the rendered Markdown and annotates it with an opinion about the whole document
+- **THEN** the annotation targets that heading's original Markdown range and exact quote through the ordinary text-annotation flow, without a separate whole-document comment action or editor
 
 #### Scenario: Select across Markdown formatting
 
@@ -133,7 +150,7 @@ The instance SHALL retain its original input while being reviewed. Results SHALL
 #### Scenario: Submit several opinions together
 
 - **WHEN** a person adds or revises several annotations and explicitly submits
-- **THEN** one review-submitted event contains the current annotations, with an overall opinion represented by a whole-document target rather than a top-level comment, and editing alone does not emit feedback
+- **THEN** one review-submitted event contains the current annotations with per-entry comments and selected-text targets, without a top-level comment, and editing alone does not emit feedback
 
 ### Requirement: Keep the GitHub PR example read-only and deliver opinions to the agent
 

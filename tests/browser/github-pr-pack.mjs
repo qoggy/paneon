@@ -21,7 +21,7 @@ try {
     assert.ok(files.has(file), `Missing packaged public UI entry: ${file}`);
   for (const file of [
     'SKILL.md',
-    'references/examples.md',
+    'references/authoring.md',
     'assets/examples/github-pr/panel.tsx',
     'assets/examples/github-pr/github.ts',
     'assets/examples/github-pr/model.ts',

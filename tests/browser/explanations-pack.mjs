@@ -17,7 +17,7 @@ try {
   const [metadata] = JSON.parse(stdout);
   const files = new Set(metadata.files.map((file) => file.path));
   for (const file of [
-    'references/examples.md',
+    'references/authoring.md',
     'assets/examples/dining-philosophers/panel.tsx',
     'assets/examples/dining-philosophers/model.ts',
     'assets/examples/sentinel-leap-array/panel.tsx',
