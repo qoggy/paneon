@@ -70,6 +70,7 @@ const browserScripts = [
   'git-history-resizable',
   'git-file-tree',
   'tree',
+  'diff-review',
   'git-file-toolbar',
   'git-file-split',
   'git-select-all',

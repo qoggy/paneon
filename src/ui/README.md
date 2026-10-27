@@ -80,6 +80,8 @@ await tree.current!.revealItem(id, { signal: controller.signal });
 
 `revealItem` requests ancestor expansion, waits for controlled state to be returned and resolves after the mounted row can be scrolled with non-smooth nearest positioning. It does not select, focus, open or clear search. It waits without an implicit timeout if the parent does not accept; the required signal owns cancellation. Missing or filtered targets reject with `TreeRevealError.code` (`TREE_ITEM_NOT_FOUND` / `TREE_ITEM_FILTERED`). Cancellation, unmount, a new reveal or an intervening expansion command rejects the old call with `AbortError` and releases its listeners and queued scroll. Repeated calls to the same ID reveal again.
 
+The [built-in Diff Review panel](../../skills/paneon/assets/panels/diff-review/panel.tsx) demonstrates non-Git adaptation and composes a page-owned file-read query, DiffView and explicit annotation submission; Git Review keeps its path construction, sections, status rendering and toolbar in the skill's adapter.
+
 ### Resizable
 
 `ResizablePanelGroup`, `ResizablePanel` and `ResizableHandle` follow [shadcn Resizable](https://ui.shadcn.com/docs/components/base/resizable), backed by `react-resizable-panels` v4. Use `orientation="horizontal"` or `"vertical"`; sizes accept explicit strings such as `"20%"`, `"9rem"` and `"320px"`. Numeric sizes mean pixels. A handle is a narrow separator by default; `withHandle` adds a visible grip. The library owns pointer resizing, size constraints and separator accessibility. `groupRef` accepts the exported `ResizablePanelGroupHandle` for imperative layout operations.

@@ -25,6 +25,12 @@ try {
     'assets/panels/choose/schema.ts',
     'assets/panels/form/panel.tsx',
     'assets/panels/form/schema.ts',
+    'references/diff-review.md',
+    'assets/panels/diff-review/panel.tsx',
+    'assets/panels/diff-review/schema.ts',
+    'assets/panels/diff-review/model.ts',
+    'assets/panels/diff-review/icons.tsx',
+    'assets/panels/diff-review/icons.LICENSE',
     'assets/shared/submission.ts',
   ])
     assert.equal(files.has(`skills/paneon/${file}`), true, `Missing packaged resource: ${file}`);
@@ -39,21 +45,39 @@ try {
     JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version,
     metadata.version,
   );
-  const result = await exec(
-    process.execPath,
-    [new URL('./skill-pages.mjs', import.meta.url).pathname],
-    {
-      cwd: project,
-      env: {
-        ...process.env,
-        PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js')).href,
-        PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
-        PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
-      },
-      maxBuffer: 4 * 1024 * 1024,
-    },
-  );
-  console.log(result.stdout.trim());
+  const failed = [];
+  for (const name of [
+    'skill-pages',
+    'tree',
+    'diff-review',
+    'markdown-frontmatter',
+    'file-references',
+  ]) {
+    console.log(`Installed package browser verification: ${name}`);
+    try {
+      const result = await exec(
+        process.execPath,
+        [new URL(`./${name}.mjs`, import.meta.url).pathname],
+        {
+          cwd: project,
+          env: {
+            ...process.env,
+            PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js'))
+              .href,
+            PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+            PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
+          },
+          timeout: 180_000,
+          maxBuffer: 4 * 1024 * 1024,
+        },
+      );
+      console.log(result.stdout.trim());
+    } catch (error) {
+      failed.push(name);
+      console.error(`${name} failed:`, error.stdout || '', error.stderr || error.message);
+    }
+  }
+  assert.deepEqual(failed, [], 'Every installed-package browser verification must pass.');
   console.log(
     'Independent npm installation: complete version-matched skill copy and packaged runtime/CLI passed browser acceptance.',
   );
