@@ -4,9 +4,25 @@ import { defineConfig } from 'vite';
 import { esmExternalRequirePlugin } from 'rolldown/plugins';
 import { fileURLToPath } from 'node:url';
 
-const richDependencies = new Set(['mermaid', 'react-markdown', 'remark-gfm']);
+const richDependencies = new Set(['mermaid', 'react-markdown', 'remark-gfm', 'yaml']);
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'yaml-browser-module-metadata',
+      generateBundle() {
+        // YAML's initialization only wires its own exported parser classes.
+        // Preserve that boundary after preserveModules so consumers that do
+        // not use Markdown can drop the complete browser parser graph.
+        this.emitFile({
+          type: 'asset',
+          fileName: 'node_modules/yaml/package.json',
+          source: '{"type":"module","sideEffects":false}\n',
+        });
+      },
+    },
+  ],
   build: {
     outDir: 'dist/ui',
     lib: { entry: 'src/ui/index.ts', formats: ['es'], fileName: 'index', cssFileName: 'theme' },

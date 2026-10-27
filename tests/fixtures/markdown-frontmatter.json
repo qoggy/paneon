@@ -1,0 +1,192 @@
+[
+  {
+    "id": "skill",
+    "source": "---\nname: openspec-apply-change\ndescription: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.\nlicense: MIT\ncompatibility: Requires openspec CLI.\nmetadata:\n  author: openspec\n  version: '1.0'\n  generatedBy: '1.5.0'\n---\n\n# Skill body",
+    "expected": "valid"
+  },
+  {
+    "id": "simple",
+    "source": "---\ntitle: \"Frontmatter 支持\"\ndescription: 让元数据和正文各就各位\ndraft: false\ntags: [AI, Markdown, YAML]\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "nested",
+    "source": "---\nagent:\n  model: example-model\n  tools:\n    - name: search\n      enabled: true\n    - name: shell\n      args: [\"--read-only\", \"--json\"]\n  limits: {tokens: 8000, timeout: 60}\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "flow",
+    "source": "---\n{\"name\": \"agent\", \"tools\": [\"search\", {\"name\": \"shell\", \"enabled\": true}]}\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "root-seq",
+    "source": "---\n- read\n- write\n- {name: review, required: true}\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "root-scalar",
+    "source": "---\n\"一份仅有单值元数据的文档\"\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "empty-values",
+    "source": "---\nobject: {}\narray: []\nexplicit: null\ntilde: ~\nomitted:\nempty: \"\"\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "typed-keys",
+    "source": "---\ntrue: 布尔键\n42: 数字键\nnull: 空键\n\"true\": 字符串键\n\"\": 空字符串键\n__proto__: 普通文本\nconstructor: 普通文本\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "complex-key",
+    "source": "---\n? [east, west]\n: 两个方向\n? {role: admin, scope: local}\n: 管理员\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "quotes",
+    "source": "---\nplain: https://example.com/a#b\nsingle: 'It''s a skill'\ndouble: \"第一行\\n第二行\\t缩进 \\u4E2D\"\nlooksLikeMd: \"**不是粗体** <b>不是 HTML</b>\"\n\"key: #\": \"value: #\"\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "literal",
+    "source": "---\nclip: |\n  第一行\n  第二行\nstrip: |-\n  第一行\n  第二行\nkeep: |+\n  第一行\n  第二行\n\n\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "fold",
+    "source": "---\nsummary: >-\n  这是第一行，\n  这是第二行。\n\n  这是第二段。\nindented: |2-\n    保留两个前导空格\nfoldKeep: >+\n  one\n  two\n\n\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "multiline-plain",
+    "source": "---\nplain: this is\n  a continued string\nquoted: \"hello\n  world\"\nsingle: 'hello\n  world'\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "numbers",
+    "source": "---\ninteger: 42\nnegative: -12\nhex: 0xFF\noctal: 0o17\nfloat: 1.25\nscientific: 1.2e+3\ninfinity: .inf\nnotNumber: .nan\nlarge: 900719925474099312345\nprecise: 0.123456789012345678901\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "versions",
+    "source": "---\nyesValue: yes\nonValue: on\noffValue: off\nboolean: true\nleadingZero: 012\ndate: 2026-10-26\nversion: \"1.0\"\nforcedString: !!str 123\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "comments",
+    "source": "---\n# 这是文档注释\nz: 1 # 行尾注释\n\n# 此字段的解释\na: \"保留引号\"\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "anchors",
+    "source": "---\ndefaults: &base\n  model: example-model\n  retry: 3\ncopy: *base\nlist: [&x alpha, *x]\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "cycle",
+    "source": "---\nnode: &self\n  name: loop\n  next: *self\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "merge",
+    "source": "---\ndefaults: &base {model: a, retry: 2}\nagent:\n  <<: *base\n  model: b\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "tags",
+    "source": "---\ntoken: !env API_TOKEN\nlocation: !<tag:example.com,2026:point> [1, 2]\nforced: !!str 42\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "warning"
+  },
+  {
+    "id": "legacy-tags",
+    "source": "---\nset: !!set {a: null, b: null}\nordered: !!omap [a: 1, b: 2]\npairs: !!pairs [a: 1, a: 2]\ndate: !!timestamp 2026-10-26\ndata: !!binary SGVsbG8=\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "warning"
+  },
+  {
+    "id": "empty",
+    "source": "---\n\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "comment-only",
+    "source": "---\n# 仅供维护者阅读\n# 暂时没有字段\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "valid"
+  },
+  {
+    "id": "no-body",
+    "source": "---\nname: metadata-only\n---",
+    "expected": "valid"
+  },
+  {
+    "id": "bom-crlf",
+    "source": "﻿---  \r\nname: windows\r\ndraft: false\r\n--- \r\n\r\n# Windows 文档\r\n\r\n正文。",
+    "expected": "valid"
+  },
+  {
+    "id": "dots",
+    "source": "---\nname: alternate-end\n...\n\n# 正文\n\n由 ... 结束元数据。",
+    "expected": "valid"
+  },
+  {
+    "id": "body-rule",
+    "source": "---\nname: demo\n---\n\n# 正文\n\n段落。\n\n---\n\n后续段落。\n\n```yaml\n---\nname: example\n---\n```",
+    "expected": "valid"
+  },
+  {
+    "id": "ordinary",
+    "source": "# 一般文档\n\n正文中的分隔线：\n\n---\n\nname: 这里仍是普通段落",
+    "expected": "markdown"
+  },
+  {
+    "id": "blank-before",
+    "source": "\n---\nname: not-at-start\n---\n\n# 正文",
+    "expected": "markdown"
+  },
+  {
+    "id": "fenced",
+    "source": "# YAML 示例\n\n```yaml\n---\nname: example\n---\n```",
+    "expected": "markdown"
+  },
+  {
+    "id": "unclosed",
+    "source": "---\nname: incomplete\n\n# 不能丢掉这段正文\n\n没有第二条分隔线。",
+    "expected": "markdown"
+  },
+  {
+    "id": "duplicate",
+    "source": "---\nname: first\nname: second\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "error"
+  },
+  {
+    "id": "bad-indent",
+    "source": "---\nmetadata:\n\tname: tab-is-not-indent\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "error"
+  },
+  {
+    "id": "bad-flow",
+    "source": "---\ntools: [read, write\nname: \"unclosed\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "error"
+  },
+  {
+    "id": "undefined-alias",
+    "source": "---\nvalue: *missing\n---\n\n# 使用说明\n\n这是 Markdown 正文，支持 **强调**、[链接](https://yaml.org/) 和列表。\n\n- 第一步：阅读元数据\n- 第二步：执行任务",
+    "expected": "error"
+  },
+  {
+    "id": "directives",
+    "source": "%YAML 1.2\n%TAG !e! tag:example.com,2026:\n---\nvalue: !e!point [1, 2]\n...\n\n# 正文",
+    "expected": "markdown"
+  },
+  {
+    "id": "multi-doc",
+    "source": "---\nname: first\n---\nname: second\n...\n\n# 正文",
+    "expected": "valid"
+  },
+  {
+    "id": "ambiguous",
+    "source": "---\n这可能只是两条水平线之间的一句话。\n---\n\n正文。",
+    "expected": "valid"
+  }
+]

@@ -47,7 +47,7 @@ export function markdownOffsets(
     if (at >= raw.length) break;
     const begin = at;
     let part = raw[at++];
-    if (part === '\r') {
+    if (part === '\r' && value[renderedLength] !== '\r') {
       if (raw[at] === '\n') at++;
       part = '\n';
     }

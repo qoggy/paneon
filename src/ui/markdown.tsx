@@ -18,6 +18,8 @@ import { sourceMappingPlugin } from './markdown-annotation-mapper';
 import { Mermaid } from './mermaid';
 import { MarkdownCodeBlock } from './markdown-code-block';
 import { markdownCodeText } from './code-highlighting';
+import { parseFrontmatter } from './markdown-frontmatter';
+import { MarkdownFrontmatter } from './markdown-frontmatter-view';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 
@@ -45,6 +47,8 @@ const components: Components = {
 
 export type MarkdownProps<TRef = JsonValue> = {
   children: string;
+  /** Recognize a leading YAML block; disable for intentionally ambiguous Markdown. */
+  frontmatter?: 'auto' | 'off';
   /** Opt into the session enabled by usePageAnnotations; the value is delivered unchanged as target.ref. */
   annotationTarget?: TRef;
   className?: string;
@@ -62,19 +66,25 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   rehypePlugins,
   rootRef,
   annotated,
+  frontmatter = 'auto',
 }: RenderProps) {
+  const metadata = useMemo(
+    () => (frontmatter === 'off' ? null : parseFrontmatter(children)),
+    [children, frontmatter],
+  );
   return (
     <div
       ref={rootRef}
       className={cn('markdown-body min-w-0 overflow-x-auto', className)}
       data-markdown-annotation={annotated ? '' : undefined}
     >
+      {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypePlugins}
         components={{ ...components, ...overrides }}
       >
-        {children}
+        {metadata?.markdown ?? children}
       </ReactMarkdown>
     </div>
   );
@@ -138,7 +148,7 @@ function AnnotatedMarkdown<TRef>({
       observer.disconnect();
       unregister?.();
     };
-  }, [store, reference, source, props.components, plugins]);
+  }, [store, reference, source, props.components, props.frontmatter, plugins]);
   return (
     <>
       <MarkdownContent {...props} rootRef={root} annotated rehypePlugins={plugins}>

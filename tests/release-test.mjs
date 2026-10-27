@@ -55,6 +55,7 @@ const browserScripts = [
   'diff-annotations',
   'diff-highlighting',
   'markdown-highlighting',
+  'markdown-frontmatter',
   'diff-toolbar',
   'git-review',
   'git-review-chrome',

@@ -1,0 +1,56 @@
+:root .markdown-body [data-markdown-frontmatter] {
+  margin-bottom: 1rem;
+  font-size: 0.875em;
+}
+
+:root .markdown-body [data-markdown-frontmatter]:empty {
+  display: none;
+}
+
+:root .markdown-body [data-markdown-frontmatter] dl {
+  margin: 0;
+  padding: 0;
+}
+
+:root .markdown-body [data-markdown-frontmatter] .yaml-entry {
+  display: grid;
+  grid-template-columns: minmax(6rem, 30%) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+}
+
+:root .markdown-body [data-markdown-frontmatter] .yaml-entry + .yaml-entry {
+  border-top: 1px solid var(--border);
+}
+
+:root .markdown-body [data-markdown-frontmatter] dl dt,
+:root .markdown-body [data-markdown-frontmatter] dl dd {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-style: normal;
+  font-weight: normal;
+}
+
+:root .markdown-body [data-markdown-frontmatter] dt,
+:root .markdown-body [data-markdown-frontmatter] .yaml-properties {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:root .markdown-body [data-markdown-frontmatter] .yaml-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:root .markdown-body [data-markdown-frontmatter] ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+:root .markdown-body [data-markdown-frontmatter] li + li {
+  margin-top: 0.5rem;
+}

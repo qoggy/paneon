@@ -40,3 +40,26 @@ void test('actual GFM AST text leaves retain explicit boundaries through formatt
   assert.equal(repetitions.length, 1);
   assert.equal(mapped.get(repetitions[0])?.[0], source.indexOf('**repeat**') + 2);
 });
+
+void test('fenced code maps parser-preserved CRLF and its synthetic final newline', async () => {
+  const source =
+    '# 标题\r\n\r\n```ts\r\nconst title = "中文🙂";\r\n\r\n  console.log(title);\r\n```';
+  const parser = unified().use(remarkParse).use(remarkGfm).use(remarkRehype);
+  const tree = await parser.run(parser.parse(source));
+  sourceMappingPlugin(source, (entity) => entity)()(tree);
+  let code: SourceNode | undefined;
+  function find(node: SourceNode) {
+    if (node.tagName === 'code') code = node;
+    node.children?.forEach(find);
+  }
+  find(tree);
+  const leaf = code?.children?.[0];
+  const offsets = JSON.parse(leaf?.properties?.['data-source-offsets'] as string) as number[];
+  const text = leaf?.children?.[0]?.value ?? '';
+  assert.equal(text, 'const title = "中文🙂";\r\n\r\n  console.log(title);\n');
+  assert.equal(offsets.length, text.length + 1);
+  for (const quote of ['const', '中文🙂', 'console.log(title);']) {
+    const index = text.indexOf(quote);
+    assert.equal(source.slice(offsets[index], offsets[index + quote.length]), quote);
+  }
+});

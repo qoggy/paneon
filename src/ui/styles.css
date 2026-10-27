@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import './upstream-tailwind.css';
 @import './markdown-theme.css';
+@import './markdown-frontmatter.css';
 
 @custom-variant dark (&:is(.dark *));
 
