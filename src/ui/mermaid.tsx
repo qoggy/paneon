@@ -4,7 +4,6 @@ import { Spinner } from './spinner';
 import { cn } from './utils';
 import { Code, Copy, Download, Ellipsis, Expand } from 'lucide-react';
 import { Button } from './button';
-import { Dialog, DialogContent } from './dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +13,7 @@ import {
 } from './dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 import { snapshotDiagram, type DiagramImage } from './mermaid-image';
-import { DiagramIconButton, MermaidViewer } from './mermaid-viewer';
+import { ImageViewerDialog, ViewerIconButton as DiagramIconButton } from './image-viewer';
 import { useBrowserAction } from './browser-action-context';
 import type { BrowserAction } from '../shared/browser-actions';
 import { useToastManager } from './toast-manager';
@@ -113,7 +112,7 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
     setImage(capture());
     setOpen(true);
   }
-  async function run(kind: BrowserAction['kind']) {
+  async function run(kind: 'copy-text' | 'copy-image' | 'download-image') {
     if (busy) return;
     setBusy(true);
     try {
@@ -179,7 +178,7 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
             menuOpen ? 'visible opacity-100' : 'invisible opacity-0',
           )}
         >
-          <DiagramIconButton label={t('Expand diagram')} onClick={expand}>
+          <DiagramIconButton label={t('Expand diagram')} tooltipSide="right" onClick={expand}>
             <Expand />
           </DiagramIconButton>
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -200,7 +199,7 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
                   />
                 }
               />
-              <TooltipContent>{t('More diagram options')}</TooltipContent>
+              <TooltipContent side="right">{t('More diagram options')}</TooltipContent>
             </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
@@ -220,28 +219,19 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
           </DropdownMenu>
         </div>
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          data-slot="mermaid-viewer"
-          showCloseButton={false}
-          className="flex h-[calc(100dvh-4rem)] w-[calc(100vw-4rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
-          onKeyDownCapture={(event) => {
-            // A focused icon's tooltip is a nested dismissable layer. Escape still closes the viewer.
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              setOpen(false);
-            }
-          }}
+      {image && (
+        <ImageViewerDialog
+          kind="diagram"
+          open={open}
+          onOpenChange={setOpen}
+          image={image}
+          busy={busy}
+          download={() => void run('download-image')}
           finalFocus={() =>
             returnFocus.current?.isConnected ? returnFocus.current : diagram.current
           }
-        >
-          {image && (
-            <MermaidViewer image={image} busy={busy} download={() => void run('download-image')} />
-          )}
-        </DialogContent>
-      </Dialog>
+        />
+      )}
     </TooltipProvider>
   );
 }

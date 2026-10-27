@@ -2,16 +2,62 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Download, Maximize, Minus, Plus, X } from 'lucide-react';
 import { Button } from './button';
-import { DialogClose, DialogDescription, DialogTitle } from './dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 import { useUI } from './use-ui';
-import type { DiagramImage } from './mermaid-image';
 
-export function DiagramIconButton({
+type ViewerImage = { url: string; width: number; height: number; alt?: string };
+type ViewerProps = {
+  image: ViewerImage;
+  kind: 'image' | 'diagram';
+  download?: () => void;
+  busy?: boolean;
+};
+
+export function ImageViewerDialog({
+  open,
+  onOpenChange,
+  finalFocus,
+  ...props
+}: ViewerProps & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  finalFocus: React.ComponentProps<typeof DialogContent>['finalFocus'];
+}) {
+  return (
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          data-slot={props.kind === 'diagram' ? 'mermaid-viewer' : 'image-viewer'}
+          showCloseButton={false}
+          className="flex h-[calc(100dvh-4rem)] w-[calc(100vw-4rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          onKeyDownCapture={(event) => {
+            // Focused icon tooltips must not consume the viewer's Escape action.
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              onOpenChange(false);
+            }
+          }}
+          finalFocus={finalFocus}
+        >
+          <ImageViewer {...props} />
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
+  );
+}
+
+export function ViewerIconButton({
   label,
   children,
+  tooltipSide = 'top',
   ...props
-}: React.ComponentProps<typeof Button> & { label: string; children: ReactNode }) {
+}: React.ComponentProps<typeof Button> & {
+  label: string;
+  children: ReactNode;
+  tooltipSide?: React.ComponentProps<typeof TooltipContent>['side'];
+}) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -21,20 +67,13 @@ export function DiagramIconButton({
           </Button>
         }
       />
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent side={tooltipSide}>{label}</TooltipContent>
     </Tooltip>
   );
 }
 
-export function MermaidViewer({
-  image,
-  download,
-  busy,
-}: {
-  image: DiagramImage;
-  download: () => void;
-  busy: boolean;
-}) {
+function ImageViewer({ image, kind, download, busy }: ViewerProps) {
+  const prefix = kind === 'diagram' ? 'mermaid' : 'image';
   const { t } = useUI();
   const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; y: number; panX: number; panY: number } | null>(
@@ -71,21 +110,23 @@ export function MermaidViewer({
   }
   return (
     <>
-      <DialogTitle className="sr-only">{t('Diagram viewer')}</DialogTitle>
+      <DialogTitle className="sr-only">
+        {t(kind === 'diagram' ? 'Diagram viewer' : 'Image viewer')}
+      </DialogTitle>
       <DialogDescription className="sr-only">
         {t('Drag to pan. Press Escape to close.')}
       </DialogDescription>
       <div
-        data-slot="mermaid-viewer-toolbar"
+        data-slot={`${prefix}-viewer-toolbar`}
         className="flex shrink-0 items-center justify-end gap-0.5 border-b px-3 py-2 text-muted-foreground"
       >
-        <DiagramIconButton
+        <ViewerIconButton
           label={t('Zoom out')}
           disabled={view.scale <= 0.05}
           onClick={() => zoom(1 / 1.25)}
         >
           <Minus />
-        </DiagramIconButton>
+        </ViewerIconButton>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -103,34 +144,36 @@ export function MermaidViewer({
           />
           <TooltipContent>{t('Actual size')}</TooltipContent>
         </Tooltip>
-        <DiagramIconButton
+        <ViewerIconButton
           label={t('Zoom in')}
           disabled={view.scale >= 8}
           onClick={() => zoom(1.25)}
         >
           <Plus />
-        </DiagramIconButton>
-        <DiagramIconButton
+        </ViewerIconButton>
+        <ViewerIconButton
           label={t('Fit to window')}
           onClick={() => setView({ scale: fitScale(), x: 0, y: 0, fitted: true })}
         >
           <Maximize />
-        </DiagramIconButton>
+        </ViewerIconButton>
         <span className="mx-1.5 h-4 border-l" aria-hidden="true" />
-        <DiagramIconButton label={t('Download PNG')} disabled={busy} onClick={download}>
-          <Download />
-        </DiagramIconButton>
+        {download && (
+          <ViewerIconButton label={t('Download PNG')} disabled={busy} onClick={download}>
+            <Download />
+          </ViewerIconButton>
+        )}
         <DialogClose
           render={
-            <DiagramIconButton label={t('Close diagram')}>
+            <ViewerIconButton label={t(kind === 'diagram' ? 'Close diagram' : 'Close image')}>
               <X />
-            </DiagramIconButton>
+            </ViewerIconButton>
           }
         />
       </div>
       <div
         ref={viewport}
-        data-slot="mermaid-viewport"
+        data-slot={`${prefix}-viewport`}
         className="relative min-h-0 flex-1 touch-none overflow-hidden select-none"
         style={{ cursor: dragging ? 'grabbing' : 'grab' }}
         onPointerDown={(event) => {
@@ -164,9 +207,9 @@ export function MermaidViewer({
         }}
       >
         <img
-          data-slot="mermaid-viewer-image"
+          data-slot={`${prefix}-viewer-image`}
           src={image.url}
-          alt={t('Expanded diagram')}
+          alt={image.alt ?? t('Expanded diagram')}
           draggable={false}
           className="pointer-events-none absolute top-1/2 left-1/2 max-w-none"
           style={{

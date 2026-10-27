@@ -56,6 +56,7 @@ const browserScripts = [
   'diff-highlighting',
   'markdown-highlighting',
   'markdown-anchors',
+  'markdown-images',
   'markdown-frontmatter',
   'diff-toolbar',
   'git-review',

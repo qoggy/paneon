@@ -12,10 +12,13 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type ComponentProps,
   type Ref,
   type ReactNode,
 } from 'react';
+import { ImageViewerDialog } from './image-viewer';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import type { JsonValue } from '../sdk/annotation';
 import { annotationKey } from '../sdk/annotation';
 import { useAnnotationContext, useAnnotations } from './annotation-context';
@@ -52,6 +55,7 @@ function MarkdownLink({
 }
 
 const components: Components = {
+  img: MarkdownImage,
   a: MarkdownLink,
   pre({ children, node: _node, ...props }) {
     const child = Children.toArray(children)[0];
@@ -73,6 +77,52 @@ const components: Components = {
     );
   },
 };
+
+function MarkdownImage({
+  node: _node,
+  className,
+  alt,
+  ...props
+}: ComponentProps<'img'> & {
+  node?: unknown;
+}) {
+  const { t } = useUI();
+  const [expandable, setExpandable] = useState(false);
+  const image = (
+    <img
+      {...props}
+      alt={alt}
+      role={expandable ? 'button' : undefined}
+      tabIndex={expandable ? 0 : undefined}
+      aria-label={expandable ? `${t('Expand image')}${alt ? `: ${alt}` : ''}` : undefined}
+      className={cn(
+        expandable &&
+          'cursor-zoom-in outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring',
+        className,
+      )}
+      onLoad={(event) => {
+        setExpandable(!event.currentTarget.closest('a'));
+        props.onLoad?.(event);
+      }}
+      onError={(event) => {
+        setExpandable(false);
+        props.onError?.(event);
+      }}
+    />
+  );
+  const address =
+    typeof props.src === 'string' && !props.src.startsWith('data:') ? props.src : null;
+  return address ? (
+    <Tooltip>
+      <TooltipTrigger delay={500} render={image} />
+      <TooltipContent className="max-w-[min(32rem,calc(100vw-2rem))] text-left break-all">
+        {address}
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    image
+  );
+}
 
 export type MarkdownProps<TRef = JsonValue> = {
   children: string;
@@ -104,6 +154,28 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
     [],
   );
   const anchorPrefix = `paneon-md-${useId()}-`;
+  const [image, setImage] = useState<{
+    url: string;
+    width: number;
+    height: number;
+    alt: string;
+  } | null>(null);
+  const [imageOpen, setImageOpen] = useState(false);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  function expandImage(target: EventTarget | null) {
+    if (!(target instanceof HTMLImageElement) || target.closest('a, [data-slot="mermaid"]'))
+      return false;
+    if (!target.complete || !target.naturalWidth || !target.naturalHeight) return false;
+    if (target.hasAttribute('tabindex')) returnFocus.current = target;
+    setImage({
+      url: target.currentSrc || target.src,
+      width: target.naturalWidth,
+      height: target.naturalHeight,
+      alt: target.alt,
+    });
+    setImageOpen(true);
+    return true;
+  }
   const metadata = useMemo(
     () => (frontmatter === 'off' ? null : parseFrontmatter(children)),
     [children, frontmatter],
@@ -131,22 +203,52 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
     [anchorPrefix],
   );
   return (
-    <FileLinkContext.Provider value={linkContext}>
-      <div
-        ref={root}
-        className={cn('markdown-body min-w-0 overflow-x-auto', className)}
-        data-markdown-annotation={annotated ? '' : undefined}
-      >
-        {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[...(rehypePlugins ?? []), [rehypeSlug, { prefix: anchorPrefix }]]}
-          components={{ ...components, ...overrides }}
+    <>
+      <FileLinkContext.Provider value={linkContext}>
+        <div
+          ref={root}
+          className={cn('markdown-body min-w-0 overflow-x-auto', className)}
+          data-markdown-annotation={annotated ? '' : undefined}
+          onPointerDownCapture={(event) => {
+            // A mouse click blurs the prior control when a custom image cannot receive focus.
+            if (event.target instanceof HTMLImageElement) {
+              const active = document.activeElement;
+              returnFocus.current = active instanceof HTMLElement ? active : null;
+            }
+          }}
+          onClick={(event) => {
+            if (!event.defaultPrevented) expandImage(event.target);
+          }}
+          onKeyDown={(event) => {
+            if (
+              !event.defaultPrevented &&
+              (event.key === 'Enter' || event.key === ' ') &&
+              expandImage(event.target)
+            )
+              event.preventDefault();
+          }}
         >
-          {metadata?.markdown ?? children}
-        </ReactMarkdown>
-      </div>
-    </FileLinkContext.Provider>
+          {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[...(rehypePlugins ?? []), [rehypeSlug, { prefix: anchorPrefix }]]}
+            components={{ ...components, ...overrides }}
+          >
+            {metadata?.markdown ?? children}
+          </ReactMarkdown>
+        </div>
+      </FileLinkContext.Provider>
+      {image && (
+        <ImageViewerDialog
+          key={image.url}
+          kind="image"
+          image={image}
+          open={imageOpen}
+          onOpenChange={setImageOpen}
+          finalFocus={() => (returnFocus.current?.isConnected ? returnFocus.current : null)}
+        />
+      )}
+    </>
   );
 });
 function AnnotatedMarkdown<TRef>({
