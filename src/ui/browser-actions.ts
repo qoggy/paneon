@@ -40,6 +40,11 @@ async function diagramPNG(svg: string, background: string): Promise<Blob> {
 }
 
 export async function performBrowserAction(action: BrowserAction): Promise<void> {
+  if (action.kind === 'open-url') {
+    if (!/^https?:$/.test(new URL(action.url).protocol)) throw new Error('Unsupported URL.');
+    window.open(action.url, '_blank', 'noopener,noreferrer');
+    return;
+  }
   if (action.kind === 'copy-text') {
     await navigator.clipboard.writeText(action.text);
     return;

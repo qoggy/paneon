@@ -14,10 +14,12 @@ export function buildGitFeedback(
   const sources: Record<string, GitReviewSource> = {};
   const annotations = feedback.annotations.map((annotation) => {
     const targets = annotation.targets.map((target) => {
+      if (target.sourceRef !== undefined) return target;
+      const domainTarget = target;
       const snapshot = snapshots.get(target.ref.sourceId);
       if (!snapshot) throw new Error('Original snapshot is missing. Draft retained.');
-      diffTargetText(snapshot.model, target);
-      const normalized = normalizeDiffTarget(snapshot.model, target);
+      diffTargetText(snapshot.model, domainTarget);
+      const normalized = normalizeDiffTarget(snapshot.model, domainTarget);
       const ref = normalized.ref;
       const source = (sources[snapshot.id] ??= { ...snapshot.source, evidence: [] });
       let evidence: Evidence | undefined;
@@ -175,6 +177,7 @@ export function validateGitFeedback(
   }
   for (const annotation of result.annotations)
     for (const target of annotation.targets) {
+      if (target.sourceRef !== undefined) continue;
       const source = result.sources[target.ref.sourceId];
       if (!source) throw new Error('Missing original source. Draft retained.');
       validateTarget(source, target);

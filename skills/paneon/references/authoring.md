@@ -196,6 +196,8 @@ Slider is not included.
 - `Mermaid` and Markdown diagrams use the bundled Mermaid library; never load Mermaid from a CDN. Invalid source shows an error in place of that diagram.
 - `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [annotations](annotations.md#markdown-and-diffview).
 
+- Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
+
 ## Theme and language
 
 - Public components follow the user's theme and language preference automatically. Never add theme or language to panel input.

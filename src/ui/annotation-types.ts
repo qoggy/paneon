@@ -30,6 +30,7 @@ export type AnnotationTextProps<TRef = JsonValue> = {
 };
 export type AnnotationTextRegistration<TRef = JsonValue> = {
   ref: TRef;
+  sourceRef?: JsonValue;
   source: string;
   segments: { node: Text; sourceOffsets: (number | null)[] }[];
 };

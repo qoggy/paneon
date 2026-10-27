@@ -118,8 +118,9 @@ export function selectedTextTargets<TRef>(
       groups.push(previous);
     }
   }
-  const targets = groups.map(({ ref, source, start, end }) => ({
+  const targets = groups.map(({ ref, source, start, end, registration }) => ({
     ref,
+    ...(registration.sourceRef === undefined ? {} : { sourceRef: registration.sourceRef }),
     text: { start, end, quote: source.slice(start, end) },
   }));
   return [...new Map(targets.map((target) => [annotationTargetKey(target), target])).values()];

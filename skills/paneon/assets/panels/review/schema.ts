@@ -16,6 +16,7 @@ export function completeReviewSchema(params: ReviewParams) {
   return reviewSubmittedSchema.superRefine((value, ctx) => {
     value.annotations.forEach((entry, index) =>
       entry.targets.forEach((target, at) => {
+        if (target.sourceRef !== undefined) return;
         if (!validSourceRange(params.markdown, target))
           ctx.addIssue({
             code: 'custom',

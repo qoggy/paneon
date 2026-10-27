@@ -11,6 +11,8 @@ export function usePanelInput<I>(): I {
 }
 import { defaultUI, type UIPreferences } from '../shared/preferences.js';
 import type { BrowserAction } from '../shared/browser-actions.js';
+import type { FilePreview, FileReferenceRequest } from '../shared/file-references.js';
+import { isFileReferenceRequest } from '../shared/file-references.js';
 let ui = defaultUI;
 const uiListeners = new Set<() => void>();
 export const getUI = () => ui;
@@ -103,6 +105,15 @@ export const agent = {
 };
 /** Used by UIProvider to keep browser operations outside the opaque-origin panel. */
 export const panelBrowserAction = (action: BrowserAction) => request<void>('browser', action);
+/** Read local source through the authenticated instance host, never through a static URL. */
+export const panelReadFile = (reference: FileReferenceRequest) =>
+  isFileReferenceRequest(reference)
+    ? request<FilePreview>('file', reference)
+    : Promise.reject(
+        Object.assign(new Error('A valid local file reference is required.'), {
+          code: 'INVALID_FILE_REFERENCE',
+        }),
+      );
 export function useQuery<I, O>(
   action: Action<I, O, 'query'>,
   input: I,

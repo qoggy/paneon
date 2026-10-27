@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { annotationKey, annotationTargetKey, annotationValueSchema } from '../sdk/annotation.js';
-import type { AnnotationValue, AnnotationTarget } from '../sdk/annotation.js';
+import { annotationTargetKey, annotationValueSchema } from '../sdk/annotation.js';
+import type { AnnotationValue, AnnotationTarget, JsonValue } from '../sdk/annotation.js';
+import type { FilePreview, FileReferenceRequest } from '../shared/file-references';
 import type {
   AnnotationController,
   PageAnnotationOptions,
@@ -12,6 +13,20 @@ import { selectedTextTargets, validTextRange } from './annotation-selection';
 import { createRectClipper } from './annotation-geometry';
 import type { ClippedRect } from './annotation-geometry';
 import { indexTextSegments, textSegmentsInRange } from './annotation-text-index';
+
+export type FileSnapshot<TRef = unknown> = {
+  ref: TRef;
+  sourceRef: JsonValue;
+  file: FilePreview;
+};
+export type FileAnnotationView<TRef = unknown> = {
+  id: number;
+  ref: TRef;
+  reference: FileReferenceRequest;
+  trigger?: HTMLElement;
+  snapshot?: FileSnapshot<TRef>;
+  open: boolean;
+};
 
 let schema: ReturnType<typeof annotationValueSchema> | undefined;
 function getSchema() {
@@ -25,14 +40,23 @@ function frozen<T>(value: T): T {
   return value;
 }
 const copy = <T>(value: T): T => structuredClone(value);
+const sourceKey = (target: AnnotationTarget<unknown>) =>
+  annotationTargetKey({ ref: target.ref, sourceRef: target.sourceRef });
 
 export class AnnotationStore<TRef> {
   private listeners = new Set<() => void>();
   private texts = new Map<
     symbol,
-    AnnotationTextRegistration<TRef> & { index: ReturnType<typeof indexTextSegments> }
+    AnnotationTextRegistration<TRef> & {
+      index: ReturnType<typeof indexTextSegments>;
+    }
   >();
   private sources = new Map<string, string>();
+  private fileSnapshots = new Map<string, FileSnapshot<TRef>>();
+  private fileView: FileAnnotationView<TRef> | null = null;
+  private fileSequence = 0;
+  overlayContainer: HTMLElement | null = null;
+  private fileReady: (() => void) | undefined;
   private locating = 0;
   private options: PageAnnotationOptions<TRef> | undefined;
   private state: AnnotationController<TRef> & AnnotationUI<TRef>;
@@ -62,6 +86,74 @@ export class AnnotationStore<TRef> {
       registerText: this.registerText,
       submit: this.submit,
     };
+  }
+  getFileView = () => this.fileView;
+  setOverlayContainer = (container: HTMLElement | null) => {
+    if (this.overlayContainer === container) return;
+    this.overlayContainer = container;
+    this.publish({});
+  };
+  openFile = (reference: FileReferenceRequest, ref: TRef, trigger?: HTMLElement) => {
+    this.fileReady?.();
+    this.fileReady = undefined;
+    this.dismissSelection();
+    this.fileView = { id: ++this.fileSequence, ref: copy(ref), reference, trigger, open: true };
+    this.pruneFiles();
+    this.publish({});
+  };
+  closeFile = () => {
+    if (this.state.editor && !this.disabled) this.saveEditor();
+    this.dismissSelection();
+    if (this.fileView) this.fileView = { ...this.fileView, open: false };
+    this.fileReady?.();
+    this.fileReady = undefined;
+    this.pruneFiles();
+    this.publish({});
+  };
+  createFileSnapshot = async (file: FilePreview, ref: TRef): Promise<FileSnapshot<TRef>> => {
+    const reference = copy(ref);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(file.text));
+    const snapshotId =
+      'sha256:' +
+      Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return { file, ref: reference, sourceRef: { path: file.path, snapshotId } };
+  };
+  retainFile = (snapshot: FileSnapshot<TRef>) => {
+    this.fileSnapshots.set(sourceKey(snapshot), snapshot);
+    if (this.fileView) this.fileView = { ...this.fileView, snapshot };
+    this.pruneFiles();
+  };
+  private pruneFiles() {
+    const refs = new Set(
+      [
+        ...this.state.value.annotations.flatMap((entry) => entry.targets),
+        ...(this.state.editor?.targets ?? []),
+        ...this.state.pending,
+      ].map(sourceKey),
+    );
+    if (this.fileView?.open && this.fileView.snapshot) refs.add(sourceKey(this.fileView.snapshot));
+    for (const key of this.fileSnapshots.keys()) if (!refs.has(key)) this.fileSnapshots.delete(key);
+  }
+  fileMounted = (id: number) => {
+    if (this.fileView?.id !== id) return;
+    this.fileReady?.();
+    this.fileReady = undefined;
+  };
+  private showFile(snapshot: FileSnapshot<TRef>): Promise<void> {
+    this.fileReady?.();
+    return new Promise((resolve) => {
+      this.fileReady = resolve;
+      this.fileView = {
+        id: ++this.fileSequence,
+        ref: snapshot.ref,
+        reference: {
+          href: 'file://' + snapshot.file.path.split('/').map(encodeURIComponent).join('/'),
+        },
+        snapshot,
+        open: true,
+      };
+      this.publish({});
+    });
   }
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -112,12 +204,13 @@ export class AnnotationStore<TRef> {
       value.annotations.map((annotation, index) => [annotation.id, index + 1]),
     );
     this.publish({ value: frozen(copy(value)), activeAnnotationId, error: null });
+    this.pruneFiles();
   }
   private remember(targets: AnnotationTarget<TRef>[]) {
     for (const target of targets) {
       if (!target.text || this.sources.has(annotationTargetKey(target))) continue;
       const registration = [...this.texts.values()].find(
-        (item) => annotationKey(item.ref) === annotationKey(target.ref),
+        (item) => sourceKey(item) === sourceKey(target),
       );
       if (registration) this.sources.set(annotationTargetKey(target), registration.source);
     }
@@ -162,7 +255,7 @@ export class AnnotationStore<TRef> {
     );
   };
   registerText: AnnotationController<TRef>['registerText'] = (registration) => {
-    annotationKey(registration.ref);
+    sourceKey(registration);
     const nodes = new Set<Text>();
     for (const { node, sourceOffsets } of registration.segments) {
       if (node.nodeType !== 3 || nodes.has(node))
@@ -190,6 +283,7 @@ export class AnnotationStore<TRef> {
     }));
     this.texts.set(id, {
       ref: copy(registration.ref),
+      ...(registration.sourceRef === undefined ? {} : { sourceRef: copy(registration.sourceRef) }),
       source: registration.source,
       segments,
       index: indexTextSegments(segments),
@@ -202,14 +296,14 @@ export class AnnotationStore<TRef> {
   };
   /** Internal renderer bridge: keep the source being annotated until its drafts are removed. */
   retainedSource(ref: TRef): string | undefined {
-    const key = annotationKey(ref);
+    const key = sourceKey({ ref });
     const targets = [
       ...this.state.value.annotations.flatMap((entry) => entry.targets),
       ...(this.state.editor?.targets ?? []),
       ...this.state.pending,
     ];
     for (const target of targets) {
-      if (!target.text || annotationKey(target.ref) !== key) continue;
+      if (!target.text || sourceKey(target) !== key) continue;
       const id = annotationTargetKey(target);
       const source =
         this.sources.get(id) ?? this.editorSources.get(id) ?? this.stagedSources.get(id);
@@ -265,7 +359,7 @@ export class AnnotationStore<TRef> {
       if (!target.text) continue;
       const source = [...this.texts.values()].find(
         (item) =>
-          annotationKey(item.ref) === annotationKey(target.ref) &&
+          sourceKey(item) === sourceKey(target) &&
           item.segments.some((segment) => segment.node.isConnected),
       )?.source;
       if (source !== undefined) this.stagedSources.set(annotationTargetKey(target), source);
@@ -343,7 +437,12 @@ export class AnnotationStore<TRef> {
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
   targetRects = (target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] => {
-    const key = annotationKey(target.ref);
+    const key = sourceKey(target);
+    if (
+      this.fileView?.open &&
+      (!this.fileView.snapshot || key !== sourceKey(this.fileView.snapshot))
+    )
+      return [];
     const clipRect = createRectClipper();
     if (!target.text) return this.adapterRects(target, firstOnly);
     const text = target.text;
@@ -353,7 +452,7 @@ export class AnnotationStore<TRef> {
       this.stagedSources.get(annotationTargetKey(target));
     const registrations = [...this.texts.values()].filter(
       (item) =>
-        annotationKey(item.ref) === key &&
+        sourceKey(item) === key &&
         (original === undefined || item.source === original) &&
         validTextRange(item.source, target),
     );
@@ -397,6 +496,7 @@ export class AnnotationStore<TRef> {
   private adapterRects(target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] {
     const rects: ClippedRect[] = [];
     const clipRect = createRectClipper();
+    if (this.fileSnapshots.has(sourceKey(target))) return rects;
     for (const range of this.options?.adapter?.targetRanges?.(target) ?? []) {
       if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
       const element =
@@ -416,12 +516,13 @@ export class AnnotationStore<TRef> {
   }
 
   private async resolve(target: AnnotationTarget<TRef>): Promise<AnnotationTargetResolution> {
-    if (this.options?.adapter) return this.options?.adapter.resolve(target);
-    const key = annotationKey(target.ref);
+    const snapshot = this.fileSnapshots.get(sourceKey(target));
+    if (snapshot) return { status: 'ready', text: snapshot.file.text };
+    if (this.options?.adapter) return this.options.adapter.resolve(target);
+    const key = sourceKey(target);
     const texts = [...this.texts.values()].filter(
       (item) =>
-        item.segments.some((segment) => segment.node.isConnected) &&
-        annotationKey(item.ref) === key,
+        item.segments.some((segment) => segment.node.isConnected) && sourceKey(item) === key,
     );
     if (target.text && texts.length > 0) {
       const sources = new Set(texts.map((item) => item.source));
@@ -454,15 +555,20 @@ export class AnnotationStore<TRef> {
   locate: AnnotationController<TRef>['locate'] = async (target) => {
     const request = ++this.locating;
     try {
+      const fileSnapshot = this.fileSnapshots.get(sourceKey(target));
       const resolution = await this.resolve(target);
       this.checkResolution(target, resolution);
       const source = resolution.status === 'ready' ? resolution.text : undefined;
       if (request !== this.locating) return;
-      if (this.options?.adapter) await this.options?.adapter.locate(copy(target));
+      if (fileSnapshot) await this.showFile(fileSnapshot);
+      else {
+        if (this.fileView?.open) this.closeFile();
+        if (this.options?.adapter) await this.options.adapter.locate(copy(target));
+      }
       if (request !== this.locating) return;
-      const key = annotationKey(target.ref);
+      const key = sourceKey(target);
       const registration = [...this.texts.values()].find(
-        (item) => annotationKey(item.ref) === key && (!target.text || item.source === source),
+        (item) => sourceKey(item) === key && (!target.text || item.source === source),
       );
       const segments =
         registration && target.text
@@ -494,7 +600,7 @@ export class AnnotationStore<TRef> {
   private highlightText(target: AnnotationTarget<TRef>, source: string | undefined) {
     if (!target.text) return;
     const registrations = [...this.texts.values()].filter(
-      (item) => annotationKey(item.ref) === annotationKey(target.ref) && item.source === source,
+      (item) => sourceKey(item) === sourceKey(target) && item.source === source,
     );
     const segments = registrations.flatMap((item) => item.segments);
     const start = segments.find(

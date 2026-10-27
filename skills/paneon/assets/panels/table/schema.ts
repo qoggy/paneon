@@ -123,6 +123,7 @@ export function completeTableSchema(params: TableParams) {
   return tableSubmittedSchema.superRefine((value, ctx) => {
     value.annotations.forEach((entry, index) =>
       entry.targets.forEach((target, at) => {
+        if (target.sourceRef !== undefined) return;
         const message = tableTargetError(params, target);
         if (message)
           ctx.addIssue({ code: 'custom', path: ['annotations', index, 'targets', at], message });

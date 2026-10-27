@@ -3,7 +3,12 @@ import type { JsonValue } from '../shared/types.js';
 
 export type { JsonValue } from '../shared/types.js';
 export type AnnotationTextRange = { start: number; end: number; quote: string };
-export type AnnotationTarget<TRef = JsonValue> = { ref: TRef; text?: AnnotationTextRange };
+export type AnnotationTarget<TRef = JsonValue> = {
+  ref: TRef;
+  /** Optional source identity within the page-defined reference. */
+  sourceRef?: JsonValue;
+  text?: AnnotationTextRange;
+};
 export type Annotation<TRef = JsonValue> = {
   id: string;
   targets: AnnotationTarget<TRef>[];
@@ -63,6 +68,7 @@ export function annotationKey(value: unknown): string {
 export function annotationTargetKey(target: AnnotationTarget<unknown>): string {
   return annotationKey({
     ref: target.ref,
+    ...(target.sourceRef === undefined ? {} : { sourceRef: target.sourceRef }),
     ...(target.text === undefined ? {} : { text: target.text }),
   });
 }
@@ -92,7 +98,16 @@ export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
           path: ['quote'],
         });
     });
-  const target = z.object({ ref: reference, text: text.optional() }).strict();
+  const target = z
+    .object({
+      ref: reference,
+      sourceRef: z
+        .custom<JsonValue>(isAnnotationJson, 'Source reference must be JSON.')
+        .pipe(z.json())
+        .optional(),
+      text: text.optional(),
+    })
+    .strict();
   const annotation = z
     .object({
       id: z.string().min(1),

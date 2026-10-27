@@ -9,7 +9,7 @@ export type BridgeIdentity = {
 export type BridgeRequest = BridgeIdentity & {
   direction: 'request';
   requestId: string;
-  method: 'action' | 'event' | 'browser';
+  method: 'action' | 'event' | 'browser' | 'file';
   payload: JsonValue;
 };
 export type BridgeResponse = BridgeIdentity & {

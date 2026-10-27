@@ -1,5 +1,6 @@
 import type { BridgeIdentity, BridgeRequest as SdkBridgeRequest } from '../sdk/protocol.js';
 import { isBrowserAction } from '../shared/browser-actions.ts';
+import { isFileReferenceRequest } from '../shared/file-references.ts';
 export type { BridgeIdentity };
 export type BridgeRequest = SdkBridgeRequest & { payload: Record<string, unknown> };
 function record(value: unknown): value is Record<string, unknown> {
@@ -24,6 +25,7 @@ export function validRequest(value: unknown, identity: BridgeIdentity): value is
   if (value.method === 'event')
     return typeof value.payload.type === 'string' && Object.hasOwn(value.payload, 'payload');
   if (value.method === 'browser') return isBrowserAction(value.payload);
+  if (value.method === 'file') return isFileReferenceRequest(value.payload);
   return false;
 }
 export function validSource(source: unknown, frame: unknown): boolean {

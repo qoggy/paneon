@@ -518,6 +518,13 @@ export class Runtime extends EventEmitter {
     this.state(id);
     return { status: 'closed' as const, alreadyClosed };
   }
+  async readFile(id: string, revision: string, reference: unknown) {
+    const panel = this.current(id, revision);
+    const { readFilePreview } = await import('./file-preview.js');
+    const result = await readFilePreview(panel.cwd, reference);
+    this.current(id, revision);
+    return result;
+  }
   private current(id: string, revision: string) {
     if (this.stopping) throw new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.');
     const panel = this.store.get(id);

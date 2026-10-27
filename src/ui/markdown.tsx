@@ -1,4 +1,4 @@
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import {
@@ -16,47 +16,102 @@ import {
   type ComponentProps,
   type Ref,
   type ReactNode,
+  type ReactElement,
 } from 'react';
-import { ImageViewerDialog } from './image-viewer';
-import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import type { JsonValue } from '../sdk/annotation';
 import { annotationKey } from '../sdk/annotation';
 import { useAnnotationContext, useAnnotations } from './annotation-context';
 import { sourceMappingPlugin } from './markdown-annotation-mapper';
+import { parseFrontmatter } from './markdown-frontmatter';
+import { MarkdownFrontmatter } from './markdown-frontmatter-view';
 import { Mermaid } from './mermaid';
 import { MarkdownCodeBlock } from './markdown-code-block';
 import { markdownCodeText } from './code-highlighting';
-import { parseFrontmatter } from './markdown-frontmatter';
-import { MarkdownFrontmatter } from './markdown-frontmatter-view';
+import { ImageViewerDialog } from './image-viewer';
 import { cn } from './utils';
 import { useUI } from './use-ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
+import { markdownLink, markdownLinkAddress } from '../shared/file-references';
+import type { FileReferenceRequest } from '../shared/file-references';
+import { useFileReference } from './file-reference-context';
+import { useBrowserAction } from './browser-action-context';
+import { AnnotationEnabledContext, AnnotationEnvironmentContext } from './annotation-environment';
+import { FilePreviewSheet } from './file-preview';
+import { toast } from './toast-manager';
 
-const FileLinkContext = createContext<{ revealAnchor: (href: string) => boolean } | null>(null);
+const FileLinkContext = createContext<{
+  sourcePath?: string;
+  openFile: (reference: FileReferenceRequest, trigger: HTMLAnchorElement) => void;
+  revealAnchor: (href: string) => boolean;
+} | null>(null);
+
 function MarkdownLink({
   node: _node,
   href = '',
   children,
   ...props
 }: ComponentProps<'a'> & { node?: unknown }) {
+  const target = markdownLink(href);
   const context = useContext(FileLinkContext);
-  return (
+  const readFile = useFileReference();
+  const browserAction = useBrowserAction();
+  const { t } = useUI();
+  const withAddress = (element: ReactElement) =>
+    href ? (
+      <Tooltip>
+        <TooltipTrigger delay={500} render={element} />
+        <TooltipContent className="max-w-[min(32rem,calc(100vw-2rem))] text-left break-all">
+          {markdownLinkAddress(href)}
+        </TooltipContent>
+      </Tooltip>
+    ) : (
+      element
+    );
+  if (target.kind === 'disabled' || (target.kind === 'file' && (!context || !readFile)))
+    return withAddress(<span tabIndex={-1}>{children}</span>);
+  if (target.kind === 'anchor')
+    return (
+      <a
+        {...props}
+        href={href}
+        onClick={(event) => {
+          props.onClick?.(event);
+          if (!event.defaultPrevented && context?.revealAnchor(href)) event.preventDefault();
+        }}
+      >
+        {children}
+      </a>
+    );
+  return withAddress(
     <a
       {...props}
+      title={undefined}
       href={href}
       onClick={(event) => {
         props.onClick?.(event);
-        if (!event.defaultPrevented && href.startsWith('#') && context?.revealAnchor(href))
-          event.preventDefault();
+        if (event.defaultPrevented) return;
+        event.preventDefault();
+        if (target.kind === 'file' && context) {
+          context.openFile(
+            { href, ...(context?.sourcePath ? { sourcePath: context.sourcePath } : {}) },
+            event.currentTarget,
+          );
+        } else if (target.kind === 'web') {
+          void browserAction({ kind: 'open-url', url: target.url }).catch((error: unknown) => {
+            console.error('Open Markdown link failed.', error);
+            toast.add({ title: t('Unable to open link.'), type: 'error' });
+          });
+        }
       }}
     >
       {children}
-    </a>
+    </a>,
   );
 }
 
 const components: Components = {
-  img: MarkdownImage,
   a: MarkdownLink,
+  img: MarkdownImage,
   pre({ children, node: _node, ...props }) {
     const child = Children.toArray(children)[0];
     if (
@@ -126,6 +181,8 @@ function MarkdownImage({
 
 export type MarkdownProps<TRef = JsonValue> = {
   children: string;
+  /** Original Markdown file path. Relative file links use its directory; otherwise panel cwd. */
+  sourcePath?: string;
   /** Recognize a leading YAML block; disable for intentionally ambiguous Markdown. */
   frontmatter?: 'auto' | 'off';
   /** Opt into the session enabled by usePageAnnotations; the value is delivered unchanged as target.ref. */
@@ -137,6 +194,7 @@ export type MarkdownProps<TRef = JsonValue> = {
 type RenderProps = Omit<MarkdownProps, 'annotationTarget'> & {
   rootRef?: Ref<HTMLDivElement>;
   annotated?: boolean;
+  annotationReference?: unknown;
 };
 const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   children,
@@ -145,7 +203,9 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   rehypePlugins,
   rootRef,
   annotated,
+  annotationReference,
   frontmatter = 'auto',
+  sourcePath,
 }: RenderProps) {
   const root = useRef<HTMLDivElement>(null);
   useImperativeHandle<HTMLDivElement | null, HTMLDivElement | null>(
@@ -154,6 +214,53 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
     [],
   );
   const anchorPrefix = `paneon-md-${useId()}-`;
+  const [file, setFile] = useState<{
+    reference: FileReferenceRequest;
+    trigger: HTMLAnchorElement;
+    id: number;
+  }>();
+  const [fileOpen, setFileOpen] = useState(false);
+  const fileId = useRef(0);
+  const annotationEnabled = useContext(AnnotationEnabledContext);
+  const annotationEnvironment = useContext(AnnotationEnvironmentContext);
+  const linkContext = useMemo(
+    () => ({
+      sourcePath,
+      revealAnchor(href: string) {
+        let fragment: string;
+        try {
+          fragment = decodeURIComponent(href.slice(1));
+        } catch (error) {
+          console.warn('Invalid Markdown anchor.', error);
+          return false;
+        }
+        if (!fragment) return false;
+        // Generated IDs are instance-scoped; author-supplied IDs keep their original spelling.
+        const target =
+          root.current?.querySelector<HTMLElement>(`#${CSS.escape(anchorPrefix + fragment)}`) ??
+          root.current?.querySelector<HTMLElement>(`#${CSS.escape(fragment)}`);
+        if (!target) return false;
+        target.scrollIntoView({ block: 'start' });
+        return true;
+      },
+      openFile(reference: FileReferenceRequest, trigger: HTMLAnchorElement) {
+        if (annotated && annotationEnabled && annotationEnvironment) {
+          annotationEnvironment.openFile(reference, trigger, annotationReference);
+          return;
+        }
+        setFile({ reference, trigger, id: ++fileId.current });
+        setFileOpen(true);
+      },
+    }),
+    [
+      sourcePath,
+      anchorPrefix,
+      annotated,
+      annotationReference,
+      annotationEnabled,
+      annotationEnvironment,
+    ],
+  );
   const [image, setImage] = useState<{
     url: string;
     width: number;
@@ -180,27 +287,22 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
     () => (frontmatter === 'off' ? null : parseFrontmatter(children)),
     [children, frontmatter],
   );
-  const linkContext = useMemo(
-    () => ({
-      revealAnchor(href: string) {
-        let fragment: string;
-        try {
-          fragment = decodeURIComponent(href.slice(1));
-        } catch (error) {
-          console.warn('Invalid Markdown anchor.', error);
-          return false;
+  const renderedMarkdown = useMemo(
+    () => (
+      <ReactMarkdown
+        urlTransform={(url, key) =>
+          key === 'href' && (markdownLink(url).kind === 'file' || /^vscode:\/\//i.test(url))
+            ? url
+            : defaultUrlTransform(url)
         }
-        if (!fragment) return false;
-        // Generated IDs are instance-scoped; author-supplied IDs keep their original spelling.
-        const target =
-          root.current?.querySelector<HTMLElement>(`#${CSS.escape(anchorPrefix + fragment)}`) ??
-          root.current?.querySelector<HTMLElement>(`#${CSS.escape(fragment)}`);
-        if (!target) return false;
-        target.scrollIntoView({ block: 'start' });
-        return true;
-      },
-    }),
-    [anchorPrefix],
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[...(rehypePlugins ?? []), [rehypeSlug, { prefix: anchorPrefix }]]}
+        components={{ ...components, ...overrides }}
+      >
+        {metadata?.markdown ?? children}
+      </ReactMarkdown>
+    ),
+    [children, metadata, overrides, rehypePlugins, anchorPrefix],
   );
   return (
     <>
@@ -229,15 +331,18 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
           }}
         >
           {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[...(rehypePlugins ?? []), [rehypeSlug, { prefix: anchorPrefix }]]}
-            components={{ ...components, ...overrides }}
-          >
-            {metadata?.markdown ?? children}
-          </ReactMarkdown>
+          {renderedMarkdown}
         </div>
       </FileLinkContext.Provider>
+      {file && (
+        <FilePreviewSheet
+          key={file.id}
+          reference={file.reference}
+          open={fileOpen}
+          onOpenChange={setFileOpen}
+          finalFocus={() => (file.trigger.isConnected ? file.trigger : null)}
+        />
+      )}
       {image && (
         <ImageViewerDialog
           key={image.url}
@@ -313,7 +418,13 @@ function AnnotatedMarkdown<TRef>({
   }, [store, reference, source, props.components, props.frontmatter, plugins]);
   return (
     <>
-      <MarkdownContent {...props} rootRef={root} annotated rehypePlugins={plugins}>
+      <MarkdownContent
+        {...props}
+        rootRef={root}
+        annotated
+        annotationReference={reference}
+        rehypePlugins={plugins}
+      >
         {source}
       </MarkdownContent>
       {source !== children && (

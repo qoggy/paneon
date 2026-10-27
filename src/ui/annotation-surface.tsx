@@ -211,6 +211,10 @@ export function AnnotationSurface() {
             }
             if (details.reason === 'escape-key') close();
             else if (details.reason === 'outside-press') {
+              if (store.overlayContainer) {
+                store.saveEditor();
+                return;
+              }
               if (!state.editor?.id) {
                 store.changeEditor('');
                 store.saveEditor();
@@ -219,6 +223,7 @@ export function AnnotationSurface() {
           }}
         >
           <PopoverContent
+            container={store.overlayContainer ?? undefined}
             data-annotation-controls=""
             data-annotation-editor=""
             aria-label={t('编辑批注')}
@@ -322,7 +327,7 @@ export function AnnotationSurface() {
         </Popover>
       )}
     </div>,
-    document.body,
+    store.overlayContainer ?? document.body,
   );
 }
 
@@ -423,7 +428,7 @@ export function AnnotationMenu() {
       observer.disconnect();
       window.removeEventListener('resize', constrain);
     };
-  }, []);
+  }, [store.overlayContainer]);
   const finishDrag = () => {
     drag.current = null;
     setDragging(false);
@@ -528,6 +533,7 @@ export function AnnotationMenu() {
           }
         />
         <PopoverContent
+          container={store.overlayContainer ?? undefined}
           ref={content}
           align="end"
           side="top"
@@ -690,6 +696,6 @@ export function AnnotationMenu() {
         </PopoverContent>
       </Popover>
     </div>,
-    document.body,
+    store.overlayContainer ?? document.body,
   );
 }

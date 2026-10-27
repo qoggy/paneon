@@ -341,3 +341,26 @@ void test('fresh PR readers use browser evidence for checks, fixed diffs, review
     /preserved detail/,
   );
 });
+
+void test('PR feedback preserves local file targets separately from commit-backed PR sources', async () => {
+  const f = fixture();
+  const detail = await f.client.detail(f.repository, f.session, 101);
+  const description = detail.snapshots.find((snapshot) => snapshot.source.kind === 'description');
+  assert.ok(description);
+  const common = {
+    ref: { sourceId: description.id, kind: 'description' },
+    sourceRef: { path: '/local.txt', snapshotId: 'local' },
+    text: { start: 0, end: 5, quote: 'local' },
+  };
+  const result = f.client.feedback(f.repository, f.session, {
+    annotations: [
+      {
+        id: 'mixed',
+        comment: '',
+        targets: [{ ref: { sourceId: description.id, kind: 'description' } }, common],
+      },
+    ],
+  });
+  assert.deepEqual(result.annotations[0].targets[1], common);
+  assert.deepEqual(Object.keys(result.sources), [description.id]);
+});

@@ -147,6 +147,11 @@ function Frame({ panel }: { panel: PanelDetails }) {
         await performBrowserAction(payload);
         return null;
       }
+      if (message.method === 'file')
+        return api<unknown>(`${endpoint}/file`, {
+          method: 'POST',
+          body: JSON.stringify({ revision: panel.revision, reference: payload }),
+        });
       if (message.method === 'action') {
         const action = panel.manifest?.actions.find((item) => item.id === payload.actionId);
         if (!action) throw new ApiError('UNKNOWN_ACTION', 'The requested action does not exist.');

@@ -246,6 +246,10 @@ async function bootServer(
       b.payload,
     );
   });
+  route('POST', '/api/panels/:instanceId/file', (request) => {
+    const b = body(request);
+    return runtime.readFile(params(request).instanceId, String(b.revision), b.reference);
+  });
   route('GET', '/api/panels/:instanceId/events', (request) => {
     const q = request.query as Record<string, string>;
     return runtime.events(
@@ -379,7 +383,7 @@ async function bootServer(
     reply.header('Access-Control-Allow-Origin', '*');
     reply.header(
       'Content-Security-Policy',
-      "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self'",
+      "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self'",
     );
     return reply
       .type(mime[extname(asset)] ?? 'application/octet-stream')

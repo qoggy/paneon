@@ -450,7 +450,9 @@ function GithubPR() {
     onSubmit: async (feedback) => {
       const ids = new Set(
         feedback.annotations.flatMap((annotation) =>
-          annotation.targets.map((target) => target.ref.sourceId),
+          annotation.targets.flatMap((target) =>
+            target.sourceRef !== undefined ? [] : [target.ref.sourceId],
+          ),
         ),
       );
       const evidence = [...ids].map((id) => {

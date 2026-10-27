@@ -739,12 +739,13 @@ export class GitHubReview {
       throw new Error('Save at least one annotation before submitting.');
     const annotations = feedback.annotations.map((entry) => {
       const targets = entry.targets.map((target) => {
+        if (target.sourceRef !== undefined) return target;
         const snapshot = session.snapshots.get(target.ref.sourceId);
         if (!snapshot)
           throw new Error(
             'Original PR snapshot is missing. The draft is retained and cannot be reassigned.',
           );
-        resolvePRTarget(snapshot, target);
+        resolvePRTarget(snapshot, { ...target, ref: target.ref });
         sources[snapshot.id] = snapshot.source;
         if (
           snapshot.source.kind === 'diff' &&
