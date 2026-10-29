@@ -4,6 +4,7 @@ import {
   diffReviewParamsSchema,
   diffReviewSubmittedSchema,
   validateRanges,
+  validateSources,
 } from '../skills/paneon/assets/panels/diff-review/schema.ts';
 import { reviewTree, visibleFileCount } from '../skills/paneon/assets/panels/diff-review/model.ts';
 import type { DiffReviewSubmitted } from '../skills/paneon/assets/panels/diff-review/schema.ts';
@@ -109,4 +110,49 @@ void test('comparison feedback preserves page-defined file targets without addin
   });
   assert.deepEqual(feedback.annotations[0].targets[1], common);
   assert.deepEqual(feedback.sources, sources);
+});
+
+void test('source validation accepts feedback without full files and rejects inconsistent paths or targets', () => {
+  const snapshotId = `sha256:${'a'.repeat(64)}`;
+  const file = { oldPath: null, newPath: '/proposed' };
+  const feedback: DiffReviewSubmitted = {
+    annotations: [
+      {
+        id: 'annotation',
+        comment: 'Check this',
+        targets: [
+          {
+            ref: { fileIndex: 0, snapshotId, side: 'new' },
+            text: { start: 0, end: 3, quote: 'new' },
+          },
+        ],
+      },
+    ],
+    sources: [{ ...file, fileIndex: 0, snapshotId }],
+  };
+  assert.equal(validateSources({ files: [file] }, feedback), feedback);
+  const wrongPath = structuredClone(feedback);
+  wrongPath.sources[0].newPath = '/another-file';
+  assert.throws(() => validateSources({ files: [file] }, wrongPath), /inconsistent/);
+  const unknown = structuredClone(feedback);
+  unknown.annotations[0].targets[0].ref.snapshotId = `sha256:${'b'.repeat(64)}`;
+  assert.throws(() => validateSources({ files: [file] }, unknown), /Missing original/);
+  const absent = structuredClone(feedback);
+  absent.annotations[0].targets[0].ref.side = 'old';
+  assert.throws(() => validateSources({ files: [file] }, absent), /Missing original/);
+  const withoutText = structuredClone(feedback);
+  delete withoutText.annotations[0].targets[0].text;
+  assert.throws(() => validateSources({ files: [file] }, withoutText), /Text range/);
+  assert.throws(
+    () => validateSources({ files: [file] }, { annotations: [], sources: [] }),
+    /at least one/,
+  );
+  assert.deepEqual(
+    validateSources({ files: [file] }, { annotations: [], sources: [], replacesEventId: 1 }),
+    {
+      annotations: [],
+      sources: [],
+      replacesEventId: 1,
+    },
+  );
 });

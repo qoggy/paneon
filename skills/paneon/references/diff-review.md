@@ -57,4 +57,5 @@ Input:
 
 - `fileIndex` is the index in the input `files`; `side` is `old` or `new`.
 - `text` gives UTF-16 offsets into the complete text of that side as read when the human opened it. `snapshotId` identifies that read; the file may since have changed on disk.
+- An annotation on a whole edit has a target on each changed side: old and new for a replacement, one side for a pure addition or deletion.
 - A correction carrying `replacesEventId` may have no annotations, which withdraws all earlier feedback.

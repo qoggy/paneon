@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { ChevronsDownUp, ChevronsUpDown, FileDiff, FolderTree, TreeIcon } from './icons';
 import { agent, definePanel, serverAction, usePanelInput, useQuery, z } from '@qoggy/paneon/sdk';
 import { readFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
 import type { AnnotationValue } from '@qoggy/paneon/sdk';
 import type { DiffViewHandle } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
@@ -12,8 +11,8 @@ import {
   comparisonSchema,
   diffReviewParamsSchema,
   diffReviewSubmittedSchema,
-  snapshotSchema,
   validateRanges,
+  validateSources,
 } from './schema';
 import type { DiffRef, Snapshot } from './schema';
 import {
@@ -43,10 +42,15 @@ import {
 import type { Comparison, ComparisonStatus } from './model';
 
 // Snapshot identity is internal; callers supply only the physical paths.
-function snapshotId(comparison: Comparison, oldText: string, newText: string) {
-  return `sha256:${createHash('sha256')
-    .update(JSON.stringify([comparison, oldText, newText]))
-    .digest('hex')}`;
+async function snapshotId(comparison: Comparison, oldText: string, newText: string) {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify([comparison, oldText, newText])),
+  );
+  return (
+    'sha256:' +
+    Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  );
 }
 
 export const validateFeedback = serverAction({
@@ -54,38 +58,48 @@ export const validateFeedback = serverAction({
     .object({
       params: diffReviewParamsSchema,
       feedback: diffReviewSubmittedSchema,
-      snapshots: z.record(z.string(), snapshotSchema),
     })
     .strict(),
-  handler: (_ctx, { params, feedback, snapshots }) => {
-    validateRanges(params, feedback, snapshots);
-    for (const source of feedback.sources) {
-      const snapshot = snapshots[`${source.fileIndex}:${source.snapshotId}`];
-      if (
-        snapshotId(params.files[source.fileIndex], snapshot.oldText, snapshot.newText) !==
-        snapshot.id
-      )
-        throw new Error('Comparison snapshot identity does not match its content.');
-    }
-    return feedback;
-  },
+  handler: (_ctx, { params, feedback }) => validateSources(params, feedback),
+});
+
+async function readComparisonTexts(comparison: Comparison, signal: AbortSignal) {
+  // Only an explicit null is absent. Relative paths resolve against the panel's --cwd.
+  const read = (path: string | null) =>
+    path === null ? Promise.resolve('') : readFile(path, { encoding: 'utf8', signal });
+  const [oldText, newText] = await Promise.all([
+    read(comparison.oldPath),
+    read(comparison.newPath),
+  ]);
+  return { oldText, newText };
+}
+
+export const readComparisonStatuses = serverAction({
+  kind: 'query',
+  input: z.array(comparisonSchema),
+  handler: async (ctx, files) =>
+    Promise.all(
+      files.map(async (comparison) => {
+        try {
+          const texts = await readComparisonTexts(comparison, ctx.signal);
+          return { status: comparisonStatus(comparison, texts) };
+        } catch (error) {
+          if (ctx.signal.aborted) throw error;
+          return {
+            status: '!' as const,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    ),
 });
 
 export const readComparison = serverAction({
   kind: 'query',
   input: comparisonSchema,
   handler: async (ctx, comparison) => {
-    // Only an explicit null is absent. Missing/unreadable files propagate as errors.
-    // Relative paths resolve against the panel's --cwd, not the display hierarchy.
-    const read = (path: string | null) =>
-      path === null
-        ? Promise.resolve('')
-        : readFile(path, { encoding: 'utf8', signal: ctx.signal });
-    const [oldText, newText] = await Promise.all([
-      read(comparison.oldPath),
-      read(comparison.newPath),
-    ]);
-    return { id: snapshotId(comparison, oldText, newText), oldText, newText };
+    const { oldText, newText } = await readComparisonTexts(comparison, ctx.signal);
+    return { id: await snapshotId(comparison, oldText, newText), oldText, newText };
   },
 });
 
@@ -273,6 +287,21 @@ function DiffReviewPanel() {
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<Comparison | null>(value.files[0] ?? null);
   const [statuses, setStatuses] = useState<Record<string, ComparisonStatus>>({});
+  const statusQuery = useQuery(readComparisonStatuses, value.files);
+  const comparisonStates: Record<string, { status: ComparisonStatus; error?: string }> =
+    Object.fromEntries(
+      value.files.map((comparison, index) => {
+        const key = `file:${index}`;
+        return [
+          key,
+          statuses[key] !== undefined
+            ? { status: statuses[key] }
+            : statusQuery.error
+              ? { status: '!', error: statusQuery.error.message }
+              : (statusQuery.data?.[index] ?? { status: comparisonStatus(comparison) }),
+        ];
+      }),
+    );
   const recordStatus = useCallback(
     (comparison: Comparison, status: ComparisonStatus) => {
       const key = `file:${value.files.indexOf(comparison)}`;
@@ -322,11 +351,17 @@ function DiffReviewPanel() {
           sources.set(key, { ...value.files[fileIndex], fileIndex, snapshotId });
           retained[key] = snapshot;
         }
-      const validated = await validateFeedback({
-        params: value,
-        feedback: { ...feedback, sources: [...sources.values()] },
-        snapshots: retained,
-      });
+      const result = { ...feedback, sources: [...sources.values()] };
+      validateRanges(value, result, retained);
+      for (const source of result.sources) {
+        const snapshot = retained[`${source.fileIndex}:${source.snapshotId}`];
+        if (
+          (await snapshotId(value.files[source.fileIndex], snapshot.oldText, snapshot.newText)) !==
+          snapshot.id
+        )
+          throw new Error('Comparison snapshot identity does not match its content.');
+      }
+      const validated = await validateFeedback({ params: value, feedback: result });
       return agent.emit('diff-review-submitted', validated);
     },
     { successToast: 'Annotations submitted.' },
@@ -440,8 +475,14 @@ function DiffReviewPanel() {
                       className: 'gap-1.5',
                       title: `${node.name} · ${visibleFileCount(node, search)}`,
                     };
-                  const status = statuses[node.key] ?? comparisonStatus(node.comparison);
-                  const description = `${copy.statuses[status]} · ${comparisonPath(node.comparison)}`;
+                  const { status, error } = comparisonStates[node.key];
+                  const description = [
+                    copy.statuses[status],
+                    comparisonPath(node.comparison),
+                    error,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ');
                   return {
                     className: `gap-1.5 ${comparisonStatusClass(status)}`,
                     title: description,
@@ -485,9 +526,9 @@ function DiffReviewPanel() {
                           aria-hidden="true"
                           className="ml-auto shrink-0 text-[10px] font-normal"
                         >
-                          {(statuses[node.key] ?? comparisonStatus(node.comparison)) === 'pending'
+                          {comparisonStates[node.key].status === 'pending'
                             ? '…'
-                            : (statuses[node.key] ?? comparisonStatus(node.comparison))}
+                            : comparisonStates[node.key].status}
                         </span>
                       )}
                     </>

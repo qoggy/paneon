@@ -48,22 +48,15 @@ export const diffReviewSubmittedSchema = annotationValueSchema(diffRefSchema).sa
 });
 export type DiffReviewSubmitted = z.infer<typeof diffReviewSubmittedSchema>;
 
-/** Validate preserved text, never reread the current files to reinterpret an old annotation. */
-export function validateRanges(
-  params: DiffReviewParams,
-  feedback: DiffReviewSubmitted,
-  snapshots: Record<string, Snapshot>,
-) {
+/** Source checks need only the path manifest and feedback, never complete file contents. */
+export function validateSources(params: DiffReviewParams, feedback: DiffReviewSubmitted) {
   const seen = new Set<string>();
   for (const source of feedback.sources) {
     const key = `${source.fileIndex}:${source.snapshotId}`;
     const file = params.files[source.fileIndex];
-    const snapshot = snapshots[key];
     if (
       seen.has(key) ||
       !file ||
-      !snapshot ||
-      snapshot.id !== source.snapshotId ||
       source.oldPath !== file.oldPath ||
       source.newPath !== file.newPath ||
       source.displayPath !== file.displayPath
@@ -76,15 +69,38 @@ export function validateRanges(
       if (target.sourceRef !== undefined) continue;
       const { fileIndex, snapshotId, side } = target.ref;
       const key = `${fileIndex}:${snapshotId}`;
-      const snapshot = snapshots[key];
       const file = params.files[fileIndex];
-      if (!seen.has(key) || !snapshot || !file || file[`${side}Path`] === null)
+      if (!seen.has(key) || !file || file[`${side}Path`] === null)
         throw new Error('Missing original comparison snapshot. Draft retained.');
-      if (!target.text || !validSourceRange(snapshot[`${side}Text`], target))
+      if (!target.text)
         throw new Error('Text range does not match its original comparison snapshot.');
     }
   }
   if (feedback.replacesEventId === undefined && !feedback.annotations.length)
     throw new Error('Save at least one annotation before submitting.');
+  return feedback;
+}
+
+/** Validate retained browser text, never reread current files to reinterpret an old annotation. */
+export function validateRanges(
+  params: DiffReviewParams,
+  feedback: DiffReviewSubmitted,
+  snapshots: Record<string, Snapshot>,
+) {
+  validateSources(params, feedback);
+  for (const source of feedback.sources) {
+    const snapshot = snapshots[`${source.fileIndex}:${source.snapshotId}`];
+    if (!snapshot || snapshot.id !== source.snapshotId)
+      throw new Error('Unknown or inconsistent comparison source.');
+  }
+  for (const annotation of feedback.annotations) {
+    for (const target of annotation.targets) {
+      if (target.sourceRef !== undefined) continue;
+      const { fileIndex, snapshotId, side } = target.ref;
+      const snapshot = snapshots[`${fileIndex}:${snapshotId}`];
+      if (!target.text || !validSourceRange(snapshot[`${side}Text`], target))
+        throw new Error('Text range does not match its original comparison snapshot.');
+    }
+  }
   return feedback;
 }

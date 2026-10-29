@@ -60,6 +60,10 @@ try {
   const button = (name) => frame.getByRole('button', { name, exact: true });
   const newLine = frame.locator('[data-code-side="new"][data-line="1"]');
   await newLine.filter({ hasText: 'value = 2' }).waitFor();
+  for (const [index, status] of ['M', 'A', 'D', '='].entries())
+    await frame
+      .locator(`[data-tree-item="file:${index}"][data-comparison-status="${status}"]`)
+      .waitFor();
   const rows = frame.locator('[data-tree-item]');
   assert.deepEqual(await rows.evaluateAll((rows) => rows.map((row) => row.dataset.treeItem)), [
     'directory:docs',
@@ -155,6 +159,99 @@ try {
   await page.screenshot({
     path: '/private/tmp/paneon-neutral-tree-evidence/builtin-diff-review.png',
   });
+
+  // Resolve unopened files, including failures and empty additions/deletions. Hold the
+  // initial scan response to prove that it cannot overwrite a newer opened comparison.
+  await writeFile(join(root, 'changed.ts'), 'export const value = 3;\n');
+  await writeFile(join(root, 'empty.ts'), '');
+  const statusFiles = [
+    { oldPath: 'original.ts', newPath: 'original.ts' },
+    { oldPath: 'original.ts', newPath: 'changed.ts' },
+    { oldPath: 'original.ts', newPath: 'changed.ts' },
+    { oldPath: null, newPath: 'empty.ts' },
+    { oldPath: 'empty.ts', newPath: null },
+    { oldPath: 'empty.ts', newPath: 'empty.ts' },
+    { oldPath: 'missing.ts', newPath: 'original.ts' },
+    { oldPath: null, newPath: 'missing.ts' },
+  ].map((file, index) => ({ ...file, displayPath: `status-${index}.ts` }));
+  const statusInstance = await service.runtime.run(
+    join(skill, 'assets/panels/diff-review/panel.tsx'),
+    root,
+    { files: statusFiles },
+    false,
+  );
+  let releaseScan, scanRead;
+  const scanGate = new Promise((resolve) => (releaseScan = resolve));
+  const scanned = new Promise((resolve) => (scanRead = resolve));
+  const actionURL = `**/api/panels/${statusInstance.instanceId}/actions/*`;
+  await page.route(actionURL, async (route) => {
+    if (!Array.isArray(route.request().postDataJSON()?.input)) return route.continue();
+    const response = await route.fetch();
+    scanRead();
+    await scanGate;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.goto(
+      `http://127.0.0.1:${service.descriptor.port}/panels/${statusInstance.instanceId}`,
+    );
+    await scanned;
+    await frame.locator('[data-tree-item="file:1"][data-comparison-status="pending"]').waitFor();
+    await writeFile(join(root, 'changed.ts'), 'export const value = 1;\n');
+    await button('status-1.ts').dblclick();
+    await frame.locator('[data-tree-item="file:1"][data-comparison-status="="]').waitFor();
+    releaseScan();
+    for (const [index, status] of ['=', '=', 'M', 'A', 'D', '=', '!', '!'].entries())
+      await frame
+        .locator(`[data-tree-item="file:${index}"][data-comparison-status="${status}"]`)
+        .waitFor();
+    assert.equal(await frame.locator('[data-comparison-status="pending"]').count(), 0);
+    for (const index of [6, 7])
+      assert.match(
+        await frame.locator(`[data-tree-item="file:${index}"]`).getAttribute('title'),
+        /ENOENT/,
+      );
+    assert.equal(await button('status-1.ts').getAttribute('aria-pressed'), 'true');
+  } finally {
+    releaseScan();
+    await page.unroute(actionURL);
+  }
+
+  // Submitting a short annotation must not send the preserved full files back to the server.
+  await Promise.all([
+    writeFile(join(root, 'large-old.txt'), 'old head\n' + 'x'.repeat(140000)),
+    writeFile(join(root, 'large-new.txt'), 'new head\n' + 'x'.repeat(140000)),
+  ]);
+  const large = await service.runtime.run(
+    join(skill, 'assets/panels/diff-review/panel.tsx'),
+    root,
+    { files: [{ oldPath: 'large-old.txt', newPath: 'large-new.txt' }] },
+    false,
+  );
+  await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${large.instanceId}`);
+  await newLine.filter({ hasText: 'new head' }).waitFor();
+  await selectAnnotationText(frame, '[data-code-side="new"][data-line="1"]', 0, 3);
+  await annotations.write('Short feedback on a large file');
+  await annotations.save();
+  await writeFile(join(root, 'large-new.txt'), 'Changed after annotation.');
+  const submissions = [];
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname.startsWith(`/api/panels/${large.instanceId}/`)
+    )
+      submissions.push(request.postDataJSON());
+  });
+  await submitAnnotations(frame);
+  const delivered = await service.runtime.events(large.instanceId, 'large-diff-review', 100, 1000);
+  assert.equal(delivered.events.length, 1);
+  assert.equal(delivered.events[0].payload.annotations[0].targets[0].text.quote, 'new');
+  assert.ok(submissions.length > 0);
+  for (const body of submissions) {
+    assert.ok(Buffer.byteLength(JSON.stringify(body)) < 4096);
+    if (body.input) assert.equal(Object.hasOwn(body.input, 'snapshots'), false);
+    assert.doesNotMatch(JSON.stringify(body), /"oldText"|"newText"/);
+  }
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
@@ -168,6 +265,10 @@ try {
       explicitSubmission: true,
       correction: true,
       sharedResizable: true,
+      unopenedStatuses: true,
+      isolatedReadFailures: true,
+      lateScanPreservesNewerStatus: true,
+      largeSnapshotSubmission: true,
     }),
   );
 } catch (error) {
