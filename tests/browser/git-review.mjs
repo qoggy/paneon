@@ -215,22 +215,23 @@ try {
   await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
   const first = (await f.events())[0];
   assert.equal(first.type, 'git-review-submitted');
-  assert.equal(first.payload.annotations.length, 4);
-  assert.equal(Object.keys(first.payload.sources).length, 4);
-  const phrase = first.payload.annotations[0].targets[0];
-  assert.deepEqual(phrase.text, { start: 15, end: 17, quote: '缓存' });
-  assert.equal(phrase.ref.startLine, 1);
-  assert.equal(phrase.ref.endLine, 1);
-  const old = first.payload.annotations[1].targets[0];
-  assert.equal(old.ref.startLine, 2);
-  assert.equal(old.ref.endLine, 2);
-  assert.equal(old.text.quote, 'const n = 4;\r\n');
-  const source = first.payload.sources[old.ref.sourceId];
+  assert.ok(first.payload.files.every((source) => !('repositoryId' in source)));
+  const annotations = first.payload.files.flatMap((file) => file.annotations);
+  assert.equal(annotations.length, 4);
+  assert.equal(first.payload.files.length, 4);
+  assert.ok(annotations.every((annotation) => !('id' in annotation)));
+  assert.equal('revision' in first, false);
+  const phrase = annotations[0].targets[0];
+  assert.deepEqual(phrase.selection, { start: 15, end: 17, quote: '缓存' });
+  assert.equal(phrase.startLine, 1);
+  assert.equal(phrase.endLine, 1);
+  const old = annotations[1].targets[0];
+  assert.equal(old.startLine, 2);
+  assert.equal(old.endLine, 2);
+  assert.equal(old.text.slice(old.selection.start, old.selection.end), 'const n = 4;\r\n');
+  const source = first.payload.files[1];
   assert.equal(source.view.area, 'unstaged');
-  assert.equal(
-    first.payload.sources[first.payload.annotations[3].targets[0].ref.sourceId].repositoryPath,
-    await realpath(f.second),
-  );
+  assert.equal(first.payload.files[3].repositoryPath, await realpath(f.second));
   // Failed delivery keeps draft and successful receipt, then a complete correction can clear it.
   await comments.edit(4);
   await comments.write('修正所选内容');
@@ -257,15 +258,15 @@ try {
   await until(async () => (await f.events()).length === 2, 'correction missing');
   const second = (await f.events())[1];
   assert.equal(second.payload.replacesEventId, first.id);
-  assert.deepEqual(second.payload.annotations.slice(0, 3), first.payload.annotations.slice(0, 3));
-  assert.equal(second.payload.annotations[3].comment, '修正所选内容');
+  const corrected = second.payload.files.flatMap((file) => file.annotations);
+  assert.deepEqual(corrected.slice(0, 3), annotations.slice(0, 3));
+  assert.equal(corrected[3].comment, '修正所选内容');
   assert.equal('comment' in second.payload, false);
   for (let i = 4; i >= 1; i--) await comments.remove(i);
   await submitAnnotations(frame);
   await until(async () => (await f.events()).length === 3, 'empty correction missing');
   const cleared = (await f.events())[2];
-  assert.deepEqual(cleared.payload.annotations, []);
-  assert.deepEqual(cleared.payload.sources, {});
+  assert.deepEqual(cleared.payload.files, []);
   assert.equal(cleared.payload.replacesEventId, second.id);
   // Real CLI events and consumer ack against this runtime home.
   const execute = promisify(execFile);

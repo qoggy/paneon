@@ -5,12 +5,14 @@ import type { GitSnapshot } from './git.ts';
 import {
   gitConfigurationSchema,
   gitFeedbackResultSchema,
+  gitReviewSubmittedSchema,
 } from './schema.ts';
 import type {
   GitRef,
   GitConfiguration,
   GitFeedbackResult,
   GitSnapshotSource,
+  GitReviewSubmitted,
 } from './schema.ts';
 
 type Evidence = GitSnapshotSource['evidence'][number];
@@ -187,9 +189,81 @@ export function validateGitFeedback(
       if (!source) throw new Error('Missing original source. Draft retained.');
       validateTarget(source, target);
     }
-  if (JSON.stringify(result).length > 65536)
+  if (JSON.stringify(publicGitFeedback(result)).length > 65536)
     throw new Error(
       'Annotations exceed the 65536-character event limit. Draft retained; reduce selected content or annotations.',
     );
   return result;
+}
+
+/** Input must have passed validateGitFeedback's target/evidence checks before publishing. */
+export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitted {
+  type File = GitReviewSubmitted['files'][number];
+  type Target = File['annotations'][number]['targets'][number];
+  const files = new Map<string, { index: number; file: File }>();
+  const texts = new Map<string, { file: number; annotation: number; target: number }>();
+  const sourceFor = (id: string) => {
+    const { repositoryId: _repositoryId, evidence: _evidence, ...source } = feedback.sources[id];
+    return source;
+  };
+  for (const annotation of feedback.annotations) {
+    const first = annotation.targets[0];
+    const key = first.ref.sourceId;
+    let group = files.get(key);
+    if (!group) {
+      group = {
+        index: files.size,
+        file: {
+          ...sourceFor(key),
+          annotations: [],
+        },
+      };
+      files.set(key, group);
+    }
+    const file = group.file;
+    const targets = annotation.targets.map((target, targetIndex): Target => {
+      const { sourceId, ...ref } = target.ref;
+      let published: Target;
+      if (ref.kind === 'file') published = { kind: 'file' };
+      else if (ref.kind === 'hunk') published = { kind: 'hunk', patch: ref.patch };
+      else {
+        const evidence = feedback.sources[sourceId].evidence.find(
+          (item): item is Extract<Evidence, { kind: 'lines' }> =>
+            item.kind === 'lines' &&
+            item.side === ref.side &&
+            item.startLine === ref.startLine &&
+            item.endLine === ref.endLine,
+        )!;
+        const { start, end, quote } = target.text!;
+        const textRef = texts.get(evidence.text);
+        if (!textRef)
+          texts.set(evidence.text, {
+            file: group.index,
+            annotation: file.annotations.length,
+            target: targetIndex,
+          });
+        published = {
+          ...ref,
+          ...(textRef ? { textRef } : { text: evidence.text }),
+          selection: {
+            start,
+            end,
+            ...(quote === evidence.text || quote === evidence.text.replace(/\r?\n$/, '')
+              ? {}
+              : { quote }),
+          },
+        };
+      }
+      return sourceId === first.ref.sourceId
+        ? published
+        : { ...published, source: sourceFor(sourceId) };
+    });
+    file.annotations.push({ targets, comment: annotation.comment });
+  }
+  return gitReviewSubmittedSchema.parse({
+    files: [...files.values()].map((group) => group.file),
+    ...(feedback.replacesEventId === undefined
+      ? {}
+      : { replacesEventId: feedback.replacesEventId }),
+  });
 }

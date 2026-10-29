@@ -16,6 +16,7 @@ import {
 import { RepositoryFeedback } from '../skills/paneon/assets/panels/git-review/repository-feedback.ts';
 import { readGit, readGitFile } from '../skills/paneon/assets/panels/git-review/git.ts';
 import {
+  publicGitFeedback,
   validateGitFeedback,
 } from '../skills/paneon/assets/panels/git-review/feedback.ts';
 import { gitReviewParamsSchema } from '../skills/paneon/assets/panels/git-review/schema.ts';
@@ -145,6 +146,15 @@ void test('submission baseline detects new, changed, deleted and failed opinions
     assert.equal(state.hasChanges('a', draft, snapshots), true);
     assert.throws(() => state.retire('b', draft, snapshots), /unsubmitted/);
     const built = state.build(draft, snapshots);
+    const published = publicGitFeedback(built);
+    for (const [index, file] of published.files.entries()) {
+      assert.equal('repositoryId' in file, false);
+      const source = built.sources[[a.id, b.id][index]];
+      const { repositoryId: _repositoryId, evidence: _evidence, ...expected } = source;
+      const { annotations, ...publishedSource } = file;
+      assert.deepEqual(publishedSource, expected);
+      assert.deepEqual(annotations, [{ targets: [{ kind: 'file' }], comment: index ? 'B' : 'A' }]);
+    }
     assert.equal(
       built.sources[a.id].repositoryId,
       'a',
@@ -186,6 +196,7 @@ void test('submission baseline detects new, changed, deleted and failed opinions
       built.annotations[1],
     );
     assert.deepEqual(correction.sources[b.id], built.sources[b.id]);
+    assert.equal('repositoryId' in publicGitFeedback(correction).files[1], false);
     assert.equal(correction.replacesEventId, 42);
     state.accept(removed, correction);
     const withdrawA = state.build({ annotations: [], replacesEventId: 43 }, snapshots);

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { readGit, readGitFile } from '../skills/paneon/assets/panels/git-review/git.ts';
 import {
   buildGitFeedback,
+  publicGitFeedback,
   validateGitFeedback,
 } from '../skills/paneon/assets/panels/git-review/feedback.ts';
 import {
@@ -238,7 +239,8 @@ void test('line/character/hunk/file evidence is deduplicated and strictly intern
       { annotations: [], sources: {}, replacesEventId: 42 },
     );
     assert.equal(
-      gitReviewSubmittedSchema.safeParse({ ...event, replacesEventId: -1 }).success,
+      gitReviewSubmittedSchema.safeParse({ ...publicGitFeedback(event), replacesEventId: -1 })
+        .success,
       false,
     );
     const malformed = structuredClone(file);

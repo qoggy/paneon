@@ -174,8 +174,39 @@ export const gitFeedbackResultSchema = gitFeedbackSchema.safeExtend({
   replacesEventId: z.number().int().positive().optional(),
 });
 export type GitFeedbackResult = z.infer<typeof gitFeedbackResultSchema>;
-export const gitReviewSubmittedSchema = gitFeedbackSchema.safeExtend({
-  sources: z.record(z.string(), gitSnapshotSourceSchema),
+
+const { evidence: _evidence, ...publishedSourceShape } = gitReviewSourceSchema.shape;
+const publishedSource = z.object(publishedSourceShape);
+const publishedSelection = z.object({
+  start: z.number(),
+  end: z.number(),
+  quote: z.string().optional(),
+});
+const publishedLines = z.object({
+  kind: z.literal('lines'),
+  side: z.enum(['old', 'new']),
+  startLine: z.number(),
+  endLine: z.number(),
+  selection: publishedSelection,
+});
+const publishedTarget = z.intersection(
+  z.union([
+    z.object({ kind: z.literal('file') }),
+    z.object({ kind: z.literal('hunk'), patch: z.string() }),
+    publishedLines.extend({ text: z.string() }),
+    publishedLines.extend({
+      textRef: z.object({ file: z.number(), annotation: z.number(), target: z.number() }),
+    }),
+  ]),
+  // A target in another snapshot keeps its source alongside that target.
+  z.object({ source: publishedSource.optional() }),
+);
+export const gitReviewSubmittedSchema = z.object({
+  files: z.array(
+    publishedSource.extend({
+      annotations: z.array(z.object({ targets: z.array(publishedTarget), comment: z.string() })),
+    }),
+  ),
   replacesEventId: z.number().int().positive().optional(),
 });
 export type GitReviewSubmitted = z.infer<typeof gitReviewSubmittedSchema>;

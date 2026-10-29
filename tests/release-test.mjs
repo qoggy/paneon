@@ -68,6 +68,8 @@ const browserScripts = [
   'diff-toolbar',
   'git-review',
   'git-review-refresh',
+  'git-review-repositories',
+  'git-review-input',
   'git-review-checkout',
   'git-review-chrome',
   'git-review-navigation',

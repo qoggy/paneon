@@ -48,6 +48,7 @@ import {
 } from './actions.ts';
 import { RevisionPicker } from './revision-picker.tsx';
 import { RepositoryFeedback } from './repository-feedback.ts';
+import { publicGitFeedback } from './feedback.ts';
 import { RepositoryPicker } from './repository-dialogs.tsx';
 import { createReviewInput } from './input.ts';
 import { CommitDetails, HistoryRows } from './history.tsx';
@@ -158,7 +159,7 @@ function Review() {
       });
       if (!result.ok) throw new Error(result.message);
       const checked = result.data;
-      const receipt = await agent.emit('git-review-submitted', checked);
+      const receipt = await agent.emit('git-review-submitted', publicGitFeedback(checked));
       feedbackState.current.accept(feedback, checked);
       return receipt;
     },
