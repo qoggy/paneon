@@ -27,9 +27,25 @@ import { PanelHost } from './web/panel-host';
 import { ServerStatus } from './web/server-status';
 import PanelDeleteDialog from './web/panel-delete-dialog';
 type ManagementPath = '/' | '/server' | '/settings';
+type PanelListState = { status: PanelSummary['status'] | 'all'; page: number };
+type NavigationMode = 'push' | 'replace' | 'pop';
 const managementPaths = ['/', '/server', '/settings'] as const;
 function managementPath(path: string): ManagementPath {
   return path === '/server' || path === '/settings' ? path : '/';
+}
+function readPanelListState(search: string): PanelListState {
+  const query = new URLSearchParams(search);
+  return {
+    status: (query.get('status') ?? 'all') as PanelListState['status'],
+    page: Number(query.get('page') ?? '1'),
+  };
+}
+function panelListUrl({ status, page }: PanelListState): string {
+  const query = new URLSearchParams();
+  if (status !== 'all') query.set('status', status);
+  if (page !== 1) query.set('page', String(page));
+  const search = query.toString();
+  return search ? `/?${search}` : '/';
 }
 export default function App() {
   const match = /^\/panels\/([^/]+)\/?$/.exec(window.location.pathname);
@@ -37,21 +53,38 @@ export default function App() {
 }
 function ManagementApp() {
   const [path, setPath] = useState(window.location.pathname);
+  const [list, setList] = useState(() =>
+    readPanelListState(window.location.pathname === '/' ? window.location.search : ''),
+  );
   const [panelsVisited, setPanelsVisited] = useState(window.location.pathname === '/');
-  const activePath = useRef(path);
+  const activeUrl = useRef(path + window.location.search);
   const scrollPositions = useRef<Record<string, number>>({});
-  const navigate = useCallback((next: string, push = true) => {
-    if (activePath.current === next) return;
-    scrollPositions.current[activePath.current] = window.scrollY;
-    if (push) window.history.pushState(null, '', next);
-    if (next === '/') setPanelsVisited(true);
-    activePath.current = next;
-    setPath(next);
+  const navigate = useCallback((next: string, mode: NavigationMode = 'push') => {
+    if (activeUrl.current === next) return;
+    const previous = new URL(activeUrl.current, window.location.origin);
+    const target = new URL(next, window.location.origin);
+    scrollPositions.current[previous.pathname] = window.scrollY;
+    if (mode !== 'pop')
+      window.history[mode === 'replace' ? 'replaceState' : 'pushState'](null, '', next);
+    if (target.pathname === '/') {
+      setPanelsVisited(true);
+      setList(readPanelListState(target.search));
+    }
+    activeUrl.current = next;
+    setPath(target.pathname);
   }, []);
+  const changeList = useCallback(
+    (next: PanelListState, replace = false) => {
+      if (new URL(activeUrl.current, window.location.origin).pathname === '/')
+        navigate(panelListUrl(next), replace ? 'replace' : 'push');
+      else setList(next);
+    },
+    [navigate],
+  );
   useEffect(() => {
     const previous = history.scrollRestoration;
     history.scrollRestoration = 'manual';
-    const pop = () => navigate(window.location.pathname, false);
+    const pop = () => navigate(window.location.pathname + window.location.search, 'pop');
     window.addEventListener('popstate', pop);
     return () => {
       window.removeEventListener('popstate', pop);
@@ -62,31 +95,42 @@ function ManagementApp() {
     window.scrollTo(0, scrollPositions.current[path] ?? 0);
   }, [path]);
   return (
-    <Management path={managementPath(path)} navigate={navigate} panelsVisited={panelsVisited} />
+    <Management
+      path={managementPath(path)}
+      navigate={navigate}
+      panelsVisited={panelsVisited}
+      list={list}
+      changeList={changeList}
+    />
   );
 }
 function Management({
   path,
   navigate,
   panelsVisited,
+  list,
+  changeList,
 }: {
   path: ManagementPath;
   navigate: (path: string) => void;
   panelsVisited: boolean;
+  list: PanelListState;
+  changeList: (next: PanelListState, replace?: boolean) => void;
 }) {
   const { t } = useUI();
+  const listUrl = panelListUrl(list);
   const labels = { '/': t('Panels'), '/server': t('Server'), '/settings': t('Settings') };
   return (
     <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
       <header className="flex items-center gap-6 border-b py-4">
         <a
           className="w-fit text-2xl font-semibold tracking-tight"
-          href="/"
+          href={listUrl}
           onClick={(event) => {
             if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
               return;
             event.preventDefault();
-            navigate('/');
+            navigate(listUrl);
           }}
         >
           Paneon
@@ -96,7 +140,7 @@ function Management({
             {managementPaths.map((target) => (
               <NavigationMenuItem key={target}>
                 <NavigationMenuLink
-                  href={target}
+                  href={target === '/' ? listUrl : target}
                   active={path === target}
                   className={navigationMenuTriggerStyle()}
                   onClick={(event) => {
@@ -109,7 +153,7 @@ function Management({
                     )
                       return;
                     event.preventDefault();
-                    navigate(target);
+                    navigate(target === '/' ? listUrl : target);
                   }}
                 >
                   {labels[target]}
@@ -120,7 +164,9 @@ function Management({
         </NavigationMenu>
       </header>
       <main className="py-8">
-        <div hidden={path !== '/'}>{(panelsVisited || path === '/') && <PanelList />}</div>
+        <div hidden={path !== '/'}>
+          {(panelsVisited || path === '/') && <PanelList {...list} onChange={changeList} />}
+        </div>
         {path === '/server' && <ServerStatus />}
         <div hidden={path !== '/settings'}>
           <PreferencesSettings />
@@ -129,10 +175,12 @@ function Management({
     </div>
   );
 }
-function PanelList() {
+function PanelList({
+  status,
+  page,
+  onChange,
+}: PanelListState & { onChange: (next: PanelListState, replace?: boolean) => void }) {
   const { t } = useUI();
-  const [status, setStatus] = useState<PanelSummary['status'] | 'all'>('all');
-  const [page, setPage] = useState(1);
   const [result, setResult] = useState<PanelPage & { filter: typeof status }>();
   const [loading, setLoading] = useState(true);
   const generation = useRef(0);
@@ -177,7 +225,7 @@ function PanelList() {
       const result = await api<PanelPage>(`/api/panels?${query}`);
       if (request !== generation.current) return;
       if (page > Math.max(1, result.totalPages)) {
-        setPage(Math.max(1, result.totalPages));
+        onChange({ status, page: Math.max(1, result.totalPages) }, true);
         return;
       }
       setResult({ ...result, filter: status });
@@ -187,7 +235,7 @@ function PanelList() {
     } finally {
       if (request === generation.current) setLoading(false);
     }
-  }, [page, status]);
+  }, [page, status, onChange]);
   const currentRefresh = useRef(refresh);
   useLayoutEffect(() => {
     currentRefresh.current = refresh;
@@ -221,8 +269,7 @@ function PanelList() {
     <Tabs
       value={status}
       onValueChange={(value) => {
-        setStatus(value as typeof status);
-        setPage(1);
+        onChange({ status: value as typeof status, page: 1 });
       }}
       className="gap-4"
       render={
@@ -362,7 +409,7 @@ function PanelList() {
                       className={busy || page <= 1 ? 'pointer-events-none opacity-50' : undefined}
                       onClick={(event) => {
                         event.preventDefault();
-                        if (!busy && page > 1) setPage(page - 1);
+                        if (!busy && page > 1) onChange({ status, page: page - 1 });
                       }}
                     />
                   </PaginationItem>
@@ -385,7 +432,7 @@ function PanelList() {
                       }
                       onClick={(event) => {
                         event.preventDefault();
-                        if (!busy && page < totalPages) setPage(page + 1);
+                        if (!busy && page < totalPages) onChange({ status, page: page + 1 });
                       }}
                     />
                   </PaginationItem>

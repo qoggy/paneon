@@ -20,6 +20,20 @@ The management interface SHALL provide Panels, Server and Settings as top-level 
 - **WHEN** a person opens or refreshes /settings, /server or /panels/:instanceId
 - **THEN** the corresponding content loads and the individual panel page has no management navigation injected
 
+### Requirement: Address panel list filters and pagination
+
+The panel list SHALL use the root path with status and page query parameters to address its selected status and page. Generated URLs SHALL omit the default All status and page 1. Direct access, refresh and browser back/forward SHALL restore the addressed list view. Switching status SHALL reset the page to 1. Returning from Server or Settings SHALL retain the list URL, loaded data and scroll. When the existing pagination logic adjusts a page beyond the available total, it SHALL replace the current URL rather than add a history entry. The query parameters SHALL NOT change individual panel routes or service APIs.
+
+#### Scenario: Restore a filtered page from its URL
+
+- **WHEN** a person opens or refreshes /?status=running&page=2
+- **THEN** the list selects Running and loads page 2
+
+#### Scenario: Traverse list history
+
+- **WHEN** a person changes the list status or page and uses browser back or forward
+- **THEN** the selected status, page and list results match the restored URL
+
 ### Requirement: Edit preferences on a dedicated settings page
 
 Settings SHALL present appearance and language as ordinary page content rather than a modal. Changes SHALL save immediately using the shared preferences path, with accurate pending/success/failure feedback and protection against duplicate writes. The page SHALL NOT add a separate Save/Cancel step, preview-only copy, system-follow mode or additional preference scopes.

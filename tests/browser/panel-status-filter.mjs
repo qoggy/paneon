@@ -59,8 +59,10 @@ try {
 
   await page.getByRole('link', { name: 'Go to next page', exact: true }).click();
   await waitSummary('Page 2 of 2 · 25 panels');
+  assert.equal(new URL(page.url()).search, '?page=2');
   await page.getByRole('tab', { name: 'Running', exact: true }).click();
   await waitSummary('Page 1 of 2 · 22 panels');
+  assert.equal(new URL(page.url()).search, '?status=running');
   assert.ok((await titles()).every((title) => title.startsWith('running-')));
   assert.equal(queries.at(-1).get('page'), '1');
   assert.equal(queries.at(-1).get('status'), 'running');
@@ -68,11 +70,52 @@ try {
   await waitSummary('Page 1 of 2 · 22 panels');
   assert.equal(queries.at(-1).get('status'), 'running');
 
+  // Direct access, reload and query-only history restore the same list view.
+  await page.getByRole('link', { name: 'Go to next page', exact: true }).click();
+  await waitSummary('Page 2 of 2 · 22 panels');
+  assert.equal(new URL(page.url()).search, '?status=running&page=2');
+  const direct = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await direct.goto(page.url());
+  await direct.getByText('Page 2 of 2 · 22 panels', { exact: true }).waitFor();
+  assert.equal(
+    await direct.getByRole('tab', { name: 'Running', exact: true }).getAttribute('aria-selected'),
+    'true',
+  );
+  await direct.reload();
+  await direct.getByText('Page 2 of 2 · 22 panels', { exact: true }).waitFor();
+  assert.equal(new URL(direct.url()).search, '?status=running&page=2');
+  await direct.close();
+
+  await page.goBack();
+  await waitSummary('Page 1 of 2 · 22 panels');
+  assert.equal(new URL(page.url()).search, '?status=running');
+  await page.goBack();
+  await waitSummary('Page 2 of 2 · 25 panels');
+  assert.equal(new URL(page.url()).search, '?page=2');
+  assert.equal(
+    await page.getByRole('tab', { name: 'All', exact: true }).getAttribute('aria-selected'),
+    'true',
+  );
+  await page.goForward();
+  await waitSummary('Page 1 of 2 · 22 panels');
+  await page.goForward();
+  await waitSummary('Page 2 of 2 · 22 panels');
+  await page.goBack();
+  await waitSummary('Page 1 of 2 · 22 panels');
+
   // Switching management pages retains the selected filter.
+  const listRequests = queries.length;
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+  assert.equal(new URL(page.url()).search, '');
+  assert.equal(
+    await page.getByRole('link', { name: 'Panels', exact: true }).getAttribute('href'),
+    '/?status=running',
+  );
   await page.getByRole('link', { name: 'Panels', exact: true }).click();
   await waitSummary('Page 1 of 2 · 22 panels');
+  assert.equal(new URL(page.url()).search, '?status=running');
+  assert.equal(queries.length, listRequests, 'Returning to Panels must retain loaded data.');
   assert.equal(
     await page.getByRole('tab', { name: 'Running', exact: true }).getAttribute('aria-selected'),
     'true',
@@ -122,14 +165,18 @@ try {
   await waitSummary('Page 1 of 2 · 22 panels');
   await page.getByRole('link', { name: 'Go to next page', exact: true }).click();
   await waitSummary('Page 2 of 2 · 22 panels');
+  const historyLength = await page.evaluate(() => history.length);
   await page.getByRole('button', { name: 'Close', exact: true }).first().click();
   await waitSummary('Page 2 of 2 · 21 panels');
   assert.equal((await titles()).length, 1);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await waitSummary('Page 1 of 1 · 20 panels');
   assert.equal((await titles()).length, 20);
+  assert.equal(new URL(page.url()).search, '?status=running');
+  assert.equal(await page.evaluate(() => history.length), historyLength);
   await page.getByRole('tab', { name: 'All', exact: true }).click();
   await waitSummary('Page 1 of 2 · 25 panels');
+  assert.equal(new URL(page.url()).search, '');
   assert.equal(queries.at(-1).has('status'), false);
 
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
@@ -148,7 +195,7 @@ try {
   await page.screenshot({ path: join(artifacts, 'dark-zh-CN.png') });
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: desktop status Tabs, filtered pagination, refresh, navigation, stale responses, keyboard, empty state, closing, and dark Chinese UI.',
+    'PASS: list URL state, direct access, reload, history, retained navigation, status Tabs, filtered pagination, stale responses, keyboard, empty state, closing, and dark Chinese UI.',
   );
 } finally {
   await browser?.close();

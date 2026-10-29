@@ -28,6 +28,7 @@ const browserScripts = [
   'artifact-retention',
   'management-navigation',
   'panel-status-filter',
+  'panel-deletion',
   'skill-pages',
   'choose-review-interactions',
   'table-review',
