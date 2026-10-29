@@ -101,6 +101,12 @@ const en = {
   'Auto reload off': 'Auto reload off',
   'Open panel': 'Open panel',
   'Closing…': 'Closing…',
+  Delete: 'Delete',
+  'Deleting…': 'Deleting…',
+  'Delete panel?': 'Delete panel?',
+  'This permanently deletes the panel and its interaction history. This cannot be undone.':
+    'This permanently deletes the panel and its interaction history. This cannot be undone.',
+  'This panel no longer exists.': 'This panel no longer exists.',
   'Panel pagination': 'Panel pagination',
   'Page {page} of {totalPages} · {total} panels': 'Page {page} of {totalPages} · {total} panels',
   running: 'running',

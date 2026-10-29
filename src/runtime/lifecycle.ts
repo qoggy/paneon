@@ -459,8 +459,8 @@ export class Runtime extends EventEmitter {
   }
   private failure(id: string, error: unknown) {
     if (this.stopping) return;
-    const current = this.store.get(id);
-    if (current.status === 'closed') return;
+    const current = this.store.find(id);
+    if (!current || current.status === 'closed') return;
     if (current.paneonVersion !== PACKAGE_VERSION) current.status = 'unavailable';
     current.diagnostic = diagnostic(error);
     current.updatedAt = new Date().toISOString();
@@ -504,8 +504,9 @@ export class Runtime extends EventEmitter {
       await this.release(id, lease);
     }
   }
-  async closePanel(id: string) {
+  private async retirePanel(id: string) {
     const panel = this.store.get(id);
+    id = panel.instanceId;
     const alreadyClosed = panel.status === 'closed';
     panel.status = 'closed';
     panel.updatedAt = new Date().toISOString();
@@ -515,8 +516,20 @@ export class Runtime extends EventEmitter {
       new PaneonError('PANEL_CLOSED', 'The panel instance is closed.'),
     );
     await this.enqueue(id, () => this.pruneArtifacts(id, true));
-    this.state(id);
     return { status: 'closed' as const, alreadyClosed };
+  }
+  async closePanel(id: string) {
+    id = this.store.get(id).instanceId;
+    const result = await this.retirePanel(id);
+    this.state(id);
+    return result;
+  }
+  async deletePanel(id: string) {
+    const { instanceId } = this.store.get(id);
+    await this.retirePanel(instanceId);
+    await this.enqueue(instanceId, () => Promise.resolve(this.store.delete(instanceId)));
+    this.emit('deleted', instanceId);
+    return { deleted: true as const };
   }
   async readFile(id: string, revision: string, reference: unknown) {
     const panel = this.current(id, revision);
@@ -619,9 +632,11 @@ export class Runtime extends EventEmitter {
       const cleanup = () => {
         clearTimeout(timer);
         this.off('event', onEvent);
+        this.off('deleted', onEvent);
         this.off('stop', onStop);
       };
       this.on('event', onEvent);
+      this.on('deleted', onEvent);
       this.on('stop', onStop);
     });
     result = this.store.read(id, consumer, limit);

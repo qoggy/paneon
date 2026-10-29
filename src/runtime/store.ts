@@ -125,6 +125,13 @@ export class Store {
       throw new PaneonError('PANEL_NOT_FOUND', 'Panel instance not found.', { instanceId: id });
     return p;
   }
+  delete(id: string) {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM events WHERE instance_id = ?').run(id);
+      this.db.prepare('DELETE FROM consumers WHERE instance_id = ?').run(id);
+      this.db.prepare('DELETE FROM panels WHERE id = ?').run(id);
+    })();
+  }
   append(instanceId: string, revision: string, type: string, payload: JsonValue) {
     const createdAt = new Date().toISOString();
     const result = this.db

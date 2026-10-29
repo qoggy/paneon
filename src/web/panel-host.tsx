@@ -14,6 +14,7 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
   const [panel, setPanel] = useState<PanelDetails>();
   const [error, setError] = useState<string>();
   const [connected, setConnected] = useState<boolean>();
+  const [missing, setMissing] = useState(false);
   const refreshGeneration = useRef(0);
   const refresh = useCallback(() => {
     const generation = ++refreshGeneration.current;
@@ -24,10 +25,16 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (generation === refreshGeneration.current) setError(errorMessage(cause));
+        if (generation !== refreshGeneration.current) return;
+        if (cause instanceof ApiError && cause.code === 'PANEL_NOT_FOUND') {
+          setPanel(undefined);
+          setMissing(true);
+          setError(undefined);
+        } else setError(errorMessage(cause));
       });
   }, [instanceId]);
   useEffect(() => {
+    if (missing) return;
     const generation = refreshGeneration;
     void refresh();
     const url = new URL(`/api/panels/${encodeURIComponent(instanceId)}/stream`, location.href);
@@ -51,6 +58,7 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
       socket.onclose = () => {
         if (disposed) return;
         setConnected(false);
+        void refresh();
         retry = setTimeout(connect, retryDelay);
         retryDelay = Math.min(retryDelay * 2, 10000);
       };
@@ -58,9 +66,12 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
         if (disposed) return;
         try {
           const update = JSON.parse(event.data as string) as { type?: string };
-          if (update.type === 'state') {
-            void refresh();
-          }
+          if (update.type === 'deleted') {
+            generation.current++;
+            setPanel(undefined);
+            setMissing(true);
+            setError(undefined);
+          } else if (update.type === 'state') void refresh();
         } catch {
           setError('The runtime sent an invalid state notification.');
         }
@@ -73,10 +84,10 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
       clearTimeout(retry);
       socket.close();
     };
-  }, [instanceId, refresh]);
+  }, [instanceId, refresh, missing]);
   return (
     <div className="flex h-dvh flex-col">
-      {connected === false && !error && (
+      {connected === false && !error && !missing && (
         <p role="status" className="shrink-0 px-4 py-2 text-sm text-muted-foreground">
           {t('Reconnecting to Paneon…')}
         </p>
@@ -93,7 +104,14 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
           previousAvailable={panel.status === 'running'}
         />
       )}
-      {!panel && !error && <Spinner />}
+      {missing && (
+        <Card>
+          <CardContent className="pt-6">
+            <p>{t('This panel no longer exists.')}</p>
+          </CardContent>
+        </Card>
+      )}
+      {!panel && !error && !missing && <Spinner />}
       {panel &&
         (panel.status === 'running' ? (
           <Frame key={`${panel.instanceId}:${panel.revision}`} panel={panel} />

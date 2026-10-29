@@ -228,6 +228,9 @@ async function bootServer(
   route('POST', '/api/panels/:instanceId/close', (request) =>
     runtime.closePanel(params(request).instanceId),
   );
+  route('DELETE', '/api/panels/:instanceId', (request) =>
+    runtime.deletePanel(params(request).instanceId),
+  );
   route('POST', '/api/panels/:instanceId/actions/:actionId', (request) => {
     const b = body(request);
     return runtime.invoke(
@@ -271,6 +274,8 @@ async function bootServer(
         socket.send(message);
   };
   runtime.on('state', notify);
+  const deleted = (instanceId: string) => notify(instanceId, { type: 'deleted' });
+  runtime.on('deleted', deleted);
   const heartbeat = setInterval(() => {
     for (const [socket, subscription] of subscriptions) {
       if (!subscription.alive) {
@@ -287,6 +292,7 @@ async function bootServer(
   runtime.once('stop', () => {
     clearInterval(heartbeat);
     runtime.off('state', notify);
+    runtime.off('deleted', deleted);
     for (const socket of subscriptions.keys()) socket.close(1001, 'Runtime stopping');
   });
   app.get('/api/preferences/stream', { websocket: true }, (socket) => {

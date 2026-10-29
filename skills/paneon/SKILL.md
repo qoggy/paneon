@@ -56,6 +56,8 @@ paneon panel events <instance-id> --consumer <stable-name> --wait-ms 60000 --jso
 
 `panel inspect` returns an existing instance's current URL. Run `paneon <command> --help` for other commands, options and output fields.
 
+`paneon panel close <instance-id>` ends interaction and retains submitted events and consumer positions for later reading. `paneon panel delete <instance-id>` stops and permanently removes the instance, its submitted events (including unacknowledged feedback) and consumer positions. Delete works in any status and does not delete author source or undo external actions. Use deletion only when the human asks to discard the instance and its feedback; completing an agent task or acknowledging events is not a deletion request.
+
 ## Custom pages
 
 Write an ordinary TSX file with `definePanel`, components from `@qoggy/paneon/ui`, optional `serverAction` functions and declared events. Set `requires.paneon` to a range that includes the installed CLI (`paneon --version`).

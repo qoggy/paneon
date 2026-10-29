@@ -207,6 +207,14 @@ for (const name of ['inspect', 'reload', 'close'] as const) {
     return result;
   });
 }
+const deletePanel = panel
+  .command('delete <instance-id>')
+  .description('Stop a panel and permanently delete its instance, events and consumer positions');
+execute(deletePanel, async () =>
+  (await client()).call(`/api/panels/${encodeURIComponent(deletePanel.args[0])}`, {
+    method: 'DELETE',
+  }),
+);
 const events = panel
   .command('events <instance-id>')
   .description('Read unacknowledged interaction events without acknowledging them')

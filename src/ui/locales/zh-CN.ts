@@ -99,6 +99,12 @@ const zh: Record<keyof typeof en, string> = {
   'Auto reload off': '自动重载关闭',
   'Open panel': '打开面板',
   'Closing…': '正在关闭…',
+  Delete: '删除',
+  'Deleting…': '正在删除…',
+  'Delete panel?': '删除面板？',
+  'This permanently deletes the panel and its interaction history. This cannot be undone.':
+    '将永久删除此面板及其交互历史。此操作无法撤销。',
+  'This panel no longer exists.': '此面板已不存在。',
   'Panel pagination': '面板分页',
   'Page {page} of {totalPages} · {total} panels': '第 {page} / {totalPages} 页 · 共 {total} 个面板',
   running: '运行中',

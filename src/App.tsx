@@ -21,10 +21,11 @@ import {
 import { Spinner } from './ui/spinner';
 import { Stack } from './ui/layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { api, errorMessage, type PanelPage, type PanelSummary } from './web/api';
+import { api, ApiError, errorMessage, type PanelPage, type PanelSummary } from './web/api';
 import { PreferencesSettings } from './web/preferences-settings';
 import { PanelHost } from './web/panel-host';
 import { ServerStatus } from './web/server-status';
+import PanelDeleteDialog from './web/panel-delete-dialog';
 type ManagementPath = '/' | '/server' | '/settings';
 const managementPaths = ['/', '/server', '/settings'] as const;
 function managementPath(path: string): ManagementPath {
@@ -137,11 +138,16 @@ function PanelList() {
   const generation = useRef(0);
   const [error, setError] = useState<string>();
   const [closing, setClosing] = useState<string[]>([]);
-  const [closeErrors, setCloseErrors] = useState<Record<string, string | undefined>>({});
+  const [deleting, setDeleting] = useState<string[]>([]);
+  const [deletionTarget, setDeletionTarget] = useState<{
+    panel: PanelSummary;
+    trigger: HTMLButtonElement;
+  }>();
+  const [operationErrors, setOperationErrors] = useState<Record<string, string | undefined>>({});
   async function closePanel(instanceId: string) {
     if (closing.includes(instanceId)) return;
     setClosing((current) => [...current, instanceId]);
-    setCloseErrors((current) => ({ ...current, [instanceId]: undefined }));
+    setOperationErrors((current) => ({ ...current, [instanceId]: undefined }));
     try {
       await api(`/api/panels/${encodeURIComponent(instanceId)}/close`, { method: 'POST' });
       if (status !== 'all') await refresh();
@@ -156,7 +162,7 @@ function PanelList() {
             },
         );
     } catch (cause) {
-      setCloseErrors((current) => ({ ...current, [instanceId]: errorMessage(cause) }));
+      setOperationErrors((current) => ({ ...current, [instanceId]: errorMessage(cause) }));
     } finally {
       setClosing((current) => current.filter((id) => id !== instanceId));
     }
@@ -182,6 +188,24 @@ function PanelList() {
       if (request === generation.current) setLoading(false);
     }
   }, [page, status]);
+  const currentRefresh = useRef(refresh);
+  useLayoutEffect(() => {
+    currentRefresh.current = refresh;
+  }, [refresh]);
+  async function deletePanel(instanceId: string) {
+    setDeleting((current) => [...current, instanceId]);
+    setOperationErrors((current) => ({ ...current, [instanceId]: undefined }));
+    try {
+      await api(`/api/panels/${encodeURIComponent(instanceId)}`, { method: 'DELETE' });
+      await currentRefresh.current();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'PANEL_NOT_FOUND')
+        await currentRefresh.current();
+      else setOperationErrors((current) => ({ ...current, [instanceId]: errorMessage(cause) }));
+    } finally {
+      setDeleting((current) => current.filter((id) => id !== instanceId));
+    }
+  }
   useEffect(() => {
     const requests = generation;
     void refresh();
@@ -192,7 +216,7 @@ function PanelList() {
   const currentResult = result?.filter === status && result.page === page ? result : undefined;
   const panels = currentResult?.panels;
   const totalPages = Math.max(1, currentResult?.totalPages ?? 1);
-  const busy = loading || closing.length > 0;
+  const busy = loading || closing.length > 0 || deleting.length > 0;
   return (
     <Tabs
       value={status}
@@ -280,7 +304,11 @@ function PanelList() {
                         />
                         <Button
                           variant="outline"
-                          disabled={panel.status === 'closed' || closing.includes(panel.instanceId)}
+                          disabled={
+                            panel.status === 'closed' ||
+                            closing.includes(panel.instanceId) ||
+                            deleting.includes(panel.instanceId)
+                          }
                           aria-busy={closing.includes(panel.instanceId)}
                           onClick={() => void closePanel(panel.instanceId)}
                         >
@@ -292,10 +320,29 @@ function PanelList() {
                             t('Close')
                           )}
                         </Button>
+                        <Button
+                          variant="destructive"
+                          className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                          disabled={closing.includes(panel.instanceId)}
+                          aria-disabled={deleting.includes(panel.instanceId)}
+                          aria-busy={deleting.includes(panel.instanceId)}
+                          onClick={(event) => {
+                            if (!deleting.includes(panel.instanceId))
+                              setDeletionTarget({ panel, trigger: event.currentTarget });
+                          }}
+                        >
+                          {deleting.includes(panel.instanceId) ? (
+                            <>
+                              <Spinner /> {t('Deleting…')}
+                            </>
+                          ) : (
+                            t('Delete')
+                          )}
+                        </Button>
                       </Stack>
-                      {closeErrors[panel.instanceId] && (
+                      {operationErrors[panel.instanceId] && (
                         <Alert variant="destructive">
-                          <AlertDescription>{closeErrors[panel.instanceId]}</AlertDescription>
+                          <AlertDescription>{operationErrors[panel.instanceId]}</AlertDescription>
                         </Alert>
                       )}
                     </CardContent>
@@ -344,6 +391,13 @@ function PanelList() {
               </Pagination>
             )}
           </TabsContent>
+          {deletionTarget && (
+            <PanelDeleteDialog
+              {...deletionTarget}
+              onClose={() => setDeletionTarget(undefined)}
+              onDelete={(instanceId) => void deletePanel(instanceId)}
+            />
+          )}
         </section>
       }
     />
