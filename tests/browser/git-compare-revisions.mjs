@@ -16,7 +16,13 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = [];
+  const comparisons = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => {
+    if (!request.url().includes('/actions/')) return;
+    const input = request.postDataJSON()?.input?.request;
+    if (input?.type === 'compare') comparisons.push(input);
+  });
   await page.goto(fixture.url());
   const frame = page.frameLocator('iframe');
   await frame.getByRole('tab', { name: '分支/版本对比', exact: true }).click();
@@ -152,12 +158,75 @@ try {
   input = await open(base, '基线');
   await page.screenshot({ path: '/tmp/paneon-compare-picker-open.png', animations: 'disabled' });
   await input.fill('ignored-outside-click');
-  await frame.getByRole('heading', { name: 'Git review acceptance', exact: true }).click();
+  await frame.getByRole('tab', { name: '分支/版本对比', exact: true }).click();
   await closed('基线');
   assert.ok((await base.textContent()).includes(short));
+
+  // Empty tree is an explicit Base choice, independent of branch/tag search.
+  input = await open(head, '当前版本');
+  assert.equal(
+    await dialog('当前版本').getByRole('button', { name: '空树', exact: true }).count(),
+    0,
+  );
+  await input.fill('HEAD');
+  await input.press('Enter');
+  await closed('当前版本');
+  await mode.click();
+  await frame.getByRole('option', { name: 'Three-dot diff', exact: true }).click();
+  assert.match(await mode.textContent(), /Three-dot diff/);
+  input = await open(base, '基线');
+  const emptyTree = () => dialog('基线').getByRole('button', { name: '空树', exact: true });
+  assert.equal(await emptyTree().getAttribute('aria-pressed'), 'false');
+  assert.ok((await emptyTree().boundingBox()).y < (await input.boundingBox()).y);
+  assert.equal(
+    await dialog('基线').getByText('Compare all files from an empty tree', { exact: true }).count(),
+    0,
+  );
+  await tagTab().click();
+  await input.fill('does-not-match-a-revision');
+  await emptyTree().waitFor();
+  await input.fill('');
+  await input.focus();
+  await input.press('Shift+Tab');
+  assert.equal(await emptyTree().and(frame.locator(':focus')).count(), 1);
+  await page.keyboard.press('Enter');
+  await closed('基线');
+  assert.match(await base.textContent(), /空树/);
+  assert.match(await mode.textContent(), /Two-dot diff/);
+  assert.equal(await mode.isDisabled(), true);
+  input = await open(base, '基线');
+  assert.equal(await emptyTree().getAttribute('aria-pressed'), 'true');
+  await page.screenshot({
+    path: '/tmp/paneon-compare-picker-empty-tree.png',
+    animations: 'disabled',
+  });
+  await input.press('Escape');
+  await closed('基线');
+  await frame.getByRole('button', { name: '比较', exact: true }).click();
+  await frame.locator('[data-file-scroll][aria-busy=false]').waitFor();
+  assert.equal(comparisons.at(-1).base, null, 'Empty tree is sent as null, not the text "null".');
+  assert.equal(comparisons.at(-1).head, 'HEAD');
+  assert.equal(comparisons.at(-1).mode, 'commits');
+  assert.equal(await frame.locator('[data-file-id]').count(), 3);
+  assert.equal(await frame.locator('[data-file-status="A"]').count(), 3);
+  assert.equal(await frame.getByRole('alert').count(), 0);
+
+  // Switching back to a commit re-enables both comparison modes.
+  input = await open(base, '基线');
+  await dialog('基线').getByRole('tab', { name: '分支', exact: true }).click();
+  await main().click();
+  await closed('基线');
+  assert.equal(await mode.isEnabled(), true);
+  await mode.click();
+  await frame.getByRole('option', { name: 'Three-dot diff', exact: true }).click();
+  await frame.getByRole('button', { name: '比较', exact: true }).click();
+  await frame.locator('[data-file-scroll][aria-busy=false]').waitFor();
+  assert.equal(comparisons.at(-1).base, 'main');
+  assert.equal(comparisons.at(-1).mode, 'branch');
+  assert.equal(await frame.getByRole('alert').count(), 0);
   assert.deepEqual(errors, []);
   console.log(
-    'PASS desktop revision pickers: stable selected values, independent case-insensitive search, Branches/Tags tabs, recorded default badges, selected marker, keyboard and mouse selection, full/short commit confirmation, Escape/close/outside cancellation, focus restoration, real two-dot comparison.',
+    'PASS desktop revision pickers: stable selected values, independent case-insensitive search, Branches/Tags tabs, recorded default badges, selected marker, keyboard and mouse selection, full/short commit confirmation, Escape/close/outside cancellation, focus restoration, real two-dot comparison, explicit Empty tree selection and comparison mode restoration.',
   );
 } finally {
   await browser?.close();

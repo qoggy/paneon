@@ -11,9 +11,9 @@ let browser, page, panel;
 try {
   const layout = await createLayoutRepository(f.root);
   panel = await f.run({
-    repositories: [{ id: 'layout', path: layout.repository }],
+    repositories: [layout.repository],
     initialView: {
-      repositoryId: 'layout',
+      repositoryPath: layout.repository,
       type: 'history',
       commit: layout.tip,
       file: layout.filename,
@@ -77,7 +77,9 @@ try {
   }, 'Submission did not produce a feedback event.');
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'git-review-submitted');
-  assert.equal(events[0].payload.annotations[0].comment, '保留历史分栏中的批注');
+  const annotations = events[0].payload.files.flatMap((file) => file.annotations);
+  assert.equal(annotations.length, 1);
+  assert.equal(annotations[0].comment, '保留历史分栏中的批注');
   assert.deepEqual(errors, []);
   const artifacts =
     process.env.PANEON_TEST_ARTIFACTS ?? '/private/tmp/paneon-history-resizable-evidence';

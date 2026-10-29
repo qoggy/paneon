@@ -34,6 +34,115 @@ function required<T>(value: T | undefined): T {
   return value as T;
 }
 
+void test('View Changes compares the selected commit with its first parent or the empty tree', async () => {
+  const f = await fixture();
+  try {
+    const params = { repositories: [{ id: 'web', path: f.repo }] };
+    const tree = await git(f.repo, 'rev-parse', `${f.feature}^{tree}`);
+    const side = await git(f.repo, 'commit-tree', tree, '-p', f.rootCommit, '-m', 'side');
+    const merge = await git(
+      f.repo,
+      'commit-tree',
+      tree,
+      '-p',
+      f.rootCommit,
+      '-p',
+      side,
+      '-m',
+      'merge',
+    );
+    const empty = await git(f.repo, 'commit-tree', tree, '-p', f.feature, '-m', 'empty');
+    for (const [commit, parent] of [
+      [f.feature, f.rootCommit],
+      [merge, f.rootCommit],
+      [f.rootCommit, null],
+      [empty, f.feature],
+    ] as const) {
+      const history = await readGit(params, { repositoryId: 'web', type: 'history', commit });
+      const compare = await readGit(params, {
+        repositoryId: 'web',
+        type: 'compare',
+        base: parent,
+        head: commit,
+        mode: 'commits',
+        commit,
+      });
+      assert.deepEqual(
+        compare.snapshots.map((snapshot) => snapshot.model),
+        history.snapshots.map((snapshot) => snapshot.model),
+      );
+      assert.deepEqual(compare.descriptionUI, history.descriptionUI);
+      assert.ok(
+        compare.files.every(
+          (file) =>
+            file.source.view.type === 'compare' &&
+            file.source.view.baseCommit === parent &&
+            file.source.view.headCommit === commit,
+        ),
+      );
+      if (compare.snapshots.length) {
+        const snapshot = compare.snapshots[0];
+        const feedback = buildGitFeedback(
+          {
+            annotations: [
+              {
+                id: 'commit-review',
+                comment: 'review this commit',
+                targets: [{ ref: { kind: 'file', sourceId: snapshot.id } }],
+              },
+            ],
+          },
+          new Map([[snapshot.id, snapshot]]),
+        );
+        const checked = validateGitFeedback(params, feedback);
+        assert.deepEqual(checked.sources[snapshot.id].view, snapshot.source.view);
+      }
+    }
+    const fromEmptyTree = await readGit(params, {
+      repositoryId: 'web',
+      type: 'compare',
+      base: null,
+      head: f.feature,
+      mode: 'commits',
+    });
+    assert.ok(fromEmptyTree.files.every((file) => file.status === 'A' && !file.source.old));
+    assert.equal(fromEmptyTree.files.length, 3);
+    assert.match(
+      required(
+        required(fromEmptyTree.snapshots.find((snapshot) => snapshot.source.new?.path === 'a.ts'))
+          .model.newText,
+      ),
+      /n = 2/,
+    );
+    assert.equal(
+      gitReviewParamsSchema.safeParse({
+        repositories: [f.repo],
+        initialView: { repositoryPath: f.repo, type: 'compare', base: null, head: f.rootCommit },
+      }).success,
+      true,
+    );
+
+    const sha256 = join(f.root, 'sha256');
+    await mkdir(sha256);
+    await git(sha256, 'init', '-q', '--object-format=sha256');
+    await git(sha256, 'config', 'user.name', 'Fixture');
+    await git(sha256, 'config', 'user.email', 'fixture@example.test');
+    await writeFile(join(sha256, 'root.txt'), 'first commit\n');
+    await git(sha256, 'add', '.');
+    await git(sha256, 'commit', '-qm', 'root');
+    const rootCommit = await git(sha256, 'rev-parse', 'HEAD');
+    const compared = await readGit(
+      { repositories: [{ id: 'sha256', path: sha256 }] },
+      { repositoryId: 'sha256', type: 'compare', base: null, head: rootCommit, mode: 'commits' },
+    );
+    assert.equal(compared.snapshots[0].model.newText, 'first commit\n');
+    assert.equal(compared.snapshots[0].source.old, undefined);
+    assert.equal(rootCommit.length, 64);
+  } finally {
+    await f.close();
+  }
+});
+
 void test('diff snapshots preserve both originals, Unicode, CRLF and missing final newline', () => {
   let seed = 713;
   const next = () => {

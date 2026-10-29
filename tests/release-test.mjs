@@ -85,6 +85,7 @@ const browserScripts = [
   'git-branch-navigation',
   'git-branch-tree',
   'git-history-context-menu',
+  'git-history-view-changes',
   'git-compare-revisions',
   'git-shadcn-controls',
   'github-pr',

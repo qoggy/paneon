@@ -52,12 +52,16 @@ export function HistoryRows({
   commits,
   selected,
   onSelect,
+  onViewChanges,
   onCompare,
+  scrollPosition,
 }: {
   commits: GitCommit[];
   selected?: string;
   onSelect: (commit: GitCommit) => void;
+  onViewChanges?: (commit: GitCommit) => void;
   onCompare?: (revision: string) => void;
+  scrollPosition?: { top: number; left: number };
 }) {
   const { language } = useLocale();
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
@@ -65,14 +69,27 @@ export function HistoryRows({
   const list = useRef<HTMLDivElement>(null);
   const focusTarget = useRef<string | undefined>(undefined);
   const [viewport, setViewport] = useState({ top: 0, height: 400 });
+  const [defaultPosition] = useState(() => ({ top: 0, left: 0 }));
+  const position = scrollPosition ?? defaultPosition;
+  useLayoutEffect(() => {
+    const scroll = list.current?.parentElement;
+    if (scroll) {
+      scroll.scrollTop = position.top;
+      scroll.scrollLeft = position.left;
+      setViewport({ top: scroll.scrollTop, height: scroll.clientHeight });
+    }
+  }, [position]);
   useEffect(() => {
     const scroll = list.current?.parentElement;
     if (!scroll) return;
-    const update = () =>
+    const update = () => {
+      position.top = scroll.scrollTop;
+      position.left = scroll.scrollLeft;
       setViewport((previous) => {
         const next = { top: scroll.scrollTop, height: scroll.clientHeight };
         return previous.top === next.top && previous.height === next.height ? previous : next;
       });
+    };
     const observer = new ResizeObserver(update);
     observer.observe(scroll);
     scroll.addEventListener('scroll', update, { passive: true });
@@ -80,7 +97,7 @@ export function HistoryRows({
       observer.disconnect();
       scroll.removeEventListener('scroll', update);
     };
-  }, []);
+  }, [position]);
   useLayoutEffect(() => {
     if (!focusTarget.current) return;
     const row = list.current?.querySelector<HTMLButtonElement>(
@@ -140,7 +157,12 @@ export function HistoryRows({
       {commits.slice(start, end).map((commit, offset) => {
         const index = start + offset;
         return (
-          <RevisionContextMenu key={commit.oid} revision={commit.oid} onCompare={onCompare}>
+          <RevisionContextMenu
+            key={commit.oid}
+            revision={commit.oid}
+            onViewChanges={onViewChanges && (() => onViewChanges(commit))}
+            onCompare={onCompare}
+          >
             <button
               type="button"
               tabIndex={index === tabIndex ? 0 : -1}
@@ -238,7 +260,7 @@ export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
   return (
     <section
       aria-label={t('提交说明')}
-      className="flex max-h-64 min-h-0 min-w-0 flex-col border-t md:max-h-none md:flex-1"
+      className="flex max-h-64 min-h-0 min-w-0 flex-col border-t md:max-h-none md:flex-1 md:border-t-0"
     >
       <div className="min-h-0 overflow-auto px-2 py-1.5" data-commit-details="">
         {commit ? (

@@ -13,15 +13,15 @@ import type { GitConfiguration, GitSnapshotSource, GitSourceView } from './schem
 const exec = promisify(execFile);
 const hash = (bytes: Uint8Array | string) =>
   `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-async function git(path: string, args: string[], signal?: AbortSignal) {
+async function git(path: string, args: string[], signal?: AbortSignal, input?: string) {
   try {
-    return (
-      await exec('git', ['-C', path, '-c', 'core.quotepath=false', ...args], {
-        encoding: 'buffer',
-        maxBuffer: 32 * 1024 * 1024,
-        signal,
-      })
-    ).stdout;
+    const command = exec('git', ['-C', path, '-c', 'core.quotepath=false', ...args], {
+      encoding: 'buffer',
+      maxBuffer: 32 * 1024 * 1024,
+      signal,
+    });
+    if (input !== undefined) command.child.stdin?.end(input);
+    return (await command).stdout;
   } catch (error) {
     const e = error as Error & { stderr?: Buffer };
     throw new Error(`Git query failed: ${e.stderr?.toString('utf8').trim() || e.message}`, {
@@ -334,7 +334,7 @@ export type GitRequest = {
   commit?: string;
   parent?: string | null;
   branch?: string;
-  base?: string;
+  base?: string | null;
   head?: string;
   mode?: 'branch' | 'commits';
   tip?: string;
@@ -344,6 +344,18 @@ export type GitRequest = {
   area?: 'staged' | 'unstaged' | 'untracked';
   pageOnly?: boolean;
 };
+async function commitEntries(
+  root: string,
+  parent: string | null,
+  commit: string,
+  signal?: AbortSignal,
+) {
+  // Let Git calculate its native empty-tree ID without writing an object (also works with SHA-256).
+  const old =
+    parent ??
+    (await git(root, ['hash-object', '-t', 'tree', '--stdin'], signal, '')).toString('utf8').trim();
+  return parseRaw((await git(root, [...rawArgs, old, commit, '--'], signal)).toString('utf8'));
+}
 export async function readGit(
   paramsValue: GitConfiguration,
   requestValue: GitRequest,
@@ -554,24 +566,7 @@ export async function readGit(
         (parent === null ? parents.length > 0 : !parents.includes(parent))
       )
         throw new Error('Explicit parent must belong to the selected commit.');
-      // diff-tree --root has the repository's native empty-tree semantics, including SHA-256 repos.
-      const args = parent
-        ? [...rawArgs, parent, commit, '--']
-        : [
-            'diff-tree',
-            '--root',
-            '--no-commit-id',
-            '-r',
-            '--raw',
-            '-z',
-            '--no-abbrev',
-            '--find-renames',
-            '--no-ext-diff',
-            '--no-textconv',
-            commit,
-            '--',
-          ];
-      addEntries(parseRaw((await git(root, args, signal)).toString('utf8')), {
+      addEntries(await commitEntries(root, parent, commit, signal), {
         type: 'history',
         commit,
         parent,
@@ -603,15 +598,24 @@ export async function readGit(
         : { key: 'Empty repository: no commit history' };
     }
   } else {
-    if (!request.base) throw new Error('Comparison base is required.');
-    const baseCommit = await commitOID(root, request.base, signal),
+    if (request.base === undefined || request.base === '')
+      throw new Error('Comparison base is required.');
+    const mode = request.mode ?? 'commits';
+    const baseCommit =
+        request.base === null && mode === 'commits'
+          ? null
+          : await commitOID(root, request.base ?? '', signal),
       headCommit = await commitOID(root, request.head ?? 'HEAD', signal),
-      mode = request.mode ?? 'commits';
+      commitParents = request.commit
+        ? (await text(root, ['rev-list', '--parents', '-n', '1', headCommit, '--'], signal))
+            .split(' ')
+            .slice(1)
+        : undefined;
     let old = baseCommit,
       mergeBaseCommit: string | undefined;
     if (mode === 'branch') {
       const bases = (
-        await text(root, ['merge-base', '--all', baseCommit, headCommit], signal).catch(
+        await text(root, ['merge-base', '--all', baseCommit ?? '', headCommit], signal).catch(
           (error: Error & { cause?: { code?: number } }) => {
             if (error.cause?.code === 1) return '';
             throw error;
@@ -629,24 +633,37 @@ export async function readGit(
       mergeBaseCommit = bases[0];
       old = mergeBaseCommit;
     }
-    addEntries(
-      parseRaw((await git(root, [...rawArgs, old, headCommit, '--'], signal)).toString('utf8')),
-      {
-        type: 'compare',
-        mode,
-        baseCommit,
-        headCommit,
-        ...(mergeBaseCommit ? { mergeBaseCommit } : {}),
-      },
-    );
+    addEntries(await commitEntries(root, old, headCommit, signal), {
+      type: 'compare',
+      mode,
+      baseCommit,
+      headCommit,
+      ...(mergeBaseCommit ? { mergeBaseCommit } : {}),
+    });
     description = `${mode === 'branch' ? '三点比较，共同祖先' : '端点比较'} ${old} → ${headCommit}`;
     descriptionUI = {
       key:
         mode === 'branch'
           ? 'Three-dot comparison, merge base {old} → {head}'
           : 'Endpoint comparison {old} → {head}',
-      params: { old, head: headCommit },
+      params: { old: old ?? '', head: headCommit },
     };
+    if (baseCommit === null) {
+      description = request.commit ? `根提交 ${headCommit}；相对空树` : `空树 → ${headCommit}`;
+      descriptionUI = request.commit
+        ? { key: 'Root commit {commit}; relative to empty tree', params: { commit: headCommit } }
+        : { key: 'Empty tree → {head}', params: { head: headCommit } };
+    } else if (commitParents) {
+      description = `提交 ${headCommit}；相对第一父 ${baseCommit}${commitParents.length > 1 ? '（合并提交，只展示第一父差异）' : ''}`;
+      descriptionUI = {
+        key: 'Commit {commit}; relative to first parent {parent}{merge}',
+        params: {
+          commit: headCommit,
+          parent: baseCommit,
+          merge: commitParents.length > 1 ? ' (merge commit; showing first-parent diff only)' : '',
+        },
+      };
+    }
   }
   if (request.file && !request.pageOnly) {
     const file = files.find(

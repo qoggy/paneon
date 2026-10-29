@@ -5,14 +5,14 @@ import type { ResizablePanelGroupHandle } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 
 type Layout = Record<string, number>;
-export type HistoryLayout = { columns?: Layout; rows?: Layout };
+export type HistoryLayout = { columns?: Layout; rows?: Layout; fileDetails?: Layout };
 type ColumnsProps = {
   branches: ReactNode;
   commits: ReactNode;
   files: ReactNode;
   layoutRef: RefObject<HistoryLayout>;
 };
-type Props = ColumnsProps & { diff: ReactNode; showDiff: boolean };
+type Props = ColumnsProps & { details: ReactNode; diff: ReactNode; showDiff: boolean };
 const paneClass = 'flex h-full min-h-0 min-w-0 flex-col [&>*]:flex-1';
 const columnHandleClass = 'z-10 after:w-3 focus-visible:ring-2';
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -160,8 +160,47 @@ function HistoryColumns({ branches, commits, files, layoutRef }: ColumnsProps) {
   );
 }
 
-/** Two nested native panel groups retain the history content while only geometry changes. */
-export function HistoryWorkspace({ branches, commits, files, diff, showDiff, layoutRef }: Props) {
+function HistoryFiles({
+  files,
+  details,
+  layoutRef,
+}: Pick<Props, 'files' | 'details' | 'layoutRef'>) {
+  const { t } = useLocale();
+  return (
+    <ResizablePanelGroup
+      orientation="vertical"
+      data-history-files=""
+      className="min-h-0 min-w-0 gap-0"
+      defaultLayout={layoutRef.current.fileDetails}
+      resizeTargetMinimumSize={{ fine: 12, coarse: 24 }}
+      onLayoutChanged={(_value, meta) => {
+        if (meta.isUserInteraction) layoutRef.current.fileDetails = meta.requestedLayout;
+      }}
+    >
+      <ResizablePanel id="file-list" defaultSize="50%" minSize="8rem" className={paneClass}>
+        {files}
+      </ResizablePanel>
+      <ResizableHandle
+        aria-label={t('调整文件列表与提交说明高度')}
+        className="z-10 after:h-3 focus-visible:ring-2"
+      />
+      <ResizablePanel id="commit-details" minSize="4rem" className={paneClass}>
+        {details}
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  );
+}
+
+/** Nested native panel groups retain the history content while only geometry changes. */
+export function HistoryWorkspace({
+  branches,
+  commits,
+  files,
+  details,
+  diff,
+  showDiff,
+  layoutRef,
+}: Props) {
   const { t } = useLocale();
   const group = useRef<ResizablePanelGroupHandle>(null);
   const [desktop, setDesktop] = useState(() => matchMedia('(min-width: 48rem)').matches);
@@ -184,7 +223,10 @@ export function HistoryWorkspace({ branches, commits, files, diff, showDiff, lay
         <div data-history-workspace="" className="grid min-h-0 gap-3">
           {branches}
           {commits}
-          {files}
+          <div data-history-files="" className="flex min-h-0 min-w-0 flex-col gap-1">
+            {files}
+            {details}
+          </div>
         </div>
         {diff}
       </div>
@@ -207,7 +249,12 @@ export function HistoryWorkspace({ branches, commits, files, diff, showDiff, lay
         defaultSize={`${(0.8 / 2.8) * 100}%`}
         className={paneClass}
       >
-        <HistoryColumns branches={branches} commits={commits} files={files} layoutRef={layoutRef} />
+        <HistoryColumns
+          branches={branches}
+          commits={commits}
+          files={<HistoryFiles files={files} details={details} layoutRef={layoutRef} />}
+          layoutRef={layoutRef}
+        />
       </ResizablePanel>
       <ResizableHandle
         aria-label={t('调整提交历史与文件差异高度')}

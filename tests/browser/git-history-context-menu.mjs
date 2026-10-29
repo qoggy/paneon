@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, realpath } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startGitReviewFixture, createGraphRepository } from './git-review-fixture.mjs';
 import { git } from '../git-review-fixture.ts';
@@ -13,11 +13,8 @@ try {
   // A branch and a tag with the same name must remain distinct comparison targets.
   await git(graph.repository, 'tag', 'main', graph.tip);
   const panel = await fixture.run({
-    repositories: [
-      { id: 'graph', path: graph.repository, label: 'Graph' },
-      { id: 'web', path: fixture.repo, label: 'Web' },
-    ],
-    initialView: { repositoryId: 'graph', type: 'history' },
+    repositories: [graph.repository, fixture.repo],
+    initialView: { repositoryPath: graph.repository, type: 'history' },
   });
   browser = await chromium.launch({
     headless: true,
@@ -26,11 +23,15 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
   const comparisons = [];
+  const repositoryIds = new Map();
   const historyRequests = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => {
     if (!request.url().includes('/actions/')) return;
-    const input = request.postDataJSON()?.input?.request;
+    const body = request.postDataJSON()?.input;
+    for (const repository of body?.params?.repositories ?? [])
+      repositoryIds.set(repository.path, repository.id);
+    const input = body?.request;
     if (input?.type === 'compare') comparisons.push(input);
     if (input?.type === 'history') historyRequests.push(input);
   });
@@ -62,7 +63,7 @@ try {
   async function compare(
     target,
     base,
-    { empty = false, repositoryId = 'graph', keyboard = false } = {},
+    { empty = false, repositoryPath = graph.repository, keyboard = false } = {},
   ) {
     const calls = comparisons.length;
     const selection = await selected().getAttribute('data-commit-id');
@@ -84,7 +85,7 @@ try {
     assert.equal(await tab('分支/版本对比').getAttribute('aria-selected'), 'true');
     assert.equal(comparisons.length, calls + 1, 'Selecting the action runs one comparison.');
     assert.deepEqual(comparisons.at(-1), {
-      repositoryId,
+      repositoryId: repositoryIds.get(await realpath(repositoryPath)),
       type: 'compare',
       base,
       head: 'HEAD',
@@ -149,10 +150,10 @@ try {
   await compare(button('HEAD（当前分支）'), 'HEAD', { empty: true });
 
   await history();
-  await frame.getByRole('combobox', { name: '仓库', exact: true }).click();
-  await frame.getByRole('option', { name: 'Web', exact: true }).click();
+  await frame.getByRole('button', { name: '仓库', exact: true }).click();
+  await frame.getByRole('button', { name: /^web · / }).click();
   await row(fixture.feature).waitFor();
-  await compare(button('本地分支 base'), 'refs/heads/base', { repositoryId: 'web' });
+  await compare(button('本地分支 base'), 'refs/heads/base', { repositoryPath: fixture.repo });
   await button('M a.ts').dblclick();
   await frame.locator('[data-diff-source]').waitFor();
   assert.match((await frame.locator('[data-code-side="new"]').allTextContents()).join(''), /n = 2/);

@@ -18,15 +18,19 @@ import type { GitRevision } from './git.ts';
 export function RevisionPicker({
   label,
   value,
+  valueLabel,
   prefix,
   revisions,
   onChange,
+  emptyTree,
 }: {
   label: string;
   value: string;
+  valueLabel?: string;
   prefix: string;
   revisions: GitRevision[];
   onChange: (value: string) => void;
+  emptyTree?: { selected: boolean; onSelect: () => void };
 }) {
   const { t } = useLocale();
   const id = useId();
@@ -68,11 +72,11 @@ export function RevisionPicker({
             aria-expanded={open}
             aria-controls={`${id}-list-${kind}`}
             className="max-w-72 min-w-40 justify-between font-normal"
-            title={value}
+            title={valueLabel ?? value}
           >
             <span className="shrink-0 text-muted-foreground">{prefix}</span>
             <span className="min-w-0 flex-1 truncate text-left font-medium">
-              {value || t('Choose a revision')}
+              {valueLabel ?? (value || t('Choose a revision'))}
             </span>
             <svg
               viewBox="0 0 16 16"
@@ -116,6 +120,37 @@ export function RevisionPicker({
           </Button>
         </div>
         <Separator />
+        {emptyTree && (
+          <>
+            <div className="p-1">
+              <Button
+                variant="ghost"
+                aria-pressed={emptyTree.selected}
+                className="h-8 w-full justify-start font-normal"
+                onClick={() => {
+                  emptyTree.onSelect();
+                  setOpen(false);
+                }}
+              >
+                <span className="flex size-4 shrink-0 items-center" aria-hidden="true">
+                  {emptyTree.selected && (
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="size-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    >
+                      <path d="m3 8 3 3 7-7" />
+                    </svg>
+                  )}
+                </span>
+                {t('Empty tree')}
+              </Button>
+            </div>
+            <Separator />
+          </>
+        )}
         <div className="p-2">
           <Input
             ref={input}

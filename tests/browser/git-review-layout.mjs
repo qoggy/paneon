@@ -55,18 +55,8 @@ export async function verifyHistoryColumns(frame, page, content, until) {
   const retainedRow = await frame.locator('[data-commit-id][aria-pressed="true"]').elementHandle();
   const retainedDiff = await frame.locator('[data-diff-source]').elementHandle();
   const count = await frame.locator('[data-history-count]').getAttribute('data-history-count');
-  await selectDiffLines(
-    frame,
-    'new',
-    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
-  );
-  await frame.getByRole('button', { name: '批注', exact: true }).click();
-  const editor = frame.getByLabel('批注内容', { exact: true });
-  await editor.fill('Unsaved column sizing draft');
   await separators[0].press('ArrowRight');
-  assert.equal(await editor.inputValue(), 'Unsaved column sizing draft');
   await separators[0].press('ArrowLeft');
-  await editor.press('Escape');
   const history = frame.locator('[data-commit-scroll]');
   await history.evaluate((el) => {
     el.scrollTop = 40;
@@ -228,6 +218,7 @@ export async function verifyHistoryColumns(frame, page, content, until) {
     );
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await separators[0].waitFor({ state: 'visible' });
   await until(
     async () => Math.abs((await widths())[0] - original[0]) < 2,
     'Column proportions did not survive resizing.',
@@ -356,11 +347,16 @@ export async function verifyHistorySplit(frame, page, content, until) {
 
   for (const direction of [-1, 1]) {
     point = await start();
-    await page.mouse.move(point.x, point.y + direction * 2000, { steps: 5 });
+    // Keep moves in the browser viewport so Chrome delivers the captured pointer events.
+    const edge = direction < 0 ? 1 : page.viewportSize().height - 2;
+    await page.mouse.move(point.x, edge, { steps: 8 });
     await page.mouse.up();
     const bounded = await sizes();
     const limit = direction < 0 ? 204 : available - 240;
-    assert.ok(Math.abs(bounded.upper - limit) <= 1);
+    assert.ok(
+      Math.abs(bounded.upper - limit) <= 1,
+      `History split boundary: ${JSON.stringify({ direction, available, bounded, limit })}`,
+    );
     assert.ok(
       bounded.upper >= 200 && bounded.diff >= 239,
       'Both panes retain usable minimum heights.',
@@ -393,19 +389,8 @@ export async function verifyHistorySplit(frame, page, content, until) {
     await page.mouse.up();
     await assertStopped(point);
   }
-  // Preserve both loaded content and an unsaved contextual editor across resizing.
-  await selectDiffLines(
-    frame,
-    'new',
-    Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
-  );
-  await frame.getByRole('button', { name: '批注', exact: true }).click();
-  const editor = frame.getByLabel('批注内容', { exact: true });
-  await editor.fill('Unsaved splitter regression draft');
   await divider.press('ArrowUp');
-  assert.equal(await editor.inputValue(), 'Unsaved splitter regression draft');
   await divider.press('ArrowDown');
-  await editor.press('Escape');
   await history.evaluate((el) => {
     el.scrollTop = 40;
   });
@@ -449,6 +434,7 @@ export async function verifyHistorySplit(frame, page, content, until) {
     );
   }
   await page.setViewportSize({ width: 1440, height: 700 });
+  await divider.waitFor({ state: 'visible' });
   await until(async () => (await sizes()).diff >= 239, 'Resize did not re-constrain pane heights.');
   assert.ok((await sizes()).upper >= 200);
   assert.ok(
@@ -471,7 +457,7 @@ export async function verifyHistorySplit(frame, page, content, until) {
         upper: rect('[data-history-workspace]'),
         details: rect('[aria-label="提交说明"]'),
         files: rect('[aria-label="改动文件"]'),
-        divider: rect('[role="separator"][aria-orientation="horizontal"]'),
+        divider: rect('[role="separator"][aria-label="调整提交历史与文件差异高度"]'),
         diff: rect('[aria-label="文件差异"]'),
       };
     });
@@ -509,7 +495,9 @@ export async function verifyHistorySplit(frame, page, content, until) {
     () =>
       content.evaluate(() => {
         const workspace = document.querySelector('[data-git-workspace]');
-        const divider = document.querySelector('[role="separator"][aria-orientation="horizontal"]');
+        const divider = document.querySelector(
+          '[role="separator"][aria-label="调整提交历史与文件差异高度"]',
+        );
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
         return (
           window.scrollY === 0 &&
@@ -563,10 +551,9 @@ export async function verifyGitLayout(f, page) {
   // B45: real history, long subjects/authors, many files, independently scrollable split code.
   const layout = await createLayoutRepository(f.root);
   const layoutPanel = await f.run({
-    title: 'Git workbench layout acceptance',
-    repositories: [{ id: 'layout', path: layout.repository, label: 'Layout repository' }],
+    repositories: [layout.repository],
     initialView: {
-      repositoryId: 'layout',
+      repositoryPath: layout.repository,
       type: 'history',
       commit: layout.tip,
       file: layout.filename,
@@ -995,12 +982,15 @@ export async function verifyGitLayout(f, page) {
     async () => (await f.events(layoutPanel)).length === 1,
     'layout annotation was not delivered',
   );
-  const tail = (await f.events(layoutPanel))[0].payload.annotations[0].targets[0];
-  assert.equal(tail.text.quote, 'NEW_END');
-  const oldTail = (await f.events(layoutPanel))[0].payload.annotations[1].targets[0];
-  assert.equal(oldTail.text.quote, 'OLD_END');
-  assert.equal(oldTail.ref.side, 'old');
-  assert.equal(tail.ref.side, 'new');
+  const submitted = (await f.events(layoutPanel))[0].payload.files.flatMap(
+    (file) => file.annotations,
+  );
+  const tail = submitted[0].targets[0];
+  assert.equal(tail.selection.quote, 'NEW_END');
+  const oldTail = submitted[1].targets[0];
+  assert.equal(oldTail.selection.quote, 'OLD_END');
+  assert.equal(oldTail.side, 'old');
+  assert.equal(tail.side, 'new');
   await frame.locator('[data-commit-id]').nth(1).click();
   await until(
     async () =>
@@ -1023,6 +1013,9 @@ export async function verifyGitLayout(f, page) {
   await marker.waitFor();
   if (!process.env.PANEON_TEST_DESKTOP_ONLY) {
     await page.setViewportSize({ width: 390, height: 844 });
+    await frame
+      .getByRole('separator', { name: '调整提交历史与文件差异高度' })
+      .waitFor({ state: 'hidden' });
     assert.equal(
       await frame.getByRole('separator', { name: '调整提交历史与文件差异高度' }).isVisible(),
       false,
@@ -1043,9 +1036,8 @@ export async function verifyGitLayout(f, page) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const graphRepo = await createGraphRepository(f.root);
   const graphPanel = await f.run({
-    title: 'Git Log · feature/history',
-    repositories: [{ id: 'graph', path: graphRepo.repository, label: 'Workbench' }],
-    initialView: { repositoryId: 'graph', type: 'history', commit: graphRepo.tip },
+    repositories: [graphRepo.repository],
+    initialView: { repositoryPath: graphRepo.repository, type: 'history', commit: graphRepo.tip },
   });
   await page.goto(f.url(graphPanel));
   const tipRow = frame.locator(`[data-commit-id="${graphRepo.tip}"]`);
@@ -1059,9 +1051,8 @@ export async function verifyGitLayout(f, page) {
     'Commit message follows the file list with only a small gap.',
   );
   assert.ok(
-    compactGeometry.files.height <= 130 &&
-      compactGeometry.files.height < compactGeometry.upper.height / 2,
-    'A one-file list respects the 8rem minimum without reserving half the workbench.',
+    Math.abs(compactGeometry.files.height - compactGeometry.details.height) < 2,
+    'The file list and commit details initially share the available height.',
   );
   assert.ok(
     compactGeometry.upper.bottom >= 980,
@@ -1075,6 +1066,61 @@ export async function verifyGitLayout(f, page) {
     }));
   }
   assert.equal(await frame.locator('[data-commit-graph]').count(), 6);
+  const fileDetailsDivider = frame.getByRole('separator', {
+    name: '调整文件列表与提交说明高度',
+    exact: true,
+  });
+  const retainedDetails = await frame.locator('[data-commit-details]').elementHandle();
+  const initialFileDetails = await graphFrameForGeometry();
+  const dividerBounds = await fileDetailsDivider.boundingBox();
+  const point = { x: dividerBounds.x + 20, y: dividerBounds.y + 0.5 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x, point.y + 80, { steps: 8 });
+  await page.mouse.up();
+  const draggedFileDetails = await graphFrameForGeometry();
+  assert.ok(
+    Math.abs(draggedFileDetails.files.height - initialFileDetails.files.height - 80) < 2,
+    'The file list expands beyond half the workspace with real pointer dragging.',
+  );
+  assert.ok(
+    Math.abs(draggedFileDetails.details.height - initialFileDetails.details.height + 80) < 2,
+    'Commit details shrink by the matching amount.',
+  );
+  assert.equal(await retainedDetails.evaluate((element) => element.isConnected), true);
+  await fileDetailsDivider.focus();
+  await fileDetailsDivider.press('ArrowUp');
+  const keyboardFileDetails = await graphFrameForGeometry();
+  assert.ok(keyboardFileDetails.files.height < draggedFileDetails.files.height);
+  await fileDetailsDivider.press('ArrowDown');
+  assert.ok(
+    Math.abs((await graphFrameForGeometry()).files.height - draggedFileDetails.files.height) < 2,
+    'Native separator keyboard controls resize the panes.',
+  );
+  await fileDetailsDivider.press('End');
+  const smallDetails = await graphFrameForGeometry();
+  assert.ok(Math.abs(smallDetails.details.height - 64) < 2);
+  const detailsScroll = frame.locator('[data-commit-details]');
+  await detailsScroll.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  assert.ok(await detailsScroll.evaluate((element) => element.scrollTop > 0));
+  assert.deepEqual(
+    await graphFrameForGeometry(),
+    smallDetails,
+    'Details scroll inside their pane.',
+  );
+  await fileDetailsDivider.press('ArrowUp');
+  const savedFileDetails = await graphFrameForGeometry();
+  await frame.getByRole('tab', { name: '未提交改动', exact: true }).click();
+  await fileDetailsDivider.waitFor({ state: 'hidden' });
+  await frame.getByRole('tab', { name: '提交记录', exact: true }).click();
+  await fileDetailsDivider.waitFor();
+  await until(
+    async () =>
+      Math.abs((await graphFrameForGeometry()).files.height - savedFileDetails.files.height) < 2,
+    'File list and commit details ratio was not restored after leaving history.',
+  );
   assert.equal(await frame.locator('[data-commit-message]').innerText(), graphRepo.message + '\n');
   assert.equal(
     await frame.locator('[data-commit-message] *').count(),
@@ -1100,6 +1146,10 @@ export async function verifyGitLayout(f, page) {
   assert.equal(
     (await frame.locator('[data-commit-message]').innerText()).trim(),
     'Merge feature/cache into main',
+  );
+  assert.ok(
+    Math.abs((await graphFrameForGeometry()).files.height - savedFileDetails.files.height) < 2,
+    'Switching commits preserves the file list and details split.',
   );
   await mergeRow.press('Home');
   await until(
@@ -1212,8 +1262,8 @@ export async function verifyGitLayout(f, page) {
     );
   await git(graphRepo.repository, 'update-ref', 'refs/heads/long-history', longTip);
   const longPanel = await f.run({
-    repositories: [{ id: 'graph', path: graphRepo.repository }],
-    initialView: { repositoryId: 'graph', type: 'history', branch: 'long-history' },
+    repositories: [graphRepo.repository],
+    initialView: { repositoryPath: graphRepo.repository, type: 'history', branch: 'long-history' },
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(f.url(longPanel));

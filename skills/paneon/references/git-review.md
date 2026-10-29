@@ -24,6 +24,7 @@ Input:
 
 - `history` defaults to `HEAD`.
 - `compare` requires `base`; `head` defaults to `HEAD` and `mode` to `commits`. `branch` compares the merge base with head (three-dot); `commits` compares the two endpoints directly.
+- `compare` accepts `base: null` with `mode: "commits"` to compare the empty tree with head, including for a root commit.
 - Optional `file` is repository-relative and must be in that view's changed files; a `history` file also requires `commit`.
 
 ## Repository management

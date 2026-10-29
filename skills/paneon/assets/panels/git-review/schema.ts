@@ -39,7 +39,7 @@ const initialView = z.discriminatedUnion('type', [
     .object({
       repositoryPath: absoluteDirectory,
       type: z.literal('compare'),
-      base: nonempty,
+      base: nonempty.nullable(),
       head: nonempty.optional(),
       mode: z.enum(['branch', 'commits']).optional(),
       file: relativeFile.optional(),
@@ -119,7 +119,7 @@ export const gitSourceViewSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('compare'),
       mode: z.enum(['branch', 'commits']),
-      baseCommit: oid,
+      baseCommit: oid.nullable(),
       headCommit: oid,
       mergeBaseCommit: oid.optional(),
     })
@@ -228,7 +228,7 @@ export const gitRequestSchema = z
     commit: z.string().optional(),
     parent: oid.nullable().optional(),
     branch: z.string().optional(),
-    base: z.string().optional(),
+    base: z.string().nullable().optional(),
     head: z.string().optional(),
     mode: z.enum(['branch', 'commits']).optional(),
     tip: oid.optional(),

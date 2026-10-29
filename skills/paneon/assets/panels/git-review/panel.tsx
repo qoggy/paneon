@@ -59,6 +59,7 @@ import { FileReviewSplit } from '../../shared/file-review-split';
 import type { FileReviewLayout } from '../../shared/file-review-split';
 import type {
   GitFile,
+  GitCommit,
   GitListing,
   GitRequest,
   GitSnapshot,
@@ -105,6 +106,7 @@ function Review() {
   const currentRepository = repositories.find((repo) => repo.id === view.request.repositoryId)!;
   const [historySelections, setHistorySelections] = useState<Record<string, string>>({});
   const historyLayout = useRef<HistoryLayout>({});
+  const historyScrollPositions = useRef(new Map<string, { top: number; left: number }>());
   const views = useRef(new Map<string, ViewState>());
   const snapshots = useRef(new Map<string, GitSnapshot>());
   const fileSnapshots = useRef(new Map<string, GitSnapshot>());
@@ -166,9 +168,10 @@ function Review() {
     views.current.set(keyOf(next.request), next);
     setView(next);
   }
-  async function load(request: GitRequest, more = false) {
+  async function load(request: GitRequest, more = false, openFirst = false) {
     const id = ++serial.current,
-      key = keyOf(request);
+      key = keyOf(request),
+      location = locating.current;
     activeKey.current = key;
     setPending(true);
     setError('');
@@ -206,6 +209,12 @@ function Review() {
       if (!result.ok) throw new Error(result.message);
       if (id !== serial.current || activeKey.current !== key) return;
       const listing = result.data;
+      if (openFirst && listing.files[0]) {
+        const opened = await reader.readFile(listing.files[0]);
+        if (!opened.ok) throw new Error(opened.message);
+        if (id !== serial.current || activeKey.current !== key) return;
+        listing.snapshots = [opened.data];
+      }
       setRepositoryIssues((previous) =>
         Object.fromEntries(
           Object.entries(previous).filter(
@@ -248,7 +257,8 @@ function Review() {
       }
       const selected = more ? previous?.selected : listing.snapshots[0]?.id;
       const selectedFile = more ? previous?.selectedFile : listing.snapshots[0]?.fileId;
-      if (!more) setCollapsed(!selected);
+      // A later annotation location owns visibility while this listing finishes loading.
+      if (!more && location === locating.current) setCollapsed(!selected);
       save({
         request: {
           ...request,
@@ -400,7 +410,22 @@ function Review() {
     void load(request);
   }
   function editRequest(patch: Partial<GitRequest>) {
-    save({ ...view, request: { ...view.request, ...patch } });
+    const { commit: _commit, ...request } = view.request;
+    save({ ...view, request: { ...request, ...patch } });
+  }
+  function viewCommitChanges(commit: GitCommit) {
+    void load(
+      {
+        repositoryId: view.request.repositoryId,
+        type: 'compare',
+        base: commit.parents[0] ?? null,
+        head: commit.oid,
+        mode: 'commits',
+        commit: commit.oid,
+      },
+      false,
+      true,
+    );
   }
   function compareWithCurrentBranch(base: string) {
     void load({
@@ -511,7 +536,7 @@ function Review() {
     request = view.request;
   const fileList = (
     <aside
-      className={`flex max-h-64 min-w-0 flex-col ${request.type === 'history' ? 'max-md:min-h-0 md:max-h-1/2 md:min-h-32' : 'min-h-0 md:max-h-none'}`}
+      className="flex max-h-64 min-h-0 min-w-0 flex-col md:max-h-none"
       aria-label={t('改动文件')}
     >
       <div className="flex min-h-0 flex-1 flex-col" aria-busy={pending}>
@@ -586,6 +611,12 @@ function Review() {
       }}
     />
   );
+  const historyScrollKey = `${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`;
+  const historyScrollPosition = historyScrollPositions.current.get(historyScrollKey) ?? {
+    top: 0,
+    left: 0,
+  };
+  historyScrollPositions.current.set(historyScrollKey, historyScrollPosition);
   const historyCommits = (
     <section
       aria-label={t('提交历史')}
@@ -603,6 +634,8 @@ function Review() {
           key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
           commits={listing?.history?.commits ?? []}
           selected={request.commit ?? listing?.history?.selectedCommit?.oid}
+          scrollPosition={historyScrollPosition}
+          onViewChanges={viewCommitChanges}
           onCompare={compareWithCurrentBranch}
           onSelect={(commit) =>
             void load({
@@ -628,12 +661,6 @@ function Review() {
         )}
       </div>
     </section>
-  );
-  const historyFiles = (
-    <div data-history-files="" className="flex min-h-0 min-w-0 flex-col gap-1">
-      {fileList}
-      <CommitDetails commit={listing?.history?.selectedCommit} />
-    </div>
   );
   const diffPane = selected && (
     <section
@@ -665,7 +692,7 @@ function Review() {
                     unstaged: t('未暂存改动'),
                     untracked: t('未跟踪文件'),
                   }[oldSnapshot.source.view.area]
-                : `${oldSnapshot.source.view.baseCommit.slice(0, 10)} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
+                : `${oldSnapshot.source.view.baseCommit?.slice(0, 10) ?? t('Empty tree')} → ${oldSnapshot.source.view.headCommit.slice(0, 10)}`}
             {t('· 批注仍指向原内容')}
           </span>
           <Button size="sm" variant="outline" onClick={() => setOldSnapshot(undefined)}>
@@ -693,7 +720,7 @@ function Review() {
                     : selected.source.view.type === 'compare'
                       ? (
                           selected.source.view.mergeBaseCommit ?? selected.source.view.baseCommit
-                        ).slice(0, 8)
+                        )?.slice(0, 8)
                       : selected.source.view.area === 'staged'
                         ? selected.source.view.headCommit?.slice(0, 8)
                         : t('暂存区')
@@ -732,7 +759,7 @@ function Review() {
                     : selected.source.view.type === 'compare'
                       ? (
                           selected.source.view.mergeBaseCommit ?? selected.source.view.baseCommit
-                        ).slice(0, 8)
+                        )?.slice(0, 8)
                       : selected.source.view.area === 'staged'
                         ? selected.source.view.headCommit?.slice(0, 8)
                         : t('暂存区')
@@ -899,8 +926,13 @@ function Review() {
                     label={t('Base')}
                     prefix="base:"
                     value={request.base ?? ''}
+                    valueLabel={request.base === null ? t('Empty tree') : undefined}
                     revisions={revisions}
                     onChange={(base) => editRequest({ base })}
+                    emptyTree={{
+                      selected: request.base === null,
+                      onSelect: () => editRequest({ base: null, mode: 'commits' }),
+                    }}
                   />
                   <span aria-hidden="true" className="text-muted-foreground">
                     →
@@ -913,6 +945,7 @@ function Review() {
                     onChange={(head) => editRequest({ head })}
                   />
                   <Select
+                    disabled={request.base === null}
                     items={{ branch: 'Three-dot diff', commits: 'Two-dot diff' }}
                     value={request.mode ?? 'commits'}
                     onValueChange={(value) => editRequest({ mode: value as 'branch' | 'commits' })}
@@ -926,7 +959,7 @@ function Review() {
                     </SelectContent>
                   </Select>
                   <Button
-                    disabled={pending || !request.base}
+                    disabled={pending || request.base === undefined || request.base === ''}
                     onClick={() => void load({ ...request, head: request.head || 'HEAD' })}
                   >
                     {t('比较')}
@@ -984,7 +1017,8 @@ function Review() {
                   <HistoryWorkspace
                     branches={historyBranches}
                     commits={historyCommits}
-                    files={historyFiles}
+                    files={fileList}
+                    details={<CommitDetails commit={listing?.history?.selectedCommit} />}
                     diff={diffPane}
                     showDiff={historyDiff}
                     layoutRef={historyLayout}
