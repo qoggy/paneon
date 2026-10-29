@@ -17,7 +17,7 @@ try {
   // Seed list metadata only; these tests do not need executing panel workers.
   for (let index = 0; index < 25; index++)
     service.runtime.store.save({
-      instanceId: `instance-status-${String(index).padStart(2, '0')}`,
+      instanceId: String(index + 1),
       definitionId: `${index < 22 ? 'running' : 'closed'}-panel-${index}`,
       entryPath: join(root, 'panel.tsx'),
       cwd: root,

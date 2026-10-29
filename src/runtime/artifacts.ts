@@ -110,13 +110,7 @@ export class Artifacts {
       },
     );
     return entries
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          /^instance-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(
-            entry.name,
-          ),
-      )
+      .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/.test(entry.name))
       .map((entry) => entry.name);
   }
   async prune(id: string, revision?: string) {

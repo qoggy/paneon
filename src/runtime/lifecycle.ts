@@ -224,13 +224,15 @@ export class Runtime extends EventEmitter {
   }
   inspect(id: string) {
     const panel = this.store.get(id);
-    const manifest = this.manifest(id);
+    const manifest = this.manifest(panel.instanceId);
     return { ...panel, ...(manifest ? { manifest } : {}) };
   }
   artifact(id: string, revision: string) {
     const panel = this.store.get(id);
     if (panel.status === 'closed' || panel.revision !== revision) return;
-    return this.live.get(id)?.compiled ?? this.artifacts.read(id, revision);
+    return (
+      this.live.get(panel.instanceId)?.compiled ?? this.artifacts.read(panel.instanceId, revision)
+    );
   }
   private assertOpen(panel: StoredPanel, signal?: AbortSignal) {
     if (this.stopping) throw new PaneonError('RUNTIME_UNAVAILABLE', 'The service is stopping.');
@@ -426,7 +428,7 @@ export class Runtime extends EventEmitter {
   }
   state(id: string, building = false) {
     const panel = this.store.get(id);
-    this.emit('state', id, {
+    this.emit('state', panel.instanceId, {
       type: 'state',
       status: panel.status,
       revision: panel.revision,
@@ -436,8 +438,7 @@ export class Runtime extends EventEmitter {
   }
   async run(entryPath: string, cwd: string, params: JsonValue, watch: boolean) {
     const now = new Date().toISOString();
-    const panel: StoredPanel = {
-      instanceId: 'instance-' + randomUUID(),
+    const panel = this.store.save({
       definitionId: '',
       status: 'unavailable',
       entryPath,
@@ -449,12 +450,19 @@ export class Runtime extends EventEmitter {
       updatedAt: now,
       requires: { paneon: '' },
       paneonVersion: PACKAGE_VERSION,
-    };
-    const lease = await this.residents.acquire(panel.instanceId);
+    });
     try {
-      return await this.prepare(panel, lease.signal, true, 'force');
-    } finally {
-      await this.release(panel.instanceId, lease);
+      const lease = await this.residents.acquire(panel.instanceId);
+      try {
+        return await this.prepare(panel, lease.signal, true, 'force');
+      } finally {
+        await this.release(panel.instanceId, lease);
+      }
+    } catch (error) {
+      // Close/delete owns the record once it has cancelled initial creation.
+      if (this.store.find(panel.instanceId)?.status !== 'closed')
+        this.store.delete(panel.instanceId);
+      throw error;
     }
   }
   private failure(id: string, error: unknown) {
@@ -469,6 +477,7 @@ export class Runtime extends EventEmitter {
   }
   async observe(id: string) {
     const panel = this.store.get(id);
+    id = panel.instanceId;
     if (panel.status === 'closed' || !panel.watch) return;
     const lease = await this.residents.acquire(id);
     try {
@@ -485,6 +494,7 @@ export class Runtime extends EventEmitter {
   }
   private async rebuild(id: string, execute: boolean, refresh: 'watch' | 'force' = 'force') {
     const panel = this.store.get(id);
+    id = panel.instanceId;
     if (panel.status === 'closed')
       throw new PaneonError('PANEL_CLOSED', 'The panel instance is closed.');
     const lease = await this.residents.acquire(id);
@@ -559,6 +569,7 @@ export class Runtime extends EventEmitter {
     operation: (live: Live & { execution: Execution }) => Promise<T>,
   ): Promise<T> {
     const panel = this.current(id, revision);
+    id = panel.instanceId;
     const lease = await this.residents.acquire(id);
     try {
       try {
@@ -604,14 +615,15 @@ export class Runtime extends EventEmitter {
       );
     return this.withExecution(id, revision, async (live) => {
       const parsed = await live.execution.request('validate-event', { type, payload });
-      this.current(id, revision);
-      const result = this.store.appendCurrent(id, revision, type, jsonValue(parsed));
-      this.emit('event', id);
-      this.state(id);
+      const panel = this.current(id, revision);
+      const result = this.store.appendCurrent(panel.instanceId, revision, type, jsonValue(parsed));
+      this.emit('event', panel.instanceId);
+      this.state(panel.instanceId);
       return result;
     });
   }
   async events(id: string, consumer: string, limit: number, waitMs: number) {
+    id = this.store.get(id).instanceId;
     let result = this.store.read(id, consumer, limit);
     if (result.events.length || !waitMs) return result;
     await new Promise<void>((resolve, reject) => {
@@ -644,7 +656,10 @@ export class Runtime extends EventEmitter {
   }
   manifest(id: string): Manifest | undefined {
     const panel = this.store.get(id);
-    return (this.live.get(id)?.compiled ?? this.artifacts.read(id, panel.revision))?.manifest;
+    return (
+      this.live.get(panel.instanceId)?.compiled ??
+      this.artifacts.read(panel.instanceId, panel.revision)
+    )?.manifest;
   }
   async stop() {
     this.stopping = true;

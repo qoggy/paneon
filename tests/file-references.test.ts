@@ -183,7 +183,7 @@ void test('the specialized file API is not registered', async () => {
   const service = await startServer(join(root, 'runtime'));
   const origin = `http://127.0.0.1:${service.descriptor.port}`;
   const panel = {
-    instanceId: 'file-panel',
+    instanceId: '1',
     definitionId: 'file-test',
     cwd: root,
     entryPath: join(root, 'panel.tsx'),
@@ -201,7 +201,7 @@ void test('the specialized file API is not registered', async () => {
   const request = (headers: Record<string, string>, revision = 'current') =>
     service.app.inject({
       method: 'POST',
-      url: '/api/panels/file-panel/file',
+      url: '/api/panels/1/file',
       headers: { host: `127.0.0.1:${service.descriptor.port}`, ...headers },
       payload: { revision, reference: { href: './source.ts' } },
     });

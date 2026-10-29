@@ -1,6 +1,5 @@
 import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,10 +18,9 @@ const { Runtime } = (await import(
 const execute = promisify(execFile);
 const source = (extra = '') =>
   `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${extra}function Panel(){return <div>Deletion fixture</div>}export default definePanel({id:'deletion',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
-function stored(root: string, status: StoredPanel['status']): StoredPanel {
+function stored(root: string, status: StoredPanel['status']): Omit<StoredPanel, 'instanceId'> {
   const now = new Date().toISOString();
   return {
-    instanceId: 'instance-' + randomUUID(),
     definitionId: 'deletion',
     status,
     entryPath: join(root, 'panel.tsx'),
@@ -64,8 +62,7 @@ void test('deletion uses the stored identity to retire resources, remove history
     );
     await runtime.events(panel.instanceId, 'waiting', 100, 0);
     runtime.store.ack(panel.instanceId, 'waiting', event.id);
-    const other = stored(root, 'closed');
-    runtime.store.save(other);
+    const other = runtime.store.save(stored(root, 'closed'));
     const otherEvent = runtime.store.append(other.instanceId, 'saved', 'feedback', {
       text: 'keep',
     });
@@ -79,7 +76,7 @@ void test('deletion uses the stored identity to retire resources, remove history
     await until(() => existsSync(started), 'action did not start');
     const notices: string[] = [];
     runtime.on('deleted', (id: string) => notices.push(id));
-    assert.deepEqual(await runtime.deletePanel(panel.instanceId), { deleted: true });
+    assert.deepEqual(await runtime.deletePanel('0' + panel.instanceId), { deleted: true });
     assert.deepEqual(notices, [panel.instanceId]);
     await Promise.all([waiting, invocation]);
     assert.equal(runtime.live.has(panel.instanceId), false);
@@ -115,6 +112,37 @@ void test('deletion uses the stored identity to retire resources, remove history
 });
 
 void test(
+  'deletion during initial creation succeeds and wakes waiting readers after creation cleanup',
+  { timeout: 10000 },
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'paneon-delete-creation-'));
+    const runtime = new Runtime(join(root, 'data'));
+    const entry = join(root, 'panel.tsx');
+    writeFileSync(entry, source());
+    try {
+      const creation = assert.rejects(runtime.run(entry, root, {}, false), {
+        code: 'PANEL_CLOSED',
+      });
+      const id = runtime.store.all()[0].instanceId;
+      const notices: string[] = [];
+      runtime.on('deleted', (instanceId: string) => notices.push(instanceId));
+      const waiting = assert.rejects(runtime.events(id, 'waiting', 100, 60000), {
+        code: 'PANEL_NOT_FOUND',
+      });
+      assert.deepEqual(await runtime.deletePanel(id), { deleted: true });
+      assert.deepEqual(notices, [id]);
+      await Promise.all([creation, waiting]);
+      assert.equal(runtime.store.find(id), undefined);
+      assert.equal(runtime.resourceUsage.residentPanels, 0);
+      assert.equal(runtime.resourceUsage.workers, 0);
+    } finally {
+      await runtime.stop();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
   'API and CLI delete every status and notify an existing stream',
   { timeout: 30000 },
   async () => {
@@ -125,8 +153,7 @@ void test(
     let socket: WebSocket | undefined;
     try {
       for (const status of ['running', 'unavailable', 'closed'] as const) {
-        const panel = stored(root, status);
-        service.runtime.store.save(panel);
+        const panel = service.runtime.store.save(stored(root, status));
         const event = service.runtime.store.append(panel.instanceId, 'saved', 'feedback', {
           text: status,
         });

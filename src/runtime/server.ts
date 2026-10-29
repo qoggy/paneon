@@ -168,7 +168,10 @@ async function bootServer(
       throw new PaneonError('INVALID_ARGUMENT', 'A nonempty consumer name is required.');
     return value;
   };
-  const access = (id: string) => ({ ...runtime.inspect(id), url: `${origin}/panels/${id}` });
+  const access = (id: string) => {
+    const panel = runtime.inspect(id);
+    return { ...panel, url: `${origin}/panels/${panel.instanceId}` };
+  };
   route('GET', '/api/preferences', () => ({ ui: preferences.ui }));
   route('POST', '/api/preferences', (request) => {
     const result = preferences.save(body(request).ui);
@@ -315,7 +318,7 @@ async function bootServer(
       },
     },
     (socket, request) => {
-      const instanceId = params(request).instanceId;
+      const instanceId = runtime.store.get(params(request).instanceId).instanceId;
       const subscription = { instanceId, alive: true };
       subscriptions.set(socket, subscription);
       socket.on('pong', () => {

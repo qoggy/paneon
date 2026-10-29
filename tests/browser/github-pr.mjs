@@ -194,6 +194,8 @@ async function completeAcceptance() {
     await comment().fill('原 head 的代码');
     await finish();
     await button('单列对比').click();
+    assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
+    await button('收起上下文').click();
     await button('展开全部上下文').click();
     await button('左右对比').click();
     // A description can change without a new head; its saved text remains locatable.

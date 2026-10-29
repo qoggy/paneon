@@ -1,7 +1,6 @@
 import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { randomUUID } from 'node:crypto';
 import {
   mkdtempSync,
   mkdirSync,
@@ -28,7 +27,8 @@ const { startServer } = (await import(
   '../dist/runtime/' + 'server.js'
 )) as typeof import('../src/runtime/server.js');
 const revision = (letter: string) => 'sha256:' + letter.repeat(64);
-const instance = () => 'instance-' + randomUUID();
+let nextInstanceId = 1000;
+const instance = () => String(nextInstanceId++);
 function directory() {
   return realpathSync(mkdtempSync(join(tmpdir(), 'paneon-retention-')));
 }

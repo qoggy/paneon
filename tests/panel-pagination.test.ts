@@ -31,7 +31,7 @@ void test(
     // Mix creation times and tied pairs; update times must not affect newest-first ordering.
     for (let i = 0; i < 45; i++)
       store.save({
-        instanceId: `instance-${String(i).padStart(2, '0')}`,
+        instanceId: String(i + 1),
         definitionId: 'pagination',
         status: 'closed',
         entryPath: '/not-loaded.tsx',
@@ -46,8 +46,8 @@ void test(
       });
     const first = store.listPage();
     assert.equal(first.panels.length, 20);
-    assert.equal(first.panels[0].instanceId, 'instance-44');
-    assert.equal(first.panels.at(-1)?.instanceId, 'instance-25');
+    assert.equal(first.panels[0].instanceId, '45');
+    assert.equal(first.panels.at(-1)?.instanceId, '26');
     assert.equal(first.total, 45);
     assert.equal(first.totalPages, 3);
     assert.equal('params' in first.panels[0], false);
@@ -58,7 +58,7 @@ void test(
     assert.equal(new Set(ids).size, 45);
     assert.deepEqual(
       ids,
-      Array.from({ length: 45 }, (_, i) => `instance-${String(44 - i).padStart(2, '0')}`),
+      Array.from({ length: 45 }, (_, i) => String(45 - i)),
     );
     assert.equal(store.listPage(3).panels.length, 5);
     assert.deepEqual(store.listPage(4).panels, []);
@@ -149,9 +149,9 @@ void test(
       for (let i = 0; i < 45; i++)
         service.runtime.store.db
           .prepare('UPDATE panels SET status = ? WHERE id = ?')
-          .run(statuses[i % 3], `instance-${String(i).padStart(2, '0')}`);
+          .run(statuses[i % 3], String(i + 1));
       for (const [index, status] of statuses.entries()) {
-        const expected = ids.filter((id) => Number(id.slice(-2)) % 3 === index);
+        const expected = ids.filter((id) => (Number(id) - 1) % 3 === index);
         const filtered = await read(`?status=${status}&page=2&pageSize=4`);
         assert.equal(filtered.status, 200);
         assert.equal(filtered.body.data.total, 15);

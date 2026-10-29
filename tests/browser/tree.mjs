@@ -190,7 +190,7 @@ try {
   await statusRow(0, 'M').waitFor();
   await statusRow(1, 'A').waitFor();
   await statusRow(2, 'D').waitFor();
-  await statusRow(4, 'pending').waitFor();
+  await statusRow(4, '=').waitFor();
   assert.match(await button('added.ts').getAttribute('class'), /text-green-700/);
   assert.match(await button('analyze-session-worker.md').getAttribute('class'), /text-blue-600/);
   assert.match(await button('deleted.ts').getAttribute('class'), /text-muted-foreground/);

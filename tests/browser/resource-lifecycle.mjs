@@ -72,7 +72,7 @@ try {
   assert.equal(await frame.getByLabel('Action result').textContent(), originalResult);
   let maximumWorkers = service.runtime.resourceUsage.workers;
   for (let index = 0; index < 10; index++) {
-    const id = 'cold-clone-' + index;
+    const id = String(index + 100);
     await cp(join(home, 'panels', panel.instanceId), join(home, 'panels', id), { recursive: true });
     service.runtime.store.save({ ...stored, instanceId: id });
     await service.runtime.invoke(id, panel.revision, 'panel.tsx#read', {});

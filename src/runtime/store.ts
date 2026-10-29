@@ -16,7 +16,7 @@ export class Store {
       .get();
     if (table) {
       const row = this.db.prepare('SELECT version FROM schema_meta').get() as { version: number };
-      if (row.version !== 1) {
+      if (row.version !== 2) {
         this.db.close();
         throw new PaneonError(
           'DATABASE_VERSION_UNSUPPORTED',
@@ -25,14 +25,14 @@ export class Store {
       }
     }
     this.db.exec(
-      `CREATE TABLE IF NOT EXISTS schema_meta(version INTEGER NOT NULL);INSERT INTO schema_meta SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM schema_meta);CREATE TABLE IF NOT EXISTS panels(id TEXT PRIMARY KEY,definition_id TEXT NOT NULL,entry_path TEXT NOT NULL,cwd TEXT NOT NULL,params_json TEXT NOT NULL,revision TEXT NOT NULL,watch INTEGER NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,requires_json TEXT NOT NULL,paneon_version TEXT NOT NULL,diagnostic_json TEXT);CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,instance_id TEXT NOT NULL REFERENCES panels(id),revision TEXT NOT NULL,type TEXT NOT NULL,payload_json TEXT NOT NULL,created_at TEXT NOT NULL);CREATE INDEX IF NOT EXISTS events_instance_id_id ON events(instance_id,id);CREATE TABLE IF NOT EXISTS consumers(instance_id TEXT NOT NULL REFERENCES panels(id),consumer_id TEXT NOT NULL,last_delivered_id INTEGER NOT NULL DEFAULT 0,last_ack_id INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(instance_id,consumer_id));`,
+      `CREATE TABLE IF NOT EXISTS schema_meta(version INTEGER NOT NULL);INSERT INTO schema_meta SELECT 2 WHERE NOT EXISTS(SELECT 1 FROM schema_meta);CREATE TABLE IF NOT EXISTS panels(id INTEGER PRIMARY KEY AUTOINCREMENT,definition_id TEXT NOT NULL,entry_path TEXT NOT NULL,cwd TEXT NOT NULL,params_json TEXT NOT NULL,revision TEXT NOT NULL,watch INTEGER NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,requires_json TEXT NOT NULL,paneon_version TEXT NOT NULL,diagnostic_json TEXT);CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,instance_id INTEGER NOT NULL REFERENCES panels(id),revision TEXT NOT NULL,type TEXT NOT NULL,payload_json TEXT NOT NULL,created_at TEXT NOT NULL);CREATE INDEX IF NOT EXISTS events_instance_id_id ON events(instance_id,id);CREATE TABLE IF NOT EXISTS consumers(instance_id INTEGER NOT NULL REFERENCES panels(id),consumer_id TEXT NOT NULL,last_delivered_id INTEGER NOT NULL DEFAULT 0,last_ack_id INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(instance_id,consumer_id));`,
     );
   }
-  save(p: StoredPanel) {
-    this.db
+  save(p: Omit<StoredPanel, 'instanceId'> & { instanceId?: string }): StoredPanel {
+    const result = this.db
       .prepare('INSERT OR REPLACE INTO panels VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(
-        p.instanceId,
+        p.instanceId ?? null,
         p.definitionId,
         p.entryPath,
         p.cwd,
@@ -46,10 +46,11 @@ export class Store {
         p.paneonVersion,
         p.diagnostic ? JSON.stringify(p.diagnostic) : null,
       );
+    return { ...p, instanceId: p.instanceId ?? String(result.lastInsertRowid) };
   }
   private decode(r: Record<string, unknown>): StoredPanel {
     return {
-      instanceId: r.id as string,
+      instanceId: String(r.id),
       definitionId: r.definition_id as string,
       entryPath: r.entry_path as string,
       cwd: r.cwd as string,
@@ -103,7 +104,7 @@ export class Store {
     };
     const rows = this.db
       .prepare(
-        `SELECT id AS instanceId, definition_id AS definitionId,
+        `SELECT CAST(id AS TEXT) AS instanceId, definition_id AS definitionId,
       status, entry_path AS entryPath, cwd, revision, watch,
       created_at AS createdAt, updated_at AS updatedAt
       FROM panels${where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`,

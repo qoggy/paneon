@@ -151,7 +151,7 @@ void test('SQLite events survive reopen and only explicit delivered acknowledgem
   temporary((root) => {
     let store = new Store(root);
     const panel: StoredPanel = {
-      instanceId: 'i',
+      instanceId: '1',
       definitionId: 'd',
       status: 'running',
       entryPath: '/a.tsx',
@@ -165,20 +165,20 @@ void test('SQLite events survive reopen and only explicit delivered acknowledgem
       paneonVersion: PACKAGE_VERSION,
     };
     store.save(panel);
-    store.save({ ...panel, instanceId: 'other' });
-    const event = store.append('i', 'r', 'feedback', { text: '中文' });
-    const foreign = store.append('other', 'r', 'feedback', {});
-    assert.throws(() => store.ack('i', 'agent', event.id), { code: 'INVALID_ACK' });
-    assert.equal(store.read('i', 'agent', 100).events[0]?.id, event.id);
-    assert.equal(store.read('i', 'agent', 100).events.length, 1);
-    assert.throws(() => store.ack('i', 'agent', foreign.id), { code: 'INVALID_ACK' });
-    store.ack('i', 'agent', event.id);
-    assert.equal(store.read('i', 'agent', 100).events.length, 0);
-    assert.equal(store.read('i', 'another', 100).events.length, 1);
+    store.save({ ...panel, instanceId: '2' });
+    const event = store.append('1', 'r', 'feedback', { text: '中文' });
+    const foreign = store.append('2', 'r', 'feedback', {});
+    assert.throws(() => store.ack('1', 'agent', event.id), { code: 'INVALID_ACK' });
+    assert.equal(store.read('1', 'agent', 100).events[0]?.id, event.id);
+    assert.equal(store.read('1', 'agent', 100).events.length, 1);
+    assert.throws(() => store.ack('1', 'agent', foreign.id), { code: 'INVALID_ACK' });
+    store.ack('1', 'agent', event.id);
+    assert.equal(store.read('1', 'agent', 100).events.length, 0);
+    assert.equal(store.read('1', 'another', 100).events.length, 1);
     store.close();
     store = new Store(root);
-    assert.equal(store.read('i', 'agent', 100).lastAckId, event.id);
-    assert.equal(store.read('i', 'another', 100).events.length, 1);
+    assert.equal(store.read('1', 'agent', 100).lastAckId, event.id);
+    assert.equal(store.read('1', 'another', 100).events.length, 1);
     const tables = store.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {
       name: string;
     }[];

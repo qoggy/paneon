@@ -113,7 +113,7 @@ void test('restore and indexed history reads do not evaluate any historical pane
     const now = new Date().toISOString();
     for (let index = 0; index < 1000; index++)
       runtime.store.save({
-        instanceId: 'history-' + index,
+        instanceId: String(index + 1),
         definitionId: 'history',
         status: 'running',
         entryPath: join(root, 'missing.tsx'),
@@ -127,16 +127,16 @@ void test('restore and indexed history reads do not evaluate any historical pane
         paneonVersion: PACKAGE_VERSION,
       });
     runtime.store.db
-      .prepare("UPDATE panels SET params_json = 'invalid JSON' WHERE id = 'history-999'")
+      .prepare("UPDATE panels SET params_json = 'invalid JSON' WHERE id = '1000'")
       .run();
-    runtime.store.append('history-0', 'old', 'done', { text: 'retained' });
+    runtime.store.append('1', 'old', 'done', { text: 'retained' });
     await runtime.restore();
     assert.equal(runtime.resourceUsage.residentPanels, 0);
     assert.equal(runtime.resourceUsage.workers, 0);
     assert.equal(runtime.resourceUsage.watchers, 0);
-    assert.equal(runtime.inspect('history-0').status, 'running');
+    assert.equal(runtime.inspect('1').status, 'running');
     assert.equal(runtime.store.listPage().total, 1000);
-    const events = await runtime.events('history-0', 'agent', 100, 0);
+    const events = await runtime.events('1', 'agent', 100, 0);
     assert.equal(events.events.length, 1);
     assert.equal(existsSync(join(root, 'panels')), false);
   } finally {
@@ -316,7 +316,7 @@ void test(
       assert.equal(maximumBuilds, 1);
       const original = runtime.store.get(panels[0].instanceId);
       for (let index = 0; index < 10; index++) {
-        const id = 'scale-' + index;
+        const id = String(index + 100);
         cpSync(join(home, 'panels', original.instanceId), join(home, 'panels', id), {
           recursive: true,
         });
@@ -325,7 +325,7 @@ void test(
       for (const active of [1, 5, 10]) {
         for (let round = 0; round < 2; round++)
           for (let index = 0; index < active; index++) {
-            await runtime.invoke('scale-' + index, original.revision, 'panel.tsx#read', {});
+            await runtime.invoke(String(index + 100), original.revision, 'panel.tsx#read', {});
             assert.ok(runtime.resourceUsage.residentPanels <= 3);
             assert.ok(runtime.resourceUsage.workers <= 3);
           }

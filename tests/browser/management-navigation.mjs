@@ -18,7 +18,7 @@ try {
   // Persisted closed panels exercise the real pagination endpoint without starting extra workers.
   for (let index = 0; index < 41; index++) {
     service.runtime.store.save({
-      instanceId: `instance-history-${String(index).padStart(2, '0')}`,
+      instanceId: String(index + 1),
       definitionId: `history-${index}`,
       entryPath: join(root, 'history.tsx'),
       cwd: root,

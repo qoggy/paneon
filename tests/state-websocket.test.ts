@@ -21,7 +21,7 @@ void test(
   async (t) => {
     const home = mkdtempSync(join(tmpdir(), 'paneon-state-websocket-'));
     const store = new Store(home);
-    for (const instanceId of ['first', 'second'])
+    for (const instanceId of ['1', '2'])
       store.save({
         instanceId,
         definitionId: 'state-test',
@@ -41,7 +41,7 @@ void test(
     const origin = `http://127.0.0.1:${service.descriptor.port}`;
     const url = (id: string) => `${origin.replace('http:', 'ws:')}/api/panels/${id}/stream`;
     const sockets = new Set<WebSocket>();
-    async function connect(id = 'first') {
+    async function connect(id = '1') {
       const socket = new WebSocket(url(id), { origin });
       sockets.add(socket);
       const initial = once(socket, 'message');
@@ -53,7 +53,7 @@ void test(
       });
       return socket;
     }
-    async function rejected(headers: Record<string, string>, code: string, id = 'first') {
+    async function rejected(headers: Record<string, string>, code: string, id = '1') {
       await new Promise<void>((resolve, reject) => {
         const socket = new WebSocket(url(id), { headers });
         sockets.add(socket);
@@ -101,18 +101,36 @@ void test(
         },
       );
       await t.test(
+        'numeric aliases subscribe to the stored identity and canonical URL',
+        async () => {
+          const socket = await connect('01');
+          const message = once(socket, 'message');
+          await service.runtime.closePanel('01');
+          assert.equal(state((await message)[0]).status, 'closed');
+          const response = await fetch(`${origin}/api/panels/01`, {
+            headers: { Referer: `${origin}/` },
+          });
+          const result = (await response.json()) as { data: { instanceId: string; url: string } };
+          assert.equal(result.data.instanceId, '1');
+          assert.equal(result.data.url, `${origin}/panels/1`);
+          const closed = once(socket, 'close');
+          socket.close();
+          await closed;
+        },
+      );
+      await t.test(
         'more than ten subscriptions share runtime listeners and deliver only their own state',
         async () => {
           const listeners = service.runtime.listenerCount('state');
           const stopListeners = service.runtime.listenerCount('stop');
           const first = await Promise.all(Array.from({ length: 12 }, () => connect()));
-          const second = await connect('second');
+          const second = await connect('2');
           assert.equal(service.runtime.listenerCount('state'), listeners);
           assert.equal(service.runtime.listenerCount('stop'), stopListeners);
           const messages = first.map((socket) => once(socket, 'message'));
           const otherMessages: unknown[] = [];
           second.on('message', (message) => otherMessages.push(message));
-          service.runtime.emit('state', 'first', {
+          service.runtime.emit('state', '1', {
             type: 'state',
             revision: 'next',
             status: 'closed',
@@ -133,7 +151,7 @@ void test(
           await Promise.all(closing);
           const replacement = await connect();
           const next = once(replacement, 'message');
-          service.runtime.emit('state', 'first', {
+          service.runtime.emit('state', '1', {
             type: 'state',
             revision: 'reconnected',
             status: 'closed',

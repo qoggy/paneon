@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, access, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
 import { startServer } from '../../dist/runtime/server.js';
 
@@ -33,7 +32,7 @@ try {
     text: 'history',
   });
   await service.stop();
-  const orphan = 'instance-' + randomUUID(),
+  const orphan = '1000',
     orphanRoot = join(home, 'panels', orphan, 'sha256-' + 'f'.repeat(64));
   await mkdir(orphanRoot, { recursive: true });
   await writeFile(join(orphanRoot, 'leftover'), 'data');

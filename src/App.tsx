@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -273,8 +273,8 @@ function PanelList() {
               {!loading &&
                 panels?.map((panel) => (
                   <Card key={panel.instanceId}>
-                    <CardHeader>
-                      <CardTitle>
+                    <CardHeader className="flex flex-row items-baseline justify-between gap-3">
+                      <CardTitle className="min-w-0 break-words">
                         <a
                           className="underline-offset-4 hover:underline"
                           href={`/panels/${encodeURIComponent(panel.instanceId)}`}
@@ -282,7 +282,9 @@ function PanelList() {
                           {panel.definitionId}
                         </a>
                       </CardTitle>
-                      <CardDescription className="break-all">{panel.instanceId}</CardDescription>
+                      <span className="shrink-0 text-sm text-muted-foreground">
+                        #{panel.instanceId}
+                      </span>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Stack direction="row" gap={2}>

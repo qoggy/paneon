@@ -26,6 +26,8 @@ void test('the GitHub fixture panel compiles its type-only server model imports'
     const live = runtime.live.get(panel.instanceId);
     assert.ok(live);
     assert.deepEqual(live.compiled.manifest.actions.map((action) => action.id).sort(), [
+      `@qoggy/paneon@${PACKAGE_VERSION}/image#readImage`,
+      `@qoggy/paneon@${PACKAGE_VERSION}/markdown#readLocalFile`,
       'gh-panel.tsx#listPullRequests',
       'gh-panel.tsx#viewPullRequest',
     ]);
@@ -275,7 +277,7 @@ void test('a real daemon and CLI stop complete while a framework WebSocket stays
   )) as typeof import('../src/runtime/store.js');
   const store = new Store(home);
   store.save({
-    instanceId: 'closed-websocket',
+    instanceId: '1',
     definitionId: 'websocket',
     status: 'closed',
     entryPath: '/not-loaded.tsx',
@@ -312,7 +314,7 @@ void test('a real daemon and CLI stop complete while a framework WebSocket stays
       }
     }
     assert.ok(descriptor);
-    socket = new WebSocket(`ws://127.0.0.1:${descriptor.port}/api/panels/closed-websocket/stream`, {
+    socket = new WebSocket(`ws://127.0.0.1:${descriptor.port}/api/panels/1/stream`, {
       origin: `http://127.0.0.1:${descriptor.port}`,
     });
     const initial = once(socket, 'message');
