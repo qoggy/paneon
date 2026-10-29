@@ -143,7 +143,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: { 'row-selected': z.object({ id: z.number().int().positive() }) },
   render: TablePanel,

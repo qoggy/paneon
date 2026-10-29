@@ -209,7 +209,7 @@ function DecisionPanel() {
 }
 export default definePanel({
   id: 'decision-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: { 'decision-submitted': z.object({ choice: z.string(), comment: z.string() }) },
   render: DecisionPanel,

@@ -1,3 +1,4 @@
+import { copyPanelFixtures } from './panel-fixture.ts';
 import { PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
@@ -10,6 +11,7 @@ const OLD_RUNTIME_VERSION = '0.0.0';
 
 async function controlledRuntime(protocolVersion) {
   const home = await mkdtemp(join(tmpdir(), 'paneon-old-runtime-'));
+  await copyPanelFixtures(new URL('./fixtures/panels/', import.meta.url), join(home, 'fixtures'));
   const operations = [];
   const child = fork(
     join(repositoryRoot, 'tests/acceptance-old-runtime-worker.mjs'),
@@ -51,6 +53,7 @@ async function controlledRuntime(protocolVersion) {
   };
   return {
     cli,
+    panelPath: join(home, 'fixtures/decision-panel.tsx'),
     operations,
     cleanup: async () => {
       if (child.exitCode === null && child.signalCode === null)
@@ -67,15 +70,7 @@ const compatible = await controlledRuntime(1);
 try {
   for (const args of [
     ['server', 'status'],
-    [
-      'panel',
-      'run',
-      join(repositoryRoot, 'tests/fixtures/panels/decision-panel.tsx'),
-      '--cwd',
-      repositoryRoot,
-      '--params',
-      '{}',
-    ],
+    ['panel', 'run', compatible.panelPath, '--cwd', repositoryRoot, '--params', '{}'],
   ]) {
     const result = await compatible.cli(...args);
     assert.equal(result.code, 1);

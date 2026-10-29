@@ -1,3 +1,4 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -9,7 +10,10 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-tree-contract-'));
 let service, browser, page, unblockRead;
 try {
   const entry = join(root, 'panel.tsx');
-  await cp(new URL('../fixtures/panels/tree-panel.tsx', import.meta.url), entry);
+  await writeFile(
+    entry,
+    await readPanelFixture(new URL('../fixtures/panels/tree-panel.tsx', import.meta.url)),
+  );
   service = await startServer(join(root, 'data'));
   browser = await chromium.launch({
     headless: true,

@@ -76,4 +76,4 @@ function Panel() {
     </Page>
   );
 }
-export default definePanel({id:'mermaid-acceptance',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),render:Panel});
+export default definePanel({id:'mermaid-acceptance',requires:{paneon:'__PANEON_TEST_VERSION__'},input:z.object({}),render:Panel});

@@ -1,5 +1,6 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -34,7 +35,7 @@ try {
   const entry = join(root, 'panel.tsx');
   await writeFile(
     entry,
-    await readFile(new URL('./markdown-anchors-fixture.txt', import.meta.url)),
+    await readPanelFixture(new URL('./markdown-anchors-fixture.txt', import.meta.url)),
   );
   service = await startServer(join(root, 'runtime'));
   const panel = await service.runtime.run(entry, root, { source }, false);

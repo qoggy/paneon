@@ -1,6 +1,7 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { submitAnnotations } from './annotation-tools.mjs';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
@@ -12,7 +13,7 @@ try {
   await writeFile(join(root, 'data', 'config.json'), JSON.stringify({ server: { port: 0 } }));
   await writeFile(
     join(root, 'panel.tsx'),
-    await readFile(new URL('./promoted-ui-fixture.txt', import.meta.url), 'utf8'),
+    await readPanelFixture(new URL('./promoted-ui-fixture.txt', import.meta.url)),
   );
   service = await startServer(join(root, 'data'));
   const run = await service.runtime.run(join(root, 'panel.tsx'), root, {}, false);

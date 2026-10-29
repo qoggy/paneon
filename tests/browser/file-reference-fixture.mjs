@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -63,7 +64,7 @@ function Panel() {
     <ReaderSnapshot />
   </Page>;
 }
-export default definePanel({id:'file-references', requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}).strict(), events:{annotations:annotationValueSchema(z.literal('main'))},render:Panel});`,
+export default definePanel({id:'file-references', requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}).strict(), events:{annotations:annotationValueSchema(z.literal('main'))},render:Panel});`,
     );
     service = await startServer(join(root, 'runtime'));
     await service.app.inject({

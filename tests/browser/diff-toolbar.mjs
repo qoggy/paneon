@@ -1,6 +1,7 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -23,7 +24,7 @@ try {
   const entry = join(root, 'panel.tsx');
   await writeFile(
     entry,
-    await readFile(new URL('./diff-toolbar-fixture.txt', import.meta.url), 'utf8'),
+    await readPanelFixture(new URL('./diff-toolbar-fixture.txt', import.meta.url)),
   );
   await mkdir(join(root, 'data'), { recursive: true });
   await writeFile(join(root, 'data', 'config.json'), JSON.stringify({ server: { port: 0 } }));

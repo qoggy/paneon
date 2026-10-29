@@ -132,7 +132,7 @@ function ReviewDocument({ markdown, sourcePath }: { markdown: string; sourcePath
 }
 export default definePanel({
   id: 'review',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '>=0.1.0 <0.2.0' },
   input: reviewParamsSchema,
   events: { 'review-submitted': reviewSubmittedSchema },
   render: ReviewPanel,

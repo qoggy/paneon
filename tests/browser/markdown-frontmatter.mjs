@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +28,7 @@ import {Button,Markdown,Page,usePageAnnotations} from '@qoggy/paneon/ui';
 import {useState} from 'react';
 const source=${JSON.stringify(source)}, examples=${JSON.stringify(examples)};
 function Panel(){const [example,setExample]=useState(-1);usePageAnnotations({onSubmit:value=>agent.emit('annotations',value)});return <Page title="Frontmatter acceptance"><div data-testid="annotated"><Markdown annotationTarget="document">{source}</Markdown></div><Button onClick={()=>setExample(value=>(value+1)%examples.length)}>Next YAML case</Button><output data-case-index={example}>{example < 0 ? 'No case' : examples[example].id}</output>{example>=0&&<div data-testid="case"><Markdown>{examples[example].source}</Markdown></div>}<div data-testid="off"><Markdown frontmatter="off">{source}</Markdown></div></Page>}
-export default definePanel({id:'frontmatter-acceptance',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),events:{annotations:annotationValueSchema(z.string())},render:Panel});`,
+export default definePanel({id:'frontmatter-acceptance',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{annotations:annotationValueSchema(z.string())},render:Panel});`,
   );
   service = await startServer(join(root, 'runtime'));
   const panel = await service.runtime.run(entry, root, {}, false);

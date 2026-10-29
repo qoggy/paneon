@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -36,7 +37,7 @@ try {
             oldText={${JSON.stringify(original)}} newText={${JSON.stringify(modified)}} />
         </div></>;
     }
-    export default definePanel({id:'diff-scrollbars',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),render:Panel});
+    export default definePanel({id:'diff-scrollbars',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});
   `,
   );
   service = await startServer(join(root, 'data'));

@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,7 +47,7 @@ try {
             layout={bounded ? 'bounded' : 'document'} />
         </div></>;
     }
-    export default definePanel({id:'diff-connected', requires:{paneon:'>=0.0.1 <0.1.0'}, input:z.object({}), render:Panel});
+    export default definePanel({id:'diff-connected', requires:{paneon:'${PACKAGE_VERSION}'}, input:z.object({}), render:Panel});
   `,
   );
   service = await startServer(join(root, 'data'));

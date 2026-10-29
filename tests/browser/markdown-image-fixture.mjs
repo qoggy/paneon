@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +59,7 @@ function Panel() {
     <div id="image-link-target">图片链接目标</div>
   </Page>;
 }
-export default definePanel({id:'markdown-image-acceptance',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),events:{'annotations-submitted':annotationValueSchema(z.string())},render:Panel});
+export default definePanel({id:'markdown-image-acceptance',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{'annotations-submitted':annotationValueSchema(z.string())},render:Panel});
 `,
     );
     const panel = await service.runtime.run(entry, root, {}, false);

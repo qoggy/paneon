@@ -1,4 +1,4 @@
-import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
+import { PACKAGE_VERSION, readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,7 +15,7 @@ const queryFile = join(root, 'query.jsonl');
 const mutationFile = join(root, 'mutation-count.txt');
 await writeFile(
   entry,
-  await readFile(join(repository, 'tests/browser/query-lifecycle-fixture.txt'), 'utf8'),
+  await readPanelFixture(join(repository, 'tests/browser/query-lifecycle-fixture.txt')),
 );
 let service;
 let browser;

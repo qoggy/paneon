@@ -1,5 +1,6 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -12,7 +13,7 @@ try {
   const entry = join(root, 'panel.tsx');
   await writeFile(
     entry,
-    await readFile(new URL('./diff-annotations-fixture.txt', import.meta.url), 'utf8'),
+    await readPanelFixture(new URL('./diff-annotations-fixture.txt', import.meta.url)),
   );
   service = await startServer(join(root, 'data'));
   await service.app.inject({

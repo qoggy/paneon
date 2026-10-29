@@ -149,7 +149,7 @@ function GitHubPanel() {
 }
 export default definePanel({
   id: 'gh-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/) }),
   events: {
     'review-requested': z.object({ repository: z.string(), number: z.number().int().positive() }),

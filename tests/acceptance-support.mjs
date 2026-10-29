@@ -1,6 +1,7 @@
+import { copyPanelFixtures } from './panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -63,7 +64,7 @@ export async function acceptance({ cliPath, fixturesPath, label = 'repository' }
   const artifacts =
     process.env.PANEON_TEST_ARTIFACTS || (await mkdtemp(join(tmpdir(), 'paneon-evidence-')));
   await Promise.all([mkdir(home), mkdir(workspace), mkdir(artifacts, { recursive: true })]);
-  await cp(fixturesPath, join(workspace, 'fixtures/panels'), { recursive: true });
+  await copyPanelFixtures(fixturesPath, join(workspace, 'fixtures/panels'));
   const env = { ...process.env, HOME: home };
   // HOME isolates os.homedir(); this does not add a Paneon storage override.
   delete env.PANEON_HOME;

@@ -1,4 +1,4 @@
-import { PACKAGE_VERSION } from '../dist/shared/paths.js';
+import { PACKAGE_VERSION, copyPanelFixtures } from './panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, mkdirSync } from 'node:fs';
@@ -16,8 +16,9 @@ void test('the GitHub fixture panel compiles its type-only server model imports'
   const root = mkdtempSync(join(tmpdir(), 'paneon-gh-panel-'));
   const runtime = new Runtime(join(root, 'data'));
   try {
+    await copyPanelFixtures(new URL('./fixtures/panels/', import.meta.url), join(root, 'fixtures'));
     const panel = await runtime.run(
-      join(import.meta.dirname, './fixtures/panels/gh-panel.tsx'),
+      join(root, 'fixtures/gh-panel.tsx'),
       root,
       { repository: 'cli/cli' },
       false,

@@ -138,7 +138,7 @@ function Probe() {
 }
 export default definePanel({
   id: 'tree-contract-probe',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input,
   render: Probe,
 });

@@ -32,4 +32,4 @@ function Panel(){
  <output aria-label="Mutation result">{result}</output>
  </Stack></Page>;
 }
-export default definePanel({id:'query-lifecycle',requires:{paneon:'>=0.0.1 <0.1.0'},input:z.object({}),render:Panel});
+export default definePanel({id:'query-lifecycle',requires:{paneon:'__PANEON_TEST_VERSION__'},input:z.object({}),render:Panel});

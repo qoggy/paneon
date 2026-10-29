@@ -129,7 +129,7 @@ function FormPanel() {
 }
 export default definePanel({
   id: 'form-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: {
     'parameters-submitted': z.object({

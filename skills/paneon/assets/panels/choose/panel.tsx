@@ -551,7 +551,7 @@ function ChoosePanel() {
 }
 export default definePanel({
   id: 'choose',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '>=0.1.0 <0.2.0' },
   input: chooseParamsSchema,
   events: { 'answers-submitted': answersSubmittedSchema },
   render: ChoosePanel,

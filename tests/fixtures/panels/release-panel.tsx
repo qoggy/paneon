@@ -203,7 +203,7 @@ function ReleasePanel() {
 }
 export default definePanel({
   id: 'release-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: { 'analyze-requested': z.object({ environment: z.string() }) },
   render: ReleasePanel,

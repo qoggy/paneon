@@ -438,7 +438,7 @@ function ComponentsPanel() {
 }
 export default definePanel({
   id: 'components-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: {},
   render: ComponentsPanel,

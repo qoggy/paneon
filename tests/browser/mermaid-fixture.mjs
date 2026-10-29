@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { readPanelFixture } from '../panel-fixture.ts';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,7 +12,7 @@ export async function startMermaidFixture() {
     const entry = join(root, 'panel.tsx');
     await writeFile(
       entry,
-      await readFile(new URL('./mermaid-fixture.txt', import.meta.url), 'utf8'),
+      await readPanelFixture(new URL('./mermaid-fixture.txt', import.meta.url)),
     );
     service = await startServer(join(root, 'data'));
     const panel = await service.runtime.run(entry, root, {}, false);

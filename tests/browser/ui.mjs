@@ -1,3 +1,4 @@
+import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -13,9 +14,8 @@ let server;
 let browser;
 const errors = [];
 try {
-  const original = await readFile(
+  const original = await readPanelFixture(
     process.argv[2] ?? join(root, 'tests/fixtures/panels/components-panel.tsx'),
-    'utf8',
   );
   const gallery = original
     .replace("import { definePanel, z } from '@qoggy/paneon/sdk';", '')
