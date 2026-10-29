@@ -8,11 +8,8 @@ let release;
 try {
   const panel = await fixture.run({
     ...fixture.params,
-    repositories: [
-      ...fixture.params.repositories,
-      { id: 'empty', path: './empty', label: 'Empty' },
-    ],
-    initialView: { repositoryId: 'web', type: 'history' },
+    repositories: [...fixture.params.repositories, fixture.empty],
+    initialView: { repositoryPath: fixture.repo, type: 'history' },
   });
   browser = await chromium.launch({
     headless: true,
@@ -35,15 +32,19 @@ try {
   await frame.locator('[data-commit-id]').first().waitFor();
   const calls = [];
   await page.route(`**/api/panels/${panel.instanceId}/actions/*`, async (route) => {
-    const request = route.request().postDataJSON()?.input?.request;
-    if (request?.repositoryId === 'empty' && request.type === 'changes') {
+    const input = route.request().postDataJSON()?.input;
+    const request = input?.request;
+    const repository = input?.params?.repositories.find(
+      (repo) => repo.id === request?.repositoryId,
+    );
+    if (repository?.path.endsWith('/empty') && request.type === 'changes') {
       calls.push(request);
       if (calls.length === 1) await new Promise((resolve) => (release = resolve));
     }
     await route.continue();
   });
-  await frame.getByRole('combobox', { name: '仓库', exact: true }).click();
-  await frame.getByRole('option', { name: 'Empty', exact: true }).click();
+  await frame.getByRole('button', { name: '仓库', exact: true }).click();
+  await frame.getByRole('button', { name: /^empty · / }).click();
   await frame.getByText('没有提交记录。', { exact: true }).waitFor();
   await tab('未提交改动').click();
   await frame.locator('[data-file-scroll][aria-busy=true]').waitFor();

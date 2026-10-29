@@ -16,8 +16,8 @@ try {
   for (let i = 0; i < 16; i++)
     await git(graph.repository, 'branch', `topic-${String(i).padStart(2, '0')}`);
   const panel = await fixture.run({
-    repositories: [{ id: 'graph', path: graph.repository }],
-    initialView: { repositoryId: 'graph', type: 'history' },
+    repositories: [graph.repository],
+    initialView: { repositoryPath: graph.repository, type: 'history' },
   });
   browser = await chromium.launch({
     headless: true,

@@ -29,7 +29,7 @@ try {
   await writeFile(join(f.repo, 'large.ts'), newText);
   const panel = await f.run({
     ...f.params,
-    initialView: { repositoryId: 'web', type: 'changes', file: 'large.ts' },
+    initialView: { repositoryPath: f.repo, type: 'changes', file: 'large.ts' },
   });
   browser = await chromium.launch({
     headless: true,
@@ -170,17 +170,18 @@ try {
   await frame.locator('[data-slot="toast-title"]').filter({ hasText: '批注已提交。' }).waitFor();
   const events = await f.events(panel);
   assert.equal(events.length, 1);
-  assert.equal(events[0].payload.annotations.length, 1);
-  const annotation = events[0].payload.annotations[0];
+  const annotations = events[0].payload.files.flatMap((file) => file.annotations);
+  assert.equal(annotations.length, 1);
+  const annotation = annotations[0];
   assert.equal(annotation.comment, 'Review the emoji');
   assert.equal(annotation.targets.length, 1);
   const target = annotation.targets[0];
-  assert.equal(target.ref.side, 'new');
-  assert.equal(target.text.quote, family);
-  const start = sourceLines(newText)[target.ref.startLine - 1].start;
+  assert.equal(target.side, 'new');
+  assert.equal(target.selection.quote, family);
+  const start = sourceLines(newText)[target.startLine - 1].start;
   assert.equal(
-    target.text.quote,
-    newText.slice(start + target.text.start, start + target.text.end),
+    target.selection.quote,
+    newText.slice(start + target.selection.start, start + target.selection.end),
   );
   await content.evaluate(() =>
     document.querySelector('[data-code-side]').scrollIntoView({ block: 'center' }),

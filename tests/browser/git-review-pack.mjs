@@ -36,7 +36,12 @@ try {
     { cwd: project, maxBuffer: 4 * 1024 * 1024 },
   );
   const packageRoot = join(installation, 'node_modules/@qoggy/paneon');
-  for (const script of ['git-review.mjs', 'git-review-loading.mjs']) {
+  for (const script of [
+    'git-review.mjs',
+    'git-review-loading.mjs',
+    'git-review-repositories.mjs',
+    'git-review-input.mjs',
+  ]) {
     const result = await exec(
       process.execPath,
       [new URL(`./${script}`, import.meta.url).pathname],

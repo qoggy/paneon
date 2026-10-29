@@ -6,16 +6,9 @@ import { Branches } from './branches.tsx';
 import { HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
 import type { GitCommit, GitFile, GitListing, GitRequest, GitSnapshot, HistoryRef } from './git.ts';
-import type { GitReviewParams, GitSourceView } from './schema.ts';
+import type { GitConfiguration, GitSourceView } from './schema.ts';
 
-/** Shared named-action boundary used by the built-in panel and independent readers. */
-export function useGitReader(params: GitReviewParams) {
-  return {
-    read: (request: GitRequest) => queryGit({ params, request }),
-    readFile: (file: GitFile) => queryGitFile({ params, file }),
-  };
-}
-const configuration = (repositoryPath: string): GitReviewParams => ({
+const configuration = (repositoryPath: string): GitConfiguration => ({
   repositories: [{ id: 'repository', path: repositoryPath }],
 });
 export function useGitBranches({ repositoryPath }: { repositoryPath: string }) {

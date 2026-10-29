@@ -45,14 +45,22 @@ try {
     },
   ];
   for (const initialView of initialViews) {
-    const input = { ...f.params, initialView };
+    const input = {
+      title: 'Git review acceptance',
+      repositories: [
+        { id: 'web', path: f.repo, label: 'Web' },
+        { id: 'server', path: f.second, label: 'Server' },
+      ],
+      initialView,
+    };
     const before = await f.service.runtime.run(
       join(baseline, 'skills/paneon/assets/panels/git-review/panel.tsx'),
       f.root,
       input,
       false,
     );
-    const after = await f.run(input);
+    const { repositoryId: _, ...view } = initialView;
+    const after = await f.run({ ...f.params, initialView: { ...view, repositoryPath: f.repo } });
     for (const theme of ['light', 'dark'])
       for (const language of ['en', 'zh-CN'])
         for (const width of [1440, 390]) {

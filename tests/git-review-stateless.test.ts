@@ -18,23 +18,6 @@ import type { GitRef } from '../skills/paneon/assets/panels/git-review/schema.ts
 import { jsonValue } from '../src/shared/types.ts';
 import { fixture, git } from './git-review-fixture.ts';
 const execute = promisify(execFile);
-void test('Git feedback declares its local file targets without inventing Git source evidence', () => {
-  const target = {
-    ref: { kind: 'file' as const, sourceId: 'original-git-source' },
-    sourceRef: { path: '/notes.md', snapshotId: 'local' },
-    text: { start: 0, end: 4, quote: 'note' },
-  };
-  const event = buildGitFeedback(
-    { annotations: [{ id: 'local', comment: 'review', targets: [target] }] },
-    new Map(),
-  );
-  assert.deepEqual(event.annotations[0].targets, [target]);
-  assert.deepEqual(event.sources, {});
-  assert.deepEqual(
-    validateGitFeedback({ repositories: [{ id: 'repo', path: '/repository' }] }, event),
-    event,
-  );
-});
 async function fresh<T>(input: unknown, expression: string): Promise<T> {
   const script = `import {readGit,readGitFile} from ${JSON.stringify(new URL('../skills/paneon/assets/panels/git-review/git.ts', import.meta.url).href)};
 import {validateGitFeedback} from ${JSON.stringify(new URL('../skills/paneon/assets/panels/git-review/feedback.ts', import.meta.url).href)};

@@ -11,7 +11,10 @@ try {
   await git(f.repo, 'update-ref', 'refs/remotes/origin/main', f.feature);
   await git(f.repo, 'update-ref', 'refs/remotes/origin/aaa', f.feature);
   await git(f.repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
-  const panel = await f.run({ ...f.params, initialView: { repositoryId: 'web', type: 'history' } });
+  const panel = await f.run({
+    ...f.params,
+    initialView: { repositoryPath: f.repo, type: 'history' },
+  });
   browser = await chromium.launch({
     headless: true,
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',

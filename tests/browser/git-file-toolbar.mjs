@@ -32,7 +32,7 @@ try {
   await git('add', paths[0]);
   await writeFile(join(repository, paths[0]), 'export const value = 4;\n');
   await writeFile(join(repository, 'tests/new.ts'), 'export const added = true;\n');
-  const params = { repositories: [{ id: 'toolbar', path: repository }] };
+  const params = { repositories: [repository] };
   browser = await chromium.launch({ headless: true, channel: 'chrome' });
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const calls = [];
@@ -55,7 +55,7 @@ try {
   // Working changes default to flat; Git-area groups can still be folded.
   const changes = await f.run({
     ...params,
-    initialView: { repositoryId: 'toolbar', type: 'changes' },
+    initialView: { repositoryPath: repository, type: 'changes' },
   });
   await page.goto(f.url(changes));
   await waitForFiles(3);
@@ -195,8 +195,8 @@ try {
   assert.equal(await groupToggle.getAttribute('aria-pressed'), 'false');
   // History and comparison start grouped and open a first file only on explicit request.
   for (const initialView of [
-    { repositoryId: 'toolbar', type: 'history', commit: tip },
-    { repositoryId: 'toolbar', type: 'compare', mode: 'commits', base, head: tip },
+    { repositoryPath: repository, type: 'history', commit: tip },
+    { repositoryPath: repository, type: 'compare', mode: 'commits', base, head: tip },
   ]) {
     const panel = await f.run({ ...params, initialView });
     await page.goto(f.url(panel));
@@ -225,7 +225,7 @@ try {
   await git('restore', '--staged', '--worktree', '--', paths[0]);
   const single = await f.run({
     ...params,
-    initialView: { repositoryId: 'toolbar', type: 'changes' },
+    initialView: { repositoryPath: repository, type: 'changes' },
   });
   await page.goto(f.url(single));
   await waitForFiles(1);
@@ -234,7 +234,7 @@ try {
   const empty = await f.run({
     ...params,
     initialView: {
-      repositoryId: 'toolbar',
+      repositoryPath: repository,
       type: 'compare',
       mode: 'commits',
       base: tip,
@@ -247,7 +247,7 @@ try {
   await git('clean', '-fd');
   const emptyChanges = await f.run({
     ...params,
-    initialView: { repositoryId: 'toolbar', type: 'changes' },
+    initialView: { repositoryPath: repository, type: 'changes' },
   });
   await page.goto(f.url(emptyChanges));
   const emptyMessage = frame.getByText('工作区干净', { exact: true });

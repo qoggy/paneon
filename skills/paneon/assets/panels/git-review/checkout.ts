@@ -128,7 +128,6 @@ export async function checkoutGit(value: GitCheckoutInput, signal?: AbortSignal)
       ok: true as const,
       data: {
         operationId: randomUUID(),
-        repositoryId: input.repositoryId,
         repositoryPath: root,
         target,
         before,

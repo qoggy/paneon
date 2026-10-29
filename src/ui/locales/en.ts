@@ -1,4 +1,6 @@
 const en = {
+  breadcrumb: 'Breadcrumb',
+  More: 'More',
   'Copy code': 'Copy code',
   'Unable to copy code.': 'Unable to copy code.',
   'Enable word wrap': 'Enable word wrap',

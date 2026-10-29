@@ -32,7 +32,7 @@ try {
   const tip = await git(f.repo, 'rev-parse', 'HEAD');
   const panel = await f.run({
     ...f.params,
-    initialView: { repositoryId: 'web', type: 'history', commit: tip, file: 'reading.ts' },
+    initialView: { repositoryPath: f.repo, type: 'history', commit: tip, file: 'reading.ts' },
   });
   const prefs = async (theme, language) =>
     f.service.app.inject({
@@ -150,16 +150,18 @@ try {
   await submitAnnotations(frame);
   for (let i = 0; i < 100 && (await f.events(panel)).length === 0; i++)
     await page.waitForTimeout(50);
-  const targets = (await f.events(panel))[0].payload.annotations.flatMap((x) => x.targets);
+  const targets = (await f.events(panel))[0].payload.files.flatMap((file) =>
+    file.annotations.flatMap((annotation) => annotation.targets),
+  );
   assert.deepEqual(
-    targets.map((x) => x.ref.kind),
+    targets.map((x) => x.kind),
     ['lines', 'lines', 'lines'],
   );
   assert.deepEqual(
-    targets.map((target) => target.ref.startLine),
+    targets.map((target) => target.startLine),
     [289, 290, 291],
   );
-  assert.ok(targets.every((target) => target.text && target.ref.side === 'new'));
+  assert.ok(targets.every((target) => target.text && target.side === 'new'));
   // Show balanced centre gutter / natural colour for screenshots.
   await button('定位当前差异').click();
   await mkdir(evidence, { recursive: true });
@@ -208,7 +210,7 @@ try {
   ]) {
     const singlePanel = await f.run({
       ...f.params,
-      initialView: { repositoryId: 'web', type: 'history', commit: singleCommit, file },
+      initialView: { repositoryPath: f.repo, type: 'history', commit: singleCommit, file },
     });
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto(f.url(singlePanel));
@@ -232,14 +234,14 @@ try {
     await submitAnnotations(frame);
     for (let i = 0; i < 100 && (await f.events(singlePanel)).length === 0; i++)
       await page.waitForTimeout(50);
-    const target = (await f.events(singlePanel))[0].payload.annotations[0].targets[0];
-    assert.equal(target.ref.side, side);
-    assert.equal(target.ref.startLine, 1);
-    assert.equal(target.text.start, 0);
+    const target = (await f.events(singlePanel))[0].payload.files[0].annotations[0].targets[0];
+    assert.equal(target.side, side);
+    assert.equal(target.startLine, 1);
+    assert.equal(target.selection.start, 0);
     assert.ok(
-      target.text.quote.startsWith(
-        side === 'old' ? 'export const line1' : 'export const addedLine1',
-      ),
+      target.text
+        .slice(target.selection.start, target.selection.end)
+        .startsWith(side === 'old' ? 'export const line1' : 'export const addedLine1'),
     );
     await page.screenshot({ path: join(evidence, `single-${side}.png`) });
   }

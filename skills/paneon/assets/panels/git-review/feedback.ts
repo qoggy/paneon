@@ -2,24 +2,30 @@ import type { AnnotationValue, AnnotationTarget } from '@qoggy/paneon/sdk';
 import { sourceLines } from '../../shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import type { GitSnapshot } from './git.ts';
-import { gitReviewParamsSchema, gitReviewSubmittedSchema } from './schema.ts';
-import type { GitRef, GitReviewParams, GitReviewSubmitted, GitReviewSource } from './schema.ts';
+import {
+  gitConfigurationSchema,
+  gitFeedbackResultSchema,
+} from './schema.ts';
+import type {
+  GitRef,
+  GitConfiguration,
+  GitFeedbackResult,
+  GitSnapshotSource,
+} from './schema.ts';
 
-type Evidence = GitReviewSource['evidence'][number];
+type Evidence = GitSnapshotSource['evidence'][number];
 /** Build only the source fragments required by this explicit submission. Browser memory owns them. */
 export function buildGitFeedback(
   feedback: AnnotationValue<GitRef> & { replacesEventId?: number },
   snapshots: ReadonlyMap<string, GitSnapshot>,
-): GitReviewSubmitted {
-  const sources: Record<string, GitReviewSource> = {};
+): GitFeedbackResult {
+  const sources: Record<string, GitSnapshotSource> = {};
   const annotations = feedback.annotations.map((annotation) => {
     const targets = annotation.targets.map((target) => {
-      if (target.sourceRef !== undefined) return target;
-      const domainTarget = target;
       const snapshot = snapshots.get(target.ref.sourceId);
       if (!snapshot) throw new Error('Original snapshot is missing. Draft retained.');
-      diffTargetText(snapshot.model, domainTarget);
-      const normalized = normalizeDiffTarget(snapshot.model, domainTarget);
+      diffTargetText(snapshot.model, target);
+      const normalized = normalizeDiffTarget(snapshot.model, target);
       const ref = normalized.ref;
       const source = (sources[snapshot.id] ??= { ...snapshot.source, evidence: [] });
       let evidence: Evidence | undefined;
@@ -56,7 +62,7 @@ export function buildGitFeedback(
       targets: [...new Map(targets.map((target) => [JSON.stringify(target), target])).values()],
     };
   });
-  return gitReviewSubmittedSchema.parse({ ...feedback, annotations, sources });
+  return gitFeedbackResultSchema.parse({ ...feedback, annotations, sources });
 }
 function checkHunk(evidence: Extract<Evidence, { kind: 'hunk' }>) {
   const header = `@@ -${evidence.oldStart},${evidence.oldLines} +${evidence.newStart},${evidence.newLines} @@\n`;
@@ -95,7 +101,7 @@ function checkHunk(evidence: Extract<Evidence, { kind: 'hunk' }>) {
   )
     throw new Error('Hunk patch does not match its preserved fragments.');
 }
-function validateTarget(source: GitReviewSource, target: AnnotationTarget<GitRef>) {
+function validateTarget(source: GitSnapshotSource, target: AnnotationTarget<GitRef>) {
   const ref = target.ref;
   if (ref.kind === 'file') {
     if (target.text) throw new Error('File targets cannot carry text.');
@@ -137,11 +143,11 @@ function validateTarget(source: GitReviewSource, target: AnnotationTarget<GitRef
 }
 /** Pure validation: current event + fixed panel configuration, no Git/filesystem/cache lookup. */
 export function validateGitFeedback(
-  paramsValue: GitReviewParams,
+  paramsValue: GitConfiguration,
   value: unknown,
-): GitReviewSubmitted {
-  const params = gitReviewParamsSchema.parse(paramsValue);
-  const result = gitReviewSubmittedSchema.parse(value);
+): GitFeedbackResult {
+  const params = gitConfigurationSchema.parse(paramsValue);
+  const result = gitFeedbackResultSchema.parse(value);
   for (const source of Object.values(result.sources)) {
     if (!params.repositories.some((repository) => repository.id === source.repositoryId))
       throw new Error('Unknown source repository.');
@@ -177,7 +183,6 @@ export function validateGitFeedback(
   }
   for (const annotation of result.annotations)
     for (const target of annotation.targets) {
-      if (target.sourceRef !== undefined) continue;
       const source = result.sources[target.ref.sourceId];
       if (!source) throw new Error('Missing original source. Draft retained.');
       validateTarget(source, target);

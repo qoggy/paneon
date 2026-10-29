@@ -2,6 +2,14 @@ import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export type { GitRef } from '../../shared/diff-schema.ts';
 const nonempty = z.string().refine((s) => s.trim().length > 0, 'Must not be blank.');
+export const absoluteDirectory = nonempty.refine(
+  (path) =>
+    !path.includes('\0') &&
+    (/^\//.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || /^\\\\[^\\]+\\[^\\]+/.test(path)),
+  'Enter an absolute directory path.',
+);
+export const gitRepositorySchema = z.object({ id: nonempty, path: absoluteDirectory }).strict();
+export type GitRepository = z.infer<typeof gitRepositorySchema>;
 export const relativeFile = z
   .string()
   .min(1)
@@ -11,11 +19,15 @@ export const relativeFile = z
   );
 const initialView = z.discriminatedUnion('type', [
   z
-    .object({ repositoryId: nonempty, type: z.literal('changes'), file: relativeFile.optional() })
+    .object({
+      repositoryPath: absoluteDirectory,
+      type: z.literal('changes'),
+      file: relativeFile.optional(),
+    })
     .strict(),
   z
     .object({
-      repositoryId: nonempty,
+      repositoryPath: absoluteDirectory,
       type: z.literal('history'),
       branch: nonempty.optional(),
       commit: nonempty.optional(),
@@ -25,7 +37,7 @@ const initialView = z.discriminatedUnion('type', [
     .refine((v) => !v.file || !!v.commit, 'History file requires commit.'),
   z
     .object({
-      repositoryId: nonempty,
+      repositoryPath: absoluteDirectory,
       type: z.literal('compare'),
       base: nonempty,
       head: nonempty.optional(),
@@ -36,28 +48,35 @@ const initialView = z.discriminatedUnion('type', [
 ]);
 export const gitReviewParamsSchema = z
   .object({
-    title: nonempty.optional(),
-    repositories: z
-      .array(z.object({ id: nonempty, path: nonempty, label: nonempty.optional() }).strict())
-      .min(1),
+    repositories: z.array(absoluteDirectory).min(1),
     initialView: initialView.optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
-    if (new Set(v.repositories.map((r) => r.id)).size !== v.repositories.length)
+    if (new Set(v.repositories).size !== v.repositories.length)
       ctx.addIssue({
         code: 'custom',
         path: ['repositories'],
-        message: 'Repository IDs must be unique.',
+        message: 'Repository paths must be unique.',
       });
-    if (v.initialView && !v.repositories.some((r) => r.id === v.initialView?.repositoryId))
+    if (v.initialView && !v.repositories.includes(v.initialView.repositoryPath))
       ctx.addIssue({
         code: 'custom',
-        path: ['initialView', 'repositoryId'],
+        path: ['initialView', 'repositoryPath'],
         message: 'Unknown repository.',
       });
   });
 export type GitReviewParams = z.infer<typeof gitReviewParamsSchema>;
+
+/** Internal configuration keeps session identities separate from public path-only input. */
+export const gitConfigurationSchema = z
+  .object({ repositories: z.array(gitRepositorySchema).min(1) })
+  .strict()
+  .refine(
+    (v) => new Set(v.repositories.map((r) => r.id)).size === v.repositories.length,
+    'Repository IDs must be unique.',
+  );
+export type GitConfiguration = z.infer<typeof gitConfigurationSchema>;
 const oid = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
 export const gitCheckoutTargetSchema = z
   .object({ kind: z.enum(['branch', 'remote', 'tag']), ref: nonempty, commit: oid })
@@ -71,7 +90,7 @@ export const gitCheckoutTargetSchema = z
 export const gitHeadStateSchema = z.object({ branch: nonempty.nullable(), commit: oid }).strict();
 export const gitCheckoutInputSchema = z
   .object({
-    params: gitReviewParamsSchema,
+    params: gitConfigurationSchema,
     repositoryId: nonempty,
     target: gitCheckoutTargetSchema,
     expectedHead: gitHeadStateSchema,
@@ -80,7 +99,6 @@ export const gitCheckoutInputSchema = z
 export const gitCheckoutCompletedSchema = z
   .object({
     operationId: z.string().uuid(),
-    repositoryId: nonempty,
     repositoryPath: nonempty,
     target: gitCheckoutTargetSchema,
     before: gitHeadStateSchema,
@@ -137,7 +155,7 @@ const hunkEvidence = z
   .strict();
 export const gitReviewSourceSchema = z
   .object({
-    repositoryId: nonempty,
+    repositoryPath: absoluteDirectory,
     view: gitSourceViewSchema,
     old: side.optional(),
     new: side.optional(),
@@ -146,10 +164,18 @@ export const gitReviewSourceSchema = z
   .strict()
   .refine((v) => v.old || v.new, 'Source requires at least one side.');
 export type GitReviewSource = z.infer<typeof gitReviewSourceSchema>;
+export const gitSnapshotSourceSchema = gitReviewSourceSchema.safeExtend({ repositoryId: nonempty });
+export type GitSnapshotSource = z.infer<typeof gitSnapshotSourceSchema>;
 export type GitSourceView = z.infer<typeof gitSourceViewSchema>;
 export const gitFeedbackSchema = annotationValueSchema(gitRefSchema);
+/** Internal drafts and validation retain the original targets and preserved evidence. */
+export const gitFeedbackResultSchema = gitFeedbackSchema.safeExtend({
+  sources: z.record(z.string(), gitSnapshotSourceSchema),
+  replacesEventId: z.number().int().positive().optional(),
+});
+export type GitFeedbackResult = z.infer<typeof gitFeedbackResultSchema>;
 export const gitReviewSubmittedSchema = gitFeedbackSchema.safeExtend({
-  sources: z.record(z.string(), gitReviewSourceSchema),
+  sources: z.record(z.string(), gitSnapshotSourceSchema),
   replacesEventId: z.number().int().positive().optional(),
 });
 export type GitReviewSubmitted = z.infer<typeof gitReviewSubmittedSchema>;

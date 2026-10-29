@@ -100,8 +100,8 @@ try {
   assert.equal(await empty.count(), 0, 'A failed comparison is not an empty result');
   assert.equal(await toolbar.count(), 0);
   const unborn = await fixture.run({
-    repositories: [{ id: 'empty', path: './empty' }],
-    initialView: { repositoryId: 'empty', type: 'history' },
+    repositories: [fixture.empty],
+    initialView: { repositoryPath: fixture.empty, type: 'history' },
   });
   await page.goto(fixture.url(unborn));
   await frame
@@ -111,8 +111,7 @@ try {
     .waitFor();
   await git(fixture.empty, 'commit', '--allow-empty', '-qm', 'Empty commit');
   const params = {
-    title: 'Git review empty states',
-    repositories: [{ id: 'clean', path: './empty' }],
+    repositories: [fixture.empty],
   };
   const clean = await fixture.run(params);
   await page.goto(fixture.url(clean));

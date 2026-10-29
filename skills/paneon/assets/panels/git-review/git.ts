@@ -7,8 +7,8 @@ import { promisify } from 'node:util';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { markMainlines } from './branch-model.ts';
-import { gitReviewParamsSchema, relativeFile, gitFileSchema, gitRequestSchema } from './schema.ts';
-import type { GitReviewParams, GitReviewSource, GitSourceView } from './schema.ts';
+import { gitConfigurationSchema, relativeFile, gitFileSchema, gitRequestSchema } from './schema.ts';
+import type { GitConfiguration, GitSnapshotSource, GitSourceView } from './schema.ts';
 
 const exec = promisify(execFile);
 const hash = (bytes: Uint8Array | string) =>
@@ -50,10 +50,11 @@ async function headOID(path: string, signal?: AbortSignal) {
   if (!branch) throw new Error('HEAD cannot be resolved.');
   return undefined;
 }
-export async function repository(params: GitReviewParams, id: string, signal?: AbortSignal) {
+export async function repository(params: GitConfiguration, id: string, signal?: AbortSignal) {
   const repo = params.repositories.find((r) => r.id === id);
   if (!repo) throw new Error('Unknown repository.');
-  const configured = resolve(process.cwd(), repo.path);
+  if (!isAbsolute(repo.path)) throw new Error('Enter an absolute directory path.');
+  const configured = repo.path;
   const root = (await git(configured, ['rev-parse', '--show-toplevel'], signal))
     .toString('utf8')
     .replace(/\n$/, '');
@@ -158,7 +159,7 @@ export type GitFile = {
 export type GitSnapshot = {
   fileId: string;
   id: string;
-  source: GitReviewSource;
+  source: GitSnapshotSource;
   model: DiffModel;
   status: string;
   notes: string[];
@@ -256,6 +257,7 @@ export type GitHistoryContext = {
 };
 function capture(
   repositoryId: string,
+  repositoryPath: string,
   view: GitSourceView,
   entry: GitEntry,
   old: Content | undefined,
@@ -264,8 +266,9 @@ function capture(
 ): GitSnapshot {
   const oldText = decode(old),
     newText = decode(next);
-  const source: GitReviewSource = {
+  const source: GitSnapshotSource = {
     repositoryId,
+    repositoryPath,
     view,
     evidence: [],
     ...(old
@@ -342,11 +345,11 @@ export type GitRequest = {
   pageOnly?: boolean;
 };
 export async function readGit(
-  paramsValue: GitReviewParams,
+  paramsValue: GitConfiguration,
   requestValue: GitRequest,
   signal?: AbortSignal,
 ): Promise<GitListing> {
-  const params = gitReviewParamsSchema.parse(paramsValue);
+  const params = gitConfigurationSchema.parse(paramsValue);
   const request = gitRequestSchema.parse(requestValue);
   const root = await repository(params, request.repositoryId, signal);
   const pinnedHistory = request.historyContext;
@@ -677,11 +680,11 @@ export async function readGit(
 }
 /** Capture exactly the selected entry. Directory queries never read blobs or build diff models. */
 export async function readGitFile(
-  paramsValue: GitReviewParams,
+  paramsValue: GitConfiguration,
   descriptor: GitFile,
   signal?: AbortSignal,
 ): Promise<GitSnapshot> {
-  const params = gitReviewParamsSchema.parse(paramsValue);
+  const params = gitConfigurationSchema.parse(paramsValue);
   const file = gitFileSchema.parse(descriptor);
   const root = await repository(params, file.source.repositoryId, signal);
   const { entry, working, conflict } = file.read;
@@ -692,6 +695,7 @@ export async function readGitFile(
   if (conflict && next) next = { ...next, mode: 'conflict' };
   const snapshot = capture(
     file.source.repositoryId,
+    root,
     file.source.view,
     entry,
     old,
@@ -735,7 +739,7 @@ export type GitRevision = {
   isDefault?: boolean;
 };
 export async function readGitRevisions(
-  params: GitReviewParams,
+  params: GitConfiguration,
   repositoryId: string,
   signal?: AbortSignal,
 ): Promise<GitRevision[]> {

@@ -17,8 +17,8 @@ try {
   await git(repo, 'update-ref', 'refs/remotes/origin/review/new', graph.tip);
   const otherStatus = await git(f.repo, 'status', '--porcelain');
   const panel = await f.run({
-    repositories: [{ id: 'graph', path: repo }],
-    initialView: { repositoryId: 'graph', type: 'history', commit: graph.tip, file: 'history.ts' },
+    repositories: [repo],
+    initialView: { repositoryPath: repo, type: 'history', commit: graph.tip, file: 'history.ts' },
   });
   browser = await chromium.launch({
     headless: true,
@@ -124,6 +124,7 @@ try {
   assert.equal(await git(repo, 'branch', '--show-current'), 'main');
   const [local] = await f.events(panel);
   assert.equal(local.type, 'git-checkout-completed');
+  assert.equal('repositoryId' in local.payload, false);
   assert.equal(local.payload.before.branch, 'feature/history');
   assert.deepEqual(local.payload.after, { branch: 'main', commit: graph.merge });
   assert.equal(local.payload.target.ref, 'refs/heads/main');
@@ -149,7 +150,8 @@ try {
   await submitAnnotations(frame);
   await toast('批注已提交').waitFor();
   const submitted = (await f.events(panel)).find((event) => event.type === 'git-review-submitted');
-  const source = Object.values(submitted.payload.sources)[0];
+  const source = submitted.payload.files[0];
+  assert.equal('repositoryId' in source, false);
   assert.equal(source.view.commit, graph.tip, 'Feedback keeps its original pre-checkout commit');
   await closeToasts();
 

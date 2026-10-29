@@ -42,7 +42,7 @@ try {
   );
   const panel = await fixture.run({
     ...fixture.params,
-    initialView: { repositoryId: 'web', type: 'changes', file: 'controls.ts' },
+    initialView: { repositoryPath: fixture.repo, type: 'changes', file: 'controls.ts' },
   });
   await page.goto(fixture.url(panel));
   let frame = page.frameLocator('iframe');
@@ -102,8 +102,8 @@ try {
   await mode.filter({ hasText: 'Three-dot diff' }).waitFor();
   assert.match(await mode.textContent(), /Three-dot diff/);
   await frame.getByRole('tab', { name: '未提交改动', exact: true }).click();
-  await frame.getByRole('combobox', { name: '仓库', exact: true }).click();
-  await frame.getByRole('option', { name: 'Server', exact: true }).click();
+  await frame.getByRole('button', { name: '仓库', exact: true }).click();
+  await frame.getByRole('button', { name: /^server · / }).click();
   await frame.getByRole('button', { name: '未跟踪 · ? a.ts', exact: true }).waitFor();
   assert.equal((await fixture.events(panel)).length, 0);
   await fixture.stop();

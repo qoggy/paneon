@@ -1,6 +1,7 @@
 import { FileDiffNotice } from '../../shared/file-diff-notice';
 import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
+import { RefreshCw } from '../../shared/icons.tsx';
 import { agent, definePanel, usePanelInput } from '@qoggy/paneon/sdk';
 import type { AnnotationValue } from '@qoggy/paneon/sdk';
 import {
@@ -22,8 +23,12 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   useToastManager,
   usePageAnnotations,
+  useAnnotations,
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
@@ -33,10 +38,18 @@ import {
   diffTargetText,
 } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
-import { checkFeedback, checkoutGitRef, queryGitRevisions } from './actions.ts';
+import {
+  checkFeedback,
+  checkoutGitRef,
+  queryGitRevisions,
+  queryGit,
+  queryGitFile,
+  queryRepositoryCatalog,
+} from './actions.ts';
 import { RevisionPicker } from './revision-picker.tsx';
-import { buildGitFeedback } from './feedback.ts';
-import { useGitReader } from './components.tsx';
+import { RepositoryFeedback } from './repository-feedback.ts';
+import { RepositoryPicker } from './repository-dialogs.tsx';
+import { createReviewInput } from './input.ts';
 import { CommitDetails, HistoryRows } from './history.tsx';
 import { ChangedFileTree } from './file-tree.tsx';
 import { Branches } from './branches.tsx';
@@ -58,7 +71,7 @@ import {
   gitCheckoutCompletedSchema,
 } from './schema.ts';
 import type { CheckoutReason } from './checkout.ts';
-import type { GitRef, GitReviewParams } from './schema.ts';
+import type { GitRef, GitReviewParams, GitRepository } from './schema.ts';
 
 type ViewState = {
   request: GitRequest;
@@ -66,19 +79,30 @@ type ViewState = {
   selected?: string;
   selectedFile?: string;
 };
-function initialRequest(params: GitReviewParams): GitRequest {
-  return params.initialView ?? { repositoryId: params.repositories[0].id, type: 'changes' };
-}
 const keyOf = (request: GitRequest) => `${request.repositoryId}:${request.type}`;
 function Review() {
   const { t, message } = useLocale();
   const toast = useToastManager();
   const checkoutBusy = useRef(false);
   const [checkingOut, setCheckingOut] = useState(false);
-  const params = usePanelInput<GitReviewParams>();
-  const reader = useGitReader(params);
-  const first = initialRequest(params);
+  const input = usePanelInput<GitReviewParams>();
+  const annotations = useAnnotations<GitRef>();
+  const [initial] = useState(() => createReviewInput(input));
+  const [repositories, setRepositories] = useState(initial.repositories);
+  const activeRepositories = useRef(initial.repositories);
+  const knownRepositories = useRef(new Map(initial.repositories.map((repo) => [repo.id, repo])));
+  const [ready, setReady] = useState(false);
+  const [catalogPending, setCatalogPending] = useState(true);
+  const [repositoryIssues, setRepositoryIssues] = useState<Record<string, string>>({});
+  const reader = {
+    read: (request: GitRequest) =>
+      queryGit({ params: { repositories: activeRepositories.current }, request }),
+    readFile: (file: GitFile) =>
+      queryGitFile({ params: { repositories: activeRepositories.current }, file }),
+  };
+  const first = initial.request;
   const [view, setView] = useState<ViewState>({ request: first });
+  const currentRepository = repositories.find((repo) => repo.id === view.request.repositoryId)!;
   const [historySelections, setHistorySelections] = useState<Record<string, string>>({});
   const historyLayout = useRef<HistoryLayout>({});
   const views = useRef(new Map<string, ViewState>());
@@ -93,10 +117,13 @@ function Review() {
   const [pending, setPending] = useState(false),
     [error, setError] = useState('');
   useEffect(() => {
-    if (view.request.type !== 'compare') return;
+    if (!ready || view.request.type !== 'compare') return;
     let active = true;
     setRevisions([]);
-    void queryGitRevisions({ params, repositoryId: view.request.repositoryId }).then(
+    void queryGitRevisions({
+      params: { repositories: [currentRepository] },
+      repositoryId: view.request.repositoryId,
+    }).then(
       (refs) => {
         if (active) setRevisions(refs);
       },
@@ -107,7 +134,7 @@ function Review() {
     return () => {
       active = false;
     };
-  }, [params, view.request.repositoryId, view.request.type, revisionRefresh]);
+  }, [ready, currentRepository, view.request.repositoryId, view.request.type, revisionRefresh]);
   const [oldSnapshot, setOldSnapshot] = useState<GitSnapshot>();
   const [oldFileSelected, setOldFileSelected] = useState(false);
   const diffView = useRef<DiffViewHandle>(null);
@@ -115,20 +142,23 @@ function Review() {
   const locating = useRef(0);
   const [fileReveal, setFileReveal] = useState(0);
   const [fileGrouping, setFileGrouping] = useState<Record<string, boolean>>({});
+  const feedbackState = useRef(new RepositoryFeedback());
   const submission = useSubmission<AnnotationValue<GitRef>>(
     async ({ replacesEventId, ...feedback }) => {
       if (replacesEventId === undefined && feedback.annotations.length === 0)
         throw new SubmissionError('Save at least one annotation before submitting.');
       const result = await checkFeedback({
-        params,
-        feedback: buildGitFeedback(
+        params: { repositories: [...knownRepositories.current.values()] },
+        feedback: feedbackState.current.build(
           { ...feedback, ...(replacesEventId === undefined ? {} : { replacesEventId }) },
           snapshots.current,
         ),
       });
       if (!result.ok) throw new Error(result.message);
       const checked = result.data;
-      return agent.emit('git-review-submitted', checked);
+      const receipt = await agent.emit('git-review-submitted', checked);
+      feedbackState.current.accept(feedback, checked);
+      return receipt;
     },
     { successToast: 'Annotations submitted.' },
   );
@@ -176,6 +206,13 @@ function Review() {
       if (!result.ok) throw new Error(result.message);
       if (id !== serial.current || activeKey.current !== key) return;
       const listing = result.data;
+      setRepositoryIssues((previous) =>
+        Object.fromEntries(
+          Object.entries(previous).filter(
+            ([repositoryId]) => repositoryId !== request.repositoryId,
+          ),
+        ),
+      );
       listing.snapshots.forEach((snapshot) => {
         snapshots.current.set(snapshot.id, snapshot);
         fileSnapshots.current.set(`${listing.listingId}:${snapshot.fileId}`, snapshot);
@@ -272,9 +309,73 @@ function Review() {
       preventScroll: true,
     });
   }
+  async function initialize() {
+    setCatalogPending(true);
+    setError('');
+    try {
+      const catalog = await queryRepositoryCatalog({ repositories: initial.repositories });
+      const normalized = catalog.map((entry) => entry.repository);
+      activeRepositories.current = normalized;
+      knownRepositories.current = new Map(normalized.map((repo) => [repo.id, repo]));
+      setRepositories(normalized);
+      setRepositoryIssues(
+        Object.fromEntries(
+          catalog
+            .filter((entry) => entry.error)
+            .map((entry) => [entry.repository.id, entry.error!]),
+        ),
+      );
+      setReady(true);
+      setCatalogPending(false);
+      await load(first);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setCatalogPending(false);
+    }
+  }
   useEffect(() => {
-    void load(first); /* One initial navigation; file data updates are explicit. */
+    void initialize(); /* One initial navigation; data updates are explicit. */
   }, []);
+  function addRepository(repository: GitRepository) {
+    knownRepositories.current.set(repository.id, repository);
+    activeRepositories.current = [...activeRepositories.current, repository];
+    setRepositories(activeRepositories.current);
+    void load({ repositoryId: repository.id, type: 'changes' });
+  }
+  function removalReason(id: string) {
+    if (id === view.request.repositoryId)
+      return t('Switch to another repository before removing this one.');
+    if (feedbackState.current.hasChanges(id, annotations.value, snapshots.current))
+      return t('This repository has unsubmitted annotations. Handle them before removing it.');
+    return undefined;
+  }
+  function removeRepository(id: string) {
+    if (checkoutBusy.current || submission.pending || removalReason(id)) return;
+    for (const annotationId of feedbackState.current.retire(
+      id,
+      annotations.value,
+      snapshots.current,
+    ))
+      annotations.removeAnnotation(annotationId);
+    for (const [sourceId, snapshot] of snapshots.current)
+      if (snapshot.source.repositoryId === id) snapshots.current.delete(sourceId);
+    for (const [key, snapshot] of fileSnapshots.current)
+      if (snapshot.source.repositoryId === id) fileSnapshots.current.delete(key);
+    for (const type of ['changes', 'history', 'compare']) views.current.delete(`${id}:${type}`);
+    setHistorySelections((previous) =>
+      Object.fromEntries(Object.entries(previous).filter(([key]) => key !== id)),
+    );
+    setFileGrouping((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).filter(
+          ([key]) => !['changes', 'history', 'compare'].some((type) => key === `${id}:${type}`),
+        ),
+      ),
+    );
+    activeRepositories.current = activeRepositories.current.filter((repo) => repo.id !== id);
+    setRepositories(activeRepositories.current);
+  }
   function navigate(repositoryId: string, type: GitRequest['type']) {
     const key = `${repositoryId}:${type}`;
     // Tabs can activate on both focus and mouse-down before React commits the new value.
@@ -331,7 +432,7 @@ function Review() {
     locating.current++;
     try {
       const result = await checkoutGitRef({
-        params,
+        params: { repositories: activeRepositories.current },
         repositoryId: view.request.repositoryId,
         target: { kind: entry.kind, ref: entry.ref, commit: targetCommit },
         expectedHead: { branch: listing?.currentBranch ?? null, commit: headCommit },
@@ -369,9 +470,9 @@ function Review() {
       }
       // Invalidate mutable views, retaining the original snapshots backing annotations.
       for (const type of ['changes', 'history', 'compare'] as const)
-        views.current.delete(`${result.data.repositoryId}:${type}`);
+        views.current.delete(`${view.request.repositoryId}:${type}`);
       fileSnapshots.current.clear();
-      setHistorySelections((previous) => ({ ...previous, [result.data.repositoryId]: 'HEAD' }));
+      setHistorySelections((previous) => ({ ...previous, [view.request.repositoryId]: 'HEAD' }));
       setRevisionRefresh((value) => value + 1);
       try {
         await agent.emit('git-checkout-completed', result.data);
@@ -388,7 +489,7 @@ function Review() {
           type: 'warning',
         });
       }
-      await load({ repositoryId: result.data.repositoryId, type: 'history' });
+      await load({ repositoryId: view.request.repositoryId, type: 'history' });
     } catch (failure) {
       toast.add({
         title: t(
@@ -549,8 +650,11 @@ function Review() {
           className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs"
         >
           <strong>{t('回看保留快照')}</strong>
-          <span className="min-w-0 flex-1 truncate" title={JSON.stringify(oldSnapshot.source.view)}>
-            {t('仓库')} {oldSnapshot.source.repositoryId} ·{' '}
+          <span
+            className="min-w-0 flex-1 truncate"
+            title={`${oldSnapshot.source.repositoryPath} · ${JSON.stringify(oldSnapshot.source.view)}`}
+          >
+            {t('仓库')} {oldSnapshot.source.repositoryPath} ·{' '}
             {oldSnapshot.source.view.type === 'history'
               ? t('Commit {commit}', {
                   commit: oldSnapshot.source.view.commit.slice(0, 10),
@@ -678,9 +782,10 @@ function Review() {
           : [];
       },
       async locate(target) {
-        const serial = ++locating.current;
         const snapshot = snapshots.current.get(target.ref.sourceId);
         if (snapshot) {
+          navigate(snapshot.source.repositoryId, snapshot.source.view.type);
+          const serial = ++locating.current;
           setOldSnapshot(snapshot);
           setOldFileSelected(true);
           setCollapsed(false);
@@ -707,54 +812,24 @@ function Review() {
             className="flex min-h-[34rem] flex-col gap-3 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4"
             data-git-workbench=""
           >
-            <header className="flex flex-wrap items-center justify-between gap-2">
-              <h1
-                className="min-w-0 truncate text-lg font-semibold"
-                title={params.title ?? t('Git 审阅')}
-              >
-                {params.title ?? t('Git 审阅')}
-              </h1>
-              {checkingOut && (
-                <span
-                  role="status"
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <Spinner aria-hidden="true" />
-                  {t('Checking out…')}
-                </span>
-              )}
-            </header>
-            <div
-              className="flex flex-wrap items-center gap-2 border-b pb-3"
+            <header
+              className="flex min-h-12 flex-wrap items-center gap-4 border-b pb-3"
               aria-label={t('Git 与批注操作')}
             >
-              <label className="flex items-center gap-2 text-sm">
-                {t('仓库')}
-                <Select
-                  items={params.repositories.map((repo) => ({
-                    value: repo.id,
-                    label: repo.label ?? repo.path.split('/').filter(Boolean).at(-1) ?? repo.id,
-                  }))}
-                  value={request.repositoryId}
-                  onValueChange={(value) => {
-                    if (value !== null) navigate(value, request.type);
-                  }}
-                >
-                  <SelectTrigger className="max-w-44" aria-label={t('仓库')}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {params.repositories.map((repo) => (
-                      <SelectItem key={repo.id} value={repo.id}>
-                        {repo.label ?? repo.path.split('/').filter(Boolean).at(-1) ?? repo.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
+              <RepositoryPicker
+                repositories={repositories}
+                currentId={request.repositoryId}
+                disabled={!ready || checkingOut || submission.pending}
+                selectionDisabled={!ready || checkingOut}
+                issues={repositoryIssues}
+                removalReason={removalReason}
+                onSelect={(id) => navigate(id, request.type)}
+                onAdd={addRepository}
+                onRemove={removeRepository}
+              />
               <TabsList variant="line" aria-label={t('Git 审阅')}>
                 {(['changes', 'history', 'compare'] as const).map((type) => (
-                  <TabsTrigger key={type} value={type}>
+                  <TabsTrigger key={type} value={type} disabled={!ready}>
                     {
                       {
                         changes: t('未提交改动'),
@@ -765,36 +840,58 @@ function Review() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <div className="ml-auto flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => {
-                    if (request.type === 'compare') setRevisionRefresh((value) => value + 1);
-                    const {
-                      tip: _tip,
-                      offset: _offset,
-                      file: _file,
-                      historyContext: _historyContext,
-                      ...refresh
-                    } = request;
-                    void load({
-                      ...refresh,
-                      ...(selected && !oldSnapshot
-                        ? {
-                            file: selected.source.new?.path ?? selected.source.old?.path,
-                            ...(selected.source.view.type === 'changes'
-                              ? { area: selected.source.view.area }
-                              : {}),
+              <div className="ml-auto flex items-center gap-3">
+                {(checkingOut || catalogPending) && (
+                  <span
+                    role="status"
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <Spinner aria-hidden="true" />
+                    {checkingOut ? t('Checking out…') : t('读取 Git…')}
+                  </span>
+                )}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={t('刷新')}
+                        disabled={pending || catalogPending}
+                        onClick={() => {
+                          if (!ready) {
+                            void initialize();
+                            return;
                           }
-                        : {}),
-                    });
-                  }}
-                >
-                  {t('刷新')}
-                </Button>
+                          if (request.type === 'compare') setRevisionRefresh((value) => value + 1);
+                          const {
+                            tip: _tip,
+                            offset: _offset,
+                            file: _file,
+                            historyContext: _historyContext,
+                            ...refresh
+                          } = request;
+                          void load({
+                            ...refresh,
+                            ...(selected && !oldSnapshot
+                              ? {
+                                  file: selected.source.new?.path ?? selected.source.old?.path,
+                                  ...(selected.source.view.type === 'changes'
+                                    ? { area: selected.source.view.area }
+                                    : {}),
+                                }
+                              : {}),
+                          });
+                        }}
+                      >
+                        <RefreshCw aria-hidden="true" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>{t('刷新')}</TooltipContent>
+                </Tooltip>
               </div>
-            </div>
+            </header>
             <TabsContent value={request.type} className="flex min-h-0 flex-1 flex-col gap-3">
               {request.type === 'compare' && (
                 <div className="flex flex-wrap items-center gap-2">

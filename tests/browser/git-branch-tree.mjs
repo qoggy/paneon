@@ -28,10 +28,10 @@ try {
     'Add service files\n\n' + 'A longer commit message.\n'.repeat(24),
   );
   const many = await git(graph.repository, 'rev-parse', 'HEAD');
-  const params = { repositories: [{ id: 'graph', path: graph.repository }] };
+  const params = { repositories: [graph.repository] };
   const panel = await f.run({
     ...params,
-    initialView: { repositoryId: 'graph', type: 'history', commit: many },
+    initialView: { repositoryPath: graph.repository, type: 'history', commit: many },
   });
   browser = await chromium.launch({ headless: true, channel: 'chrome' });
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -122,12 +122,27 @@ try {
   // A one-file commit still reserves a small reading area above the message.
   const single = await f.run({
     ...params,
-    initialView: { repositoryId: 'graph', type: 'history', commit: graph.tip, file: 'history.ts' },
+    initialView: {
+      repositoryPath: graph.repository,
+      type: 'history',
+      commit: graph.tip,
+      file: 'history.ts',
+    },
   });
   await page.goto(f.url(single));
   await frame.locator('[data-diff-source]').waitFor();
   for (const height of [1000, 700]) {
     await page.setViewportSize({ width: 1440, height });
+    const panelFrame = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
+    assert.ok(panelFrame);
+    await panelFrame.waitForFunction(
+      (element) => {
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        return element.getBoundingClientRect().height >= 8 * rem - 1;
+      },
+      await files.elementHandle(),
+      { timeout: 10000 },
+    );
     const geometry = await files.evaluate((el) => {
       const workspace = el.closest('[data-history-workspace]');
       const details = workspace.querySelector('[data-commit-details]');

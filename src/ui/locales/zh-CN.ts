@@ -1,5 +1,7 @@
 import type en from './en';
 const zh: Record<keyof typeof en, string> = {
+  breadcrumb: '面包屑导航',
+  More: '更多',
   'Copy code': '复制代码',
   'Unable to copy code.': '无法复制代码。',
   'Enable word wrap': '启用自动换行',

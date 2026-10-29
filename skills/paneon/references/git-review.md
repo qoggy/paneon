@@ -1,46 +1,40 @@
 # Git review
 
-Run `<skill>/assets/panels/git-review/panel.tsx`. The human browses working changes, commit history and branch/version comparisons of the configured repositories, double-clicks a file to open its diff, annotates text, lines, hunks or whole files, and submits all annotations together. The page also offers explicit local Git checkout from the history sidebar's context menus. It never stages, commits or pushes.
+Run `<skill>/assets/panels/git-review/panel.tsx`. The human browses working changes, commit history and branch/version comparisons of the given repositories and any they add, double-clicks a file to open its diff, annotates text, lines, hunks or whole files, and submits all annotations together. The page also offers explicit local Git checkout from the history sidebar's context menus. It never stages, commits or pushes.
 
 ```json
 {
-  "title": "Review the changes",
-  "repositories": [
-    { "id": "web", "path": "./web", "label": "Frontend" },
-    { "id": "api", "path": "/work/api" }
-  ],
-  "initialView": { "repositoryId": "web", "type": "changes", "file": "src/auth.ts" }
+  "repositories": ["/work/web", "/work/api"],
+  "initialView": { "repositoryPath": "/work/web", "type": "changes", "file": "src/auth.ts" }
 }
 ```
 
 Input:
 
-- `title`: optional nonblank string.
-- `repositories`: nonempty. Each has a unique nonblank `id`, a nonblank `path` and an optional `label` (default: the directory name). Relative paths resolve against `--cwd`. A path may point inside a repository; file paths are then relative to its Git root.
-- `initialView`: optional; the default opens working changes of the first repository. Its `repositoryId` must be configured.
+- `repositories`: a nonempty array of unique absolute directory paths. Relative paths and `~` are rejected. A path may point inside a repository; file paths are then relative to its Git root.
+- `initialView`: optional; omitting it opens working changes of the first repository. When provided, `repositoryPath` is required and must exactly match an entry in `repositories`.
 
 ```json
-{ "repositoryId": "web", "type": "changes" }
-{ "repositoryId": "web", "type": "history", "branch": "main" }
-{ "repositoryId": "web", "type": "history", "commit": "a1b2c3d", "file": "src/auth.ts" }
-{ "repositoryId": "web", "type": "compare", "base": "main", "head": "HEAD", "mode": "branch" }
-{ "repositoryId": "web", "type": "compare", "base": "v1.0.0", "head": "v1.1.0", "mode": "commits" }
+{ "repositoryPath": "/work/web", "type": "changes" }
+{ "repositoryPath": "/work/web", "type": "history", "branch": "main" }
+{ "repositoryPath": "/work/web", "type": "history", "commit": "a1b2c3d", "file": "src/auth.ts" }
+{ "repositoryPath": "/work/web", "type": "compare", "base": "main", "head": "HEAD", "mode": "branch" }
+{ "repositoryPath": "/work/web", "type": "compare", "base": "v1.0.0", "head": "v1.1.0", "mode": "commits" }
 ```
 
 - `history` defaults to `HEAD`.
 - `compare` requires `base`; `head` defaults to `HEAD` and `mode` to `commits`. `branch` compares the merge base with head (three-dot); `commits` compares the two endpoints directly.
 - Optional `file` is repository-relative and must be in that view's changed files; a `history` file also requires `commit`.
 
-## Checkout
+## Repository management
 
-The human can check out a local branch, remote branch or tag from the history sidebar's context menu. A remote branch creates a local branch tracking it; a tag checks out a detached HEAD. Checkout refuses to run with local changes, ongoing Git operations or Git errors, and never stashes, forces or rolls back.
+The human can add and remove repositories within the page; added ones are lost on reload. Submitted files and checkout events identify a repository by `repositoryPath`: its real Git root, which can differ from the input path when that points inside a repository or through a symlink. Removing a repository never changes files or Git, and its submitted annotations stay in later corrections.
 
 A successful checkout emits `git-checkout-completed`:
 
 ```json
 {
   "operationId": "2d9e5487-4990-46c0-a2ad-c03a67d66878",
-  "repositoryId": "web",
   "repositoryPath": "/work/web",
   "target": {
     "kind": "remote",
@@ -81,8 +75,7 @@ A successful checkout emits `git-checkout-completed`:
   ],
   "sources": {
     "snapshot-1": {
-      "repositoryId": "web",
-      "view": { "type": "changes", "area": "unstaged", "headCommit": "complete-commit-oid" },
+          "view": { "type": "changes", "area": "unstaged", "headCommit": "complete-commit-oid" },
       "old": { "path": "a.ts", "contentHash": "sha256:actual-old-bytes", "type": "text" },
       "new": { "path": "a.ts", "contentHash": "sha256:actual-new-bytes", "type": "text" },
       "evidence": [

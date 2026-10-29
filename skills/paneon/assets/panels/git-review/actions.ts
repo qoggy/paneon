@@ -3,12 +3,55 @@ import { readGit, readGitFile, readGitBranches, readGitRevisions } from './git.t
 import { validateGitFeedback } from './feedback.ts';
 import { checkoutGit } from './checkout.ts';
 import {
+  directoryErrorMessage,
+  listDirectories,
+  repositoryCatalog,
+  resolveRepository,
+} from './repositories.ts';
+import {
   gitFileSchema,
   gitCheckoutInputSchema,
   gitRequestSchema,
-  gitReviewParamsSchema,
-  gitReviewSubmittedSchema,
+  gitConfigurationSchema,
+  gitFeedbackResultSchema,
+  absoluteDirectory,
 } from './schema.ts';
+
+export const queryRepositoryCatalog = serverAction({
+  kind: 'query',
+  input: gitConfigurationSchema,
+  handler: (ctx, input) => repositoryCatalog(input, ctx.signal),
+});
+export const queryRepositoryDirectory = serverAction({
+  kind: 'query',
+  input: z.object({ path: absoluteDirectory }).strict(),
+  handler: async (ctx, input) => {
+    try {
+      return { ok: true as const, data: await resolveRepository(input.path, ctx.signal) };
+    } catch (error) {
+      console.error('Repository lookup failed:', input.path, error);
+      return {
+        ok: false as const,
+        message: directoryErrorMessage(error, 'repository'),
+      };
+    }
+  },
+});
+export const queryDirectories = serverAction({
+  kind: 'query',
+  input: z.object({ path: absoluteDirectory }).strict(),
+  handler: async (_ctx, input) => {
+    try {
+      return { ok: true as const, data: await listDirectories(input.path) };
+    } catch (error) {
+      console.error('Directory listing failed:', input.path, error);
+      return {
+        ok: false as const,
+        message: directoryErrorMessage(error, 'directory'),
+      };
+    }
+  },
+});
 export const checkoutGitRef = serverAction({
   kind: 'mutation',
   input: gitCheckoutInputSchema,
@@ -16,7 +59,7 @@ export const checkoutGitRef = serverAction({
 });
 export const queryGit = serverAction({
   kind: 'query',
-  input: z.object({ params: gitReviewParamsSchema, request: gitRequestSchema }).strict(),
+  input: z.object({ params: gitConfigurationSchema, request: gitRequestSchema }).strict(),
   handler: async (ctx, input) => {
     try {
       return { ok: true as const, data: await readGit(input.params, input.request, ctx.signal) };
@@ -30,7 +73,7 @@ export const queryGit = serverAction({
 });
 export const queryGitFile = serverAction({
   kind: 'query',
-  input: z.object({ params: gitReviewParamsSchema, file: gitFileSchema }).strict(),
+  input: z.object({ params: gitConfigurationSchema, file: gitFileSchema }).strict(),
   handler: async (ctx, input) => {
     try {
       return { ok: true as const, data: await readGitFile(input.params, input.file, ctx.signal) };
@@ -49,7 +92,7 @@ export const queryGitBranches = serverAction({
 });
 export const checkFeedback = serverAction({
   kind: 'query',
-  input: z.object({ params: gitReviewParamsSchema, feedback: gitReviewSubmittedSchema }).strict(),
+  input: z.object({ params: gitConfigurationSchema, feedback: gitFeedbackResultSchema }).strict(),
   handler: (_ctx, input) => {
     try {
       return { ok: true as const, data: validateGitFeedback(input.params, input.feedback) };
@@ -64,6 +107,6 @@ export const checkFeedback = serverAction({
 
 export const queryGitRevisions = serverAction({
   kind: 'query',
-  input: z.object({ params: gitReviewParamsSchema, repositoryId: z.string() }).strict(),
+  input: z.object({ params: gitConfigurationSchema, repositoryId: z.string() }).strict(),
   handler: (ctx, input) => readGitRevisions(input.params, input.repositoryId, ctx.signal),
 });

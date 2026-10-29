@@ -52,6 +52,7 @@ try {
     'diff-review',
     'markdown-frontmatter',
     'file-references',
+    'local-resources',
   ]) {
     console.log(`Installed package browser verification: ${name}`);
     try {

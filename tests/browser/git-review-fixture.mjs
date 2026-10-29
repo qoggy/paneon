@@ -29,12 +29,8 @@ export async function startGitReviewFixture() {
       payload: { ui: { language: 'zh-CN' } },
     });
     const params = {
-      title: 'Git review acceptance',
-      repositories: [
-        { id: 'web', path: './web', label: 'Web' },
-        { id: 'server', path: './server', label: 'Server' },
-      ],
-      initialView: { repositoryId: 'web', type: 'changes', file: 'a.ts' },
+      repositories: [f.repo, f.second],
+      initialView: { repositoryPath: f.repo, type: 'changes', file: 'a.ts' },
     };
     const run = (input = params) =>
       service.runtime.run(join(skill, 'assets/panels/git-review/panel.tsx'), f.root, input, false);

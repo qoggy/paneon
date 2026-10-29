@@ -1,3 +1,4 @@
+import { realpath } from 'node:fs/promises';
 import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines } from './annotation-tools.mjs';
 import { verifyGitLayout } from './git-review-layout.mjs';
@@ -33,7 +34,7 @@ try {
   const frame = page.frameLocator('iframe'),
     button = (name) => frame.getByRole('button', { name, exact: true });
   const comments = annotationTools(frame, page);
-  await frame.getByRole('heading', { name: 'Git review acceptance', exact: true }).waitFor();
+  await frame.getByRole('button', { name: '仓库', exact: true }).waitFor();
   await frame.locator('[data-diff-source]').waitFor();
   await comments.assertNoLegacySection();
   const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
@@ -151,6 +152,7 @@ try {
   assert.equal(await comments.count(), 2);
   await comments.locate(2, 1);
   await frame.getByText('回看保留快照', { exact: true }).waitFor();
+  assert.ok((await frame.getByRole('note').innerText()).includes(await realpath(f.repo)));
   assert.equal(
     await frame.locator('[data-code-side="new"][data-line="2"]').textContent(),
     'const n = 4;\r\n',
@@ -183,8 +185,8 @@ try {
   await selectDiffLines(frame, 'new', 1, 2);
   await finish();
   // Another repository, same file name.
-  await frame.getByRole('combobox', { name: '仓库', exact: true }).click();
-  await frame.getByRole('option', { name: 'Server', exact: true }).click();
+  await frame.getByRole('button', { name: '仓库', exact: true }).click();
+  await frame.getByRole('button', { name: /^server · / }).click();
   await frame.getByRole('tab', { name: '未提交改动', exact: true }).click();
   await frame.getByRole('button', { name: '未跟踪 · ? a.ts', exact: true }).dblclick();
   await frame
@@ -226,8 +228,8 @@ try {
   const source = first.payload.sources[old.ref.sourceId];
   assert.equal(source.view.area, 'unstaged');
   assert.equal(
-    first.payload.sources[first.payload.annotations[3].targets[0].ref.sourceId].repositoryId,
-    'server',
+    first.payload.sources[first.payload.annotations[3].targets[0].ref.sourceId].repositoryPath,
+    await realpath(f.second),
   );
   // Failed delivery keeps draft and successful receipt, then a complete correction can clear it.
   await comments.edit(4);
@@ -299,9 +301,9 @@ try {
   );
   // Agent-specified history/root, compare and missing file initial locations.
   for (const initialView of [
-    { repositoryId: 'web', type: 'history' },
-    { repositoryId: 'web', type: 'history', commit: f.rootCommit, file: 'a.ts' },
-    { repositoryId: 'web', type: 'compare', base: 'base', file: 'a.ts' },
+    { repositoryPath: f.repo, type: 'history' },
+    { repositoryPath: f.repo, type: 'history', commit: f.rootCommit, file: 'a.ts' },
+    { repositoryPath: f.repo, type: 'compare', base: 'base', file: 'a.ts' },
   ]) {
     const p = await f.run({ ...f.params, initialView });
     await page.goto(f.url(p));
@@ -313,17 +315,19 @@ try {
   await verifyGitLayout(f, page);
   const missing = await f.run({
     ...f.params,
-    initialView: { repositoryId: 'web', type: 'changes', file: 'missing.ts' },
+    initialView: { repositoryPath: f.repo, type: 'changes', file: 'missing.ts' },
   });
   await page.goto(f.url(missing));
   const missingFrame = page.frameLocator('iframe');
+  // The file-tree shell appears before the initial repository catalog has finished loading.
+  await missingFrame.locator('[data-file-id]').first().waitFor();
   await missingFrame.locator('[data-file-scroll][aria-busy=false]').waitFor();
   assert.ok((await missingFrame.locator('[data-file-id]').count()) > 0);
   assert.equal(await missingFrame.locator('[data-diff-source]').count(), 0);
   assert.equal(await missingFrame.getByRole('alert').count(), 0);
   for (const initialView of [
-    { repositoryId: 'web', type: 'history', commit: f.rootCommit, file: 'missing.ts' },
-    { repositoryId: 'web', type: 'compare', base: 'base', file: 'missing.ts' },
+    { repositoryPath: f.repo, type: 'history', commit: f.rootCommit, file: 'missing.ts' },
+    { repositoryPath: f.repo, type: 'compare', base: 'base', file: 'missing.ts' },
   ]) {
     const invalid = await f.run({ ...f.params, initialView });
     await page.goto(f.url(invalid));

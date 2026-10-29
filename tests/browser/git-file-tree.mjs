@@ -49,9 +49,8 @@ try {
   await put(modified, '// staged and unstaged stay separate\nexport const value = 3;\n');
   await put('untracked/新文件.ts', 'export const untracked = true;\n');
   const params = {
-    title: 'Compact file tree acceptance',
-    repositories: [{ id: 'tree', path: repository }],
-    initialView: { repositoryId: 'tree', type: 'changes', file: modified },
+    repositories: [repository],
+    initialView: { repositoryPath: repository, type: 'changes', file: modified },
   };
   const panel = await f.run(params);
   browser = await chromium.launch({
@@ -104,7 +103,7 @@ try {
     group(area)
       .locator('[data-file-directory]')
       .and(frame.locator(`[data-file-directory=${JSON.stringify(path)}]`));
-  await frame.getByRole('heading', { name: params.title, exact: true }).waitFor();
+  await frame.getByRole('button', { name: '仓库', exact: true }).waitFor();
   await button(`已暂存 · M ${modified}`).waitFor();
   assert.equal(await files.count(), 9, 'Each index/worktree snapshot keeps its own leaf');
   assert.equal(await group('staged').locator('[data-file-id]').count(), 7);
@@ -320,8 +319,8 @@ try {
   }
   // Same component in history and compare; these views have no working-area groups.
   for (const initialView of [
-    { repositoryId: 'tree', type: 'history', commit: tip },
-    { repositoryId: 'tree', type: 'compare', base, head: tip, mode: 'commits' },
+    { repositoryPath: repository, type: 'history', commit: tip },
+    { repositoryPath: repository, type: 'compare', base, head: tip, mode: 'commits' },
   ]) {
     const view = await f.run({ ...params, initialView });
     await page.goto(f.url(view));

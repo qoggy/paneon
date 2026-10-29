@@ -57,7 +57,7 @@ void test('local checkout is verified and returns complete before/after evidence
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(gitCheckoutCompletedSchema.safeParse(result.data).success, true);
-    assert.equal(result.data.repositoryId, 'repo');
+    assert.equal('repositoryId' in result.data, false);
     assert.equal(await git(result.data.repositoryPath, 'rev-parse', 'HEAD'), f.feature);
     assert.deepEqual(result.data.before, { branch: 'main', commit: f.main });
     assert.deepEqual(result.data.after, { branch: 'feature', commit: f.feature });

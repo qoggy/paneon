@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
 import { writeFile, mkdir, rm, chmod, symlink } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import {
   readGit as readGitListing,
   readGitFile,
@@ -79,15 +79,33 @@ void test('diff snapshots preserve both originals, Unicode, CRLF and missing fin
   );
   assert.equal(sourceLines('a\r\nb').length, 2);
 });
-void test('input validates scoped repositories and explicit initial locations', () => {
-  const base = { repositories: [{ id: 'web', path: '.' }] };
+void test('input accepts only absolute paths and requires the explicit view repository', () => {
+  const path = process.cwd();
+  const base = { repositories: [path] };
   assert.equal(gitReviewParamsSchema.safeParse(base).success, true);
+  for (const view of [
+    { type: 'changes' },
+    { type: 'history', branch: 'main' },
+    { type: 'compare', base: 'main' },
+  ]) {
+    assert.equal(gitReviewParamsSchema.safeParse({ ...base, initialView: view }).success, false);
+    assert.equal(
+      gitReviewParamsSchema.safeParse({ ...base, initialView: { ...view, repositoryPath: path } })
+        .success,
+      true,
+    );
+  }
   for (const value of [
     { repositories: [] },
-    { repositories: [base.repositories[0], base.repositories[0]] },
-    { ...base, initialView: { repositoryId: 'missing', type: 'changes' } },
-    { ...base, initialView: { repositoryId: 'web', type: 'history', file: 'a.ts' } },
-    { ...base, initialView: { repositoryId: 'web', type: 'changes', file: '../a.ts' } },
+    ...['.', './web', '~/web', '', '   ', '/work/\0web'].map((path) => ({ repositories: [path] })),
+    { repositories: [{ id: 'web', path }] },
+    { ...base, title: 'Review' },
+    { repositories: [path, path] },
+    { ...base, initialView: { repositoryPath: '/missing', type: 'changes' } },
+    { ...base, initialView: { repositoryId: 'web', type: 'changes' } },
+    { ...base, initialView: { repositoryPath: path, type: 'history', file: 'a.ts' } },
+    { ...base, initialView: { repositoryPath: path, type: 'compare' } },
+    { ...base, initialView: { repositoryPath: path, type: 'changes', file: '../a.ts' } },
   ])
     assert.equal(gitReviewParamsSchema.safeParse(value).success, false);
 });
@@ -96,7 +114,7 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
   try {
     const params = {
       repositories: [
-        { id: 'web', path: relative(process.cwd(), f.repo) },
+        { id: 'web', path: f.repo },
         { id: 'server', path: f.second },
       ],
     };
@@ -646,8 +664,8 @@ void test('single-branch history preserves complete messages and fixed tips with
     );
     assert.equal(
       gitReviewParamsSchema.safeParse({
-        ...params,
-        initialView: { repositoryId: 'web', type: 'history', branch: 'topic' },
+        repositories: [f.repo],
+        initialView: { repositoryPath: f.repo, type: 'history', branch: 'topic' },
       }).success,
       true,
     );

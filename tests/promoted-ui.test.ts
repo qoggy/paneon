@@ -13,7 +13,19 @@ void test('public UI owns rich renderers without depending on installed skill as
     metafile: true,
   });
   const names = Object.values(result.metafile.outputs).flatMap((output) => output.exports);
-  for (const name of ['DiffView', 'Markdown', 'useUI']) assert.ok(names.includes(name), name);
+  for (const name of [
+    'DiffView',
+    'Markdown',
+    'useUI',
+    'Breadcrumb',
+    'BreadcrumbList',
+    'BreadcrumbItem',
+    'BreadcrumbLink',
+    'BreadcrumbPage',
+    'BreadcrumbSeparator',
+    'BreadcrumbEllipsis',
+  ])
+    assert.ok(names.includes(name), name);
   for (const name of [
     'validateTextRange',
     'validSourceRange',

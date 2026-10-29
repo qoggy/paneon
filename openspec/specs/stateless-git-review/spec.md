@@ -6,6 +6,22 @@ Provide reusable Git and Diff components with explicit reads, browser-owned anno
 
 ## Requirements
 
+### Requirement: Configure review using absolute repository paths
+
+The public Git review input SHALL accept a nonempty array of unique absolute directory paths in `repositories`, without a custom `title`, repository `id` or `label`. `initialView` MAY be omitted to open the first repository's working changes. When supplied, every initial view SHALL require `repositoryPath` matching a configured path; compare SHALL additionally require `base`. Existing history, comparison and file constraints SHALL remain. The panel SHALL generate internal session identities and preserve Git operations and annotation source/evidence semantics. Agent-facing checkout events and submitted annotation sources SHALL identify repositories by `repositoryPath`. Checkout events SHALL NOT expose internal `repositoryId` values.
+
+#### Scenario: Select a repository explicitly
+
+- **WHEN** input specifies the second repository's absolute path in `initialView.repositoryPath`
+- **THEN** the requested view opens for that repository even when its directory name matches another repository
+- **AND** omitting `repositoryPath` from an explicit initial view rejects the input
+
+#### Scenario: Distinguish same-name repositories
+
+- **WHEN** active repositories have the same directory name
+- **THEN** the selector uses the shortest unique path suffix for each repository and retains the full path in its repository list
+- **AND** adding or removing a name collision updates display names without changing remaining repositories' identities or annotation associations
+
 ### Requirement: Execute Git reads from explicit inputs
 
 Git reads SHALL carry sufficient repository, fixed-version, path and serializable pagination context to execute without preexisting session/listing/history/snapshot Maps. Working-content rereads SHALL return new source identity rather than replace prior displayed data. Required repository/path access boundaries SHALL remain.

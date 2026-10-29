@@ -33,7 +33,7 @@ try {
   assert.equal(refs.status, 0, refs.stderr);
   const params = {
     ...f.params,
-    initialView: { repositoryId: 'web', type: 'history', commit: tip },
+    initialView: { repositoryPath: f.repo, type: 'history', commit: tip },
   };
   const panel = await f.run(params);
   browser = await chromium.launch({
@@ -218,7 +218,7 @@ try {
   }
   for (const type of ['changes', 'compare']) {
     const initialView = {
-      repositoryId: 'web',
+      repositoryPath: f.repo,
       type,
       ...(type === 'compare' ? { base: f.rootCommit, head: tip } : {}),
     };

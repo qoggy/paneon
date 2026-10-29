@@ -323,6 +323,17 @@
       "adaptations": [
         "Use the local utils import and project formatting; export the group imperative-handle type for panel composition."
       ]
+    },
+    {
+      "name": "breadcrumb",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/breadcrumb.json",
+      "sha256": "5e7a33d921824d659494dc90411393cdf795c0ad5c94631da5c2883924623350",
+      "retrievedAt": "2026-10-28",
+      "dependencies": ["cn", "@base-ui/react", "lucide-react"],
+      "registryDependencies": [],
+      "adaptations": [
+        "Use local utility imports and Lucide icons; translate the default navigation label and ellipsis text through useUI."
+      ]
     }
   ],
   "theme": {

@@ -119,16 +119,28 @@ try {
     'new',
     Number(await frame.locator('[data-code-side="new"]').first().getAttribute('data-line')),
   );
+  const beforeEditorWidth = await width();
+  const backgroundHandle = await separator.boundingBox();
   await frame.getByRole('button', { name: '批注', exact: true }).click();
   const editor = frame.getByLabel('批注内容', { exact: true });
   await editor.fill('Keep this unsaved draft while resizing');
-  await separator.press('ArrowRight');
+  // The modal editor blocks background resizing until explicitly saved or cancelled.
+  assert.equal(await separator.count(), 0);
+  await page.mouse.click(backgroundHandle.x + 3, backgroundHandle.y + backgroundHandle.height / 2);
   assert.equal(await editor.inputValue(), 'Keep this unsaved draft while resizing');
+  assert.ok(
+    Math.abs(
+      (await frame.locator('[data-file-review-split] [data-panel="true"]').first().boundingBox())
+        .width - beforeEditorWidth,
+    ) < 2,
+  );
   assert.equal(await source.evaluate((el) => el.isConnected), true);
   assert.equal(await source.getAttribute('data-diff-source'), sourceId);
   assert.equal(requests, 0, 'Resizing neither queries Git nor submits annotations.');
   page.off('request', listener);
   await editor.press('Escape');
+  await separator.press('ArrowRight');
+  assert.ok(Math.abs((await width()) - beforeEditorWidth - 16) < 2);
   const remembered = await width();
   await frame.getByRole('button', { name: '收起文件差异', exact: true }).click();
   assert.equal(await separator.count(), 0);
@@ -160,7 +172,7 @@ try {
   const comparison = await f.run({
     ...f.params,
     initialView: {
-      repositoryId: 'web',
+      repositoryPath: f.repo,
       type: 'compare',
       base: f.rootCommit,
       head: f.feature,
