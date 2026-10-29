@@ -1,3 +1,4 @@
+import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -10,13 +11,8 @@ const exec = promisify(execFile),
   project = new URL('../../', import.meta.url).pathname;
 const root = await mkdtemp(join(tmpdir(), 'paneon-git-pack-'));
 try {
-  const packed = await exec(
-    'npm',
-    ['pack', '--ignore-scripts', '--json', '--pack-destination', root],
-    { cwd: project },
-  );
-  const [metadata] = JSON.parse(packed.stdout),
-    files = new Set(metadata.files.map((f) => f.path));
+  const { metadata, packageRoot } = await createPackageFixture(root);
+  const files = new Set(metadata.files.map((file) => file.path));
   for (const file of [
     'SKILL.md',
     'references/git-review.md',
@@ -29,13 +25,6 @@ try {
     'assets/shared/submission.ts',
   ])
     assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
-  const installation = join(root, 'installation');
-  await exec(
-    'npm',
-    ['install', '--prefix', installation, '--no-audit', '--no-fund', join(root, metadata.filename)],
-    { cwd: project, maxBuffer: 4 * 1024 * 1024 },
-  );
-  const packageRoot = join(installation, 'node_modules/@qoggy/paneon');
   for (const script of [
     'git-review.mjs',
     'git-review-loading.mjs',

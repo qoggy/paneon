@@ -1,6 +1,7 @@
+import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -10,33 +11,7 @@ const execute = promisify(execFile);
 const repository = new URL('../../', import.meta.url).pathname;
 const scratch = await mkdtemp(join(tmpdir(), 'paneon-feedback-pack-'));
 try {
-  const packed = await execute(
-    'npm',
-    ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch],
-    { cwd: repository, maxBuffer: 8 * 1024 * 1024 },
-  );
-  const metadata = JSON.parse(packed.stdout);
-  const installation = join(scratch, 'installation');
-  await mkdir(installation);
-  await writeFile(
-    join(installation, 'package.json'),
-    JSON.stringify({ private: true, type: 'module' }),
-  );
-  const registry = await execute('npm', ['config', 'get', 'registry'], { cwd: repository });
-  await execute(
-    'npm',
-    [
-      'install',
-      '--omit=dev',
-      '--no-audit',
-      '--no-fund',
-      '--registry',
-      registry.stdout.trim(),
-      join(scratch, metadata[0].filename),
-    ],
-    { cwd: installation, timeout: 180000, maxBuffer: 8 * 1024 * 1024 },
-  );
-  const installed = join(installation, 'node_modules/@qoggy/paneon');
+  const { installation, packageRoot: installed } = await createPackageFixture(scratch);
   const exports = await execute(
     process.execPath,
     [

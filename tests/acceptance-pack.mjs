@@ -1,38 +1,15 @@
+import { createPackageFixture } from './package-fixture.mjs';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acceptance, execute, repositoryRoot } from './acceptance-support.mjs';
 
-const installTimeout = Number(process.env.PANEON_TEST_INSTALL_TIMEOUT_MS ?? 600_000);
-assert.ok(Number.isSafeInteger(installTimeout) && installTimeout > 0);
 const scratch = await mkdtemp(join(tmpdir(), 'paneon-package-'));
-// Keep the source checkout's selected registry when npm changes working directory.
-const { stdout: registry } = await execute('npm', ['config', 'get', 'registry'], {
-  cwd: repositoryRoot,
-});
 try {
-  // prepack builds the real package; no symlink back to the source checkout.
-  await execute('npm', ['pack', '--pack-destination', scratch], {
-    cwd: repositoryRoot,
-    timeout: 180_000,
-    maxBuffer: 16 * 1024 * 1024,
+  const { installation: install, packageRoot } = await createPackageFixture(scratch, {
+    build: true,
   });
-  const { version } = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));
-  const tarball = join(scratch, `qoggy-paneon-${version}.tgz`);
-  const install = join(scratch, 'installation');
-  await mkdir(install);
-  await writeFile(join(install, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
-  await execute(
-    'npm',
-    ['install', '--omit=dev', '--no-audit', '--no-fund', '--registry', registry.trim(), tarball],
-    {
-      cwd: install,
-      timeout: installTimeout,
-      maxBuffer: 16 * 1024 * 1024,
-    },
-  );
-  const packageRoot = join(install, 'node_modules/@qoggy/paneon');
   for (const directory of ['examples', 'tests'])
     await assert.rejects(access(join(packageRoot, directory)), { code: 'ENOENT' });
   const { stdout } = await execute(

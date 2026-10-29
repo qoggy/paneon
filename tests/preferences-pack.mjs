@@ -1,29 +1,14 @@
+import { createPackageFixture } from './package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const exec = promisify(execFile);
 const root = await mkdtemp(join(tmpdir(), 'paneon-preferences-package-'));
-const cwd = new URL('..', import.meta.url).pathname;
-const { stdout: registry } = await exec('npm', ['config', 'get', 'registry'], { cwd });
 try {
-  const { stdout: pack } = await exec(
-    'npm',
-    ['pack', '--ignore-scripts', '--pack-destination', root, '--json'],
-    { cwd, maxBuffer: 8 * 1024 * 1024 },
-  );
-  const tarball = join(root, JSON.parse(pack)[0].filename);
-  const install = join(root, 'installation');
-  await mkdir(install);
-  await writeFile(join(install, 'package.json'), '{"private":true,"type":"module"}');
-  await exec(
-    'npm',
-    ['install', '--omit=dev', '--no-audit', '--no-fund', '--registry', registry.trim(), tarball],
-    { cwd: install, timeout: 180000, maxBuffer: 8 * 1024 * 1024 },
-  );
-  const packageRoot = join(install, 'node_modules/@qoggy/paneon');
+  const { installation: install, packageRoot } = await createPackageFixture(root);
   const probe = join(install, 'probe.mjs');
   await writeFile(
     probe,

@@ -1,3 +1,4 @@
+import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { lstat, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -9,12 +10,7 @@ const exec = promisify(execFile);
 const root = await mkdtemp(join(tmpdir(), 'paneon-explanations-pack-'));
 const project = new URL('../../', import.meta.url).pathname;
 try {
-  const { stdout } = await exec(
-    'npm',
-    ['pack', '--ignore-scripts', '--json', '--pack-destination', root],
-    { cwd: project },
-  );
-  const [metadata] = JSON.parse(stdout);
+  const { metadata, packageRoot: installed } = await createPackageFixture(root);
   const files = new Set(metadata.files.map((file) => file.path));
   for (const file of [
     'references/authoring.md',
@@ -24,13 +20,6 @@ try {
     'assets/examples/sentinel-leap-array/model.ts',
   ])
     assert.equal(files.has(`skills/paneon/${file}`), true, `Missing ${file}`);
-  const installation = join(root, 'installation');
-  await exec(
-    'npm',
-    ['install', '--prefix', installation, '--no-audit', '--no-fund', join(root, metadata.filename)],
-    { cwd: project, maxBuffer: 4 * 1024 * 1024 },
-  );
-  const installed = join(installation, 'node_modules/@qoggy/paneon');
   assert.equal((await lstat(installed)).isSymbolicLink(), false);
   assert.equal(
     JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')).version,

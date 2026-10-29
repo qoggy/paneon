@@ -102,8 +102,11 @@ void test(
           worker,
           "process.once('message',()=>process.send({ok:true,data:{directory:'/next',manifest:{}}},()=>process.exit(0)));",
         );
+        // Recovery checks completion, not cold-process startup speed under parallel load.
+        t.mock.timers.enable({ apis: ['setTimeout'] });
         const next = new Compiler('/next.tsx', buildRoot, 2000);
         assert.equal((await next.result).directory, '/next');
+        t.mock.timers.reset();
         await next.stop();
       } finally {
         t.mock.timers.reset();

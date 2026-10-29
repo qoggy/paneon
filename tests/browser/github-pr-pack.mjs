@@ -1,3 +1,4 @@
+import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -10,13 +11,8 @@ const exec = promisify(execFile),
   project = new URL('../../', import.meta.url).pathname,
   root = await mkdtemp(join(tmpdir(), 'paneon-pr-pack-'));
 try {
-  const packed = await exec(
-    'npm',
-    ['pack', '--ignore-scripts', '--json', '--pack-destination', root],
-    { cwd: project },
-  );
-  const [metadata] = JSON.parse(packed.stdout),
-    files = new Set(metadata.files.map((file) => file.path));
+  const { metadata, packageRoot } = await createPackageFixture(root);
+  const files = new Set(metadata.files.map((file) => file.path));
   for (const file of ['dist/ui/index.js', 'dist/ui/index.d.ts'])
     assert.ok(files.has(file), `Missing packaged public UI entry: ${file}`);
   for (const file of [
@@ -32,13 +28,6 @@ try {
     'assets/shared/markdown-annotation.tsx',
   ])
     assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
-  const installation = join(root, 'installation');
-  await exec(
-    'npm',
-    ['install', '--prefix', installation, '--no-audit', '--no-fund', join(root, metadata.filename)],
-    { cwd: project, maxBuffer: 4 * 1024 * 1024 },
-  );
-  const packageRoot = join(installation, 'node_modules/@qoggy/paneon');
   assert.equal((await lstat(packageRoot)).isSymbolicLink(), false);
   const digest = createHash('sha256')
     .update(await readFile(join(root, metadata.filename)))
