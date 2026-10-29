@@ -21,6 +21,7 @@ try {
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
   });
   const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
+  page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`);
@@ -45,7 +46,9 @@ try {
   assert.ok(oneLine.height <= 34, `Single-line height: ${oneLine.height}`);
   assert.ok((await editor.boundingBox()).height <= 50);
   assert.equal(await input.getAttribute('rows'), '1');
-  assert.equal(await frame.getByRole('button', { name: 'Cancel', exact: true }).count(), 0);
+  const cancel = frame.getByRole('button', { name: 'Cancel', exact: true });
+  assert.equal(await cancel.count(), 1);
+  assert.equal(await editor.getByRole('button').count(), 2);
   assert.equal((await save.textContent()).trim(), '');
   await marker.waitFor();
   const previewId = await marker.getAttribute('data-annotation-marker');
@@ -87,7 +90,6 @@ try {
   assert.equal(await editor.isVisible(), true, 'IME confirmation must not save');
   await input.fill('Unsaved text survives scrolling');
   assert.equal(await editor.getAttribute('data-slot'), 'popover-content');
-  assert.notEqual(await editor.getAttribute('aria-modal'), 'true');
   await editor.evaluate((element) =>
     Promise.all(element.getAnimations().map((animation) => animation.finished)),
   );
@@ -111,9 +113,43 @@ try {
     return Math.abs(highlight.getBoundingClientRect().top - range.getBoundingClientRect().top) < 2;
   });
   await page.screenshot({ path: '/tmp/paneon-annotation-popover-scroll.png', fullPage: true });
-  await target.click({ position: { x: 500, y: 20 } });
+  const outside = await target.boundingBox();
+  await page.mouse.click(outside.x + 500, outside.y + 20);
+  assert.equal(await editor.isVisible(), true, 'Outside clicks must keep the editor open');
+  assert.equal(await input.inputValue(), 'Unsaved text survives scrolling');
+  assert.equal((await draft()).annotations.length, 0, 'Outside clicks must not save a draft');
+  assert.equal(
+    await editor.evaluate((element) =>
+      element
+        .getAnimations()
+        .some((animation) =>
+          animation.effect.getKeyframes().some((keyframe) => keyframe.translate === '-6px'),
+        ),
+    ),
+    true,
+    'Outside clicks shake the editor',
+  );
+  // Background controls must not run their handlers, even after repeated clicks.
+  const rerender = frame.getByRole('button', {
+    name: 'Rerender page 0',
+    exact: true,
+    includeHidden: true,
+  });
+  const rerenderBox = await rerender.boundingBox();
+  for (let attempt = 0; attempt < 2; attempt++)
+    await page.mouse.click(
+      rerenderBox.x + rerenderBox.width / 2,
+      rerenderBox.y + rerenderBox.height / 2,
+    );
+  assert.equal(await rerender.count(), 1);
+  assert.equal(await input.inputValue(), 'Unsaved text survives scrolling');
+  await cancel.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  // Base UI wraps focus from its guard on the next animation frame.
+  await input.and(frame.locator(':focus')).waitFor();
+  await save.click();
   await editor.waitFor({ state: 'hidden' });
-  assert.equal((await draft()).annotations[0].comment, '', 'Outside saves an empty comment');
   assert.equal((await draft()).annotations[0].id, previewId);
   assert.equal(await marker.getAttribute('data-annotation-number'), previewNumber);
   await marker.click();
@@ -121,6 +157,28 @@ try {
   await editor.evaluate((element) =>
     Promise.all(element.getAnimations().map((animation) => animation.finished)),
   );
+  assert.equal(
+    (await input.boundingBox()).height,
+    oneLine.height,
+    'Editing a single line must keep the one-line input height',
+  );
+  await input.fill('First line\nSecond line');
+  assert.ok((await input.boundingBox()).height > oneLine.height, 'Editing grows for new lines');
+  await input.fill('Saved with check');
+  assert.equal((await input.boundingBox()).height, oneLine.height, 'Editing shrinks to one line');
+  assert.equal((await cancel.textContent()).trim(), 'Cancel');
+  assert.equal((await save.textContent()).trim(), 'Save');
+  const deleteBox = await frame
+    .getByRole('button', { name: 'Delete annotation', exact: true })
+    .boundingBox();
+  const cancelBox = await cancel.boundingBox();
+  const editSaveBox = await save.boundingBox();
+  const editInputBox = await input.boundingBox();
+  assert.ok(deleteBox.y >= editInputBox.y + editInputBox.height, 'Actions are below the input');
+  assert.equal(deleteBox.y, cancelBox.y);
+  assert.equal(cancelBox.y, editSaveBox.y);
+  assert.ok(cancelBox.x > deleteBox.x + deleteBox.width + 100, 'Delete stays on the left');
+  assert.ok(editSaveBox.x >= cancelBox.x + cancelBox.width, 'Cancel and Save stay on the right');
   const scrollBeforeSave = await content.evaluate(() => scrollY);
   const saveBox = await save.boundingBox();
   await page.mouse.click(saveBox.x + saveBox.width / 2, saveBox.y + saveBox.height / 2);
@@ -128,8 +186,14 @@ try {
   assert.equal(await content.evaluate(() => scrollY), scrollBeforeSave);
   assert.equal((await draft()).annotations[0].comment, 'Saved with check');
   await marker.click();
-  await input.fill('Discard outside edit');
-  await target.click({ position: { x: 500, y: 20 } });
+  assert.equal(await editor.getByRole('button').count(), 3);
+  await input.fill('Keep editing after outside click');
+  const currentOutside = await target.boundingBox();
+  await page.mouse.click(currentOutside.x + 500, currentOutside.y + 20);
+  assert.equal(await editor.isVisible(), true);
+  assert.equal(await input.inputValue(), 'Keep editing after outside click');
+  assert.equal((await draft()).annotations[0].comment, 'Saved with check');
+  await cancel.click();
   await editor.waitFor({ state: 'hidden' });
   assert.equal((await draft()).annotations[0].comment, 'Saved with check');
   await marker.click();
@@ -188,7 +252,7 @@ try {
     await previewThree.waitFor();
     assert.equal((await draft()).annotations.length, 2);
     await input.fill('Cancel without consuming a number');
-    await input.press('Escape');
+    await cancel.click();
     await previewThree.waitFor({ state: 'detached' });
   }
   await selectAnnotationText(frame, '[data-testid=target] [data-annotation-text]', 0, 6);
@@ -216,7 +280,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'PASS compact annotation editor: auto rows, check/Enter save, Shift+Enter, IME, preview highlight/number, outside empty save, scrolling, contiguous numbers after deletion/cancel, exact mapping and unchanged event history.',
+    'PASS compact annotation editor: auto rows, check/Enter save, explicit cancel/delete, Shift+Enter, IME, preview highlight/number, outside click blocking/shake/draft retention, focus trap, scrolling, contiguous numbers after deletion/cancel, exact mapping and unchanged event history.',
   );
 } finally {
   await browser?.close();

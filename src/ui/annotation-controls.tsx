@@ -35,6 +35,7 @@ export function AnnotationControls() {
           key={file.id}
           reference={file.reference}
           snapshot={file.snapshot}
+          reader={file.reader}
           annotations={{ store, id: file.id, ref: file.ref }}
           open={file.open}
           onOpenChange={(open) => {

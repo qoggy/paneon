@@ -104,6 +104,20 @@ function operations(a: DiffLine[], b: DiffLine[]): DiffRow[] {
       .map((old, i): DiffRow => ({ kind: 'context', old, new: b[b.length - suffix + i] })),
   ];
 }
+/** Consecutive edited rows form one block; unchanged context ends it. */
+export function diffBlocks(rows: readonly DiffRow[]): DiffRow[][] {
+  const blocks: DiffRow[][] = [];
+  let current: DiffRow[] | undefined;
+  for (const row of rows) {
+    if (row.kind === 'context') current = undefined;
+    else {
+      if (!current) blocks.push((current = []));
+      current.push(row);
+    }
+  }
+  return blocks;
+}
+
 /** Navigation stops are contiguous edits, not merged context windows. */
 export function diffChanges(rows: readonly DiffRow[]): { old?: DiffLine; new?: DiffLine }[] {
   const changes: { old?: DiffLine; new?: DiffLine }[] = [];

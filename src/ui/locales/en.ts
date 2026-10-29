@@ -114,6 +114,9 @@ const en = {
   'Panel {status}': 'Panel {status}',
   'Save failed. {error}': 'Save failed. {error}',
   批注: 'Annotation',
+  '批注位置：': 'Annotation target:',
+  批注改动块: 'Annotate change block',
+  '批注第 {number} 处改动': 'Annotate change {number}',
   'Annotation {number}': 'Annotation {number}',
   'Edit annotation': 'Edit annotation',
   编辑批注: 'Edit annotation',
@@ -137,7 +140,6 @@ const en = {
   'Select text on the page, then click “Annotation” to add one.':
     'Select text on the page, then click “Annotation” to add one.',
   批注目录: 'Annotation directory',
-  'Selected text:': 'Selected text:',
   'User annotation:': 'User annotation:',
   'Annotation target': 'Annotation target',
   'Locate annotation {number}': 'Locate annotation {number}',

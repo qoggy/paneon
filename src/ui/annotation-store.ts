@@ -5,9 +5,11 @@ import type { FilePreview, FileReferenceRequest } from '../shared/file-reference
 import type { ReadFileReference } from './file-reference-context';
 import type {
   AnnotationController,
+  AnnotationEditor,
   PageAnnotationOptions,
   AnnotationTextRegistration,
   AnnotationTargetResolution,
+  AnnotationPresentation,
   AnnotationUI,
 } from './annotation-types';
 import { selectedTextTargets, validTextRange } from './annotation-selection';
@@ -44,6 +46,8 @@ function frozen<T>(value: T): T {
 const copy = <T>(value: T): T => structuredClone(value);
 const sourceKey = (target: AnnotationTarget<unknown>) =>
   annotationTargetKey({ ref: target.ref, sourceRef: target.sourceRef });
+const targetsKey = (targets: readonly AnnotationTarget<unknown>[]) =>
+  JSON.stringify(targets.map(annotationTargetKey).sort());
 
 export class AnnotationStore<TRef> {
   private listeners = new Set<() => void>();
@@ -66,6 +70,7 @@ export class AnnotationStore<TRef> {
   private numbers = new Map<string, number>();
   private stagedSources = new Map<string, string>();
   private editorSources = new Map<string, string>();
+  private summaries = new Map<string, string>();
   private registryListeners = new Set<() => void>();
   private measurementRanges = new WeakMap<Document, Range>();
 
@@ -80,6 +85,7 @@ export class AnnotationStore<TRef> {
       selectionTargets: [],
       submitting: false,
       error: null,
+      beginAnnotation: this.beginAnnotation,
       createAnnotation: this.createAnnotation,
       editAnnotation: this.editAnnotation,
       updateAnnotation: this.updateAnnotation,
@@ -210,6 +216,14 @@ export class AnnotationStore<TRef> {
   }
   private save(value: AnnotationValue<TRef>, activeAnnotationId = this.state.activeAnnotationId) {
     getSchema().parse(value);
+    const groups = new Set<string>();
+    for (const entry of value.annotations) {
+      const key = targetsKey(entry.targets);
+      groups.add(key);
+      const summary = this.presentation(entry.targets)?.summary;
+      if (summary !== undefined) this.summaries.set(key, summary);
+    }
+    for (const key of this.summaries.keys()) if (!groups.has(key)) this.summaries.delete(key);
     const retained = new Set(
       value.annotations.flatMap((entry) => entry.targets.map(annotationTargetKey)),
     );
@@ -299,6 +313,7 @@ export class AnnotationStore<TRef> {
       ref: copy(registration.ref),
       ...(registration.sourceRef === undefined ? {} : { sourceRef: copy(registration.sourceRef) }),
       source: registration.source,
+      presentation: registration.presentation,
       segments,
       index: indexTextSegments(segments),
     });
@@ -307,6 +322,17 @@ export class AnnotationStore<TRef> {
       this.texts.delete(id);
       this.registryChanged();
     };
+  };
+  /** Resolve live renderer geometry while retaining readable summaries after unmount. */
+  presentation = (
+    targets: readonly AnnotationTarget<TRef>[],
+  ): AnnotationPresentation | undefined => {
+    for (const registration of this.texts.values()) {
+      const presentation = registration.presentation?.(targets);
+      if (presentation) return presentation;
+    }
+    const summary = this.summaries.get(targetsKey(targets));
+    return summary === undefined ? undefined : { summary };
   };
   /** Internal renderer bridge: keep the source being annotated until its drafts are removed. */
   retainedSource(ref: TRef): string | undefined {
@@ -382,15 +408,27 @@ export class AnnotationStore<TRef> {
   dismissSelection = () => {
     if (this.state.pending.length) this.publish({ pending: [] });
   };
-  openAnnotation = (id?: string) => {
+  beginAnnotation: AnnotationController<TRef>['beginAnnotation'] = (targets) => {
+    const key = targetsKey(targets);
+    const existing = this.state.value.annotations.find(
+      (entry) => targetsKey(entry.targets) === key,
+    );
+    this.openAnnotation(existing?.id, targets);
+  };
+  openAnnotation = (
+    id?: string,
+    selected = this.state.pending,
+    anchor?: AnnotationEditor<TRef>['anchor'],
+  ) => {
     if (this.disabled) return;
     if (this.state.editor) {
       this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
       return;
     }
     const annotation = id ? this.state.value.annotations.find((entry) => entry.id === id) : null;
-    const targets = annotation?.targets ?? this.state.pending;
+    const targets = annotation?.targets ?? selected;
     if (!targets.length) return;
+    if (!id && selected !== this.state.pending) this.stageSources(targets);
     this.editorSources = new Map(id ? [] : this.stagedSources);
     const draftId = id ?? crypto.randomUUID();
     this.publish({
@@ -402,6 +440,7 @@ export class AnnotationStore<TRef> {
         draftId,
         targets: copy(targets),
         comment: annotation?.comment ?? '',
+        anchor,
       },
     });
   };

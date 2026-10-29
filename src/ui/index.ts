@@ -45,6 +45,7 @@ export type {
   PageAnnotationOptions,
   AnnotationTextProps,
   AnnotationTextRegistration,
+  AnnotationPresentation,
   AnnotationController,
 } from './annotation-types';
 

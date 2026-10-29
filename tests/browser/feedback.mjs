@@ -86,7 +86,7 @@ try {
     return result.data;
   };
   const read = () => cli('events', fixture.panel.instanceId, '--consumer', 'feedback-acceptance');
-  const select = async (selector, start, end, endSelector = selector, keyboard = false) => {
+  const selectText = async (selector, start, end, endSelector = selector, keyboard = false) => {
     await frame.locator(selector).scrollIntoViewIfNeeded();
     await content.evaluate(
       ({ selector, start, end, endSelector, keyboard }) => {
@@ -107,6 +107,9 @@ try {
       },
       { selector, start, end, endSelector, keyboard },
     );
+  };
+  const select = async (...args) => {
+    await selectText(...args);
     await button('批注').waitFor();
   };
   const clearSelection = () => content.evaluate(() => document.getSelection().removeAllRanges());
@@ -185,7 +188,7 @@ try {
   // Selecting another range is a new comment request, never an implicit merge into this edit.
   await clickFloating(marker(1));
   await fillEditor('尚未保存的原批注');
-  await select(plain, 20, 24);
+  await selectText(plain, 20, 24);
   // Selection itself raises the unsaved-editor guard; no second action is required.
   await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
   assert.equal(await input.inputValue(), '尚未保存的原批注');
@@ -538,7 +541,7 @@ try {
     const { anchored, number } = await content.evaluate(() => window.annotationFirstPaint);
     assert.ok(anchored.x <= number.x && anchored.x + anchored.width > number.x);
     assert.ok(
-      Math.abs(anchored.y + anchored.height - number.y) < 48,
+      Math.min(Math.abs(anchored.y - number.bottom), Math.abs(anchored.bottom - number.y)) < 48,
       'Editor must be anchored on its first painted frame.',
     );
     if (process.env.PANEON_TEST_SCREENSHOTS)

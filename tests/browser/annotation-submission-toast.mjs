@@ -97,7 +97,11 @@ try {
     );
     assert.equal(await frame.getByText(/Saved as event|已保存为事件/).count(), 0);
     const [first] = await fixture.events(panel);
-    assert.equal(first.payload.annotations[0].comment, 'Review this text');
+    const annotations = (event) =>
+      event.type === 'git-review-submitted'
+        ? event.payload.files.flatMap((file) => file.annotations)
+        : event.payload.annotations;
+    assert.equal(annotations(first)[0].comment, 'Review this text');
     await page.unroute(eventURL);
     await toast.locator('[data-slot="toast-close"]').click();
     await toasts.waitFor({ state: 'detached' });
@@ -108,7 +112,9 @@ try {
     await toast.waitFor();
     const events = await fixture.events(panel);
     assert.equal(events.length, 2);
-    assert.equal(events[1].payload.annotations[0].id, first.payload.annotations[0].id);
+    if (first.type === 'git-review-submitted')
+      assert.equal('id' in annotations(events[1])[0], false);
+    else assert.equal(annotations(events[1])[0].id, annotations(first)[0].id);
     assert.equal(events[1].payload.replacesEventId, replacesEvent ? first.id : undefined);
     assert.equal(await frame.getByText(/Saved as event|已保存为事件/).count(), 0);
     console.log(`PASS ${first.type}: failure, receipt-only toast, retained draft and correction`);
@@ -131,7 +137,7 @@ try {
       await toast.waitFor();
       const cleared = await fixture.events(panel);
       assert.equal(cleared.length, 3);
-      assert.deepEqual(cleared[2].payload.annotations, []);
+      assert.deepEqual(annotations(cleared[2]), []);
       assert.equal(cleared[2].payload.replacesEventId, events[1].id);
       console.log(`PASS ${first.type}: clear-all correction remains available`);
     }

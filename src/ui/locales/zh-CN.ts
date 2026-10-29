@@ -110,6 +110,9 @@ const zh: Record<keyof typeof en, string> = {
   'Panel {status}': '面板{status}',
   'Save failed. {error}': '保存失败。{error}',
   批注: '批注',
+  '批注位置：': '批注位置：',
+  批注改动块: '批注改动块',
+  '批注第 {number} 处改动': '批注第 {number} 处改动',
   'Annotation {number}': '批注 {number}',
   'Edit annotation': '编辑批注',
   编辑批注: '编辑批注',
@@ -133,7 +136,6 @@ const zh: Record<keyof typeof en, string> = {
   'Select text on the page, then click “Annotation” to add one.':
     '划选页面文字，点击「批注」即可添加。',
   批注目录: '批注目录',
-  'Selected text:': '所选文本：',
   'User annotation:': '用户批注：',
   'Annotation target': '批注位置',
   'Locate annotation {number}': '定位批注 {number}',

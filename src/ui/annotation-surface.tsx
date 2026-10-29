@@ -2,14 +2,14 @@ import { useUI } from './use-ui';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronUp, MessageSquareText, Pencil, Send, Trash2 } from 'lucide-react';
+import { Check, ChevronUp, MessageSquareText, Pencil, Send, Trash2, X } from 'lucide-react';
 import { annotationTargetKey } from '../sdk/annotation.js';
 import { useAnnotations, useAnnotationContext } from './annotation-context';
 import { floatingPosition, markerPosition } from './annotation-geometry';
 import { Button } from './button';
 import { Textarea } from './textarea';
 import { cn } from './utils';
-import { Popover, PopoverTrigger, PopoverContent } from './popover';
+import { Popover, PopoverTrigger, PopoverClose, PopoverContent } from './popover';
 import { Tooltip, TooltipTrigger, TooltipContent } from './tooltip';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './empty';
 import { Spinner } from './spinner';
@@ -20,6 +20,8 @@ type Geometry = {
   highlights: DOMRect[];
   anchor?: DOMRect;
   pendingAnchor?: DOMRect;
+  side?: 'top' | 'bottom';
+  align?: 'start' | 'center' | 'end';
 };
 const serialize = (value: unknown) => JSON.stringify(value);
 
@@ -30,6 +32,8 @@ export function AnnotationSurface() {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [geometry, setGeometry] = useState<Geometry>({ markers: [], highlights: [] });
   const input = useRef<HTMLTextAreaElement>(null);
+  const editor = useRef<HTMLDivElement>(null);
+  const shake = useRef<Animation | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const blocked = disabled || state.submitting;
   const editorAnchor = useMemo(
@@ -41,6 +45,13 @@ export function AnnotationSurface() {
     [geometry.anchor],
   );
   useLayoutEffect(() => store.mountSurface(), [store]);
+  useEffect(
+    () => () => {
+      shake.current?.cancel();
+      shake.current = null;
+    },
+    [state.editor?.draftId],
+  );
   useLayoutEffect(() => {
     let frame = 0;
     let registryDirty = true;
@@ -84,9 +95,32 @@ export function AnnotationSurface() {
           if (rect) return rect.rect;
         }
       };
-      const anchor = firstRect(targets);
+      const presentation = store.presentation(targets);
+      const origin = snapshot.editor?.anchor;
+      const clickedAnchor =
+        origin && 'marker' in origin
+          ? markers.find(
+              (marker) => marker.id === snapshot.editor?.draftId && marker.target === origin.marker,
+            )?.rect
+          : origin;
+      const anchor = clickedAnchor ?? presentation?.anchor ?? firstRect(targets);
       const pendingAnchor = snapshot.editor ? firstRect(snapshot.pending) : anchor;
-      const next = { markers, highlights, anchor, pendingAnchor };
+      const next = {
+        markers,
+        highlights,
+        anchor,
+        pendingAnchor,
+        side: clickedAnchor
+          ? ('bottom' as const)
+          : presentation?.anchor
+            ? presentation.side
+            : undefined,
+        align: clickedAnchor
+          ? ('center' as const)
+          : presentation?.anchor
+            ? presentation.align
+            : undefined,
+      };
       setGeometry((current) => (serialize(current) === serialize(next) ? current : next));
     };
     const schedule = () => {
@@ -166,7 +200,7 @@ export function AnnotationSurface() {
           style={{ left: marker.rect.left, top: marker.rect.top }}
           onClick={() => {
             if (state.editor?.draftId === marker.id) input.current?.focus({ preventScroll: true });
-            else store.openAnnotation(marker.id);
+            else store.openAnnotation(marker.id, undefined, { marker: marker.target });
           }}
         >
           {marker.number}
@@ -202,35 +236,37 @@ export function AnnotationSurface() {
       {state.editor && (
         <Popover
           open
-          modal={false}
+          modal
           onOpenChange={(open, details) => {
             if (open) return;
             if (blocked) {
               details.cancel();
               return;
             }
-            if (details.reason === 'escape-key') close();
+            if (details.reason === 'escape-key' || details.reason === 'close-press') close();
             else if (details.reason === 'outside-press') {
-              if (store.overlayContainer) {
-                store.saveEditor();
-                return;
-              }
-              if (!state.editor?.id) {
-                store.changeEditor('');
-                store.saveEditor();
-              } else close();
+              details.cancel();
+              input.current?.focus({ preventScroll: true });
+              shake.current?.cancel();
+              if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+                shake.current =
+                  editor.current?.animate(
+                    [0, -6, 6, -4, 4, 0].map((x) => ({ translate: `${x}px 0` })),
+                    { duration: 300, easing: 'ease-in-out' },
+                  ) ?? null;
             } else details.cancel();
           }}
         >
           <PopoverContent
+            ref={editor}
             container={store.overlayContainer ?? undefined}
             data-annotation-controls=""
             data-annotation-editor=""
             aria-label={t('编辑批注')}
-            side="top"
+            side={geometry.side ?? 'top'}
             positionMethod="fixed"
-            align="start"
-            sideOffset={28}
+            align={geometry.align ?? 'start'}
+            sideOffset={geometry.side ? 8 : 28}
             collisionPadding={8}
             anchor={editorAnchor.current}
             className="pointer-events-auto max-h-[min(calc(100dvh-16px),var(--available-height))] w-[min(22.5rem,calc(100vw-1rem))] overflow-auto rounded-2xl p-1.5 focus-within:border-ring"
@@ -244,11 +280,20 @@ export function AnnotationSurface() {
             }}
             finalFocus={returnFocus}
           >
-            <div className="flex items-end gap-1">
+            <div
+              className={
+                state.editor.id
+                  ? 'grid grid-cols-[1fr_auto_auto] items-center gap-2 p-1.5'
+                  : 'flex items-end gap-1'
+              }
+            >
               <Textarea
                 ref={input}
                 rows={1}
-                className="min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 leading-5 shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent"
+                className={cn(
+                  'min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 leading-5 shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent',
+                  state.editor.id && 'col-span-3',
+                )}
                 aria-label={t('批注内容')}
                 placeholder={t('添加批注（可留空）')}
                 disabled={blocked}
@@ -270,7 +315,7 @@ export function AnnotationSurface() {
                         type="button"
                         size="icon-sm"
                         variant="ghost"
-                        className="shrink-0 rounded-full text-muted-foreground"
+                        className="shrink-0 justify-self-start rounded-full text-muted-foreground"
                         aria-label={t('删除批注')}
                         disabled={blocked}
                         onClick={() => store.deleteEditor()}
@@ -282,18 +327,50 @@ export function AnnotationSurface() {
                   <TooltipContent>{t('删除批注')}</TooltipContent>
                 </Tooltip>
               )}
+              {state.editor.id ? (
+                <PopoverClose
+                  disabled={blocked}
+                  render={
+                    <Button type="button" size="sm" variant="outline" className="rounded-full">
+                      {t('取消')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <PopoverClose
+                        disabled={blocked}
+                        render={
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            className="shrink-0 rounded-full text-muted-foreground"
+                            aria-label={t('取消')}
+                          >
+                            <X aria-hidden="true" />
+                          </Button>
+                        }
+                      />
+                    }
+                  />
+                  <TooltipContent>{t('取消')}</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <Button
                       type="button"
-                      size="icon-sm"
+                      size={state.editor.id ? 'sm' : 'icon-sm'}
                       className="shrink-0 rounded-full"
                       aria-label={t('保存')}
                       disabled={blocked}
                       onClick={() => store.saveEditor()}
                     >
-                      <Check aria-hidden="true" />
+                      {state.editor.id ? t('保存') : <Check aria-hidden="true" />}
                     </Button>
                   }
                 />
@@ -587,15 +664,21 @@ export function AnnotationMenu() {
                   </span>
                   <span className="min-w-0 flex-1 space-y-3">
                     <span className="block space-y-1">
-                      <span className="block text-muted-foreground">{t('Selected text:')}</span>
-                      {entry.targets.map((target) => (
-                        <span
-                          key={annotationTargetKey(target)}
-                          className="line-clamp-3 font-medium wrap-anywhere whitespace-pre-wrap"
-                        >
-                          {target.text?.quote ?? t('Annotation target')}
+                      <span className="block text-muted-foreground">{t('批注位置：')}</span>
+                      {store.presentation(entry.targets)?.summary !== undefined ? (
+                        <span className="line-clamp-3 font-medium wrap-anywhere whitespace-pre-wrap">
+                          {store.presentation(entry.targets)?.summary}
                         </span>
-                      ))}
+                      ) : (
+                        entry.targets.map((target) => (
+                          <span
+                            key={annotationTargetKey(target)}
+                            className="line-clamp-3 font-medium wrap-anywhere whitespace-pre-wrap"
+                          >
+                            {target.text?.quote ?? t('Annotation target')}
+                          </span>
+                        ))
+                      )}
                     </span>
                     {entry.comment !== '' && (
                       <span className="block space-y-1">
@@ -618,11 +701,12 @@ export function AnnotationMenu() {
                           className="text-muted-foreground"
                           aria-label={`${t('编辑批注')} ${store.numberFor(entry.id)}`}
                           disabled={blocked}
-                          onClick={() => {
+                          onClick={(event) => {
+                            const anchor = event.currentTarget.getBoundingClientRect();
                             close();
                             void feedback
                               .locate(entry.targets[0])
-                              .then(() => store.openAnnotation(entry.id))
+                              .then(() => store.openAnnotation(entry.id, undefined, anchor))
                               .catch(() => {});
                           }}
                         >

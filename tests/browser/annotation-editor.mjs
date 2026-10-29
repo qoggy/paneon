@@ -23,8 +23,11 @@ try {
   service = await startServer(join(root, 'data'));
   const panel = await service.runtime.run(entry, root, {}, false);
   browser = await chromium.launch({
-    headless: true,
-    channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
+    headless: process.env.PANEON_TEST_HEADLESS !== '0',
+    executablePath: process.env.PANEON_TEST_BROWSER,
+    channel: process.env.PANEON_TEST_BROWSER
+      ? undefined
+      : (process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome'),
   });
   const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
   const errors = [];
@@ -166,6 +169,7 @@ try {
       0,
     );
     assert.equal(await editor.getByRole('button', { name: t.del, exact: true }).count(), 0);
+    assert.equal(await editor.getByRole('button', { name: t.cancel, exact: true }).count(), 1);
     const saveTooltip = frame.locator('[data-slot="tooltip-content"]').filter({
       has: frame.locator('kbd[aria-label="Shift+Enter"]'),
     });
@@ -245,7 +249,7 @@ try {
     assert.equal(await row.getByRole('button').count(), 0);
     assert.equal(
       await row
-        .getByText(language === 'en' ? 'Selected text:' : '所选文本：', { exact: true })
+        .getByText(language === 'en' ? 'Annotation target:' : '批注位置：', { exact: true })
         .isVisible(),
       true,
     );
@@ -324,11 +328,13 @@ try {
       'Typing must preserve a manually moved caret',
     );
     await input.fill('discard this edit');
-    await input.press('Escape');
+    await button(t.cancel).click();
+    await editor.waitFor({ state: 'hidden' });
     assert.equal((await draft()).annotations[0].comment, 'whole paragraph');
     await marker.click();
     await input.fill('');
     await button(t.save).click();
+    await editor.waitFor({ state: 'hidden' });
     assert.equal((await draft()).annotations[0].comment, '');
     assert.equal((await draft()).annotations[0].id, paragraph.id);
     await directoryButton.click();
@@ -347,6 +353,10 @@ try {
     await page.keyboard.press('Escape');
     await directory.waitFor({ state: 'hidden' });
     await marker.click();
+    await input.and(frame.locator(':focus')).waitFor();
+    await editor.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
     await page.screenshot({ path: join(evidence, `paragraph-${theme}-${language}.png`) });
     const del = editor.getByRole('button', { name: t.del, exact: true });
     assert.equal(

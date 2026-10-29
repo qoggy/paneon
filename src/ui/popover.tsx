@@ -16,6 +16,10 @@ function PopoverTrigger({
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
+function PopoverClose({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Close>) {
+  return <PopoverPrimitive.Close data-slot="popover-close" {...props} />;
+}
+
 function PopoverContent({
   className,
   align = 'center',
@@ -42,7 +46,8 @@ function PopoverContent({
     container?: React.ComponentProps<typeof PopoverPrimitive.Portal>['container'];
   }) {
   return (
-    <PopoverPrimitive.Portal container={container}>
+    // A custom container may disable pointer events; the modal backdrop must still receive them.
+    <PopoverPrimitive.Portal container={container} className="pointer-events-auto">
       <PopoverPrimitive.Positioner
         align={align}
         side={side}
@@ -102,4 +107,12 @@ function PopoverDescription({
   );
 }
 
-export { Popover, PopoverTrigger, PopoverContent, PopoverHeader, PopoverTitle, PopoverDescription };
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverClose,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverDescription,
+};

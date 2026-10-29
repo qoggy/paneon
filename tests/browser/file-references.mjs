@@ -157,6 +157,22 @@ try {
   await selectAnnotationText(frame, '[data-slot="file-preview"] [data-code-line="153"]', 0, 6);
   await frame.locator('[data-annotation-action]').click();
   await frame.locator('[data-annotation-editor] textarea').fill('Review the original file');
+  // Editing in a file preview must block its close button and source controls too.
+  const previewBox = await preview.boundingBox();
+  await page.mouse.click(previewBox.x + previewBox.width - 24, previewBox.y + 24);
+  assert.equal(await preview.isVisible(), true);
+  assert.equal(await frame.locator('[data-annotation-editor]').isVisible(), true);
+  assert.equal(
+    await frame.locator('[data-annotation-editor] textarea').inputValue(),
+    'Review the original file',
+  );
+  await frame.getByRole('button', { name: '取消', exact: true }).click();
+  await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
+  assert.equal(await frame.locator('[data-annotation-marker]').count(), 0);
+  assert.equal(await preview.isVisible(), true, 'Cancel closes only the editor');
+  await selectAnnotationText(frame, '[data-slot="file-preview"] [data-code-line="153"]', 0, 6);
+  await frame.locator('[data-annotation-action]').click();
+  await frame.locator('[data-annotation-editor] textarea').fill('Review the original file');
   await frame.locator('[data-annotation-editor] textarea').press('Enter');
   await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
   await close();

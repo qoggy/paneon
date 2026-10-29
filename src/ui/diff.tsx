@@ -24,6 +24,14 @@ import { DiffSplit } from './diff-split';
 import type { DiffSplitRow } from './diff-split';
 import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
 import type { DiffLocation } from './diff-annotation';
+import {
+  diffAnnotationBlocks,
+  diffBlockAnchor,
+  diffBlockKey,
+  diffBlockSummary,
+} from './diff-block-annotations';
+import { DiffBlockActions } from './diff-block-actions';
+import type { AnnotationTextRegistration } from './annotation-types';
 export type DiffViewHandle = {
   /** Expands the required context and reveals coordinates after the DOM is ready. */
   reveal(location: DiffLocation): Promise<void>;
@@ -98,6 +106,13 @@ function StringDiffView<TRef>({
   const headerId = useId();
   const registerText = feedback?.registerText;
   const root = useRef<HTMLDivElement>(null);
+  const bodyRoot = useRef<HTMLDivElement>(null);
+  const gutters = useRef(new Map<string, HTMLElement>());
+  const blocks = useMemo(() => diffAnnotationBlocks(model, targets), [model, targets]);
+  const blockLookup = useMemo(
+    () => new Map(blocks.map((block) => [diffBlockKey(block.targets), block])),
+    [blocks],
+  );
   const [view, setView] = useState({
     model,
     defaultExpanded,
@@ -148,6 +163,20 @@ function StringDiffView<TRef>({
         : ['old', 'new'];
   const sideBySide = !unified && sides.length === 2;
   const columns = sideBySide ? 'var(--diff-columns, 50% 50%)' : 'minmax(0,1fr)';
+  const presentation = useCallback<NonNullable<AnnotationTextRegistration<TRef>['presentation']>>(
+    (selected) => {
+      const block = blockLookup.get(diffBlockKey(selected));
+      return block
+        ? {
+            summary: diffBlockSummary(block, oldPath, newPath),
+            anchor: diffBlockAnchor(block, gutters.current, sideBySide),
+            side: 'bottom',
+            align: 'center',
+          }
+        : undefined;
+    },
+    [blockLookup, oldPath, newPath, sideBySide],
+  );
   const setUnified = (value: boolean) => setView((current) => ({ ...current, unified: value }));
   const setExpanded = (value: boolean) => setView((current) => ({ ...current, expanded: value }));
   const columnLayout = useRef<Record<string, number> | undefined>(undefined);
@@ -258,6 +287,7 @@ function StringDiffView<TRef>({
             ref: target,
             source,
             segments,
+            presentation,
           }),
         );
       }
@@ -269,7 +299,7 @@ function StringDiffView<TRef>({
       observer.disconnect();
       removers.forEach((remove) => remove());
     };
-  }, [targets, model, unified, expanded, registerText]);
+  }, [targets, model, unified, expanded, registerText, presentation]);
   function code(side: 'old' | 'new', cell: DiffCell, endingNote: boolean) {
     const { line, kind, spans } = cell;
     const changed = kind !== 'context';
@@ -301,6 +331,15 @@ function StringDiffView<TRef>({
       <td className="align-top" data-diff-kind={kind} style={{ backgroundColor: background }}>
         <div className="flex h-6 font-mono text-sm leading-6">
           <span
+            ref={
+              changed
+                ? (element) => {
+                    const key = `${side}:${line.number}`;
+                    if (element) gutters.current.set(key, element);
+                    else gutters.current.delete(key);
+                  }
+                : undefined
+            }
             className={`sticky z-[1] flex shrink-0 items-center bg-background/95 text-muted-foreground select-none ${side === 'old' && !unified ? 'right-0 order-2 border-l' : 'left-0 border-r'}`}
             data-diff-gutter={side}
             style={
@@ -484,6 +523,7 @@ function StringDiffView<TRef>({
         }
       >
         <div
+          ref={bodyRoot}
           className="relative min-h-full min-w-0"
           data-diff-body=""
           data-annotation-clip-top={headerId}
@@ -517,6 +557,14 @@ function StringDiffView<TRef>({
             ))
           )}
           {model.hunks.length === 0 && !expanded && <p>{t('文本内容相同；可展开查看上下文。')}</p>}
+          {feedback && (
+            <DiffBlockActions
+              blocks={blocks}
+              body={bodyRoot}
+              gutters={gutters}
+              split={sideBySide}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -28,11 +28,19 @@ export type AnnotationTextProps<TRef = JsonValue> = {
   children: string;
   className?: string;
 };
+/** Renderer-owned display information, never included in submitted annotations. */
+export type AnnotationPresentation = {
+  summary?: string;
+  anchor?: DOMRect;
+  side?: 'top' | 'bottom';
+  align?: 'start' | 'center' | 'end';
+};
 export type AnnotationTextRegistration<TRef = JsonValue> = {
   ref: TRef;
   sourceRef?: JsonValue;
   source: string;
   segments: { node: Text; sourceOffsets: (number | null)[] }[];
+  presentation?: (targets: readonly AnnotationTarget<TRef>[]) => AnnotationPresentation | undefined;
 };
 export type AnnotationController<TRef = JsonValue> = {
   value: AnnotationValue<TRef>;
@@ -41,6 +49,8 @@ export type AnnotationController<TRef = JsonValue> = {
   selectionTargets: readonly AnnotationTarget<TRef>[];
   submitting: boolean;
   error: string | null;
+  /** Open the shared editor, reusing an annotation with the same targets when one exists. */
+  beginAnnotation(targets: AnnotationTarget<TRef>[]): void;
   createAnnotation(targets: AnnotationTarget<TRef>[], comment?: string): string;
   editAnnotation(id: string | null): void;
   updateAnnotation(id: string, value: Omit<Annotation<TRef>, 'id'>): void;
@@ -56,6 +66,7 @@ export type AnnotationEditor<TRef> = {
   draftId: string;
   targets: AnnotationTarget<TRef>[];
   comment: string;
+  anchor?: { marker: string } | DOMRect;
 };
 export type AnnotationUI<TRef> = {
   pending: AnnotationTarget<TRef>[];
