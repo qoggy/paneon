@@ -5,7 +5,7 @@
 - [Changelog language](documentation-changelog-language.md) — Write changelogs in English
 - [Built-in panel references](documentation-panel-contracts.md) — Skill references cover when to use a panel, what it achieves and how to use it; no interface specifications
 - [Skill public surface](documentation-skill-public-surface.md) — Document only paneon/sdk and paneon/ui for custom pages; leave assets/shared and built-in panel internals unmentioned, neither recommended nor forbidden
-- [Versioned releases](workflow-versioned-releases.md) — Develop on MAJOR.MINOR.x branches, tag releases with vMAJOR.MINOR.PATCH, and keep main at the highest released version
+- [Versioned releases](workflow-versioned-releases.md) — Develop on separate branches, merge into MAJOR.MINOR.x for release, tag releases with vMAJOR.MINOR.PATCH, and keep main at the highest released version
 - [Commit messages](workflow-commit-messages.md) — Write English type(scope): summary messages based on the actual staged changes, with explanatory bodies when needed
 
 - [Agent scope](product-agent-scope.md) — Paneon targets general-purpose agents; local CLI access enables reuse and TSX generation enables authoring
