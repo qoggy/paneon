@@ -5,14 +5,15 @@ import type { BridgeInit, BridgePreferences, BridgeRequest, BridgeResponse } fro
 import type { JsonValue } from '../shared/types.js';
 export { z } from 'zod';
 export type { ActionContext, Action, PanelDefinition } from './server.js';
-export const PanelInputContext = createContext<unknown>({});
+const defaultPanelInput = {};
+// Running panels always provide JSON input; undefined denotes standalone UI.
+export const PanelInputContext = createContext<unknown>(undefined);
 export function usePanelInput<I>(): I {
-  return useContext(PanelInputContext) as I;
+  const input = useContext(PanelInputContext);
+  return (input === undefined ? defaultPanelInput : input) as I;
 }
 import { defaultUI, type UIPreferences } from '../shared/preferences.js';
 import type { BrowserAction } from '../shared/browser-actions.js';
-import type { FilePreview, FileReferenceRequest } from '../shared/file-references.js';
-import { isFileReferenceRequest } from '../shared/file-references.js';
 let ui = defaultUI;
 const uiListeners = new Set<() => void>();
 export const getUI = () => ui;
@@ -105,15 +106,6 @@ export const agent = {
 };
 /** Used by UIProvider to keep browser operations outside the opaque-origin panel. */
 export const panelBrowserAction = (action: BrowserAction) => request<void>('browser', action);
-/** Read local source through the authenticated instance host, never through a static URL. */
-export const panelReadFile = (reference: FileReferenceRequest) =>
-  isFileReferenceRequest(reference)
-    ? request<FilePreview>('file', reference)
-    : Promise.reject(
-        Object.assign(new Error('A valid local file reference is required.'), {
-          code: 'INVALID_FILE_REFERENCE',
-        }),
-      );
 export function useQuery<I, O>(
   action: Action<I, O, 'query'>,
   input: I,

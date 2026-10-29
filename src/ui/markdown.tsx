@@ -1,6 +1,9 @@
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
+import { serverAction, z } from '@qoggy/paneon/sdk';
+import { PanelInputContext } from '@qoggy/paneon/sdk/client';
+import { readFilePreview } from '../runtime/file-preview';
 import {
   Children,
   createContext,
@@ -27,17 +30,45 @@ import { MarkdownFrontmatter } from './markdown-frontmatter-view';
 import { Mermaid } from './mermaid';
 import { MarkdownCodeBlock } from './markdown-code-block';
 import { markdownCodeText } from './code-highlighting';
-import { ImageViewerDialog } from './image-viewer';
+import { ImageContent } from './image';
+import { useImagePreview } from './image-preview';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { markdownLink, markdownLinkAddress } from '../shared/file-references';
 import type { FileReferenceRequest } from '../shared/file-references';
-import { useFileReference } from './file-reference-context';
+import { FileReferenceContext, useFileReference } from './file-reference-context';
 import { useBrowserAction } from './browser-action-context';
 import { AnnotationEnabledContext, AnnotationEnvironmentContext } from './annotation-environment';
 import { FilePreviewSheet } from './file-preview';
 import { toast } from './toast-manager';
+
+/** Component-private text reader; Image owns image reads. */
+// eslint-disable-next-line react-refresh/only-export-components -- The build separates component actions before React compilation.
+export const readLocalFile = serverAction({
+  kind: 'query',
+  input: z.object({ href: z.string(), sourcePath: z.string().optional() }).strict(),
+  handler: async (_ctx, input) => {
+    try {
+      const file = await readFilePreview(process.cwd(), {
+        href: input.href,
+        ...(input.sourcePath ? { sourcePath: input.sourcePath } : {}),
+      });
+      return { ok: true as const, path: file.path, content: file.text };
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      if (error instanceof Error && code && /^(FILE_|INVALID_FILE_REFERENCE$)/.test(code))
+        return { ok: false as const, error: { code, message: error.message } };
+      throw error;
+    }
+  },
+});
+
+async function readTextReference(reference: FileReferenceRequest) {
+  const result = await readLocalFile(reference);
+  if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
+  return { path: result.path, text: result.content };
+}
 
 const FileLinkContext = createContext<{
   sourcePath?: string;
@@ -133,50 +164,9 @@ const components: Components = {
   },
 };
 
-function MarkdownImage({
-  node: _node,
-  className,
-  alt,
-  ...props
-}: ComponentProps<'img'> & {
-  node?: unknown;
-}) {
-  const { t } = useUI();
-  const [expandable, setExpandable] = useState(false);
-  const image = (
-    <img
-      {...props}
-      alt={alt}
-      role={expandable ? 'button' : undefined}
-      tabIndex={expandable ? 0 : undefined}
-      aria-label={expandable ? `${t('Expand image')}${alt ? `: ${alt}` : ''}` : undefined}
-      className={cn(
-        expandable &&
-          'cursor-zoom-in outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring',
-        className,
-      )}
-      onLoad={(event) => {
-        setExpandable(!event.currentTarget.closest('a'));
-        props.onLoad?.(event);
-      }}
-      onError={(event) => {
-        setExpandable(false);
-        props.onError?.(event);
-      }}
-    />
-  );
-  const address =
-    typeof props.src === 'string' && !props.src.startsWith('data:') ? props.src : null;
-  return address ? (
-    <Tooltip>
-      <TooltipTrigger delay={500} render={image} />
-      <TooltipContent className="max-w-[min(32rem,calc(100vw-2rem))] text-left break-all">
-        {address}
-      </TooltipContent>
-    </Tooltip>
-  ) : (
-    image
-  );
+function MarkdownImage({ node: _node, ...props }: ComponentProps<'img'> & { node?: unknown }) {
+  const context = useContext(FileLinkContext);
+  return <ImageContent {...props} sourcePath={context?.sourcePath} />;
 }
 
 export type MarkdownProps<TRef = JsonValue> = {
@@ -223,6 +213,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   const fileId = useRef(0);
   const annotationEnabled = useContext(AnnotationEnabledContext);
   const annotationEnvironment = useContext(AnnotationEnvironmentContext);
+  const readFile = useFileReference();
   const linkContext = useMemo(
     () => ({
       sourcePath,
@@ -245,7 +236,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
       },
       openFile(reference: FileReferenceRequest, trigger: HTMLAnchorElement) {
         if (annotated && annotationEnabled && annotationEnvironment) {
-          annotationEnvironment.openFile(reference, trigger, annotationReference);
+          annotationEnvironment.openFile(reference, trigger, annotationReference, readFile);
           return;
         }
         setFile({ reference, trigger, id: ++fileId.current });
@@ -259,30 +250,10 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
       annotationReference,
       annotationEnabled,
       annotationEnvironment,
+      readFile,
     ],
   );
-  const [image, setImage] = useState<{
-    url: string;
-    width: number;
-    height: number;
-    alt: string;
-  } | null>(null);
-  const [imageOpen, setImageOpen] = useState(false);
-  const returnFocus = useRef<HTMLElement | null>(null);
-  function expandImage(target: EventTarget | null) {
-    if (!(target instanceof HTMLImageElement) || target.closest('a, [data-slot="mermaid"]'))
-      return false;
-    if (!target.complete || !target.naturalWidth || !target.naturalHeight) return false;
-    if (target.hasAttribute('tabindex')) returnFocus.current = target;
-    setImage({
-      url: target.currentSrc || target.src,
-      width: target.naturalWidth,
-      height: target.naturalHeight,
-      alt: target.alt,
-    });
-    setImageOpen(true);
-    return true;
-  }
+  const preview = useImagePreview();
   const metadata = useMemo(
     () => (frontmatter === 'off' ? null : parseFrontmatter(children)),
     [children, frontmatter],
@@ -311,24 +282,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
           ref={root}
           className={cn('markdown-body min-w-0 overflow-x-auto', className)}
           data-markdown-annotation={annotated ? '' : undefined}
-          onPointerDownCapture={(event) => {
-            // A mouse click blurs the prior control when a custom image cannot receive focus.
-            if (event.target instanceof HTMLImageElement) {
-              const active = document.activeElement;
-              returnFocus.current = active instanceof HTMLElement ? active : null;
-            }
-          }}
-          onClick={(event) => {
-            if (!event.defaultPrevented) expandImage(event.target);
-          }}
-          onKeyDown={(event) => {
-            if (
-              !event.defaultPrevented &&
-              (event.key === 'Enter' || event.key === ' ') &&
-              expandImage(event.target)
-            )
-              event.preventDefault();
-          }}
+          {...preview.events}
         >
           {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
           {renderedMarkdown}
@@ -343,16 +297,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
           finalFocus={() => (file.trigger.isConnected ? file.trigger : null)}
         />
       )}
-      {image && (
-        <ImageViewerDialog
-          key={image.url}
-          kind="image"
-          image={image}
-          open={imageOpen}
-          onOpenChange={setImageOpen}
-          finalFocus={() => (returnFocus.current?.isConnected ? returnFocus.current : null)}
-        />
-      )}
+      {preview.viewer}
     </>
   );
 });
@@ -438,9 +383,17 @@ function AnnotatedMarkdown<TRef>({
   );
 }
 export function Markdown<TRef = JsonValue>({ annotationTarget, ...props }: MarkdownProps<TRef>) {
-  return annotationTarget === undefined ? (
-    <MarkdownContent {...props} />
-  ) : (
-    <AnnotatedMarkdown {...props} target={annotationTarget} />
+  const upstreamReader = useFileReference();
+  const inPanel = useContext(PanelInputContext) !== undefined;
+  const reader =
+    upstreamReader ?? (inPanel && readLocalFile.actionId ? readTextReference : undefined);
+  return (
+    <FileReferenceContext.Provider value={reader}>
+      {annotationTarget === undefined ? (
+        <MarkdownContent {...props} />
+      ) : (
+        <AnnotatedMarkdown {...props} target={annotationTarget} />
+      )}
+    </FileReferenceContext.Provider>
   );
 }

@@ -10,7 +10,8 @@ export function AnnotationRoot({ children }: { children: ReactNode }) {
     let controls: ReactElement | null = null;
     let store: ReturnType<AnnotationEnvironment['getStore']> | undefined;
     return {
-      openFile: (reference, trigger, ref) => store?.openFile(reference, ref, trigger),
+      openFile: (reference, trigger, ref, reader) =>
+        store?.openFile(reference, ref, trigger, reader),
       getStore: (create) => (store ??= create()),
       subscribe(listener) {
         listeners.add(listener);

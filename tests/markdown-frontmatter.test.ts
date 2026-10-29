@@ -185,6 +185,10 @@ void test('public Markdown frontmatter adds no generated copy or controls of its
       platform: 'node',
       format: 'esm',
       packages: 'external',
+      alias: {
+        '@qoggy/paneon/sdk': join(process.cwd(), 'dist/sdk/index.js'),
+        '@qoggy/paneon/sdk/client': join(process.cwd(), 'dist/sdk/client.js'),
+      },
       write: false,
     });
     const entry = join(directory, 'render.mjs');

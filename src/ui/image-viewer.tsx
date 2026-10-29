@@ -4,6 +4,7 @@ import { Download, Maximize, Minus, Plus, X } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+import { Spinner } from './spinner';
 import { useUI } from './use-ui';
 
 type ViewerImage = { url: string; width: number; height: number; alt?: string };
@@ -11,6 +12,7 @@ type ViewerProps = {
   image: ViewerImage;
   kind: 'image' | 'diagram';
   download?: () => void;
+  downloadLabel?: string;
   busy?: boolean;
 };
 
@@ -72,7 +74,7 @@ export function ViewerIconButton({
   );
 }
 
-function ImageViewer({ image, kind, download, busy }: ViewerProps) {
+function ImageViewer({ image, kind, download, downloadLabel, busy }: ViewerProps) {
   const prefix = kind === 'diagram' ? 'mermaid' : 'image';
   const { t } = useUI();
   const viewport = useRef<HTMLDivElement>(null);
@@ -159,8 +161,12 @@ function ImageViewer({ image, kind, download, busy }: ViewerProps) {
         </ViewerIconButton>
         <span className="mx-1.5 h-4 border-l" aria-hidden="true" />
         {download && (
-          <ViewerIconButton label={t('Download PNG')} disabled={busy} onClick={download}>
-            <Download />
+          <ViewerIconButton
+            label={downloadLabel ?? t('Download PNG')}
+            disabled={busy}
+            onClick={download}
+          >
+            {busy ? <Spinner aria-hidden="true" /> : <Download />}
           </ViewerIconButton>
         )}
         <DialogClose

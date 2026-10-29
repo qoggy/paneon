@@ -246,10 +246,6 @@ async function bootServer(
       b.payload,
     );
   });
-  route('POST', '/api/panels/:instanceId/file', (request) => {
-    const b = body(request);
-    return runtime.readFile(params(request).instanceId, String(b.revision), b.reference);
-  });
   route('GET', '/api/panels/:instanceId/events', (request) => {
     const q = request.query as Record<string, string>;
     return runtime.events(

@@ -24,6 +24,41 @@ try {
   const flow = frame.locator('[data-testid="standalone-flow"]');
   const chart = flow.locator('[data-slot="mermaid-diagram"] > [role="button"]');
   await chart.locator('svg').waitFor();
+  const geometry = await flow.locator('[data-slot="mermaid"]').evaluate((host) => {
+    const content = host.querySelector('[data-slot="mermaid-diagram"] > [role="button"]');
+    const toolbar = host.querySelector('[data-slot="media-toolbar"]');
+    const contentBox = content.getBoundingClientRect();
+    const toolbarBox = toolbar.getBoundingClientRect();
+    const buttons = [...toolbar.querySelectorAll('button')].map((button) => {
+      const box = button.getBoundingClientRect();
+      return { left: box.left, top: box.top, height: box.height };
+    });
+    return {
+      outerOverflowY: getComputedStyle(host).overflowY,
+      contentHeight: content.clientHeight,
+      scrollHeight: content.scrollHeight,
+      toolbarInContent: content.contains(toolbar),
+      toolbarOutsideContent: toolbarBox.left >= contentBox.right,
+      toolbarTop: toolbarBox.top,
+      contentTop: contentBox.top,
+      buttons,
+    };
+  });
+  assert.equal(geometry.outerOverflowY, 'visible');
+  assert.equal(
+    geometry.scrollHeight,
+    geometry.contentHeight,
+    'Hover controls must not add diagram scrolling.',
+  );
+  assert.equal(geometry.toolbarInContent, false);
+  assert.equal(
+    geometry.buttons[0].left,
+    geometry.buttons[1].left,
+    'Toolbar buttons share one vertical column.',
+  );
+  assert.ok(geometry.buttons[0].top < geometry.buttons[1].top);
+  assert.equal(geometry.toolbarOutsideContent, true);
+  assert.equal(geometry.toolbarTop, geometry.contentTop);
   await chart.hover();
   const more = flow.getByRole('button', { name: 'More diagram options', exact: true });
   await more.hover();

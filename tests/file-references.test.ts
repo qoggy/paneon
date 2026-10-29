@@ -73,6 +73,10 @@ void test('default Markdown renders unsupported editor links as non-interactive 
       platform: 'node',
       format: 'esm',
       packages: 'external',
+      alias: {
+        '@qoggy/paneon/sdk': join(process.cwd(), 'dist/sdk/index.js'),
+        '@qoggy/paneon/sdk/client': join(process.cwd(), 'dist/sdk/client.js'),
+      },
       write: false,
     });
     const entry = join(directory, 'render.mjs');
@@ -113,14 +117,9 @@ void test('address presentation decodes readable text without changing URI separ
   assert.equal(markdownLinkAddress('./bad%ZZ.ts'), './bad%ZZ.ts');
 });
 
-void test('invalid file requests reject locally instead of leaving a bridge promise pending', async () => {
-  const { panelReadFile } = await import('../dist/sdk/client.js');
-  await assert.rejects(panelReadFile({ href: './file.ts', sourcePath: 'bad\npath.md' }), {
-    code: 'INVALID_FILE_REFERENCE',
-  });
-  await assert.rejects(panelReadFile({ href: 'vscode://file/tmp/a' }), {
-    code: 'INVALID_FILE_REFERENCE',
-  });
+void test('the SDK no longer exposes the specialized file-request function', async () => {
+  const sdk = await import('../dist/sdk/client.js');
+  assert.equal('panelReadFile' in sdk, false);
 });
 
 void test('preview resolves cwd/document bases and reads fresh, bounded UTF-8 source snapshots', async () => {
@@ -179,7 +178,7 @@ void test('preview resolves cwd/document bases and reads fresh, bounded UTF-8 so
   }
 });
 
-void test('file API requires same-origin access and a current running panel revision', async () => {
+void test('the specialized file API is not registered', async () => {
   const root = await mkdtemp(join(tmpdir(), 'paneon-file-api-'));
   const service = await startServer(join(root, 'runtime'));
   const origin = `http://127.0.0.1:${service.descriptor.port}`;
@@ -219,31 +218,10 @@ void test('file API requires same-origin access and a current running panel revi
       }>().error.code,
       'INVALID_ORIGIN',
     );
-    assert.equal(
-      (await request({ origin }, 'stale')).json<{
-        error: { code: string };
-        data: { path: string; text: string };
-      }>().error.code,
-      'PANEL_REVISION_MISMATCH',
-    );
-    assert.deepEqual(
-      (await request({ origin })).json<{
-        error: { code: string };
-        data: { path: string; text: string };
-      }>().data,
-      {
-        path: join(root, 'source.ts'),
-        text: 'safe source',
-      },
-    );
+    assert.equal((await request({ origin }, 'stale')).statusCode, 404);
+    assert.equal((await request({ origin })).statusCode, 404);
     await service.runtime.closePanel(panel.instanceId);
-    assert.equal(
-      (await request({ origin })).json<{
-        error: { code: string };
-        data: { path: string; text: string };
-      }>().error.code,
-      'PANEL_CLOSED',
-    );
+    assert.equal((await request({ origin })).statusCode, 404);
   } finally {
     await service.stop();
     await rm(root, { recursive: true, force: true });

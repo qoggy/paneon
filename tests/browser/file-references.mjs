@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startFileReferenceFixture } from './file-reference-fixture.mjs';
@@ -23,7 +23,12 @@ try {
   const reads = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname.endsWith('/file')) reads.push(request.url());
+    if (
+      new URL(request.url()).pathname.includes('/actions/') &&
+      request.method() === 'POST' &&
+      decodeURIComponent(new URL(request.url()).pathname).endsWith('/markdown#readLocalFile')
+    )
+      reads.push(request.url());
   });
   await page.goto(fixture.url);
   const frame = page.frameLocator('iframe');
@@ -41,7 +46,9 @@ try {
   };
   const open = async (label) => {
     const link = frame.getByRole('link', { name: label, exact: true });
-    // Move off the previous link so its address tooltip closes before changing files.
+    // Closing restores link focus; clear both focus and hover before waiting
+    // for its address tooltip to close.
+    await frame.getByRole('heading', { name: '文件引用验收', exact: true }).click();
     await page.mouse.move(0, 0);
     await frame.locator('[data-slot="tooltip-content"]').waitFor({ state: 'hidden' });
     try {
@@ -163,7 +170,7 @@ try {
     {
       ref: 'main',
       sourceRef: {
-        path: join(fixture.root, 'source.ts'),
+        path: join(await realpath(fixture.root), 'source.ts'),
         snapshotId: 'sha256:' + createHash('sha256').update(original).digest('hex'),
       },
       text: {

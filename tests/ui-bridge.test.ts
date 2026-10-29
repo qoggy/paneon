@@ -95,12 +95,31 @@ void test('diagram browser operations require the existing bridge identity and t
       true,
     );
     assert.equal(validRequest({ ...request, payload: { kind, svg: '<svg/>' } }, identity), false);
+    assert.equal(
+      validRequest(
+        {
+          ...request,
+          payload: { kind, url: 'data:image/png;base64,YQ==', filename: 'picture.png' },
+        },
+        identity,
+      ),
+      true,
+    );
+    assert.equal(
+      validRequest(
+        { ...request, payload: { kind, url: 'https://example.com/picture.png' } },
+        identity,
+      ),
+      true,
+    );
   }
   for (const payload of [
     { kind: 'copy-text', text: 123 },
     { kind: 'open-url', url: 'file:///tmp/private' },
     { kind: 'download-image', svg: null, background: 'white' },
     { kind: 'copy-image', svg: '<svg/>', background: 123 },
+    { kind: 'copy-image', url: 123 },
+    { kind: 'download-image', url: 'https://example.com/image', filename: 123 },
   ])
     assert.equal(validRequest({ ...request, payload }, identity), false);
 });

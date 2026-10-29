@@ -2,18 +2,12 @@ import { useUI } from './use-ui';
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from './spinner';
 import { cn } from './utils';
-import { Code, Copy, Download, Ellipsis, Expand } from 'lucide-react';
-import { Button } from './button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+import { Code, Copy, Download } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from './dropdown-menu';
+import { TooltipProvider } from './tooltip';
 import { snapshotDiagram, type DiagramImage } from './mermaid-image';
-import { ImageViewerDialog, ViewerIconButton as DiagramIconButton } from './image-viewer';
+import { ImageViewerDialog } from './image-viewer';
+import { MediaToolbar } from './media-toolbar';
 import { useBrowserAction } from './browser-action-context';
 import type { BrowserAction } from '../shared/browser-actions';
 import { useToastManager } from './toast-manager';
@@ -77,7 +71,7 @@ export function Mermaid({ code, className }: { code: string; className?: string 
   const current = result?.code === code && result.theme === theme ? result : undefined;
 
   return (
-    <div ref={host} data-slot="mermaid" className={cn('min-w-0 overflow-x-auto', className)}>
+    <div ref={host} data-slot="mermaid" className={cn('min-w-0', className)}>
       {!current ? (
         <Spinner aria-label={t('Rendering diagram')} />
       ) : 'error' in current ? (
@@ -100,7 +94,6 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
   const returnFocus = useRef<HTMLElement | null>(null);
   const [image, setImage] = useState<DiagramImage | null>(null);
   const [open, setOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   function capture() {
     const source = diagram.current?.querySelector('svg');
@@ -142,13 +135,13 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
   }
   return (
     <TooltipProvider>
-      <div className="group relative" data-slot="mermaid-diagram">
+      <div className="group/media flex min-w-0 items-start gap-2" data-slot="mermaid-diagram">
         <div
           ref={diagram}
           role="button"
           tabIndex={0}
           aria-label={t('Expand diagram')}
-          className="cursor-zoom-in overflow-x-auto rounded-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+          className="min-w-0 flex-1 cursor-zoom-in overflow-x-auto rounded-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
           onClick={(event) => {
             if ((event.target as Element).closest('a')) return;
             const selection = window.getSelection();
@@ -172,52 +165,26 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
           }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
-        <div
-          className={cn(
-            'absolute top-2 right-2 flex flex-col items-center rounded-md border bg-background p-0.5 text-muted-foreground shadow-xs transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100',
-            menuOpen ? 'visible opacity-100' : 'invisible opacity-0',
-          )}
+        <MediaToolbar
+          expandLabel={t('Expand diagram')}
+          moreLabel={t('More diagram options')}
+          onExpand={expand}
+          busy={busy}
         >
-          <DiagramIconButton label={t('Expand diagram')} tooltipSide="right" onClick={expand}>
-            <Expand />
-          </DiagramIconButton>
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={t('More diagram options')}
-                      >
-                        <Ellipsis />
-                      </Button>
-                    }
-                  />
-                }
-              />
-              <TooltipContent side="right">{t('More diagram options')}</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
-                <Code />
-                {t('Copy Mermaid code')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={busy} onClick={() => void run('copy-image')}>
-                <Copy />
-                {t('Copy image')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={busy} onClick={() => void run('download-image')}>
-                <Download />
-                {t('Download PNG')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+          <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
+            <Code />
+            {t('Copy Mermaid code')}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={busy} onClick={() => void run('copy-image')}>
+            <Copy />
+            {t('Copy image')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={busy} onClick={() => void run('download-image')}>
+            <Download />
+            {t('Download PNG')}
+          </DropdownMenuItem>
+        </MediaToolbar>
       </div>
       {image && (
         <ImageViewerDialog

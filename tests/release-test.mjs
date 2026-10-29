@@ -59,6 +59,7 @@ const browserScripts = [
   'markdown-anchors',
   'markdown-images',
   'file-references',
+  'local-resources',
   'markdown-frontmatter',
   'diff-toolbar',
   'git-review',

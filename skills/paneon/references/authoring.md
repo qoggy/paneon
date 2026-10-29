@@ -186,6 +186,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Separator` | Divider |
 | `CodeBlock` | Highlighted code |
 | `Markdown` | GFM Markdown, including Mermaid fences |
+| `Image` | Remote or local image |
 | `Mermaid` | Diagram |
 | `DiffView` | Text diff |
 | `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` | Resizable split layout |
@@ -195,9 +196,10 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 - `Select` needs `items` to display labels for values.
 - `CodeBlock` takes `code` and `language`: javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, diff, python, java, css, html or markdown. Other languages render as plain text.
 - `Markdown` renders GFM without raw HTML. Replacing `pre` through `components` also drops Mermaid rendering.
+- `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath` and `className`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component.
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
 - `Mermaid` is bundled; never load Mermaid from a CDN.
-- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` and `onCollapse`. To annotate it, see [Markdown and DiffView](#markdown-and-diffview).
+- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [Markdown and DiffView](#markdown-and-diffview).
 
 ## Theme and language
 
@@ -289,9 +291,10 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 `useAnnotations<TRef>()` exposes:
 
 - `value`, `activeAnnotationId`, `selectionTargets`, `submitting`, `error`.
+- `beginAnnotation(targets)` opens the built-in editor for supplied targets, reopening an existing annotation when its targets match. Saving creates or updates the draft; canceling leaves saved annotations unchanged.
 - `createAnnotation(targets, comment?)`, `editAnnotation(id | null)`, `updateAnnotation(id, {targets, comment})`, `removeAnnotation(id)`. These change the draft immediately; keep target sets nonempty and IDs stable.
 - Async `locate(target)` and `submit()`; handle their rejections in custom controls.
-- `registerText({ref, sourceRef?, source, segments})`, returning an unregister function for effect cleanup.
+- `registerText({ref, sourceRef?, source, segments, presentation?})`, returning an unregister function for effect cleanup. Optional `presentation(targets)` supplies a summary and editor placement (`anchor: DOMRect`, `side`, `align`); display-only, never submitted.
 
 ### Adapters
 
@@ -320,6 +323,7 @@ type AnnotationAdapter<TRef> = {
 
 - `<Markdown annotationTarget="plan-a">{source}</Markdown>` registers the document; the target becomes `ref` unchanged. Give each document its own target, even when texts are identical. Offsets address the Markdown source, so a quote can include Markdown syntax, and a selection across separate source fragments becomes several targets.
 - `<DiffView oldText="before" newText="after" annotationTargets={{ old: refA, new: refB }} />` registers each side; its reference becomes `ref` unchanged. The two sides need different references. Omit a side to disable annotations on it. Offsets address that side's complete original string.
+- With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side. Page validation must accept annotations spanning both sides.
 - A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
 - For another renderer, pass `registerText` `segments: {node: Text, sourceOffsets: (number | null)[]}[]`. Each array has `node.data.length + 1` UTF-16 boundaries into one `source`; use `null` for an unmappable boundary.
 

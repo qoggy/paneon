@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { annotationTargetKey, annotationValueSchema } from '../sdk/annotation.js';
 import type { AnnotationValue, AnnotationTarget, JsonValue } from '../sdk/annotation.js';
 import type { FilePreview, FileReferenceRequest } from '../shared/file-references';
+import type { ReadFileReference } from './file-reference-context';
 import type {
   AnnotationController,
   PageAnnotationOptions,
@@ -23,6 +24,7 @@ export type FileAnnotationView<TRef = unknown> = {
   id: number;
   ref: TRef;
   reference: FileReferenceRequest;
+  reader?: ReadFileReference;
   trigger?: HTMLElement;
   snapshot?: FileSnapshot<TRef>;
   open: boolean;
@@ -93,11 +95,23 @@ export class AnnotationStore<TRef> {
     this.overlayContainer = container;
     this.publish({});
   };
-  openFile = (reference: FileReferenceRequest, ref: TRef, trigger?: HTMLElement) => {
+  openFile = (
+    reference: FileReferenceRequest,
+    ref: TRef,
+    trigger?: HTMLElement,
+    reader?: ReadFileReference,
+  ) => {
     this.fileReady?.();
     this.fileReady = undefined;
     this.dismissSelection();
-    this.fileView = { id: ++this.fileSequence, ref: copy(ref), reference, trigger, open: true };
+    this.fileView = {
+      id: ++this.fileSequence,
+      ref: copy(ref),
+      reference,
+      trigger,
+      reader,
+      open: true,
+    };
     this.pruneFiles();
     this.publish({});
   };

@@ -6,6 +6,7 @@ import { Copy } from 'lucide-react';
 import type { FilePreview, FileReferenceRequest } from '../shared/file-references';
 import { markdownLink } from '../shared/file-references';
 import { useFileReference } from './file-reference-context';
+import type { ReadFileReference } from './file-reference-context';
 import { useBrowserAction } from './browser-action-context';
 import { Button } from './button';
 import { CodeText } from './code-text';
@@ -31,7 +32,9 @@ export function FilePreviewSheet({
   finalFocus,
   annotations,
   snapshot,
+  reader: providedReader,
 }: {
+  reader?: ReadFileReference;
   snapshot?: FileSnapshot;
   annotations?: { store: AnnotationStore<unknown>; id: number; ref: unknown };
   reference: FileReferenceRequest;
@@ -41,7 +44,7 @@ export function FilePreviewSheet({
 }) {
   // One reader per opening: provider rerenders must not replace the displayed snapshot.
   const reader = useFileReference();
-  const [readFile] = useState(() => reader);
+  const [readFile] = useState(() => providedReader ?? reader);
   const { t } = useUI();
   const title = useRef<HTMLHeadingElement>(null);
   const store = annotations?.store;
