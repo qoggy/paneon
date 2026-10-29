@@ -174,7 +174,6 @@ export class Store {
       const more = rows.length > limit;
       const events = rows.slice(0, limit).map((r) => ({
         id: r.id,
-        revision: r.revision,
         type: r.type,
         payload: JSON.parse(r.payload_json) as JsonValue,
         createdAt: r.created_at,

@@ -215,7 +215,7 @@ const events = panel
   .option('--limit <count>', 'Maximum events, 1–1000', '100')
   .addHelpText(
     'after',
-    '\nResult: events[] with id, type, payload, revision and createdAt; hasMore means more events are waiting; timedOut means the wait ended without events.\nDelivery is at least once: unacknowledged events are delivered again. A consumer name keeps its position across processes and sessions.',
+    '\nResult: events[] with id, type, payload and createdAt; hasMore means more events are waiting; timedOut means the wait ended without events.\nDelivery is at least once: unacknowledged events are delivered again. A consumer name keeps its position across processes and sessions.',
   );
 execute(events, async () => {
   const o = events.opts<{ consumer: string; waitMs: string; limit: string }>();

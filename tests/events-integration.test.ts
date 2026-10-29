@@ -12,7 +12,7 @@ import { promisify } from 'node:util';
 const { startServer } =
   (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');
 const execute = promisify(execFile);
-type Event = { id: number; type: string; payload: { text: string }; revision: string };
+type Event = { id: number; type: string; payload: { text: string } };
 type ReadResult = {
   events: Event[];
   lastAckId: number;
@@ -128,9 +128,10 @@ void test(
       const database = new DatabaseSync(join(storage, 'runtime.sqlite'), { readOnly: true });
       try {
         const saved = database
-          .prepare('SELECT payload_json FROM events WHERE id = ?')
-          .get(first.id) as { payload_json: string };
+          .prepare('SELECT payload_json, revision FROM events WHERE id = ?')
+          .get(first.id) as { payload_json: string; revision: string };
         assert.deepEqual(JSON.parse(saved.payload_json) as unknown, { text: '第一条反馈' });
+        assert.equal(saved.revision, panel.revision);
       } finally {
         database.close();
       }
@@ -142,6 +143,7 @@ void test(
       assert.equal(delivered.timedOut, false);
       assert.equal(delivered.events[0]?.id, first.id);
       assert.equal(delivered.events[0]?.payload.text, '第一条反馈');
+      assert.equal('revision' in delivered.events[0], false);
       assert.equal(delivered.lastAckId, 0);
       assert.deepEqual(
         (await read(panel.instanceId, 'agent')).events,

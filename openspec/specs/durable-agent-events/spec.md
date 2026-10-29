@@ -29,6 +29,11 @@ CLI SHALL 按 instanceId 和显式 consumer 名称返回该 consumer 未确认�
 - **WHEN** 用户手动唤醒 agent，agent 用原 instanceId 和 consumer 从新进程读取
 - **THEN** 系统返回停止期间及此前尚未确认的事件，不要求重新创建面板或登录特定 agent
 
+#### Scenario: Omit internal panel revisions from agent reads
+
+- **WHEN** agent 读取已保存事件
+- **THEN** 每条事件返回 `id`、`type`、`payload` 和 `createdAt`，不返回页面 `revision`；内部持久化和提交版本校验继续保留 revision，事件 ID 仍用于 ACK
+
 ### Requirement: Acknowledge separately from reading
 
 读取 SHALL 不推进确认游标。ack SHALL 在事务中验证 through ID 属于实例、已向该 consumer 交付、且不会回退，再更新游标；确认不能删除原事件。
