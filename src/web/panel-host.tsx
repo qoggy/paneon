@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle, Card, CardContent, Spinner } from '../ui';
-import { useUI } from '../ui';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Card, CardContent } from '../ui/card';
+import { Spinner } from '../ui/spinner';
+import { useUI } from '../ui/use-ui';
 import { BuildDiagnostic } from './build-diagnostic';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';

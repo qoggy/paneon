@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, AlertDescription, Badge, Spinner, useUI } from '../ui';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Badge } from '../ui/badge';
+import { Spinner } from '../ui/spinner';
+import { useUI } from '../ui/use-ui';
 import { api, errorMessage } from './api';
 import type { RuntimeDescriptor } from '../shared/types';
 type Health = Omit<RuntimeDescriptor, 'controlToken'>;

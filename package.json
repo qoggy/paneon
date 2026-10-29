@@ -121,5 +121,8 @@
       "default": "./dist/ui/index.js"
     },
     "./ui/theme.css": "./dist/ui/theme.css"
+  },
+  "paneon": {
+    "componentActions": "./dist/ui/paneon-actions.json"
   }
 }

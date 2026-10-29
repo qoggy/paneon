@@ -1,5 +1,6 @@
 import type { Diagnostic } from '../shared/types';
-import { Alert, AlertDescription, AlertTitle, useUI } from '../ui';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { useUI } from '../ui/use-ui';
 
 export function BuildDiagnostic({
   diagnostic,

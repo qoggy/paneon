@@ -1,32 +1,26 @@
 import { useUI } from './ui/use-ui';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Alert, AlertDescription } from './ui/alert';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import {
-  Alert,
-  AlertDescription,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
   navigationMenuTriggerStyle,
+} from './ui/navigation-menu';
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
-  Spinner,
-  Stack,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from './ui';
+} from './ui/pagination';
+import { Spinner } from './ui/spinner';
+import { Stack } from './ui/layout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { api, errorMessage, type PanelPage, type PanelSummary } from './web/api';
 import { PreferencesSettings } from './web/preferences-settings';
 import { PanelHost } from './web/panel-host';

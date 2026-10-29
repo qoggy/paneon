@@ -3,10 +3,16 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { esmExternalRequirePlugin } from 'rolldown/plugins';
 import { fileURLToPath } from 'node:url';
+import { componentActions } from './src/compiler/component-library.ts';
 
 const richDependencies = new Set(['mermaid', 'react-markdown', 'remark-gfm', 'yaml']);
 export default defineConfig({
   plugins: [
+    componentActions({
+      entry: fileURLToPath(new URL('./src/ui/index.ts', import.meta.url)),
+      packageRoot: fileURLToPath(new URL('.', import.meta.url)),
+      outDir: fileURLToPath(new URL('./dist/ui', import.meta.url)),
+    }),
     react(),
     tailwindcss(),
     {

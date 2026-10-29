@@ -199,10 +199,14 @@ export function staticRequirement(module: SourceModule, version: string): string
     );
   return range.text;
 }
-function references(node: ts.Node, module: SourceModule) {
+function references(node: ts.Node, module: SourceModule, allowDynamicImports = false) {
   const refs = new Set<string>();
   function visit(n: ts.Node) {
-    if (ts.isCallExpression(n) && n.expression.kind === ts.SyntaxKind.ImportKeyword)
+    if (
+      !allowDynamicImports &&
+      ts.isCallExpression(n) &&
+      n.expression.kind === ts.SyntaxKind.ImportKeyword
+    )
       throw new PaneonError(
         'UNSUPPORTED_ACTION_CAPTURE',
         'Dynamic imports are not supported in panel source.',
@@ -248,12 +252,22 @@ export type Graph = {
   sources: Map<string, string>;
   actions: { id: string; name: string; file: string; kind: 'query' | 'mutation' }[];
 };
+export type GraphOptions = {
+  entryExports?: string[];
+  actionId?: (file: string, name: string) => string;
+  library?: boolean;
+};
 export function createGraph(
   entry: string,
   side: 'client' | 'server',
   readSource?: (file: string) => string,
   isFile?: (file: string) => boolean,
+  options: GraphOptions = {},
 ): Graph {
+  const actionId =
+    options.actionId ??
+    ((file: string, name: string) =>
+      `${relative(dirname(entry), file).replaceAll('\\', '/')}#${name}`);
   const resolveLocal = (from: string, specifier: string) => localPath(from, specifier, isFile);
   const modules = new Map<string, SourceModule>();
   const selected = new Map<string, Set<ts.Statement>>();
@@ -288,7 +302,7 @@ export function createGraph(
       const opts = node.expression.arguments[0];
       for (const p of opts.properties)
         if (p.name?.getText(m.source) !== 'render')
-          for (const name of references(p, m)) reference(file, name);
+          for (const name of references(p, m, options.library)) reference(file, name);
       reference(file, node.expression.expression.getText(m.source));
       return;
     }
@@ -302,7 +316,7 @@ export function createGraph(
         'Actions cannot capture mutable module bindings.',
         { entryPath: file },
       );
-    for (const name of references(node, m)) reference(file, name);
+    for (const name of references(node, m, options.library)) reference(file, name);
   }
   function reference(file: string, name: string) {
     const m = load(file);
@@ -486,7 +500,7 @@ export function createGraph(
           );
       }
   }
-  include(entry, 'default');
+  for (const name of options.entryExports ?? ['default']) include(entry, name);
   // Imported actions may be reached through aliases or barrels. Unrelated
   // re-export branches must not become action roots.
   const discovered = new Set<string>();
@@ -501,7 +515,7 @@ export function createGraph(
       actionModules.add(file);
       for (const [name, action] of m.actions)
         actions.push({
-          id: `${relative(dirname(entry), file).replaceAll('\\', '/')}#${name}`,
+          id: actionId(file, name),
           name,
           file,
           kind: action.kind,
@@ -551,7 +565,7 @@ export function createGraph(
       }
     }
   }
-  discover(entry, 'default');
+  for (const name of options.entryExports ?? ['default']) discover(entry, name);
   const sources = new Map<string, string>();
   for (const [file, m] of modules) {
     const lines: string[] = [];
@@ -624,9 +638,9 @@ export function createGraph(
       } else if (selected.get(file)!.has(statement)) {
         const action = [...m.actions].find(([, a]) => a.statement === statement);
         if (side === 'client' && action) {
-          const id = `${relative(dirname(entry), file).replaceAll('\\', '/')}#${action[0]}`;
+          const id = actionId(file, action[0]);
           lines.push(
-            `export const ${action[0]} = __paneonProxy(${JSON.stringify(id)},${JSON.stringify(action[1].kind)});`,
+            `export const ${action[0]} = ${options.library ? '/* @__PURE__ */ ' : ''}__paneonProxy(${JSON.stringify(id)},${JSON.stringify(action[1].kind)});`,
           );
         } else if (
           side === 'server' &&

@@ -25,6 +25,7 @@ import { PACKAGE_ROOT, PACKAGE_VERSION } from '../shared/paths.js';
 import { PaneonError } from '../shared/types.js';
 import type { Manifest, JsonValue, WatchInputs } from '../shared/types.js';
 import { isLocalSource } from './watch-inputs.js';
+import { ComponentActions } from './component-actions.js';
 import {
   parseModule,
   staticRequirement,
@@ -214,6 +215,7 @@ async function compileSnapshot(
     const isFile = (file: string) => snapshot.track(() => snapshot.exists(file, 'file'));
     const client = createGraph(entry, 'client', readSource, isFile);
     const server = createGraph(entry, 'server', readSource, isFile);
+    const componentActions = new ComponentActions(snapshot);
     const dependencySet = new Set([
       ...environmentFiles,
       ...client.modules.keys(),
@@ -265,6 +267,8 @@ async function compileSnapshot(
         if (extname(path) === '.css') return snapshot.text(path);
       },
       generateBundle(_options, bundle) {
+        componentActions.collect(bundle);
+        for (const file of componentActions.files) dependencySet.add(file);
         const assets = Object.values(bundle).flatMap((output) =>
           output.type === 'asset' ? output.originalFileNames : [],
         );
@@ -290,10 +294,6 @@ async function compileSnapshot(
     };
     const frameSource = join(buildDirectory, 'frame-source.tsx');
     const nodeSource = join(buildDirectory, 'node-source.ts');
-    writeFileSync(
-      nodeSource,
-      `import definition from ${JSON.stringify(entry)};\n${server.actions.map((a, i) => `import {${a.name} as a${i}} from ${JSON.stringify(a.file)};`).join('\n')}\nexport default definition;export const __paneonActions={${server.actions.map((a, i) => `${JSON.stringify(a.id)}:a${i}`).join(',')}};`,
-    );
     const authorCss = join(buildDirectory, 'author.css');
     const authorSource = join(buildDirectory, 'author-source.txt');
     // Tailwind must scan exactly the captured client graph, including shared
@@ -325,6 +325,20 @@ async function compileSnapshot(
         },
       },
     });
+    const actions = [...server.actions];
+    for (const action of componentActions.actions) {
+      if (actions.some((existing) => existing.id === action.id))
+        throw new PaneonError(
+          'COMPONENT_ACTION_CONFLICT',
+          'Panel and component action identities conflict.',
+          { actionId: action.id },
+        );
+      actions.push(action);
+    }
+    writeFileSync(
+      nodeSource,
+      `import definition from ${JSON.stringify(entry)};\n${actions.map((a, i) => `import {${a.name} as a${i}} from ${JSON.stringify(a.file)};`).join('\n')}\nexport default definition;export const __paneonActions={${actions.map((a, i) => `${JSON.stringify(a.id)}:a${i}`).join(',')}};`,
+    );
     stage = 'server-build';
     await build({
       ...common,
@@ -345,7 +359,7 @@ async function compileSnapshot(
     const serverFile = join(buildDirectory, 'server/server.js');
     // Validation runs in an isolated child, never in the persistent control process.
     stage = 'metadata';
-    const metadata = await inspectServer(serverFile, server.actions);
+    const metadata = await inspectServer(serverFile, actions);
     const clientFiles = files(join(buildDirectory, 'client')).map((f) =>
       relative(join(buildDirectory, 'client'), f).replaceAll('\\', '/'),
     );

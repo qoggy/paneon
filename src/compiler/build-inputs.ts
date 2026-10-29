@@ -37,6 +37,7 @@ export function captureBuildEnvironment(snapshot: SourceSnapshot, entry: string)
   for (const name of [
     'index',
     'action-transform',
+    'component-actions',
     'source-snapshot',
     'build-inputs',
     'watch-inputs',

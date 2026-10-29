@@ -1,16 +1,9 @@
 import { useRef, useState } from 'react';
-import {
-  Label,
-  RadioGroup,
-  RadioGroupItem,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  useToastManager,
-  useUI,
-} from '../ui';
+import { Label } from '../ui/label';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useToastManager } from '../ui/toast-manager';
+import { useUI } from '../ui/use-ui';
 import { cn } from '../ui/utils';
 import { useSavePreferences } from './preferences-state';
 import { errorMessage } from './api';

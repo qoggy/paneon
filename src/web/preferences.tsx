@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UIProvider } from '../ui';
+import { UIProvider } from '../ui/ui-provider';
 import { defaultUI, type UIPreferences } from '../shared/preferences';
 import { SaveContext } from './preferences-state';
 import { api } from './api';

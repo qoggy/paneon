@@ -24,6 +24,8 @@ Mermaid diagrams expose unobtrusive expand and more-options icons on hover or ke
 
 Build the public library with `vite build --config vite.ui.config.ts`. Its outputs are `dist/ui/index.js` and `dist/ui/theme.css`; the runtime includes the theme in each isolated panel, separately from the host stylesheet.
 
+The library build reuses the panel action extractor for component modules. Its current source restrictions also apply here: retain initialization in referenced declarations, avoid top-level expression statements such as `Component.displayName = ...`, and use bare side-effect imports only for CSS. The source rewrite currently does not emit source maps.
+
 Loaded Markdown images open the shared image viewer on click, Enter or Space. The viewer supports zoom, actual size, fit, drag-to-pan, and closing via its icon, backdrop or Escape, returning focus to the image. Linked images retain their navigation behavior; broken or still-loading images do not open a viewer. Images inside Mermaid diagrams belong to the diagram viewer. Custom `components.img` renderers retain their props and also support click-to-expand when they render an image and allow its click event to bubble. Panels allow HTTP and HTTPS image sources directly through the browser, including in the expanded viewer. Loading an external image makes a direct browser request to its source; the script-src and connect-src directives remain unchanged. Images requiring authentication or blocked by their source server's embedding policy may remain unavailable.
 
 The default Markdown image renderer shows its source address in the shared Tooltip on hover or keyboard focus. Long addresses wrap within the viewport. The default Markdown URL filter does not accept `data:` image addresses.
