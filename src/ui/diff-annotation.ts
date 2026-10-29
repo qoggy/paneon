@@ -40,15 +40,20 @@ export function diffLocationRanges(
   return ranges;
 }
 
-/** Use the nearest vertical viewport; standalone document diffs own their page scroll. */
-export function revealDiffElement(element: HTMLElement) {
+/** Standalone document diffs use the page; bounded diffs use their own viewport. */
+export function diffVerticalViewport(element: HTMLElement): HTMLElement | null {
   let viewport = element.parentElement;
   while (viewport) {
     const overflow = getComputedStyle(viewport).overflowY;
     if (/(auto|scroll)/.test(overflow) && viewport.scrollHeight > viewport.clientHeight + 1) break;
     viewport = viewport.parentElement;
   }
-  viewport ??= document.scrollingElement as HTMLElement | null;
+  return viewport ?? (document.scrollingElement as HTMLElement | null);
+}
+
+/** Use the shared scroll track when the source columns have different heights. */
+export function revealDiffElement(element: HTMLElement) {
+  const viewport = diffVerticalViewport(element);
   if (!viewport) return;
   const clip =
     viewport === document.scrollingElement ? { top: 0 } : viewport.getBoundingClientRect();
@@ -56,7 +61,15 @@ export function revealDiffElement(element: HTMLElement) {
   // Only a header inside this viewport overlays its scroll content. Bounded
   // layouts keep headers outside the code viewport, so there is no inset.
   const inset = header && viewport.contains(header) ? header.getBoundingClientRect().height : 0;
-  const bounds = element.getBoundingClientRect();
+  const row = element.closest<HTMLElement>('[data-diff-track-top]');
+  const split = row?.closest('[data-diff-split]');
+  const bounds =
+    row && split
+      ? {
+          top: split.getBoundingClientRect().top + Number(row.dataset.diffTrackTop),
+          height: Number(row.dataset.diffTrackBottom) - Number(row.dataset.diffTrackTop),
+        }
+      : element.getBoundingClientRect();
   viewport.scrollTop +=
     bounds.top -
     clip.top -

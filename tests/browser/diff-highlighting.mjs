@@ -136,7 +136,10 @@ try {
   ]) {
     const oldBox = await line('old', oldNumber).boundingBox();
     const newBox = await line('new', newNumber).boundingBox();
-    assert.ok(Math.abs(oldBox.y - newBox.y) < 1, 'Modified code remains aligned after insertion.');
+    assert.ok(
+      Math.abs(newBox.y - oldBox.y - 24) < 1,
+      'Each source stays continuous after insertion; the connector represents the offset.',
+    );
   }
   assert.equal(await line('new', 8).evaluate((e) => e.closest('td').dataset.diffKind), 'add');
   await page.screenshot({ path: join(evidence, 'light.png') });
@@ -222,7 +225,7 @@ try {
     JSON.stringify({
       status: 'passed',
       blockAndInlineColors: true,
-      alignedLines: true,
+      continuousLines: true,
       exactSourceText: true,
       syntaxHighlighting: true,
       annotationSubmission: true,

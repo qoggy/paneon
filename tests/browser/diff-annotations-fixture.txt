@@ -90,6 +90,7 @@ function Annotated() {
       <div data-testid="annotated" className="h-96 overflow-auto border">
         <DiffView<Ref>
           ref={diff}
+          defaultExpanded={false}
           oldText={before}
           oldPath="file.ts"
           newPath="file.ts"
@@ -126,6 +127,7 @@ function Panel() {
       <div data-testid="plain" className="h-64 overflow-auto border">
         <DiffView
           ref={plain}
+          defaultExpanded={false}
           oldText={before}
           newText={after}
           oldPath="file.ts"

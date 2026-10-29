@@ -49,6 +49,7 @@ function Panel() {
             key={kind}
             ref={diff}
             model={model}
+            defaultExpanded={false}
             annotationTargets={diffAnnotationTargets(model, kind)}
             oldPath="file.ts"
             newPath="file.ts"

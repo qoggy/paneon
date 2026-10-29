@@ -11,9 +11,17 @@ type Props = {
   label: string;
 };
 
+function syncColumns(source: HTMLDivElement | null, width: number, oldSize: number) {
+  if (!source || width <= 1) return;
+  // Align the table boundary to the middle of the library's 1px separator.
+  const left = ((width - 1) * oldSize) / 100 + 0.5;
+  source.style.setProperty('--diff-columns', `${left}px minmax(0,1fr)`);
+  source.style.setProperty('--diff-left', `${left}px`);
+}
+
 /**
  * One sizing track for all hunk tables and the path headers. The existing tables
- * keep their aligned rows and independent horizontal scrollports; the library's
+ * keep their continuous sources and independent horizontal scrollports; the library's
  * panel sizes drive their shared CSS columns without rerendering source text.
  */
 export function DiffColumns({ idPrefix, source, layoutRef, label }: Props) {
@@ -32,6 +40,8 @@ export function DiffColumns({ idPrefix, source, layoutRef, label }: Props) {
     const measure = () => {
       const width = track.current?.clientWidth ?? 0;
       if (width <= 1) return;
+      // The library only reports ratio changes; resizing the container also changes pixels.
+      if (group.current) syncColumns(source.current, width, group.current.getLayout()[oldId]);
       // A container resize ends the current gesture, retaining its latest size.
       const current = drag.current;
       drag.current = null;
@@ -53,7 +63,7 @@ export function DiffColumns({ idPrefix, source, layoutRef, label }: Props) {
       observer.disconnect();
       window.removeEventListener('blur', blur);
     };
-  }, []);
+  }, [oldId, source]);
   useLayoutEffect(() => {
     if (minimum === null || initialized.current || !group.current) return;
     // Restore after the measured constraints are installed, without reading refs in render.
@@ -70,13 +80,9 @@ export function DiffColumns({ idPrefix, source, layoutRef, label }: Props) {
       resizeTargetMinimumSize={{ fine: 8, coarse: 24 }}
       className="pointer-events-none absolute inset-0 z-[5]"
       data-diff-column-layout=""
-      onLayoutChange={(value) => {
-        const width = track.current?.clientWidth ?? 0;
-        if (!source.current || width <= 1) return;
-        // Align the table boundary to the middle of the library's 1px separator.
-        const left = ((width - 1) * value[oldId]) / 100 + 0.5;
-        source.current.style.setProperty('--diff-columns', `${left}px minmax(0,1fr)`);
-      }}
+      onLayoutChange={(value) =>
+        syncColumns(source.current, track.current?.clientWidth ?? 0, value[oldId])
+      }
       onLayoutChanged={(_value, meta) => {
         if (initialized.current) layoutRef.current = meta.requestedLayout;
       }}

@@ -162,6 +162,7 @@ const en = {
   '{current} / {total} differences': '{current} / {total} differences',
   '{side} diff, scroll horizontally for long lines':
     '{side} diff, scroll horizontally for long lines',
+  '{side} diff, scroll vertically': '{side} diff, scroll vertically',
   上一个差异: 'Previous difference',
   下一个差异: 'Next difference',
   单列对比: 'Unified',

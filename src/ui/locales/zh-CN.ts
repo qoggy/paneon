@@ -156,6 +156,7 @@ const zh: Record<keyof typeof en, string> = {
   Old: '旧',
   '{current} / {total} differences': '{current} / {total} 处差异',
   '{side} diff, scroll horizontally for long lines': '{side}侧差异，横向滚动查看长行',
+  '{side} diff, scroll vertically': '{side}侧差异，纵向滚动',
   上一个差异: '上一个差异',
   下一个差异: '下一个差异',
   单列对比: '单列对比',

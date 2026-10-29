@@ -20,6 +20,8 @@ import { diffPresentation } from './diff-presentation';
 import type { DiffCell } from './diff-presentation';
 import { DiffToolbar } from './diff-toolbar';
 import { DiffColumns } from './diff-columns';
+import { DiffSplit } from './diff-split';
+import type { DiffSplitRow } from './diff-split';
 import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
 import type { DiffLocation } from './diff-annotation';
 export type DiffViewHandle = {
@@ -68,7 +70,7 @@ function StringDiffView<TRef>({
   newPath,
   oldRevision,
   newRevision,
-  defaultExpanded = false,
+  defaultExpanded = true,
   onCollapse,
   layout = 'document',
   feedback,
@@ -118,6 +120,24 @@ function StringDiffView<TRef>({
   const tables = useMemo(
     () => (expanded ? [model.rows] : model.hunks.map((hunk) => hunk.rows)).map(diffPresentation),
     [model, expanded],
+  );
+  const splitRows = useMemo<DiffSplitRow[]>(
+    () =>
+      expanded
+        ? tables[0].split
+        : tables.flatMap((table, index) => {
+            const hunk = model.hunks[index];
+            return [
+              {
+                hunk: {
+                  index,
+                  label: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@ ${t('(changed block)')}`,
+                },
+              },
+              ...table.split,
+            ];
+          }),
+    [tables, model, expanded, t],
   );
   // Decide from whole source texts, never from an individual hunk or trimmed content.
   const sides: ('old' | 'new')[] =
@@ -250,14 +270,7 @@ function StringDiffView<TRef>({
       removers.forEach((remove) => remove());
     };
   }, [targets, model, unified, expanded, registerText]);
-  function code(side: 'old' | 'new', cell: DiffCell | undefined, endingNote: boolean) {
-    if (!cell)
-      return (
-        <td className="bg-muted/30">
-          <div className="h-6" />
-          {endingNote && <div className="h-5" />}
-        </td>
-      );
+  function code(side: 'old' | 'new', cell: DiffCell, endingNote: boolean) {
     const { line, kind, spans } = cell;
     const changed = kind !== 'context';
     const background = changed ? `var(--diff-${kind})` : undefined;
@@ -271,6 +284,7 @@ function StringDiffView<TRef>({
         js: 'javascript',
         jsx: 'jsx',
         json: 'json',
+        jsonc: 'jsonc',
         sh: 'bash',
         yaml: 'yaml',
         yml: 'yaml',
@@ -328,11 +342,7 @@ function StringDiffView<TRef>({
     );
   }
   const display = ({ split, unified: lines }: ReturnType<typeof diffPresentation>) => {
-    const hasEndingNote = (row: { old?: DiffCell; new?: DiffCell }) =>
-      !!(
-        (row.old && !row.old.line.text.endsWith('\n')) ||
-        (row.new && !row.new.line.text.endsWith('\n'))
-      );
+    const side = sides[0];
     return unified ? (
       <div
         className="min-w-0 overflow-x-auto"
@@ -350,29 +360,26 @@ function StringDiffView<TRef>({
       </div>
     ) : (
       <div
-        className="grid min-w-0"
-        style={{ gridTemplateColumns: columns }}
-        data-diff-split={sideBySide ? '' : undefined}
+        className="min-w-0 overflow-x-auto"
+        data-diff-scroll={side}
+        tabIndex={0}
+        aria-label={t('{side} diff, scroll horizontally for long lines', {
+          side: t(side === 'old' ? 'Old' : 'New'),
+        })}
       >
-        {sides.map((side) => (
-          <div
-            key={side}
-            className="min-w-0 overflow-x-auto"
-            data-diff-scroll={side}
-            tabIndex={0}
-            aria-label={t('{side} diff, scroll horizontally for long lines', {
-              side: t(side === 'old' ? 'Old' : 'New'),
-            })}
-          >
-            <table className="w-max min-w-full border-collapse">
-              <tbody>
-                {split.map((row, index) => (
-                  <tr key={index}>{code(side, row[side], hasEndingNote(row))}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
+        <table className="w-max min-w-full border-collapse">
+          <tbody>
+            {split.flatMap((row, index) =>
+              row[side]
+                ? [
+                    <tr key={index}>
+                      {code(side, row[side], !row[side].line.text.endsWith('\n'))}
+                    </tr>,
+                  ]
+                : [],
+            )}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -469,6 +476,7 @@ function StringDiffView<TRef>({
       </div>
       <div
         data-diff-viewport=""
+        style={sideBySide ? { scrollbarWidth: 'none' } : undefined}
         className={
           layout === 'bounded'
             ? 'min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain'
@@ -488,7 +496,13 @@ function StringDiffView<TRef>({
               label={t('调整差异两侧宽度')}
             />
           )}
-          {expanded ? (
+          {sideBySide ? (
+            splitRows.length > 0 && (
+              <div className="min-w-0 border-b">
+                <DiffSplit rows={splitRows} renderCell={code} layout={layout} />
+              </div>
+            )
+          ) : expanded ? (
             <div className="min-w-0 border-b">{display(tables[0])}</div>
           ) : (
             model.hunks.map((hunk, index) => (

@@ -153,7 +153,7 @@ try {
   const widths = await frame
     .locator('[data-diff-scroll="old"]')
     .evaluateAll((es) => es.map((e) => e.clientWidth));
-  assert.equal(widths.length, 2);
+  assert.equal(widths.length, 1, 'Collapsed hunks share one continuous source pane.');
   assert.ok(
     widths.every((w) => Math.abs(w - keyWidth) < 2),
     'all hunks share ratio',

@@ -6,6 +6,7 @@ import typescript from 'shiki/langs/typescript.mjs';
 import jsx from 'shiki/langs/jsx.mjs';
 import tsx from 'shiki/langs/tsx.mjs';
 import json from 'shiki/langs/json.mjs';
+import jsonc from 'shiki/langs/jsonc.mjs';
 import bash from 'shiki/langs/bash.mjs';
 import yaml from 'shiki/langs/yaml.mjs';
 import diff from 'shiki/langs/diff.mjs';
@@ -31,6 +32,7 @@ const supported = new Set([
   'jsx',
   'tsx',
   'json',
+  'jsonc',
   'bash',
   'yaml',
   'diff',
@@ -50,6 +52,7 @@ function getHighlighter() {
       jsx,
       tsx,
       json,
+      jsonc,
       bash,
       yaml,
       diff,
