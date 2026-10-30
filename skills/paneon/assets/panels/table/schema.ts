@@ -83,6 +83,8 @@ export const tableParamsSchema = z
   });
 export type TableParams = z.infer<typeof tableParamsSchema>;
 export const tableRefSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('title') }).strict(),
+  z.object({ kind: z.literal('description') }).strict(),
   z.object({ kind: z.literal('row'), rowIndex: z.number().int().nonnegative() }).strict(),
   z.object({ kind: z.literal('column'), columnKey: label }).strict(),
   z.object({ kind: z.literal('header'), columnKey: label }).strict(),
@@ -94,6 +96,18 @@ export type TableRef = z.infer<typeof tableRefSchema>;
 export const tableSubmittedSchema = annotationValueSchema(tableRefSchema).safeExtend({
   replacesEventId: z.number().int().positive().optional(),
 });
+export function tableTargetText(params: TableParams, ref: TableRef): string | undefined {
+  switch (ref.kind) {
+    case 'title':
+      return params.title;
+    case 'description':
+      return params.description;
+    case 'header':
+      return params.columns.find((column) => column.key === ref.columnKey)?.label;
+    case 'cell':
+      return cellText(params.rows[ref.rowIndex][ref.columnKey]);
+  }
+}
 export function tableTargetError(
   params: TableParams,
   target: AnnotationTarget<TableRef>,
@@ -105,17 +119,18 @@ export function tableTargetError(
     return 'Unknown original rowIndex.';
   if ('columnKey' in value && !params.columns.some((column) => column.key === value.columnKey))
     return 'Unknown column key.';
+  if (value.kind === 'description' && params.description === undefined)
+    return 'Table description is unavailable.';
   if (target.text) {
-    if (value.kind !== 'cell' && value.kind !== 'header')
-      return 'Only header labels and string cells support text ranges.';
-    const source =
-      value.kind === 'header'
-        ? params.columns.find((column) => column.key === value.columnKey)?.label
-        : params.rows[value.rowIndex][value.columnKey];
+    if (value.kind === 'row' || value.kind === 'column')
+      return 'Rows and columns do not support text ranges.';
+    const source = tableTargetText(params, value);
     if (typeof source !== 'string' || !validSourceRange(source, target))
       return value.kind === 'header'
         ? 'Text range does not match the original header label.'
-        : 'Text range does not match the original string cell.';
+        : value.kind === 'cell'
+          ? 'Text range does not match the original cell text.'
+          : `Text range does not match the original ${value.kind}.`;
   }
   return null;
 }

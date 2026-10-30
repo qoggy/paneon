@@ -21,12 +21,14 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
+  AnnotationText,
   Badge,
   Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
   Input,
+  Page,
   Select,
   SelectContent,
   SelectItem,
@@ -709,7 +711,10 @@ function GithubPR() {
               </Button>
             )}
           </aside>
-          <main className="min-w-0 space-y-4" aria-busy={detailLoading}>
+          <Page
+            className="mx-0 w-auto max-w-none min-w-0 space-y-4 p-0 md:p-0"
+            aria-busy={detailLoading}
+          >
             {detailLoading && (
               <p role="status" className="flex items-center gap-2 text-muted-foreground">
                 <Spinner aria-hidden="true" />
@@ -764,7 +769,11 @@ function GithubPR() {
                   <div className="flex items-start justify-between gap-4">
                     <div data-pr-overview="" className="space-y-3">
                       <h2 className="text-2xl leading-tight font-semibold tracking-tight">
-                        {shown.title}{' '}
+                        <AnnotationText<PRRef>
+                          target={{ sourceId: shown.overviewSourceId, kind: 'pull-request' }}
+                        >
+                          {shown.title}
+                        </AnnotationText>{' '}
                         <span className="font-normal text-muted-foreground">#{shown.number}</span>
                       </h2>
                       <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
@@ -1184,7 +1193,7 @@ function GithubPR() {
                 </TabsContent>
               </Tabs>
             )}
-          </main>
+          </Page>
         </div>
       </div>
     </>

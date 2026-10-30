@@ -193,6 +193,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Tree` | Expandable hierarchy, such as a file tree |
 | `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](#annotations) |
 
+- `Page` centers its content at most 1152px wide (`max-w-6xl`, `p-4 md:p-8`). For multi-column workbenches, side-by-side diffs, wide tables or large diagrams, use the full width: `<Page className="max-w-none md:p-4">`. Narrow a form with `max-w-160`.
 - `Select` needs `items` to display labels for values.
 - `CodeBlock`: `<CodeBlock code={source} language="ts" header="Retry strategy" />`. Only `code` is required. `header` defaults to `true` for the language title; pass a string for a custom title, or `false` to hide the title bar. Use `lineNumbers` when line references help the explanation, or `highlightedLines={{ start: 3, end: 5 }}` to emphasize a range (1-based, both endpoints included). Line numbers default to `false`; wrapping defaults to `true`, with `defaultWrap={false}` for initial horizontal scrolling. To collect feedback on code, see [annotations](#markdown-codeblock-and-diffview).
 - `Markdown` renders GFM without raw HTML. Replacing `pre` through `components` also drops Mermaid rendering.
@@ -267,7 +268,8 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 - `adapter` is needed to locate content the page may not be displaying; see [adapters](#adapters).
 - `disabled` blocks editing and submission while saved annotations stay readable. To lock feedback after a successful submission, set `disabled` and pass `onRequestEdit`, which the list offers as a correction action that should unlock editing.
 - `allowEmptySubmit` (default `false`) permits submitting an empty list, such as a correction that withdraws all feedback.
-- `AnnotationText` takes `target`, plain-string `children` and optional `className`. JSX children are not supported. Unregistered DOM and graphics cannot be annotated.
+- `AnnotationText` takes `target`, plain-string `children` and optional `className`. Unregistered DOM and graphics cannot be annotated.
+- Add `annotationTarget="api"` to `Page` or `Section` to annotate its title and description; refs are `{id: "api", field: "title" | "description"}`, with `id` holding the given reference unchanged. Content inside uses its own targets.
 
 ### Controller
 

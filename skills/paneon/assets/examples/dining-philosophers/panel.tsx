@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw } from './icons';
 import { z } from 'zod';
 import { definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button } from '@qoggy/paneon/ui';
+import { Badge, Button, Page } from '@qoggy/paneon/ui';
 import {
   PHILOSOPHERS,
   STRATEGIES,
@@ -340,7 +340,7 @@ function DiningPhilosophersPanel() {
     setStep(value);
   };
   return (
-    <main className="mx-auto max-w-6xl space-y-5 p-6">
+    <Page className="w-auto space-y-5 p-6 md:p-6">
       <header className="flex items-start justify-between gap-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
@@ -520,7 +520,7 @@ function DiningPhilosophersPanel() {
           {copy.source} ↗
         </a>
       </div>
-    </main>
+    </Page>
   );
 }
 export default definePanel({

@@ -21,7 +21,12 @@ export function resolvePRTarget(
       throw new Error('Description quote does not match the preserved Markdown.');
     return snapshot.body;
   }
-  if (target.text) throw new Error('PR overview and checks support whole-object feedback only.');
+  if (source.kind === 'pull-request') {
+    if (!validSourceRange(source.title, target))
+      throw new Error('PR title quote does not match the preserved title.');
+    return source.title;
+  }
+  if (target.text) throw new Error('Checks support whole-object feedback only.');
 }
 export function safeLink(value?: string) {
   if (!value) return undefined;

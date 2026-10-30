@@ -26,12 +26,14 @@ import {
   usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
+import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   cellText,
   completeTableSchema,
   tableParamsSchema,
   tableSubmittedSchema,
   tableTargetError,
+  tableTargetText,
   visibleRows,
 } from './schema';
 import type { TableParams, TableRef, TableView } from './schema';
@@ -228,11 +230,7 @@ function DataTable({
                       data-cell-key={column.key}
                       className={`h-10 px-3 py-2 ${column.type === 'number' ? 'w-px text-right tabular-nums' : column.type === 'boolean' ? 'w-px' : 'max-w-xl min-w-40 wrap-anywhere whitespace-normal'}`}
                     >
-                      {typeof row[column.key] === 'string' ? (
-                        <AnnotationText target={ref}>{String(row[column.key])}</AnnotationText>
-                      ) : (
-                        cellText(row[column.key])
-                      )}
+                      <AnnotationText target={ref}>{cellText(row[column.key])}</AnnotationText>
                     </TableCell>
                   );
                 })}
@@ -306,8 +304,13 @@ function TablePanel() {
   const params = usePanelInput<TableParams>();
   const [view, setView] = useState<TableView>(initialView),
     [page, setPage] = useState(0),
-    [locked, setLocked] = useState(false);
+    [locked, setLocked] = useState(false),
+    [descriptionOpen, setDescriptionOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  // Keep the description portal below the page's annotation controls.
+  const headingContainer = useRef<HTMLDivElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  const description = useRef<HTMLDivElement>(null);
   const submission = useSubmission<AnnotationValue<TableRef>>(
     async (feedback) => {
       const validated = await validateTable({ snapshot: params, feedback });
@@ -322,13 +325,7 @@ function TablePanel() {
       resolve(target: Target<TableRef>) {
         const message = tableTargetError(params, target);
         if (message) return { status: 'stale' as const, message };
-        const ref = target.ref;
-        const source =
-          ref.kind === 'header'
-            ? params.columns.find((column) => column.key === ref.columnKey)?.label
-            : ref.kind === 'cell'
-              ? params.rows[ref.rowIndex][ref.columnKey]
-              : undefined;
+        const source = tableTargetText(params, target.ref);
         return {
           status: 'ready' as const,
           ...(typeof source === 'string' ? { text: source } : {}),
@@ -336,25 +333,33 @@ function TablePanel() {
       },
       async locate(target: Target<TableRef>) {
         const ref = target.ref;
-        if (ref.kind !== 'header') setView(initialView);
+        if (ref.kind === 'description') setDescriptionOpen(true);
+        if (ref.kind === 'row' || ref.kind === 'column' || ref.kind === 'cell')
+          setView(initialView);
         if ('rowIndex' in ref) setPage(Math.floor(ref.rowIndex / (params.pageSize ?? 20)));
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         );
+        if (ref.kind === 'description') {
+          if (description.current) locateMarkdownAnnotation(description.current, target.text);
+          return;
+        }
         const row =
           'rowIndex' in ref
             ? root.current?.querySelector<HTMLElement>(`[data-row-index="${ref.rowIndex}"]`)
             : null;
         const element =
-          ref.kind === 'column' || ref.kind === 'header'
-            ? [...(root.current?.querySelectorAll<HTMLElement>('[data-column-key]') ?? [])].find(
-                (node) => node.dataset.columnKey === ref.columnKey,
-              )
-            : ref.kind === 'row'
-              ? row
-              : [...(row?.querySelectorAll<HTMLElement>('[data-cell-key]') ?? [])].find(
-                  (node) => node.dataset.cellKey === ref.columnKey,
-                );
+          ref.kind === 'title'
+            ? title.current
+            : ref.kind === 'column' || ref.kind === 'header'
+              ? [...(root.current?.querySelectorAll<HTMLElement>('[data-column-key]') ?? [])].find(
+                  (node) => node.dataset.columnKey === ref.columnKey,
+                )
+              : ref.kind === 'row'
+                ? row
+                : [...(row?.querySelectorAll<HTMLElement>('[data-cell-key]') ?? [])].find(
+                    (node) => node.dataset.cellKey === ref.columnKey,
+                  );
         element?.scrollIntoView({ block: 'center', inline: 'center' });
         element?.animate(
           [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],
@@ -381,10 +386,15 @@ function TablePanel() {
     <Page className="min-w-0 space-y-4">
       <>
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">{params.title}</h1>
+          <div
+            ref={headingContainer}
+            className="isolate flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+          >
+            <h1 ref={title} className="text-2xl font-semibold tracking-tight wrap-anywhere">
+              <AnnotationText<TableRef> target={{ kind: 'title' }}>{params.title}</AnnotationText>
+            </h1>
             {params.description && (
-              <Popover>
+              <Popover open={descriptionOpen} onOpenChange={setDescriptionOpen}>
                 <PopoverTrigger
                   render={
                     <Button
@@ -399,12 +409,16 @@ function TablePanel() {
                   }
                 />
                 <PopoverContent
+                  ref={description}
+                  container={headingContainer}
                   align="start"
                   collisionPadding={16}
                   className="max-h-[min(28rem,var(--available-height))] w-96 max-w-[calc(100vw-2rem)] overflow-auto"
                   aria-label={t('表格说明')}
                 >
-                  <Markdown>{params.description}</Markdown>
+                  <Markdown annotationTarget={{ kind: 'description' }}>
+                    {params.description}
+                  </Markdown>
                 </PopoverContent>
               </Popover>
             )}

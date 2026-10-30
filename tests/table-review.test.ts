@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { z } from '@qoggy/paneon/sdk';
 import {
   tableParamsSchema,
+  tableSubmittedSchema,
   completeTableSchema,
   tableTargetError,
   visibleRows,
@@ -108,7 +109,7 @@ void test('table complete result validates mixed targets, independent entries, o
     { ref: { kind: 'column', columnKey: 'unknown' } },
     {
       ref: { kind: 'cell', rowIndex: 0, columnKey: 'n' },
-      text: { start: 0, end: 1, quote: '2' },
+      text: { start: 0, end: 1, quote: '3' },
     },
     {
       ref: { kind: 'cell', rowIndex: 0, columnKey: 'name' },
@@ -313,4 +314,34 @@ void test('table and Markdown review validate page targets alongside page-define
     ],
   });
   assert.deepEqual(review.annotations[0].targets[1], { ...common, ref: { kind: 'document' } });
+});
+
+void test('Table annotates displayed number and boolean text without changing input types', () => {
+  const values = [120, 0, -12.5, true, false, '120'];
+  const params = tableParamsSchema.parse({
+    title: 'Cell types',
+    columns: [{ key: 'value', label: 'Value' }],
+    rows: [...values, null].map((value) => ({ value })),
+  });
+  const targets = values.map((value, rowIndex) => ({
+    ref: { kind: 'cell' as const, rowIndex, columnKey: 'value' },
+    text: { start: 0, end: String(value).length, quote: String(value) },
+  }));
+  // Selecting only part of a displayed value works just like selecting part of a string.
+  targets.push({
+    ref: { kind: 'cell', rowIndex: 0, columnKey: 'value' },
+    text: { start: 1, end: 3, quote: '20' },
+  });
+  const published = completeTableSchema(params).parse({
+    annotations: [{ id: 'mixed', targets, comment: 'Check these values' }],
+  });
+  assert.deepEqual(tableSubmittedSchema.parse(published).annotations[0], {
+    id: 'mixed',
+    targets,
+    comment: 'Check these values',
+  });
+  assert.deepEqual(
+    params.rows.map((row) => row.value),
+    [...values, null],
+  );
 });

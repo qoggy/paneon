@@ -40,7 +40,7 @@ try {
     assert.equal(response.statusCode, 200);
     return response.json().data.events;
   };
-  await selectAnnotationText(frame, '[data-annotation-text]', 4, 9);
+  await selectAnnotationText(frame, '[data-slot="card"] [data-annotation-text]', 4, 9);
   await frame.locator('[data-annotation-action]').click();
   await frame.locator('[data-annotation-editor] textarea').fill('Consider persistence.');
   await frame.getByRole('button', { name: /^(Save|保存)$/, exact: true }).click();

@@ -13,6 +13,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  Page,
   Select,
   SelectContent,
   SelectItem,
@@ -831,13 +832,14 @@ function Review() {
   return (
     <>
       <Tabs
+        className="gap-3"
         value={request.type}
         onValueChange={(type) => navigate(request.repositoryId, type as GitRequest['type'])}
         render={
-          <main
+          <Page
             inert={checkingOut || undefined}
             aria-busy={checkingOut || undefined}
-            className="flex min-h-[34rem] flex-col gap-3 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4"
+            className="mx-0 flex min-h-[34rem] max-w-none flex-col space-y-0 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4"
             data-git-workbench=""
           >
             <header
@@ -1041,7 +1043,7 @@ function Review() {
                 </p>
               )}
             </TabsContent>
-          </main>
+          </Page>
         }
       />
     </>

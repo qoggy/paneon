@@ -1,4 +1,8 @@
-import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
+import {
+  openAnnotationDirectory,
+  selectAnnotationText,
+  submitAnnotations,
+} from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
@@ -165,10 +169,41 @@ try {
   await selectText(textCell, 12, 18, 'repeat');
   await comments.write('第二个repeat');
   await comments.save();
+  // One continuous selection includes the number and boolean cells between two string cells.
+  await selectAnnotationText(
+    frame,
+    '[data-row-index="0"] [data-cell-key="name"] [data-annotation-text]',
+    12,
+    4,
+    '[data-row-index="1"] [data-cell-key="name"] [data-annotation-text]',
+  );
+  await comments.write('跨单元格意见');
+  await comments.save();
   await frame.getByRole('button', { name: '下一页', exact: true }).click();
   await comments.locate(2);
   await frame.locator('[data-row-index="0"]').waitFor();
   assert.equal(await textCell.evaluate(() => document.getSelection().toString()), '中文🙂');
+  for (const [rowIndex, columnKey, quote] of [
+    [0, 'n', '20'],
+    [0, 'b', 'true'],
+    [1, 'b', 'false'],
+  ]) {
+    const cell = frame.locator(
+      `[data-row-index="${rowIndex}"] [data-cell-key="${columnKey}"] [data-annotation-text]`,
+    );
+    await selectText(cell, 0, quote.length, quote);
+    await comments.write(`检查 ${quote}`);
+    await comments.save();
+  }
+  await frame.getByRole('button', { name: '下一页', exact: true }).click();
+  await comments.locate(5);
+  await frame.locator('[data-row-index="0"]').waitFor();
+  assert.equal(
+    await frame
+      .locator('[data-row-index="0"] [data-cell-key="n"]')
+      .evaluate(() => document.getSelection().toString()),
+    '20',
+  );
   assert.equal((await fixture.events(fixture.table)).length, 0);
   const eventUrl = `**/api/panels/${fixture.table.instanceId}/events`;
   await page.route(eventUrl, (route) =>
@@ -183,7 +218,7 @@ try {
   );
   await submitAnnotations(frame);
   await frame.getByRole('alert').filter({ hasText: '未保存。' }).waitFor();
-  assert.equal(await comments.count(), 3);
+  assert.equal(await comments.count(), 7);
   assert.equal(await comments.text(2), '中文🙂');
   await page.unroute(eventUrl);
   let releaseEvent;
@@ -213,7 +248,7 @@ try {
   await page.unroute(eventUrl);
   const first = (await fixture.events(fixture.table))[0];
   assert.equal(first.type, 'table-submitted');
-  assert.equal(first.payload.annotations.length, 3);
+  assert.equal(first.payload.annotations.length, 7);
   assert.equal('comment' in first.payload, false);
   assert.deepEqual(first.payload.annotations[0].targets, [
     { ref: { kind: 'header', columnKey: 'name' }, text: { start: 0, end: 2, quote: '说明' } },
@@ -230,6 +265,43 @@ try {
       text: { start: 12, end: 18, quote: 'repeat' },
     },
   ]);
+  assert.deepEqual(first.payload.annotations[3], {
+    id: first.payload.annotations[3].id,
+    targets: [
+      {
+        ref: { kind: 'cell', rowIndex: 0, columnKey: 'name' },
+        text: { start: 12, end: 18, quote: 'repeat' },
+      },
+      {
+        ref: { kind: 'cell', rowIndex: 0, columnKey: 'n' },
+        text: { start: 0, end: 2, quote: '20' },
+      },
+      {
+        ref: { kind: 'cell', rowIndex: 0, columnKey: 'b' },
+        text: { start: 0, end: 4, quote: 'true' },
+      },
+      {
+        ref: { kind: 'cell', rowIndex: 1, columnKey: 'name' },
+        text: { start: 0, end: 4, quote: 'same' },
+      },
+    ],
+    comment: '跨单元格意见',
+  });
+  for (const [index, rowIndex, columnKey, quote] of [
+    [4, 0, 'n', '20'],
+    [5, 0, 'b', 'true'],
+    [6, 1, 'b', 'false'],
+  ])
+    assert.deepEqual(first.payload.annotations[index], {
+      id: first.payload.annotations[index].id,
+      targets: [
+        {
+          ref: { kind: 'cell', rowIndex, columnKey },
+          text: { start: 0, end: quote.length, quote },
+        },
+      ],
+      comment: `检查 ${quote}`,
+    });
   assert.equal(await frame.getByRole('button', { name: '选择对象', exact: true }).count(), 0);
   if (process.env.PANEON_TEST_ARTIFACTS) {
     await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });
@@ -240,7 +312,7 @@ try {
   }
   await openAnnotationDirectory(frame);
   await frame.getByRole('button', { name: '修改反馈', exact: true }).click();
-  for (let number = 3; number >= 1; number--) await comments.remove(number);
+  for (let number = 7; number >= 1; number--) await comments.remove(number);
   await submitAnnotations(frame);
   await waitForSubmitted();
   const revisions = await fixture.events(fixture.table);

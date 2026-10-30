@@ -15,6 +15,7 @@ import {
   SheetTitle,
   Spinner,
   Markdown,
+  Page,
   RadioGroup,
   RadioGroupItem,
   Textarea,
@@ -136,7 +137,7 @@ function ChoosePanel() {
   );
   return (
     <div>
-      <main className="mx-auto w-full max-w-xl space-y-6 px-4 py-8 sm:py-12">
+      <Page className="max-w-xl space-y-6 p-[2rem_1rem] sm:py-12 md:p-[3rem_1rem]">
         <fieldset disabled={submission.pending} className="min-w-0 space-y-5">
           <header className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -525,7 +526,7 @@ function ChoosePanel() {
             <AlertDescription>{submission.message}</AlertDescription>
           </Alert>
         )}
-      </main>
+      </Page>
       <Sheet
         open={!!detail}
         onOpenChange={(open) => {

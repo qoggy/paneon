@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button, Input, Label } from '@qoggy/paneon/ui';
+import { Badge, Button, Input, Label, Page } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { SOURCE_COMMIT, SOURCE_ROOT } from './model';
 import {
@@ -124,7 +124,7 @@ function SentinelPanel() {
     setFocusRequest(undefined);
   }
   return (
-    <main className="mx-auto max-w-7xl space-y-5 p-6">
+    <Page className="w-auto max-w-7xl space-y-5 p-6 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">{c.title}</h1>
@@ -591,7 +591,7 @@ function SentinelPanel() {
           </div>
         </div>
       </details>
-    </main>
+    </Page>
   );
 }
 export default definePanel({

@@ -22,6 +22,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   Input,
+  Page,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -407,7 +408,7 @@ function DiffReviewPanel() {
     value.files.find((_, index) => `file:${index}` === selected) ?? value.files[0];
   const hasBranches = roots.some((node) => node.nodes !== undefined);
   return (
-    <main className="flex h-screen min-h-0 flex-col gap-4 p-4">
+    <Page className="mx-0 flex h-screen min-h-0 max-w-none flex-col gap-4 space-y-0 p-4 md:p-4">
       <h1 className="text-lg font-semibold">{value.title ?? copy.title}</h1>
       <p className="text-sm text-muted-foreground">{copy.help}</p>
       <FileReviewSplit
@@ -577,7 +578,7 @@ function DiffReviewPanel() {
       {submission.message && (
         <p role={submission.failed ? 'alert' : 'status'}>{submission.message}</p>
       )}
-    </main>
+    </Page>
   );
 }
 

@@ -1,39 +1,39 @@
-import { useMemo, useRef } from 'react';
 import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
-import { Page, Card, AnnotationText, toast, usePageAnnotations } from '@qoggy/paneon/ui';
-import type { AnnotationAdapter } from '@qoggy/paneon/ui';
+import {
+  Page,
+  Card,
+  AnnotationText,
+  toast,
+  useAnnotations,
+  usePageAnnotations,
+} from '@qoggy/paneon/ui';
 
 const source = 'Use Redis for shared cache storage.';
-const refSchema = z.literal('redis-plan');
+const refSchema = z.union([
+  z.literal('redis-plan'),
+  z.object({
+    id: z.object({ page: z.literal('example'), version: z.literal(1) }),
+    field: z.enum(['title', 'description']),
+  }),
+]);
 type Ref = z.infer<typeof refSchema>;
 const resultSchema = annotationValueSchema(refSchema);
 
 function Panel() {
-  const card = useRef<HTMLDivElement>(null);
-  const adapter = useMemo<AnnotationAdapter<Ref>>(
-    () => ({
-      resolve(target) {
-        return refSchema.safeParse(target.ref).success
-          ? { status: 'ready', text: source }
-          : { status: 'missing', message: 'Unknown plan.' };
-      },
-      locate() {
-        card.current?.scrollIntoView({ block: 'center' });
-      },
-    }),
-    [],
-  );
   usePageAnnotations<Ref>({
-    adapter: adapter,
     onSubmit: async (value) => {
       const receipt = await agent.emit('annotations-submitted', value);
       toast.add({ title: `Saved as event ${receipt.id}.`, type: 'success' });
     },
   });
   return (
-    <Page title="Annotation example">
+    <Page
+      title="Annotation example"
+      description="Annotation description"
+      annotationTarget={{ page: 'example', version: 1 }}
+    >
       <>
-        <Card ref={card} className="p-4">
+        <Card className="p-4">
           <AnnotationText target="redis-plan">{source}</AnnotationText>
         </Card>
       </>
