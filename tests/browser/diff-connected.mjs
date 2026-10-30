@@ -37,8 +37,8 @@ try {
       const [bounded, setBounded] = useState(true);
       usePageAnnotations<'old' | 'new'>({onSubmit: async () => {}, adapter: {
         resolve: target => ({status:'ready', text:target.ref === 'old' ? oldText : newText}),
-        targetRanges: target => target.text ? diff.current?.getRanges({kind:'text', side:target.ref, ...target.text}) ?? [] : [],
-        locate: target => diff.current?.reveal(target.text ? {kind:'text', side:target.ref, ...target.text} : {kind:'file'}),
+        targetRanges: target => target.type !== 'mermaid' && target.text ? diff.current?.getRanges({kind:'text', side:target.ref, ...target.text}) ?? [] : [],
+        locate: target => diff.current?.reveal(target.type !== 'mermaid' && target.text ? {kind:'text', side:target.ref, ...target.text} : {kind:'file'}),
       }});
       return <><Draft /><Button onClick={() => setBounded(!bounded)}>Toggle document</Button>
         <div data-test-host className={bounded ? 'flex h-[36rem] flex-col border' : 'border'}>

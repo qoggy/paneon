@@ -95,7 +95,7 @@ export function AnnotationSurface() {
       for (const annotation of annotations) {
         for (const target of annotation.targets) {
           const rects = store.targetRects(target);
-          highlights.push(...rects.map((item) => item.rect));
+          if (!store.isMediaTarget(target)) highlights.push(...rects.map((item) => item.rect));
           const last = rects.at(-1);
           if (!last) continue;
           const position = markerPosition(last, placed);
@@ -192,11 +192,25 @@ export function AnnotationSurface() {
   const close = () => {
     store.cancelEditor();
   };
+  // The viewer's translated dialog is the containing block for fixed descendants.
+  // Marker rectangles use viewport coordinates, so remove that containing-block origin.
+  const mediaContainer = store.mediaViewActive ? store.overlayContainer : null;
+  const mediaOrigin = mediaContainer?.getBoundingClientRect();
   return createPortal(
     <div
       data-annotation-controls=""
       data-annotation-surface=""
       className="pointer-events-none fixed inset-0 z-50"
+      style={
+        mediaOrigin && mediaContainer
+          ? {
+              left: -mediaOrigin.left - mediaContainer.clientLeft,
+              top: -mediaOrigin.top - mediaContainer.clientTop,
+              width: window.innerWidth,
+              height: window.innerHeight,
+            }
+          : undefined
+      }
     >
       <div aria-hidden="true">
         {geometry.highlights.map((rect, index) => (

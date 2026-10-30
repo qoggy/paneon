@@ -21,10 +21,12 @@ import {
   type ReactNode,
   type ReactElement,
 } from 'react';
-import type { JsonValue } from '../sdk/annotation';
+import type { AnnotationTarget, JsonValue } from '../sdk/annotation';
 import { annotationKey } from '../sdk/annotation';
 import { useAnnotationContext, useAnnotations } from './annotation-context';
 import { sourceMappingPlugin } from './markdown-annotation-mapper';
+import type { SourceNode } from './markdown-annotation-mapper';
+import { MediaAnnotationContext, MediaToolbarHostContext } from './media-annotation';
 import { parseFrontmatter } from './markdown-frontmatter';
 import { MarkdownFrontmatter } from './markdown-frontmatter-view';
 import { Mermaid } from './mermaid';
@@ -75,18 +77,51 @@ const FileLinkContext = createContext<{
   openFile: (reference: FileReferenceRequest, trigger: HTMLAnchorElement) => void;
   revealAnchor: (href: string) => boolean;
 } | null>(null);
+const MarkdownMediaContext = createContext<{ ref: unknown; source: string } | undefined>(undefined);
+
+function markdownMediaTarget(
+  context: { ref: unknown; source: string } | undefined,
+  node: SourceNode | undefined,
+  mermaid: boolean,
+) {
+  const start = node?.position?.start.offset,
+    end = node?.position?.end.offset;
+  if (!context || start === undefined || end === undefined) return undefined;
+  const target: AnnotationTarget<unknown> = mermaid
+    ? { ref: context.ref, type: 'mermaid', text: { start, end } }
+    : { ref: context.ref, text: { start, end, quote: context.source.slice(start, end) } };
+  return {
+    target,
+    source: context.source,
+    summary: mermaid ? 'Mermaid' : context.source.slice(start, end),
+  };
+}
 
 function MarkdownLink({
-  node: _node,
+  node,
   href = '',
   children,
   ...props
-}: ComponentProps<'a'> & { node?: unknown }) {
+}: ComponentProps<'a'> & { node?: SourceNode }) {
   const target = markdownLink(href);
   const context = useContext(FileLinkContext);
   const readFile = useFileReference();
   const browserAction = useBrowserAction();
   const { t } = useUI();
+  const document = useContext(MarkdownMediaContext);
+  const annotationEnabled = useContext(AnnotationEnabledContext);
+  const [tools, setTools] = useState<HTMLSpanElement | null>(null);
+  const linkedMedia =
+    document && annotationEnabled && node?.children?.some((child) => child.tagName === 'img');
+  const withMedia = (link: ReactElement) =>
+    linkedMedia ? (
+      <span className="group/media inline-flex max-w-full items-start gap-2 align-top">
+        <MediaToolbarHostContext.Provider value={tools}>{link}</MediaToolbarHostContext.Provider>
+        <span ref={setTools} className="flex shrink-0 items-start gap-1" />
+      </span>
+    ) : (
+      link
+    );
   const withAddress = (element: ReactElement) =>
     href ? (
       <Tooltip>
@@ -101,7 +136,7 @@ function MarkdownLink({
   if (target.kind === 'disabled' || (target.kind === 'file' && (!context || !readFile)))
     return withAddress(<span tabIndex={-1}>{children}</span>);
   if (target.kind === 'anchor')
-    return (
+    return withMedia(
       <a
         {...props}
         href={href}
@@ -111,9 +146,9 @@ function MarkdownLink({
         }}
       >
         {children}
-      </a>
+      </a>,
     );
-  return withAddress(
+  const link = withAddress(
     <a
       {...props}
       title={undefined}
@@ -138,35 +173,45 @@ function MarkdownLink({
       {children}
     </a>,
   );
+  return withMedia(link);
 }
 
 const components: Components = {
   a: MarkdownLink,
   img: MarkdownImage,
-  pre({ children, node: _node, ...props }) {
-    const child = Children.toArray(children)[0];
-    if (
-      !isValidElement<{ className?: string; children?: ReactNode }>(child) ||
-      child.type !== 'code'
-    )
-      return <pre {...props}>{children}</pre>;
-    const language = child.props.className
-      ?.split(/\s+/)
-      .find((name) => name.startsWith('language-'))
-      ?.slice(9);
-    if (language === 'mermaid')
-      return <Mermaid code={markdownCodeText(child.props.children).replace(/\n$/, '')} />;
-    return (
-      <MarkdownCodeBlock {...props} language={language}>
-        {child}
-      </MarkdownCodeBlock>
-    );
-  },
+  pre: MarkdownPre,
 };
 
-function MarkdownImage({ node: _node, ...props }: ComponentProps<'img'> & { node?: unknown }) {
+function MarkdownPre({ children, node, ...props }: ComponentProps<'pre'> & { node?: SourceNode }) {
+  const context = useContext(MarkdownMediaContext);
+  const child = Children.toArray(children)[0];
+  if (!isValidElement<{ className?: string; children?: ReactNode }>(child) || child.type !== 'code')
+    return <pre {...props}>{children}</pre>;
+  const language = child.props.className
+    ?.split(/\s+/)
+    .find((name) => name.startsWith('language-'))
+    ?.slice(9);
+  if (language === 'mermaid')
+    return (
+      <MediaAnnotationContext.Provider value={markdownMediaTarget(context, node, true)}>
+        <Mermaid code={markdownCodeText(child.props.children).replace(/\n$/, '')} />
+      </MediaAnnotationContext.Provider>
+    );
+  return (
+    <MarkdownCodeBlock {...props} language={language}>
+      {child}
+    </MarkdownCodeBlock>
+  );
+}
+
+function MarkdownImage({ node, ...props }: ComponentProps<'img'> & { node?: SourceNode }) {
   const context = useContext(FileLinkContext);
-  return <ImageContent {...props} sourcePath={context?.sourcePath} />;
+  const document = useContext(MarkdownMediaContext);
+  return (
+    <MediaAnnotationContext.Provider value={markdownMediaTarget(document, node, false)}>
+      <ImageContent {...props} sourcePath={context?.sourcePath} />
+    </MediaAnnotationContext.Provider>
+  );
 }
 
 export type MarkdownProps<TRef = JsonValue> = {
@@ -285,7 +330,11 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
           {...preview.events}
         >
           {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
-          {renderedMarkdown}
+          <MarkdownMediaContext.Provider
+            value={annotated ? { ref: annotationReference, source: children } : undefined}
+          >
+            {renderedMarkdown}
+          </MarkdownMediaContext.Provider>
         </div>
       </FileLinkContext.Provider>
       {file && (

@@ -49,6 +49,16 @@ const sourceKey = (target: AnnotationTarget<unknown>) =>
 const targetsKey = (targets: readonly AnnotationTarget<unknown>[]) =>
   JSON.stringify(targets.map(annotationTargetKey).sort());
 
+/** Renderer-owned media source and readiness; geometry is available after loading succeeds. */
+export type AnnotationObjectRegistration<TRef> = {
+  target: AnnotationTarget<TRef>;
+  source: string;
+  element?: HTMLElement;
+  error?: string;
+  summary: string;
+  anchor?: () => DOMRect | undefined;
+};
+
 export class AnnotationStore<TRef> {
   private listeners = new Set<() => void>();
   private texts = new Map<
@@ -58,12 +68,14 @@ export class AnnotationStore<TRef> {
     }
   >();
   private sources = new Map<string, string>();
+  private objects = new Map<symbol, AnnotationObjectRegistration<TRef>>();
   /** Latest registered source per identity, kept after unmount so changes stay detectable. */
   private lastSources = new Map<string, string>();
   private fileSnapshots = new Map<string, FileSnapshot<TRef>>();
   private fileView: FileAnnotationView<TRef> | null = null;
   private fileSequence = 0;
   overlayContainer: HTMLElement | null = null;
+  private mediaViewTarget: AnnotationTarget<TRef> | undefined;
   private fileReady: (() => void) | undefined;
   private locating = 0;
   private options: PageAnnotationOptions<TRef> | undefined;
@@ -104,6 +116,13 @@ export class AnnotationStore<TRef> {
     this.overlayContainer = container;
     this.publish({});
   };
+  setMediaView = (target: AnnotationTarget<TRef> | undefined) => {
+    this.mediaViewTarget = target;
+    this.registryChanged();
+  };
+  get mediaViewActive() {
+    return this.mediaViewTarget !== undefined;
+  }
   openFile = (
     reference: FileReferenceRequest,
     ref: TRef,
@@ -342,10 +361,70 @@ export class AnnotationStore<TRef> {
       this.registryChanged();
     };
   };
+  registerObject = (registration: AnnotationObjectRegistration<TRef>) => {
+    const id = Symbol();
+    this.objects.set(id, { ...registration, target: copy(registration.target) });
+    this.lastSources.set(sourceKey(registration.target), registration.source);
+    this.registryChanged();
+    return () => {
+      this.objects.delete(id);
+      this.registryChanged();
+    };
+  };
+  private objectPresentations(target: AnnotationTarget<TRef>) {
+    const key = annotationTargetKey(target);
+    const modal = this.overlayContainer?.closest('[role="dialog"]') ?? this.overlayContainer;
+    return [...this.objects.values()].filter(
+      (item): item is AnnotationObjectRegistration<TRef> & { element: HTMLElement } =>
+        annotationTargetKey(item.target) === key &&
+        !!item.element?.isConnected &&
+        (!modal || modal.contains(item.element)),
+    );
+  }
+  private async locateObject(target: AnnotationTarget<TRef>, request: number) {
+    const key = annotationTargetKey(target);
+    while (request === this.locating) {
+      const object = this.objectPresentations(target)[0];
+      if (object) return object.element;
+      const registrations = [...this.objects.values()].filter(
+        (item) => annotationTargetKey(item.target) === key,
+      );
+      if (!registrations.length) {
+        // Navigation removed the loading media. Invalidate this request instead of opening
+        // its editor in the view the person has just switched to.
+        this.locating++;
+        return;
+      }
+      if (!registrations.some((item) => !item.element && !item.error)) {
+        const failed = registrations.find((item) => item.error);
+        if (failed) throw new Error(failed.error);
+        return;
+      }
+      // Loading media registers its identity before its DOM is ready. Resume after the renderer
+      // reports success or failure; awaiting also lets cleanup/register pairs finish together.
+      await new Promise<void>((resolve) => {
+        const unsubscribe = this.subscribeRegistry(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+    }
+  }
+  isMediaTarget = (target: AnnotationTarget<TRef>) => this.objectPresentations(target).length > 0;
   /** Resolve live renderer geometry while retaining readable summaries after unmount. */
   presentation = (
     targets: readonly AnnotationTarget<TRef>[],
   ): AnnotationPresentation | undefined => {
+    for (const target of targets) {
+      const object = this.objectPresentations(target)[0];
+      if (object)
+        return {
+          summary: object.summary,
+          anchor: object.anchor?.() ?? object.element.getBoundingClientRect(),
+          side: 'bottom',
+          align: 'end',
+        };
+    }
     for (const registration of this.texts.values()) {
       const presentation = registration.presentation?.(targets);
       if (presentation) return presentation;
@@ -401,13 +480,14 @@ export class AnnotationStore<TRef> {
   registeredElements = () =>
     [
       ...new Set([
+        ...[...this.objects.values()].map((item) => item.element),
         ...[...this.texts.values()].flatMap((item) =>
           item.segments.flatMap((segment) =>
             segment.node.parentElement ? [segment.node.parentElement] : [],
           ),
         ),
       ]),
-    ].filter((element) => element?.isConnected);
+    ].filter((element): element is HTMLElement => !!element?.isConnected);
   numberFor = (id: string) =>
     this.numbers.get(id) ??
     (this.state.editor && !this.state.editor.id && this.state.editor.draftId === id
@@ -417,11 +497,13 @@ export class AnnotationStore<TRef> {
     this.stagedSources.clear();
     for (const target of targets) {
       if (!target.text) continue;
-      const source = [...this.texts.values()].find(
-        (item) =>
-          sourceKey(item) === sourceKey(target) &&
-          item.segments.some((segment) => segment.node.isConnected),
-      )?.source;
+      const source =
+        this.objectPresentations(target)[0]?.source ??
+        [...this.texts.values()].find(
+          (item) =>
+            sourceKey(item) === sourceKey(target) &&
+            item.segments.some((segment) => segment.node.isConnected),
+        )?.source;
       if (source !== undefined) this.stagedSources.set(annotationTargetKey(target), source);
     }
   }
@@ -513,6 +595,11 @@ export class AnnotationStore<TRef> {
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
   targetRects = (target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] => {
+    if (
+      this.mediaViewTarget &&
+      annotationTargetKey(this.mediaViewTarget) !== annotationTargetKey(target)
+    )
+      return [];
     const key = sourceKey(target);
     if (
       this.fileView?.open &&
@@ -520,6 +607,14 @@ export class AnnotationStore<TRef> {
     )
       return [];
     const clipRect = createRectClipper();
+    const object = this.objectPresentations(target)[0];
+    if (object) {
+      const bounds =
+        object.element.querySelector?.('svg')?.getBoundingClientRect() ??
+        object.element.getBoundingClientRect();
+      const visible = clipRect(bounds, object.element);
+      return visible ? [visible] : [];
+    }
     if (!target.text) return this.adapterRects(target, firstOnly);
     const text = target.text;
     const original =
@@ -662,6 +757,14 @@ export class AnnotationStore<TRef> {
         }
       }
       if (request !== this.locating) return;
+      // Only media needs this wait. Yielding for text would let asynchronous highlighting
+      // replace its Text nodes before the renderer has rebound their source registration.
+      const objectKey = annotationTargetKey(target);
+      const mediaTarget = [...this.objects.values()].some(
+        (item) => annotationTargetKey(item.target) === objectKey,
+      );
+      const objectElement = mediaTarget ? await this.locateObject(target, request) : undefined;
+      if (request !== this.locating) return;
       const key = sourceKey(target);
       const registrations = [...this.texts.values()].filter(
         (item) => sourceKey(item) === key && (!target.text || item.source === source),
@@ -681,14 +784,14 @@ export class AnnotationStore<TRef> {
               (offset) => offset !== null && offset > text.start && offset <= text.end,
             )),
       )?.node.parentElement;
-      const element = textElement;
+      const element = objectElement ?? textElement;
       // Without an adapter, Paneon cannot bring back content that the page unmounted.
       if (!element && !fileSnapshot && !this.options?.adapter)
         throw new Error(
           'The target is not displayed. Supply an adapter whose locate shows its view.',
         );
       element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      if (target.text) this.highlightText(target, source);
+      if (target.text && !this.isMediaTarget(target)) this.highlightText(target, source);
       if (element) await waitForAnnotationLocation(element);
       if (request !== this.locating) return;
       element?.animate?.(

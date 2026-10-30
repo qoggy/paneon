@@ -61,7 +61,7 @@ export function diffTargetLocation(
     side: ref.side,
     start: offset + range.start,
     end: offset + range.end,
-    quote: range.quote,
+    quote: range.quote!, // diffTargetText above has verified the original quote.
   };
 }
 export function diffTargetText(
@@ -131,7 +131,7 @@ export function normalizeDiffTarget(
     text: {
       start: startOffset - lines[start].start,
       end: endOffset - lines[start].start,
-      quote: target.text.quote,
+      quote: target.text.quote!, // diffTargetText above has verified this text-only target.
     },
   };
 }

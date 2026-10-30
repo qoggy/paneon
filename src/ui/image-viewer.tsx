@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Download, Maximize, Minus, Plus, X } from 'lucide-react';
+import { Download, Maximize, MessageSquareText, Minus, Plus, X } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 import { Spinner } from './spinner';
 import { useUI } from './use-ui';
+import { MediaAnnotationContext, useMediaAnnotation } from './media-annotation';
+import type { MediaAnnotationHandle } from './media-annotation';
 
 type ViewerImage = { url: string; width: number; height: number; alt?: string };
 type ViewerProps = {
@@ -14,6 +16,7 @@ type ViewerProps = {
   download?: () => void;
   downloadLabel?: string;
   busy?: boolean;
+  annotation?: MediaAnnotationHandle;
 };
 
 export function ImageViewerDialog({
@@ -26,27 +29,59 @@ export function ImageViewerDialog({
   onOpenChange: (open: boolean) => void;
   finalFocus: React.ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
+  const store = props.annotation?.store;
+  const descriptor = props.annotation?.descriptor;
+  const previousContainer = useRef<HTMLElement | null>(null);
+  const overlay = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!store || !descriptor) return;
+      if (node) {
+        previousContainer.current = store.overlayContainer;
+        store.setOverlayContainer(node);
+        store.setMediaView(descriptor.target);
+      } else {
+        store.setMediaView(undefined);
+        store.setOverlayContainer(previousContainer.current);
+      }
+    },
+    [store, descriptor],
+  );
+  function changeOpen(next: boolean) {
+    if (!next && store?.getSnapshot().editor) {
+      store.openAnnotation();
+      return;
+    }
+    onOpenChange(next);
+  }
   return (
-    <TooltipProvider>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          data-slot={props.kind === 'diagram' ? 'mermaid-viewer' : 'image-viewer'}
-          showCloseButton={false}
-          className="flex h-[calc(100dvh-4rem)] w-[calc(100vw-4rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
-          onKeyDownCapture={(event) => {
-            // Focused icon tooltips must not consume the viewer's Escape action.
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              onOpenChange(false);
-            }
-          }}
-          finalFocus={finalFocus}
+    <MediaAnnotationContext.Provider value={descriptor}>
+      <TooltipProvider>
+        <Dialog
+          open={open}
+          onOpenChange={changeOpen}
+          onOpenChangeComplete={() => store?.refreshGeometry()}
         >
-          <ImageViewer {...props} />
-        </DialogContent>
-      </Dialog>
-    </TooltipProvider>
+          <DialogContent
+            ref={overlay}
+            data-slot={props.kind === 'diagram' ? 'mermaid-viewer' : 'image-viewer'}
+            showCloseButton={false}
+            className="flex h-[calc(100dvh-4rem)] w-[calc(100vw-4rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+            onKeyDownCapture={(event) => {
+              // Focused icon tooltips must not consume the viewer's Escape action.
+              if (event.key === 'Escape') {
+                if (store?.getSnapshot().editor) return;
+                event.preventDefault();
+                event.stopPropagation();
+                changeOpen(false);
+              }
+            }}
+            finalFocus={finalFocus}
+          >
+            <ImageViewer {...props} />
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
+    </MediaAnnotationContext.Provider>
   );
 }
 
@@ -78,6 +113,11 @@ function ImageViewer({ image, kind, download, downloadLabel, busy }: ViewerProps
   const prefix = kind === 'diagram' ? 'mermaid' : 'image';
   const { t } = useUI();
   const viewport = useRef<HTMLDivElement>(null);
+  const picture = useRef<HTMLImageElement>(null);
+  const annotation = useMediaAnnotation(picture, {
+    source: '',
+    summary: image.alt ?? t('Annotation target'),
+  });
   const drag = useRef<{ id: number; x: number; y: number; panX: number; panY: number } | null>(
     null,
   );
@@ -160,6 +200,15 @@ function ImageViewer({ image, kind, download, downloadLabel, busy }: ViewerProps
           <Maximize />
         </ViewerIconButton>
         <span className="mx-1.5 h-4 border-l" aria-hidden="true" />
+        {annotation && (
+          <ViewerIconButton
+            label={t('批注')}
+            disabled={annotation.disabled}
+            onClick={(event) => annotation.begin(event.currentTarget)}
+          >
+            <MessageSquareText />
+          </ViewerIconButton>
+        )}
         {download && (
           <ViewerIconButton
             label={downloadLabel ?? t('Download PNG')}
@@ -213,6 +262,7 @@ function ImageViewer({ image, kind, download, downloadLabel, busy }: ViewerProps
         }}
       >
         <img
+          ref={picture}
           data-slot={`${prefix}-viewer-image`}
           src={image.url}
           alt={image.alt ?? t('Expanded diagram')}

@@ -5,10 +5,14 @@ export type { JsonValue } from '../shared/types.js';
 export type AnnotationTextRange = { start: number; end: number; quote: string };
 export type AnnotationTarget<TRef = JsonValue> = {
   ref: TRef;
+  /** Original src supplied to a standalone Image. */
+  src?: string;
   /** Optional source identity within the page-defined reference. */
   sourceRef?: JsonValue;
-  text?: AnnotationTextRange;
-};
+} & (
+  | { type?: undefined; text?: AnnotationTextRange }
+  | { type: 'mermaid'; text?: { start: number; end: number; quote?: never } }
+);
 export type Annotation<TRef = JsonValue> = {
   id: string;
   targets: AnnotationTarget<TRef>[];
@@ -65,9 +69,17 @@ export function annotationKey(value: unknown): string {
 }
 
 // Optional text is omitted from semantic identity, including explicit undefined from TS callers.
-export function annotationTargetKey(target: AnnotationTarget<unknown>): string {
+export function annotationTargetKey(target: {
+  ref: unknown;
+  src?: string;
+  type?: 'mermaid';
+  sourceRef?: JsonValue;
+  text?: { start: number; end: number; quote?: string };
+}): string {
   return annotationKey({
     ref: target.ref,
+    ...(target.src === undefined ? {} : { src: target.src }),
+    ...(target.type === undefined ? {} : { type: target.type }),
     ...(target.sourceRef === undefined ? {} : { sourceRef: target.sourceRef }),
     ...(target.text === undefined ? {} : { text: target.text }),
   });
@@ -81,7 +93,7 @@ export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
     .object({
       start: z.number().int().nonnegative(),
       end: z.number().int().positive(),
-      quote: z.string(),
+      quote: z.string().optional(),
     })
     .strict()
     .superRefine((range, ctx) => {
@@ -91,23 +103,35 @@ export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
           message: 'Text range end must exceed start.',
           path: ['end'],
         });
-      if (range.quote.length !== range.end - range.start)
+      if (range.quote !== undefined && range.quote.length !== range.end - range.start)
         ctx.addIssue({
           code: 'custom',
           message: 'Quote must match the UTF-16 range length.',
           path: ['quote'],
         });
     });
-  const target = z
+  const targetSchema = z
     .object({
       ref: reference,
+      src: z.string().optional(),
+      type: z.literal('mermaid').optional(),
       sourceRef: z
         .custom<JsonValue>(isAnnotationJson, 'Source reference must be JSON.')
         .pipe(z.json())
         .optional(),
       text: text.optional(),
     })
-    .strict();
+    .strict()
+    .superRefine((target, ctx) => {
+      if (target.text && target.type !== 'mermaid' && target.text.quote === undefined)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A text target requires its original quote.',
+          path: ['text', 'quote'],
+        });
+    });
+  // Preserve object-shape composition while exposing the refined target union to consumers.
+  const target = targetSchema as typeof targetSchema & z.ZodType<AnnotationTarget<TRef>>;
   const annotation = z
     .object({
       id: z.string().min(1),

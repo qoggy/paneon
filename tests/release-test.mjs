@@ -41,6 +41,7 @@ const browserScripts = [
   'table-header-themes',
   'feedback',
   'annotation-api',
+  'media-annotations',
   'annotation-editor',
   'annotation-popover',
   'annotation-drag',
@@ -202,6 +203,12 @@ const selectedCommands = [
     command: process.execPath,
     args: [`tests/${file}`],
   })),
+  {
+    phase: 'package',
+    name: 'media-annotations-pack',
+    command: process.execPath,
+    args: ['tests/browser/media-annotations.mjs', '--package'],
+  },
   {
     phase: 'package',
     name: 'package-cli-bin',

@@ -1,5 +1,6 @@
 import { useRef, useState, type HTMLAttributes } from 'react';
 import { ImageViewerDialog } from './image-viewer';
+import type { MediaAnnotationHandle } from './media-annotation';
 
 /** Shared by Image and Markdown's delegated custom-image preview. */
 export function useImagePreview(
@@ -7,6 +8,7 @@ export function useImagePreview(
     download?: (url: string) => void;
     downloadLabel?: string;
     busy?: boolean;
+    annotation?: MediaAnnotationHandle;
   } = {},
 ) {
   const [image, setImage] = useState<{
@@ -72,6 +74,7 @@ export function useImagePreview(
         download={image.download}
         downloadLabel={options.downloadLabel}
         busy={options.busy}
+        annotation={options.annotation}
         finalFocus={() => (returnFocus.current?.isConnected ? returnFocus.current : null)}
       />
     ) : null,

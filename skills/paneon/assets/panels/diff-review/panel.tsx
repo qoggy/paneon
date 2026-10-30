@@ -382,7 +382,12 @@ function DiffReviewPanel() {
       },
       targetRanges(target) {
         return mounted.current === `${target.ref.fileIndex}:${target.ref.snapshotId}` && target.text
-          ? (diff.current?.getRanges({ kind: 'text', side: target.ref.side, ...target.text }) ?? [])
+          ? (diff.current?.getRanges({
+              kind: 'text',
+              side: target.ref.side,
+              ...target.text,
+              quote: target.text.quote!,
+            }) ?? [])
           : [];
       },
       async locate(target) {
@@ -402,7 +407,12 @@ function DiffReviewPanel() {
         );
         if (serial !== locating.current) return;
         if (grouped) tree.current?.expandAll();
-        await diff.current?.reveal({ kind: 'text', side, ...target.text });
+        await diff.current?.reveal({
+          kind: 'text',
+          side,
+          ...target.text,
+          quote: target.text.quote!,
+        });
       },
     },
   });

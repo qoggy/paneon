@@ -42,7 +42,7 @@ export function validTextRange(source: string, target: AnnotationTarget<unknown>
     end <= source.length &&
     normalized.start === start &&
     normalized.end === end &&
-    source.slice(start, end) === quote
+    (target.type === 'mermaid' || source.slice(start, end) === quote)
   );
 }
 

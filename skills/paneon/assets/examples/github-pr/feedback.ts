@@ -32,6 +32,7 @@ export function publicPRFeedback(feedback: PRResolvedFeedback): PRFeedbackSubmit
             : {};
         return {
           ...location,
+          ...(target.type === undefined ? {} : { type: target.type }),
           ...(target.text === undefined ? {} : { text: target.text }),
           ...(origin.key === parent.key ? {} : { source: origin.source }),
         };

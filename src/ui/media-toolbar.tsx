@@ -1,5 +1,5 @@
 import { useState, type MouseEventHandler, type ReactNode } from 'react';
-import { Ellipsis, Expand } from 'lucide-react';
+import { Ellipsis, Expand, MessageSquareText } from 'lucide-react';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
 import { ViewerIconButton } from './image-viewer';
@@ -13,13 +13,15 @@ export function MediaToolbar({
   moreLabel,
   onExpand,
   busy = false,
+  annotation,
   children,
 }: {
   expandLabel: string;
   moreLabel: string;
-  onExpand: MouseEventHandler<HTMLButtonElement>;
+  onExpand?: MouseEventHandler<HTMLButtonElement>;
   busy?: boolean;
-  children: ReactNode;
+  annotation?: { label: string; disabled: boolean; onClick: MouseEventHandler<HTMLButtonElement> };
+  children?: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -32,32 +34,46 @@ export function MediaToolbar({
           menuOpen || busy ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
-        <ViewerIconButton label={expandLabel} tooltipSide="right" onClick={onExpand}>
-          <Expand />
-        </ViewerIconButton>
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={moreLabel}
-                      disabled={busy}
-                    >
-                      {busy ? <Spinner aria-hidden="true" /> : <Ellipsis />}
-                    </Button>
-                  }
-                />
-              }
-            />
-            <TooltipContent side="right">{moreLabel}</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end">{children}</DropdownMenuContent>
-        </DropdownMenu>
+        {onExpand && (
+          <ViewerIconButton label={expandLabel} tooltipSide="right" onClick={onExpand}>
+            <Expand />
+          </ViewerIconButton>
+        )}
+        {annotation && (
+          <ViewerIconButton
+            label={annotation.label}
+            tooltipSide="right"
+            disabled={annotation.disabled}
+            onClick={annotation.onClick}
+          >
+            <MessageSquareText />
+          </ViewerIconButton>
+        )}
+        {children && (
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={moreLabel}
+                        disabled={busy}
+                      >
+                        {busy ? <Spinner aria-hidden="true" /> : <Ellipsis />}
+                      </Button>
+                    }
+                  />
+                }
+              />
+              <TooltipContent side="right">{moreLabel}</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">{children}</DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </span>
     </TooltipProvider>
   );

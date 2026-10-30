@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="240" viewBox="0 0 640 240">
+  <rect width="640" height="240" rx="12" fill="#fafafa"/>
+  <rect x="24" y="24" width="592" height="192" rx="8" fill="white" stroke="#ddd"/>
+  <text x="48" y="68" font-family="sans-serif" font-size="22" fill="#171717">Order summary</text>
+  <text x="48" y="116" font-family="sans-serif" font-size="16" fill="#555">Workspace plan</text>
+  <text x="48" y="176" font-family="sans-serif" font-size="16" fill="#171717">Total: $99</text>
+  <rect x="430" y="144" width="160" height="44" rx="6" fill="#171717"/>
+  <text x="458" y="172" font-family="sans-serif" font-size="16" fill="white">Place order</text>
+</svg>

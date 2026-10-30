@@ -80,6 +80,7 @@ export type PRResolvedFeedback = z.infer<typeof prResolvedFeedbackSchema>;
 const localSourceSchema = z.object({ path: z.string(), snapshotId: z.string() });
 const sourceMetadataSchema = z.union([prSourceSchema, localSourceSchema]);
 const targetShape = {
+  type: z.literal('mermaid').optional(),
   text: prFeedbackSchema.shape.annotations.element.shape.targets.element.shape.text,
   source: sourceMetadataSchema.optional(),
 };

@@ -1,7 +1,10 @@
 import type { AnnotationTextRange } from '@qoggy/paneon/sdk';
 
 /** Locate a raw-source range using the same explicit boundary map used for selection. */
-export function locateMarkdownAnnotation(root: HTMLElement, text?: AnnotationTextRange) {
+export function locateMarkdownAnnotation(
+  root: HTMLElement,
+  text?: Pick<AnnotationTextRange, 'start' | 'end'>,
+) {
   root.scrollIntoView({ block: 'start' });
   if (!text) {
     root.animate?.(

@@ -23,7 +23,9 @@ export function publicFileFeedback(
       targets: annotation.targets.map((target) =>
         target.ref.part === 'path'
           ? { path: { quote: target.text!.quote! } }
-          : { text: target.text! },
+          : target.type === 'mermaid'
+            ? { type: 'mermaid' as const, text: target.text! }
+            : { text: target.text! },
       ),
       comment: annotation.comment,
     });

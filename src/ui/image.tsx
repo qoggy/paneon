@@ -21,6 +21,9 @@ import { Spinner } from './spinner';
 import { useToastManager } from './toast-manager';
 import { cn } from './utils';
 import { useUI } from './use-ui';
+import { createPortal } from 'react-dom';
+import type { JsonValue } from '../sdk/annotation';
+import { MediaToolbarHostContext, useMediaAnnotation } from './media-annotation';
 
 const imageMime: Record<string, string> = {
   '.png': 'image/png',
@@ -118,14 +121,15 @@ export const readImage = serverAction({
   },
 });
 
-export type ImageProps = {
+export type ImageProps<TRef = JsonValue> = {
   src: string;
   alt: string;
   sourcePath?: string;
   className?: string;
+  annotationTarget?: TRef;
 };
 
-export function Image(props: ImageProps) {
+export function Image<TRef = JsonValue>(props: ImageProps<TRef>) {
   return <ImageContent {...props} />;
 }
 
@@ -134,10 +138,12 @@ export function ImageContent({
   sourcePath,
   className,
   alt,
+  annotationTarget,
   ...props
-}: ComponentProps<'img'> & { sourcePath?: string }) {
+}: ComponentProps<'img'> & { sourcePath?: string; annotationTarget?: unknown }) {
   const { t, message } = useUI();
   const inPanel = useContext(PanelInputContext) !== undefined;
+  const toolbarHost = useContext(MediaToolbarHostContext);
   const source = typeof props.src === 'string' ? props.src : '';
   const local = inPanel && !!readImage.actionId && markdownLink(source).kind === 'file';
   const key = JSON.stringify([source, sourcePath]);
@@ -148,7 +154,23 @@ export function ImageContent({
     error: boolean;
     previewable: boolean;
   }>();
+  const current = resource?.key === key ? resource : undefined;
+  const actualSrc = local ? current?.src : props.src;
+  const currentStatus = status?.key === key && status.src === actualSrc ? status : undefined;
+  const failure =
+    (local ? current?.error : undefined) ??
+    (currentStatus?.error ? 'Unable to load image.' : undefined);
+  const ready = !!currentStatus && !currentStatus.error;
+  const loading = !!props.src && !failure && !ready;
+  const expandable = ready && currentStatus.previewable;
   const imageRef = useRef<HTMLImageElement>(null);
+  const annotation = useMediaAnnotation(imageRef, {
+    annotationTarget,
+    source,
+    summary: alt || t('Annotation target'),
+    ready,
+    error: failure,
+  });
   const browserAction = useBrowserAction();
   const toast = useToastManager();
   const [busy, setBusy] = useState(false);
@@ -158,6 +180,7 @@ export function ImageContent({
     download: (url) => void run('download-image', url),
     downloadLabel: t('Download original'),
     busy,
+    annotation,
   });
   useEffect(() => {
     if (!local) return;
@@ -181,15 +204,6 @@ export function ImageContent({
       active = false;
     };
   }, [source, sourcePath, key, local]);
-  const current = resource?.key === key ? resource : undefined;
-  const actualSrc = local ? current?.src : props.src;
-  const currentStatus = status?.key === key && status.src === actualSrc ? status : undefined;
-  const failure =
-    (local ? current?.error : undefined) ??
-    (currentStatus?.error ? 'Unable to load image.' : undefined);
-  const ready = !!currentStatus && !currentStatus.error;
-  const loading = !!props.src && !failure && !ready;
-  const expandable = ready && currentStatus.previewable;
   useLayoutEffect(() => {
     // Cached images may finish before React attaches their load listener.
     const element = imageRef.current;
@@ -300,11 +314,20 @@ export function ImageContent({
               }}
             />
           )}
-          {expandable && (
+          {expandable && toolbarHost === undefined && (
             <MediaToolbar
               expandLabel={t('Expand image')}
               moreLabel={t('More image options')}
               busy={busy}
+              annotation={
+                annotation
+                  ? {
+                      label: t('批注'),
+                      disabled: annotation.disabled,
+                      onClick: (event) => annotation.begin(event.currentTarget),
+                    }
+                  : undefined
+              }
               onExpand={(event) => preview.expand(imageRef.current, event.currentTarget)}
             >
               <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
@@ -324,6 +347,21 @@ export function ImageContent({
           )}
         </span>
       )}
+      {toolbarHost &&
+        annotation &&
+        ready &&
+        createPortal(
+          <MediaToolbar
+            expandLabel={t('Expand image')}
+            moreLabel={t('More image options')}
+            annotation={{
+              label: t('批注'),
+              disabled: annotation.disabled,
+              onClick: (event) => annotation.begin(event.currentTarget),
+            }}
+          />,
+          toolbarHost,
+        )}
       {preview.viewer}
     </>
   );

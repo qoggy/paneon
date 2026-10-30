@@ -1,7 +1,11 @@
-import type { AnnotationTarget } from '@qoggy/paneon/sdk';
-
 /** Offsets refer to the complete, unmodified source, and must not split a grapheme. */
-export function validSourceRange(source: string, target: AnnotationTarget<unknown>) {
+export function validSourceRange(
+  source: string,
+  target: {
+    type?: 'mermaid';
+    text?: { start: number; end: number; quote?: string };
+  },
+) {
   if (!target.text) return true;
   const { start, end, quote } = target.text;
   const boundaries = new Set([0, source.length]);
@@ -15,6 +19,6 @@ export function validSourceRange(source: string, target: AnnotationTarget<unknow
     end <= source.length &&
     boundaries.has(start) &&
     boundaries.has(end) &&
-    source.slice(start, end) === quote
+    (target.type === 'mermaid' || source.slice(start, end) === quote)
   );
 }

@@ -1,5 +1,6 @@
 import { useUI } from './use-ui';
 import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { Spinner } from './spinner';
 import { cn } from './utils';
 import { Code, Copy, Download } from 'lucide-react';
@@ -11,6 +12,9 @@ import { MediaToolbar } from './media-toolbar';
 import { useBrowserAction } from './browser-action-context';
 import type { BrowserAction } from '../shared/browser-actions';
 import { useToastManager } from './toast-manager';
+import type { JsonValue } from '../sdk/annotation';
+import { useMediaAnnotation } from './media-annotation';
+import type { MediaAnnotationHandle } from './media-annotation';
 
 let library: Promise<typeof import('mermaid').default> | undefined;
 
@@ -23,9 +27,20 @@ function getMermaid() {
 
 type RenderResult = { code: string; theme: string } & ({ svg: string } | { error: string });
 
-export function Mermaid({ code, className }: { code: string; className?: string }) {
+export type MermaidProps<TRef = JsonValue> = {
+  code: string;
+  className?: string;
+  annotationTarget?: TRef;
+};
+
+export function Mermaid<TRef = JsonValue>({
+  code,
+  className,
+  annotationTarget,
+}: MermaidProps<TRef>) {
   const { t, theme } = useUI();
   const host = useRef<HTMLDivElement>(null);
+  const diagram = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<RenderResult>();
 
   useEffect(() => {
@@ -69,6 +84,14 @@ export function Mermaid({ code, className }: { code: string; className?: string 
   }, [code, theme]);
 
   const current = result?.code === code && result.theme === theme ? result : undefined;
+  const annotation = useMediaAnnotation(diagram, {
+    annotationTarget,
+    type: 'mermaid',
+    source: code,
+    summary: t('Diagram viewer'),
+    ready: !!current && 'svg' in current,
+    error: current && 'error' in current ? current.error : undefined,
+  });
 
   return (
     <div ref={host} data-slot="mermaid" className={cn('min-w-0', className)}>
@@ -80,17 +103,32 @@ export function Mermaid({ code, className }: { code: string; className?: string 
           <pre className="whitespace-pre-wrap">{current.error}</pre>
         </div>
       ) : (
-        <MermaidDiagram key={`${code}:${theme}`} code={code} svg={current.svg} />
+        <MermaidDiagram
+          key={`${code}:${theme}`}
+          code={code}
+          svg={current.svg}
+          diagram={diagram}
+          annotation={annotation}
+        />
       )}
     </div>
   );
 }
 
-function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
+function MermaidDiagram({
+  code,
+  svg,
+  diagram,
+  annotation,
+}: {
+  code: string;
+  svg: string;
+  diagram: RefObject<HTMLDivElement | null>;
+  annotation: MediaAnnotationHandle;
+}) {
   const { t } = useUI();
   const browserAction = useBrowserAction();
   const toast = useToastManager();
-  const diagram = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [image, setImage] = useState<DiagramImage | null>(null);
   const [open, setOpen] = useState(false);
@@ -170,6 +208,15 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
           moreLabel={t('More diagram options')}
           onExpand={expand}
           busy={busy}
+          annotation={
+            annotation
+              ? {
+                  label: t('批注'),
+                  disabled: annotation.disabled,
+                  onClick: (event) => annotation.begin(event.currentTarget),
+                }
+              : undefined
+          }
         >
           <DropdownMenuItem disabled={busy} onClick={() => void run('copy-text')}>
             <Code />
@@ -193,6 +240,7 @@ function MermaidDiagram({ code, svg }: { code: string; svg: string }) {
           onOpenChange={setOpen}
           image={image}
           busy={busy}
+          annotation={annotation}
           download={() => void run('download-image')}
           finalFocus={() =>
             returnFocus.current?.isConnected ? returnFocus.current : diagram.current

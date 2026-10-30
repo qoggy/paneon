@@ -41,6 +41,13 @@ export const fileReviewSubmittedSchema = z.object({
           targets: z.array(
             z.union([
               z.object({ text: target.shape.text.unwrap().safeExtend({ quote: z.string() }) }),
+              z.object({
+                type: z.literal('mermaid'),
+                text: z.object({
+                  start: target.shape.text.unwrap().shape.start,
+                  end: target.shape.text.unwrap().shape.end,
+                }),
+              }),
               z.object({ path: z.object({ quote: z.string() }) }),
             ]),
           ),

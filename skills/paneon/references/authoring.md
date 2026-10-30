@@ -186,7 +186,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 - `Select` needs `items` to display labels for values.
 - `CodeBlock`: `<CodeBlock code={source} language="ts" header="Retry strategy" />`. Only `code` is required. `header` defaults to `true` for the language title; pass a string for a custom title, or `false` to hide the title bar. Use `lineNumbers` when line references help the explanation, or `highlightedLines={{ start: 3, end: 5 }}` to emphasize a range (1-based, both endpoints included). Line numbers default to `false`; wrapping defaults to `true`, with `defaultWrap={false}` for initial horizontal scrolling. To collect feedback on code, see [annotations](#markdown-codeblock-and-diffview).
 - `Markdown` renders GFM without raw HTML. Replacing `pre` through `components` also drops Mermaid rendering.
-- `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath` and `className`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component.
+- `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath`, `className` and `annotationTarget`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component. To annotate it, see [Image and Mermaid](#image-and-mermaid).
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
 - `Mermaid` is bundled; never load Mermaid from a CDN.
 - `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [annotations](#markdown-codeblock-and-diffview).
@@ -248,8 +248,8 @@ export default definePanel({
 
 ### Result data
 
-- `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading. A target is `{ref, sourceRef?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
-- `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`.
+- `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading. A target is `{ref, src?, sourceRef?, type?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
+- `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`. A target with `type: 'mermaid'` is a diagram; its `text`, when present, is `{start, end}` without `quote`.
 - `ref` is any finite JSON value. For ordinary content use a stable string: `target="redis-plan"` is delivered as `ref: "redis-plan"`. For dynamic content include the source version. Functions, DOM elements and screen coordinates are not references.
 - `annotationValueSchema(refSchema)` checks structure only.
 
@@ -331,6 +331,12 @@ type AnnotationAdapter<TRef> = {
 - With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side. Page validation must accept annotations spanning both sides.
 - A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
 - For another renderer, pass `registerText` `segments: {node: Text, sourceOffsets: (number | null)[]}[]`. Each array has `node.data.length + 1` UTF-16 boundaries into one `source`; use `null` for an unmappable boundary.
+
+### Image and Mermaid
+
+- `<Image annotationTarget="checkout-screen" … />` and `<Mermaid annotationTarget="flow-v1" … />` register the whole image or diagram; the reference becomes `ref` unchanged, without `text`. An Image target also has its `src` prop as written, such as `{ref: 'checkout-screen', src: './screen.svg'}`; a Mermaid target has `type: 'mermaid'`.
+- Inside an annotatable `Markdown`, images and Mermaid fences use the document's `ref`. An image target's `text` covers its image syntax, with `quote`; a Mermaid target has `type: 'mermaid'` and `text` covering the whole fence, without `quote`. Identical occurrences differ by range.
+- Replacing `img` or `pre` through `Markdown` `components` drops these annotations for them.
 
 ### Submission
 
