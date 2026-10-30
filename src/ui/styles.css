@@ -184,3 +184,22 @@ html[data-theme-changing] *::before,
 html[data-theme-changing] *::after {
   transition: none !important;
 }
+
+/* The outline is outside the source-mapped content, with no extra first/last block spacing. */
+:root .markdown-body > [data-markdown-content] > :first-child {
+  margin-top: 0 !important;
+}
+:root .markdown-body > [data-markdown-content] > :last-child {
+  margin-bottom: 0 !important;
+}
+.markdown-body .markdown-toc {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* GitHub's float-clearing pseudo-elements must not consume outline grid columns. */
+:root .markdown-body[data-toc-mode='sidebar']::before,
+:root .markdown-body[data-toc-mode='sidebar']::after {
+  display: none;
+}

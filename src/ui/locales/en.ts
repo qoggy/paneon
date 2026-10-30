@@ -1,4 +1,5 @@
 const en = {
+  'On this page': 'On this page',
   breadcrumb: 'Breadcrumb',
   More: 'More',
   'Copy code': 'Copy code',

@@ -117,6 +117,132 @@ try {
     'Resolved anchors must not navigate or reload the iframe.',
   );
 
+  // Outline layout follows each Markdown region, independently of window width.
+  const wide = frame.getByTestId('wide');
+  const wideRoot = wide.locator('.markdown-body');
+  await wide.evaluate((node) => node.scrollIntoView({ block: 'start' }));
+  const inner = page.frames().find((item) => item.parentFrame());
+  await inner.evaluate(() => window.scrollBy(0, -200));
+  await wideRoot.locator('[data-toc-sidebar]').waitFor();
+  assert.equal(await wideRoot.getAttribute('data-toc-mode'), 'sidebar');
+  const widths = await wideRoot.evaluate((root) => ({
+    root: root.getBoundingClientRect().width,
+    content: root.querySelector('[data-markdown-content]').getBoundingClientRect().width,
+    sidebar: root.querySelector('[data-toc-sidebar]').getBoundingClientRect().width,
+  }));
+  assert.deepEqual(widths, { root: 1088, content: 844, sidebar: 220 });
+  const sidebar = wideRoot.locator('[data-toc-sidebar]');
+  assert.deepEqual(await sidebar.locator('[data-tree-item]').allTextContents(), [
+    '项目升级与环境配置的完整操作说明：从准备工作到上线验证都需要完整阅读',
+    'Parent',
+    'Child bold code',
+    'Last',
+  ]);
+  // Skipped levels nest under the closest actual parent.
+  assert.ok(
+    (await sidebar
+      .getByRole('button', { name: 'Child bold code', exact: true })
+      .evaluate((node) => parseFloat(node.style.paddingLeft))) >
+      (await sidebar
+        .getByRole('button', { name: 'Parent', exact: true })
+        .evaluate((node) => parseFloat(node.style.paddingLeft))),
+  );
+  // The document starts below other page content: align with the window, not its moving edge.
+  await sidebar.getByRole('button', { name: 'Parent', exact: true }).click();
+  await inner.waitForFunction(
+    () =>
+      Math.abs(
+        document.querySelector('[data-testid="wide"] h2').getBoundingClientRect().top - 76,
+      ) <= 1,
+  );
+  assert.equal(
+    await sidebar.getByRole('button', { name: 'Child bold code', exact: true }).count(),
+    1,
+    'Navigating to a parent must keep its child chapters visible.',
+  );
+  assert.equal(await sidebar.locator('[data-toc-active="true"]').textContent(), 'Parent');
+  await frame.getByRole('button', { name: '新增子章节', exact: true }).click();
+  await sidebar.getByRole('button', { name: 'NewChild', exact: true }).waitFor();
+  await frame.getByRole('button', { name: '切换目录宽度', exact: true }).click();
+  await wideRoot.locator('[data-toc-trigger]').waitFor();
+  assert.equal(await wideRoot.getAttribute('data-toc-mode'), 'popup');
+  assert.equal(
+    await wideRoot
+      .locator('[data-markdown-content]')
+      .evaluate((el) => el.getBoundingClientRect().width),
+    1087,
+  );
+  await wideRoot.locator('[data-toc-trigger]').click();
+  const popup = frame.locator('[data-toc-popup]');
+  await popup.waitFor();
+  await popup.evaluate(async (node) => {
+    await Promise.all(node.getAnimations().map((animation) => animation.finished));
+  });
+  const popupSize = await popup.evaluate((node) => ({
+    height: node.getBoundingClientRect().height,
+    scroll: node.scrollHeight,
+  }));
+  assert.ok(
+    popupSize.height < 300,
+    'Short outlines grow with their contents instead of a fixed/minimum height.',
+  );
+  assert.ok(popupSize.scroll <= popupSize.height + 1, JSON.stringify(popupSize));
+  await popup.press('Escape');
+  await popup.waitFor({ state: 'hidden' });
+  assert.equal(
+    await wideRoot.locator('[data-toc-trigger]').evaluate((el) => el === document.activeElement),
+    true,
+  );
+  assert.equal(
+    await frame.getByTestId('no-headings').locator('.markdown-body').getAttribute('data-toc-mode'),
+    'none',
+  );
+
+  await reset(first);
+  await reset(second);
+  await second.scrollIntoViewIfNeeded();
+  // Hover opens only at the small visible trigger, after the requested delay.
+  const trigger = second.locator('[data-toc-trigger]');
+  await trigger.hover();
+  assert.equal(await popup.count(), 0);
+  await popup.waitFor();
+  assert.ok((await popup.evaluate((node) => node.getBoundingClientRect().height)) <= 360);
+  await popup.getByRole('button', { name: 'Repeat', exact: true }).nth(1).click();
+  await popup.waitFor({ state: 'hidden' });
+  // Wait for the clicked heading to reach its reading position and receive focus.
+  await page
+    .frames()
+    .find((item) => item.parentFrame())
+    .waitForFunction(() => {
+      const host = document.querySelector('[data-testid="second"]');
+      const target = host.querySelector('[id$="-repeat-1"]');
+      return (
+        Math.abs(
+          target.getBoundingClientRect().top -
+            Math.max(12, host.getBoundingClientRect().top + host.clientTop + 8) -
+            64,
+        ) <= 1 && document.activeElement === target
+      );
+    });
+  assert.ok((await top(second)) > 0);
+  assert.equal(await top(first), 0, 'The outline must only scroll its own document.');
+  const active = second.locator('[data-toc-trigger]');
+  await active.click();
+  await popup.waitFor();
+  const current = popup.locator('[data-toc-active="true"]');
+  assert.equal(await current.textContent(), 'Repeat');
+  assert.equal(
+    await current.getAttribute('data-tree-item'),
+    await heading(second, 'Repeat').nth(1).getAttribute('id'),
+  );
+  assert.equal(
+    await current.evaluate((el) => getComputedStyle(el).backgroundColor),
+    'rgba(0, 0, 0, 0)',
+  );
+  await popup.press('Escape');
+  await popup.waitFor({ state: 'hidden' });
+  assert.equal(await frame.getByLabel('State marker').inputValue(), 'still retained');
+
   await reset(second);
   await second.getByRole('link', { name: '不存在', exact: true }).click();
   assert.equal(await top(second), 0, 'A missing heading must not scroll to another document.');
@@ -147,9 +273,36 @@ try {
   assert.deepEqual(events[0].payload.annotations[0].targets, [
     { ref: 'second', text: { start, end: start + 4, quote: '中文章节' } },
   ]);
+  // A translated modal and body scroll lock must not hide or offset the trigger.
+  await frame.getByRole('button', { name: '打开目录弹窗', exact: true }).click();
+  const dialogReader = frame.getByTestId('dialog-reader');
+  const dialogTrigger = dialogReader.locator('[data-toc-trigger]');
+  await dialogTrigger.waitFor();
+  await inner.waitForFunction(() => {
+    const reader = document.querySelector('[data-testid="dialog-reader"]');
+    const trigger = reader.querySelector('[data-toc-trigger]').getBoundingClientRect();
+    const body = reader.querySelector('.markdown-body').getBoundingClientRect();
+    const host = reader.getBoundingClientRect();
+    return (
+      Math.abs(trigger.right - body.right) <= 1 &&
+      trigger.top >= host.top &&
+      trigger.bottom <= host.bottom
+    );
+  });
+  await dialogTrigger.click();
+  await popup.waitFor();
+  await popup.press('Escape');
+  await popup.waitFor({ state: 'hidden' });
+  await frame.getByRole('button', { name: 'Expand background', exact: true }).click();
+  await inner.waitForFunction(() => {
+    const reader = document.querySelector('[data-testid="dialog-reader"]');
+    const trigger = reader.querySelector('[data-toc-trigger]').getBoundingClientRect();
+    const body = reader.querySelector('.markdown-body').getBoundingClientRect();
+    return Math.abs(trigger.right - body.right) <= 1;
+  });
   assert.deepEqual(errors, []);
   console.log(
-    'Markdown anchors passed: scoped scroll, Chinese/encoded fragments, duplicate/formatted headings, keyboard, source updates, custom IDs/renderers, no reload, and exact annotation submission.',
+    'Markdown anchors/outline passed: window and padded scroll alignment, parent/new child visibility, translated Dialog with short/tall locked body, 1088px boundary, sidebar/popup, tree hierarchy, hover, content height, plain/code-only content, current text highlight, scoped scroll, Chinese/encoded fragments, duplicate/formatted headings, keyboard, source updates, custom IDs/renderers, no reload, and exact annotation submission.',
   );
 } finally {
   await browser?.close();

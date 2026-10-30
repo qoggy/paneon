@@ -34,7 +34,7 @@ import { MarkdownCodeBlock } from './markdown-code-block';
 import { markdownCodeText } from './code-highlighting';
 import { ImageContent } from './image';
 import { useImagePreview } from './image-preview';
-import { cn } from './utils';
+import { MarkdownOutline } from './markdown-outline';
 import { useUI } from './use-ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { markdownLink, markdownLinkAddress } from '../shared/file-references';
@@ -323,10 +323,10 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   return (
     <>
       <FileLinkContext.Provider value={linkContext}>
-        <div
-          ref={root}
-          className={cn('markdown-body min-w-0 overflow-x-auto', className)}
-          data-markdown-annotation={annotated ? '' : undefined}
+        <MarkdownOutline
+          contentRef={root}
+          className={className}
+          annotated={annotated}
           {...preview.events}
         >
           {metadata && <MarkdownFrontmatter value={metadata} annotated={annotated ?? false} />}
@@ -335,7 +335,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
           >
             {renderedMarkdown}
           </MarkdownMediaContext.Provider>
-        </div>
+        </MarkdownOutline>
       </FileLinkContext.Provider>
       {file && (
         <FilePreviewSheet

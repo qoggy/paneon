@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
-import { Button, Markdown, Page, usePageAnnotations } from '@qoggy/paneon/ui';
+import { Button, Dialog, DialogContent, DialogTitle, Markdown, Page, usePageAnnotations } from '@qoggy/paneon/ui';
 
 function existingHeadingId() {
   return (tree: { children: { tagName?: string; properties: Record<string, unknown> }[] }) => {
@@ -13,8 +13,21 @@ function Panel() {
   const { source } = usePanelInput<{ source: string }>();
   const [updated, setUpdated] = useState(false);
   const [customClicked, setCustomClicked] = useState(false);
+  const [width, setWidth] = useState(1088);
+  const [withChild, setWithChild] = useState(false);
+  const [dialog, setDialog] = useState(false);
+  const [tall, setTall] = useState(false);
   usePageAnnotations({ onSubmit: (value) => agent.emit('annotations-submitted', value) });
   const markdown = source + (updated ? '\n\n## Later heading\n\nUpdated content.' : '');
+  const filler = '正文段落，用于验证目录跳转。\n\n'.repeat(16);
+  const wideMarkdown = `# 项目升级与环境配置的完整操作说明：从准备工作到上线验证都需要完整阅读\n\n${filler}## Parent\n\n${filler}#### Child **bold** \`code\`\n\n${filler}## Last\n\n${filler}${withChild ? '### NewChild\n\nNew text.' : ''}`;
+  if (dialog) return <>
+    <div style={{height: tall ? 3000 : 0}} />
+    <Dialog defaultOpen><DialogContent><DialogTitle>Directory dialog</DialogTitle>
+      <Button onClick={() => setTall(true)}>Expand background</Button>
+      <div data-testid="dialog-reader" style={{maxHeight:300, overflowY:'auto'}}><Markdown>{markdown}</Markdown></div>
+    </DialogContent></Dialog>
+  </>;
   return <Page title="Markdown 目录跳转验收">
     <input aria-label="State marker" defaultValue="retained" />
     <Button onClick={() => setUpdated(true)}>更新文档</Button>
@@ -22,10 +35,18 @@ function Panel() {
       <div data-testid="first" style={{ height: 400, overflowY: 'auto' }}>
         <Markdown>{markdown}</Markdown>
       </div>
-      <div data-testid="second" style={{ height: 400, overflowY: 'auto' }}>
+      <div data-testid="second" style={{ height: 400, overflowY: 'auto', padding: 16 }}>
         <Markdown annotationTarget="second">{markdown}</Markdown>
       </div>
     </div>
+    <table aria-label="Mixed table"><tbody><tr><td>Service</td><td>Ready</td></tr></tbody></table>
+    <Button onClick={() => setDialog(true)}>打开目录弹窗</Button>
+    <Button onClick={() => setWithChild(true)}>新增子章节</Button>
+    <Button onClick={() => setWidth(width === 1088 ? 1087 : 1088)}>切换目录宽度</Button>
+    <div data-testid="wide" style={{width}}>
+      <Markdown>{wideMarkdown}</Markdown>
+    </div>
+    <div data-testid="no-headings"><Markdown>{'Plain content.\n\n```markdown\n# Code only\n```'}</Markdown></div>
     <div data-testid="author-id">
       <Markdown rehypePlugins={[existingHeadingId]} components={{ h2: ({ node: _node, ...props }) => <h2 {...props} data-custom-heading="" /> }}>
         {'[作者锚点](#author-heading)\n\n## Author heading'}
