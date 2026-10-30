@@ -11,9 +11,10 @@ import {
 } from '../skills/paneon/assets/shared/diff-schema.ts';
 import {
   diffReviewParamsSchema,
-  diffReviewSubmittedSchema,
+  diffFeedbackResultSchema,
   validateRanges,
 } from '../skills/paneon/assets/panels/diff-review/schema.ts';
+import { publicDiffFeedback } from '../skills/paneon/assets/panels/diff-review/feedback.ts';
 
 const compiled = await build({
   stdin: {
@@ -270,7 +271,7 @@ void test('opening a text annotation preserves the source captured at selection 
   assert.equal(store.retainedSource('text'), 'old context');
 });
 
-void test('unchanged diff-review-submitted schema and original-snapshot validation accept both block sides', () => {
+void test('diff-review draft validation accepts both block sides before publishing', () => {
   const params = diffReviewParamsSchema.parse({
     files: [{ oldPath: '/before/config.ts', newPath: '/after/config.ts' }],
   });
@@ -282,7 +283,7 @@ void test('unchanged diff-review-submitted schema and original-snapshot validati
     old: { fileIndex: 0, snapshotId: id, side: 'old' as const },
     new: { fileIndex: 0, snapshotId: id, side: 'new' as const },
   })[0].targets;
-  const payload = diffReviewSubmittedSchema.parse({
+  const payload = diffFeedbackResultSchema.parse({
     annotations: [{ id: 'block-1', targets, comment: 'review this block' }],
     sources: [
       { fileIndex: 0, snapshotId: id, oldPath: '/before/config.ts', newPath: '/after/config.ts' },
@@ -294,4 +295,8 @@ void test('unchanged diff-review-submitted schema and original-snapshot validati
     }),
     payload,
   );
+  assert.deepEqual(publicDiffFeedback(params, payload).files[0].annotations[0], {
+    targets: targets.map(({ ref, text }) => ({ side: ref.side, text })),
+    comment: 'review this block',
+  });
 });

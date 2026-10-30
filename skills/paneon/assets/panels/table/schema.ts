@@ -93,9 +93,21 @@ export const tableRefSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 export type TableRef = z.infer<typeof tableRefSchema>;
-export const tableSubmittedSchema = annotationValueSchema(tableRefSchema).safeExtend({
+export const tableFeedbackSchema = annotationValueSchema(tableRefSchema).safeExtend({
   replacesEventId: z.number().int().positive().optional(),
 });
+export type TableFeedback = z.infer<typeof tableFeedbackSchema>;
+const draftAnnotation = tableFeedbackSchema.shape.annotations.element;
+export const tableSubmittedSchema = z.object({
+  annotations: z.array(
+    z.object({
+      targets: draftAnnotation.shape.targets,
+      comment: draftAnnotation.shape.comment,
+    }),
+  ),
+  replacesEventId: tableFeedbackSchema.shape.replacesEventId,
+});
+export type TableSubmitted = z.infer<typeof tableSubmittedSchema>;
 export function tableTargetText(params: TableParams, ref: TableRef): string | undefined {
   switch (ref.kind) {
     case 'title':
@@ -135,7 +147,7 @@ export function tableTargetError(
   return null;
 }
 export function completeTableSchema(params: TableParams) {
-  return tableSubmittedSchema.superRefine((value, ctx) => {
+  return tableFeedbackSchema.superRefine((value, ctx) => {
     value.annotations.forEach((entry, index) =>
       entry.targets.forEach((target, at) => {
         if (target.sourceRef !== undefined) return;

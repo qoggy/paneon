@@ -44,7 +44,7 @@ function Review() {
 
 export default definePanel({
   id: 'review-panel',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '>=0.1.0 <0.2.0' },
   input: z.object({ topic: z.string() }),
   events: { 'review-requested': z.object({ topic: z.string() }) },
   render: Review,
@@ -56,7 +56,7 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 ```
 
 - `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
-- `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.0.1 <0.1.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
+- `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.1.0 <0.2.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
 ## Deliver events
 
@@ -67,7 +67,7 @@ Declare every event type in `events`. `await agent.emit(type, payload)` resolves
 - Declare each `serverAction` as a named top-level export. Use `kind: 'query'` for reads and `kind: 'mutation'` (the default) for effects. Inputs and results must be JSON serializable.
 - Actions cannot capture render closures or module `let`/`var` bindings; pass page state as input. Imports and pure module-level helpers are fine.
 - The action context has no `params`; pass the panel input an action needs as action input.
-- Handlers run in Node with the instance's `--cwd`; browser components cannot import Node modules. Paneon provides no `ctx.exec`, task system or business persistence: use `execFile` with argument arrays, `fetch` or ordinary libraries.
+- Handlers run in Node with the instance's `--cwd`; browser components cannot import Node modules. Use `execFile` with argument arrays rather than a shell.
 - Browser `fetch` works where CORS allows; use a server action for CLI access, server-side credentials or CORS-blocked APIs.
 - For a page that needs a token, use a password `Input` and pass its value as ordinary input to a server action. The page and action own its use and storage. Keep it out of action results, agent events and logs; Paneon does not manage or filter secrets.
 
@@ -98,7 +98,7 @@ export const readApi = serverAction({
 });
 ```
 
-- `ctx.signal` aborts when the instance closes. Timeouts, retries, logs and storage belong to page code.
+- `ctx.signal` aborts when the instance closes.
 - An unhandled exception reaches the browser as `ACTION_FAILED`, without its stack.
 - Paneon never retries a mutation. A lost connection means the result was not received, not that the operation failed.
 
@@ -114,45 +114,34 @@ export const readApi = serverAction({
 `useQuery(queryAction, input, { refreshMs })` returns `{ data, error, loading, refetch }`. It runs on mount and when `input` changes, never overlaps runs, and accepts only query actions, so automatic refresh never repeats a side effect:
 
 ```tsx
-// Inside a component; listItems and saveSelection are declared actions.
+// Inside a component; listItems is a query action, saveSelection a mutation.
 const items = useQuery(listItems, { filter });
-const [saving, setSaving] = useState(false);
-const [failure, setFailure] = useState('');
 
 async function save() {
-  setSaving(true);
-  setFailure('');
   try {
     await saveSelection({ ids: selectedIds });
     await items.refetch();
   } catch {
-    setFailure('The selection could not be saved.');
-  } finally {
-    setSaving(false);
+    toast.add({ title: 'The selection could not be saved.', type: 'error' });
   }
 }
 
-return (
-  <Stack>
-    {items.loading && <Spinner aria-label="Loading items" />}
-    {(items.error || failure) && (
-      <Alert variant="destructive">
-        <AlertTitle>Request failed</AlertTitle>
-        <AlertDescription>{failure || 'Unable to read items.'}</AlertDescription>
-      </Alert>
-    )}
-    {items.data?.length === 0 && (
-      <Empty>
-        <EmptyHeader>
-          <EmptyDescription>No matching items.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    )}
-    <Button disabled={saving || selectedIds.length === 0} onClick={() => void save()}>
-      Save selection
-    </Button>
-  </Stack>
-);
+if (items.loading) return <Spinner aria-label="Loading items" />;
+if (items.error)
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>Unable to read items</AlertTitle>
+    </Alert>
+  );
+if (items.data?.length === 0)
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyDescription>No matching items.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+return <Button onClick={() => void save()}>Save selection</Button>;
 ```
 
 ## Components
@@ -222,12 +211,22 @@ import { Card, AnnotationText, toast, usePageAnnotations } from '@qoggy/paneon/u
 const source = 'Use Redis for shared cache storage.';
 const refSchema = z.literal('redis-plan');
 type Ref = z.infer<typeof refSchema>;
-const resultSchema = annotationValueSchema(refSchema);
+const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
+const resultSchema = z.object({
+  annotations: z.array(
+    z.object({
+      targets: draftAnnotation.shape.targets,
+      comment: draftAnnotation.shape.comment,
+    }),
+  ),
+});
 
 function Panel() {
   usePageAnnotations<Ref>({
     onSubmit: async (value) => {
-      await agent.emit('annotations-submitted', value);
+      await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+      });
       toast.add({ title: 'Annotations submitted.', type: 'success' });
     },
   });
@@ -240,7 +239,7 @@ function Panel() {
 
 export default definePanel({
   id: 'custom-annotations',
-  requires: { paneon: '>=0.0.1 <0.1.0' },
+  requires: { paneon: '>=0.1.0 <0.2.0' },
   input: z.object({}).strict(),
   events: { 'annotations-submitted': resultSchema },
   render: Panel,
@@ -249,8 +248,7 @@ export default definePanel({
 
 ### Result data
 
-- A result is `{annotations: [{id, targets, comment}]}`; there is no page-level comment. A target is `{ref, sourceRef?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
-- Do not build a separate page-level comment editor; an opinion about a whole document is an annotation on its heading.
+- `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading. A target is `{ref, sourceRef?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
 - `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`.
 - `ref` is any finite JSON value. For ordinary content use a stable string: `target="redis-plan"` is delivered as `ref: "redis-plan"`. For dynamic content include the source version. Functions, DOM elements and screen coordinates are not references.
 - `annotationValueSchema(refSchema)` checks structure only.
@@ -263,7 +261,7 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 ### Annotation components
 
-- `usePageAnnotations<TRef>({ onSubmit, adapter?, disabled?, allowEmptySubmit?, onRequestEdit? })` turns on annotations for the page: Paneon supplies the editor and a floating annotation list with the submit action. Call it once in the page component; nested components read the state with `useAnnotations`. Without it the page has no annotation controls.
+- `usePageAnnotations<TRef>({ onSubmit, adapter?, disabled?, allowEmptySubmit?, onRequestEdit? })` turns on annotations for the page: Paneon supplies the editor and a floating annotation list with the submit action. Call it once in the page component; nested components read the state with `useAnnotations`.
 - `onSubmit` receives the complete annotation list; the page emits the event itself.
 - `adapter` is needed to locate content the page may not be displaying; see [adapters](#adapters).
 - `disabled` blocks editing and submission while saved annotations stay readable. To lock feedback after a successful submission, set `disabled` and pass `onRequestEdit`, which the list offers as a correction action that should unlock editing.
@@ -337,12 +335,12 @@ type AnnotationAdapter<TRef> = {
 ### Submission
 
 - Paneon checks each target's range against its original text through the adapter or registration before calling `onSubmit`; if either fails, the draft stays.
-- Paneon does not clear the draft, generate `replacesEventId` or choose a correction policy. Built-in pages submit each correction as a complete result with `replacesEventId` pointing to the previous one; follow that pattern when a correction should replace an earlier result.
+- To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the earlier event's ID, as built-in pages do. The draft is not cleared after submission.
 - Drafts live in browser memory, so a reload can lose them. [Event limits](#deliver-events) apply.
 
 ## Examples
 
-Each example is a complete custom page. Run it as-is, or read its source to borrow a technique; write new pages on `@qoggy/paneon/sdk` and `@qoggy/paneon/ui` rather than importing from the example. `<skill>` is the absolute path of this skill directory.
+Each example is a complete custom page. Run it as-is, or read its source to borrow a technique.
 
 ### Dining philosophers
 

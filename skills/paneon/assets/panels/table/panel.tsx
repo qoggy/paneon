@@ -30,6 +30,7 @@ import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   cellText,
   completeTableSchema,
+  tableFeedbackSchema,
   tableParamsSchema,
   tableSubmittedSchema,
   tableTargetError,
@@ -37,8 +38,9 @@ import {
   visibleRows,
 } from './schema';
 import type { TableParams, TableRef, TableView } from './schema';
+import { publicTableFeedback } from './feedback';
 export const validateTable = serverAction({
-  input: z.object({ snapshot: tableParamsSchema, feedback: tableSubmittedSchema }).strict(),
+  input: z.object({ snapshot: tableParamsSchema, feedback: tableFeedbackSchema }).strict(),
   handler: (_ctx, input) => completeTableSchema(input.snapshot).parse(input.feedback),
 });
 const initialView: TableView = { search: '', filters: {}, sort: null };
@@ -314,7 +316,7 @@ function TablePanel() {
   const submission = useSubmission<AnnotationValue<TableRef>>(
     async (feedback) => {
       const validated = await validateTable({ snapshot: params, feedback });
-      const receipt = await agent.emit('table-submitted', validated);
+      const receipt = await agent.emit('table-submitted', publicTableFeedback(validated));
       setLocked(true);
       return receipt;
     },

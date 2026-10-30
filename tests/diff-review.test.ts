@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   diffReviewParamsSchema,
+  diffFeedbackResultSchema,
   diffReviewSubmittedSchema,
   validateRanges,
   validateSources,
 } from '../skills/paneon/assets/panels/diff-review/schema.ts';
 import { reviewTree, visibleFileCount } from '../skills/paneon/assets/panels/diff-review/model.ts';
-import type { DiffReviewSubmitted } from '../skills/paneon/assets/panels/diff-review/schema.ts';
+import type { DiffFeedbackResult } from '../skills/paneon/assets/panels/diff-review/schema.ts';
+import { publicDiffFeedback } from '../skills/paneon/assets/panels/diff-review/feedback.ts';
 
 void test('path-only manifest rejects ambiguous absence and unsolicited identity fields', () => {
   assert.equal(
@@ -50,7 +52,7 @@ void test('annotation validation uses preserved text and rejects wrong source, s
   const file = { oldPath: null, newPath: '/proposed' };
   const snapshot = { id, oldText: '', newText: 'first é🙂 last' };
   const snapshots = { [`0:${id}`]: snapshot };
-  const feedback: DiffReviewSubmitted = {
+  const feedback: DiffFeedbackResult = {
     annotations: [
       {
         id: 'annotation-1',
@@ -88,7 +90,7 @@ void test('comparison feedback preserves page-defined file targets without addin
     sourceRef: { path: '/local.txt', snapshotId: 'local' },
     text: { start: 0, end: 5, quote: 'local' },
   };
-  const feedback = diffReviewSubmittedSchema.parse({
+  const feedback = diffFeedbackResultSchema.parse({
     annotations: [
       {
         id: 'mixed',
@@ -110,12 +112,94 @@ void test('comparison feedback preserves page-defined file targets without addin
   });
   assert.deepEqual(feedback.annotations[0].targets[1], common);
   assert.deepEqual(feedback.sources, sources);
+  assert.deepEqual(
+    publicDiffFeedback({ files: [{ oldPath: null, newPath: '/proposed' }] }, feedback).files[0]
+      .annotations[0].targets[1].sourceRef,
+    common.sourceRef,
+  );
+});
+
+void test('published feedback groups annotations by original file snapshot without internal IDs', () => {
+  const params = {
+    files: [
+      { displayPath: 'request.ts', oldPath: '/old/request.ts', newPath: '/new/request.ts' },
+      { oldPath: null, newPath: '/new/worker.ts' },
+    ],
+  };
+  const a = `sha256:${'a'.repeat(64)}`;
+  const b = `sha256:${'b'.repeat(64)}`;
+  const text = { start: 6, end: 10, quote: 'é🙂' };
+  const target = (fileIndex: number, snapshotId: string, side: 'old' | 'new' = 'new') => ({
+    ref: { fileIndex, snapshotId, side },
+    text,
+  });
+  const feedback: DiffFeedbackResult = {
+    annotations: [
+      { id: 'first', targets: [target(0, a, 'old'), target(0, a)], comment: '两侧一起调整' },
+      { id: 'second', targets: [target(0, a)], comment: '同一快照的另一条意见' },
+      { id: 'added', targets: [target(1, a)], comment: '新增文件' },
+      { id: 'new-version', targets: [target(0, b)], comment: '同一文件的另一个版本' },
+    ],
+    sources: [
+      { ...params.files[0], fileIndex: 0, snapshotId: a },
+      { ...params.files[1], fileIndex: 1, snapshotId: a },
+      { ...params.files[0], fileIndex: 0, snapshotId: b },
+    ],
+    replacesEventId: 42,
+  };
+  const original = structuredClone(feedback);
+  const result = publicDiffFeedback(params, feedback);
+  assert.deepEqual(result, {
+    files: [
+      {
+        ...params.files[0],
+        snapshotId: a,
+        annotations: [
+          {
+            targets: [
+              { side: 'old', text },
+              { side: 'new', text },
+            ],
+            comment: '两侧一起调整',
+          },
+          { targets: [{ side: 'new', text }], comment: '同一快照的另一条意见' },
+        ],
+      },
+      {
+        ...params.files[1],
+        snapshotId: a,
+        annotations: [{ targets: [{ side: 'new', text }], comment: '新增文件' }],
+      },
+      {
+        ...params.files[0],
+        snapshotId: b,
+        annotations: [{ targets: [{ side: 'new', text }], comment: '同一文件的另一个版本' }],
+      },
+    ],
+    replacesEventId: 42,
+  });
+  assert.deepEqual(diffReviewSubmittedSchema.parse(result), result);
+  assert.deepEqual(feedback, original, 'Publishing must not mutate editable draft identities.');
+});
+
+void test('published empty correction withdraws all annotations', () => {
+  assert.deepEqual(
+    publicDiffFeedback(
+      { files: [{ oldPath: '/old', newPath: '/new' }] },
+      {
+        annotations: [],
+        sources: [],
+        replacesEventId: 42,
+      },
+    ),
+    { files: [], replacesEventId: 42 },
+  );
 });
 
 void test('source validation accepts feedback without full files and rejects inconsistent paths or targets', () => {
   const snapshotId = `sha256:${'a'.repeat(64)}`;
   const file = { oldPath: null, newPath: '/proposed' };
-  const feedback: DiffReviewSubmitted = {
+  const feedback: DiffFeedbackResult = {
     annotations: [
       {
         id: 'annotation',

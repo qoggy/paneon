@@ -1,5 +1,5 @@
 import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
-import { gitRefSchema } from '../../shared/diff-schema.ts';
+import { gitLocationSchema, gitRefSchema } from '../../shared/diff-schema.ts';
 export const repositorySchema = z
   .string()
   .regex(/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/, 'Expected owner/repository.');
@@ -71,9 +71,39 @@ export const prSourceSchema = z.discriminatedUnion('kind', [
 ]);
 export type PRSource = z.infer<typeof prSourceSchema>;
 export const prFeedbackSchema = annotationValueSchema(prRefSchema);
-export const prFeedbackSubmittedSchema = prFeedbackSchema.safeExtend({
+export const prResolvedFeedbackSchema = prFeedbackSchema.safeExtend({
   repository: repositorySchema,
   sources: z.record(z.string(), prSourceSchema),
+});
+export type PRResolvedFeedback = z.infer<typeof prResolvedFeedbackSchema>;
+
+const localSourceSchema = z.object({ path: z.string(), snapshotId: z.string() });
+const sourceMetadataSchema = z.union([prSourceSchema, localSourceSchema]);
+const targetShape = {
+  text: prFeedbackSchema.shape.annotations.element.shape.targets.element.shape.text,
+  source: sourceMetadataSchema.optional(),
+};
+const publishedTargetSchema = z.union([
+  gitLocationSchema.options[0].extend(targetShape),
+  gitLocationSchema.options[1].extend(targetShape),
+  gitLocationSchema.options[2].extend(targetShape),
+  z.object(targetShape),
+]);
+export type PRPublishedTarget = z.infer<typeof publishedTargetSchema>;
+const annotations = z.array(
+  z.object({ targets: z.array(publishedTargetSchema), comment: z.string() }),
+);
+export const prFeedbackSubmittedSchema = z.object({
+  repository: repositorySchema,
+  sources: z.array(
+    z.union([
+      prSourceSchema.options[0].safeExtend({ annotations }),
+      prSourceSchema.options[1].safeExtend({ annotations }),
+      prSourceSchema.options[2].safeExtend({ annotations }),
+      prSourceSchema.options[3].safeExtend({ annotations }),
+      localSourceSchema.extend({ annotations }),
+    ]),
+  ),
 });
 export type PRFeedbackSubmitted = z.infer<typeof prFeedbackSubmittedSchema>;
 export const prReviewRequestedSchema = z

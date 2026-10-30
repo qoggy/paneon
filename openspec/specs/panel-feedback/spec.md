@@ -15,6 +15,25 @@ Paneon SHALL provide opt-in public SDK/UI capabilities for selection and annotat
 - **WHEN** an author marks selectable content and supplies a submission callback
 - **THEN** the custom panel can reuse common selection state, annotation editing, and submission controls
 
+#### Scenario: Publish feedback from the supplied AnnotationText example
+
+- **WHEN** the supplied AnnotationText authoring example explicitly emits its annotations to the agent
+- **THEN** each published annotation contains its complete targets and comment without the internal annotation id, preserving every target's page-defined ref and text range
+- **AND** the internal draft and onSubmit value retain annotation ids for editing, deletion and navigation; the example's mapping does not change shared SDK/UI submission behavior for other components
+
+#### Scenario: Publish CodeBlock feedback from a custom page
+
+- **WHEN** a custom page explicitly emits CodeBlock annotations to the agent
+- **THEN** each published annotation contains targets and comment without its internal annotation id, preserving every target's page-defined ref (including any business id) and exact original-code UTF-16 range and quote
+- **AND** internal drafts and the onSubmit value retain annotation ids for editing, deletion and navigation; shared submission behavior for other components remains unchanged
+
+#### Scenario: Publish DiffView feedback from a custom page
+
+- **WHEN** a custom page explicitly emits DiffView annotations to the agent
+- **THEN** each published annotation contains its complete targets and comment without its internal annotation id, preserving every target's ref (including business ids), original text range and quote
+- **AND** replacement blocks retain old/new targets in one opinion and addition/deletion blocks retain the existing side only
+- **AND** internal drafts and the onSubmit value retain ids for editing, deletion and navigation; shared submission behavior for other components remains unchanged
+
 ### Requirement: Preserve normal interactions and author-controlled layout
 
 The common UI SHALL allow registered text to be selected during normal browsing, presenting a contextual Annotation action before creating an annotation draft. Explicit object-selection controls MAY be composed for multi-object selection. It SHALL operate on registered content, preserve ordinary buttons, links, form input, and text copying, and SHALL NOT treat business actions or form answers as annotation submissions. Enabled pages SHALL show one floating annotation directory at the panel viewport bottom right, opening upward without consuming document layout space. Pages without usePageAnnotations SHALL show no annotation controls. Toasts SHALL appear above the floating entry. Supporting original-element composition SHALL NOT introduce invalid table wrappers.

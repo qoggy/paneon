@@ -152,7 +152,7 @@ try {
   await submitAnnotations(frame);
   const event = (await service.runtime.events(instance.instanceId, 'diff-highlighting', 100, 0))
     .events[0];
-  const target = event.payload.annotations[0].targets[0];
+  const target = event.payload.files[0].annotations[0].targets[0];
   assert.equal(target.text.quote, 'build{InterfaceName}');
   assert.equal(after.slice(target.text.start, target.text.end), target.text.quote);
   await frame.getByRole('button', { name: '单列对比', exact: true }).click();

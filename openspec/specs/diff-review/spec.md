@@ -26,7 +26,12 @@ The panel SHALL provide directory/flat mode, directory-first name sorting, singl
 
 ### Requirement: Submit annotations tied to preserved comparisons
 
-The panel SHALL allow text annotation on existing sides, preserve the exact read snapshots for annotation resolution and location, and emit `diff-review-submitted` only after explicit submission. Submission SHALL validate referenced manifest entries, snapshot identity and original UTF-16 text ranges. Events SHALL carry the complete annotations and referenced source descriptors with internally generated identities; they SHALL retain selected quotes without embedding whole files. Corrections SHALL replace the previous successful event through replacesEventId; failures SHALL retain the draft.
+The panel SHALL allow text annotation on existing sides, preserve the exact read snapshots for annotation resolution and location, and emit `diff-review-submitted` only after explicit submission. Submission SHALL validate referenced manifest entries, snapshot identity and original UTF-16 text ranges. Events SHALL group the complete feedback in `files`, with each original file snapshot carrying its paths, snapshot identity and annotations together. Targets SHALL carry their side and original text ranges without repeating the enclosing source identity. Internal file indexes and annotation IDs SHALL remain in the editable draft rather than the published event. Events SHALL retain selected quotes without embedding whole files. Corrections SHALL replace the previous successful event through replacesEventId; an empty `files` array SHALL withdraw all earlier feedback. Failures SHALL retain the draft.
+
+#### Scenario: Submit several annotations on one snapshot
+
+- **WHEN** a user submits several annotations on one original file snapshot
+- **THEN** the event contains one file entry with all those annotations, publishing its paths and snapshot identity once without a separate sources table
 
 #### Scenario: Locate and submit after a physical file changes
 

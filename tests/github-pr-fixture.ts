@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 export type PRFixtureState = {
+  body?: string;
   version?: number;
   headVersion?: number;
   fail?: string;
@@ -91,7 +92,7 @@ export function fixtureDetail(number: number, state: PRFixtureState = {}) {
     updatedAt: `2026-10-21T10:00:0${state.version ?? 0}Z`,
     url: `https://github.com/example/project/pull/${number}`,
     author: { login: 'fixture-author' },
-    body: second ? '第二个 PR 的说明。\n' : body(state.version),
+    body: state.body ?? (second ? '第二个 PR 的说明。\n' : body(state.version)),
     baseRefOid: ids.base,
     headRefOid: second ? ids.second : state.headVersion ? ids.newer : ids.head,
     changedFiles: second ? 1 : state.coverage ? 301 : 8,

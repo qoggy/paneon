@@ -156,18 +156,38 @@ try {
     await diff.getByRole('button', { name: '左右对比', exact: true }).getAttribute('aria-pressed'),
     'true',
   );
+  const beforeSubmit = await draft();
   await submitAnnotations(frame);
   const events = (await service.runtime.events(panel.instanceId, 'diff-annotations', 100, 0))
     .events;
   assert.equal(events.length, 1);
-  assert.deepEqual(events[0].payload, await draft());
+  assert.deepEqual(events[0].payload, {
+    annotations: beforeSubmit.annotations.map(({ targets, comment }) => ({ targets, comment })),
+  });
+  assert.deepEqual(await draft(), beforeSubmit, 'Publishing preserves internal ids and refs');
+  for (const annotation of beforeSubmit.annotations) assert.ok(annotation.id.length > 0);
+  await openAnnotationDirectory(frame);
+  await button('编辑批注 1').click();
+  await frame.getByLabel('批注内容', { exact: true }).fill('Corrected old side');
+  await button('保存').click();
+  const edited = await draft();
+  assert.equal(edited.annotations[0].id, beforeSubmit.annotations[0].id);
+  assert.deepEqual(edited.annotations[0].targets, beforeSubmit.annotations[0].targets);
+  await submitAnnotations(frame);
+  const revised = (await service.runtime.events(panel.instanceId, 'diff-annotations', 100, 0))
+    .events;
+  assert.equal(revised.length, 2);
+  assert.deepEqual(revised[1].payload, {
+    annotations: edited.annotations.map(({ targets, comment }) => ({ targets, comment })),
+  });
+  assert.deepEqual(await draft(), edited);
 
   await button('Refresh source').click();
   await submitAnnotations(frame);
   await frame.locator('[data-submit-error]').filter({ hasText: /stale/ }).waitFor();
   assert.equal(
     (await service.runtime.events(panel.instanceId, 'diff-annotations', 100, 0)).events.length,
-    1,
+    2,
   );
   assert.equal((await draft()).annotations.length, 3, 'stale submission preserves every draft');
   await button('Restore source').click();
@@ -190,9 +210,63 @@ try {
     assert.equal((await draft()).annotations.at(-1).targets[0].ref, side === 'old' ? false : null);
   }
   assert.equal((await draft()).annotations.length, 6);
+
+  // A test-only page covers replacement, addition and deletion submission mappings.
+  const exampleEntry = join(root, 'diff-example.tsx');
+  await writeFile(
+    exampleEntry,
+    await readPanelFixture(new URL('./diff-submission-fixture.txt', import.meta.url)),
+  );
+  for (const [kind, oldText, newText] of [
+    ['replace', 'const n = 1;\r\n', 'const n = 2;\r\n'],
+    ['add', '', 'const n = 2;\r\n'],
+    ['delete', 'const n = 1;\r\n', ''],
+  ]) {
+    const example = await service.runtime.run(exampleEntry, root, { oldText, newText }, false);
+    await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${example.instanceId}`);
+    await frame.getByRole('heading', { name: 'Review file changes', exact: true }).waitFor();
+    const expected = [];
+    const sides = [...(oldText ? [['old', oldText]] : []), ...(newText ? [['new', newText]] : [])];
+    if (kind === 'replace') {
+      for (const [side, source] of sides) {
+        await selectAnnotationText(frame, `[data-code-side="${side}"][data-line="1"]`, 0, 12);
+        await annotations.write(side);
+        await annotations.save();
+        expected.push({
+          targets: [
+            {
+              ref: { id: 'request-v1', side },
+              text: { start: 0, end: 12, quote: source.slice(0, 12) },
+            },
+          ],
+          comment: side,
+        });
+      }
+    }
+    await frame.locator('[data-diff-block-action="0"]').click();
+    await frame.getByLabel('批注内容', { exact: true }).fill(kind);
+    await button('保存').click();
+    expected.push({
+      targets: sides.map(([side, source]) => ({
+        ref: { id: 'request-v1', side },
+        text: { start: 0, end: source.length, quote: source },
+      })),
+      comment: kind,
+    });
+    const submitted = page.waitForResponse(
+      (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
+    );
+    await submitAnnotations(frame);
+    assert.equal((await submitted).status(), 200);
+    const exampleEvents = (await service.runtime.events(example.instanceId, 'diff-example', 100, 0))
+      .events;
+    assert.equal(exampleEvents.length, 1);
+    assert.equal(exampleEvents[0].type, 'diff-annotations-submitted');
+    assert.deepEqual(exampleEvents[0].payload, { annotations: expected });
+  }
   assert.deepEqual(errors, []);
   console.log(
-    'Diff annotation API passed: generic and falsy refs, optional sides, instance-scoped reveal, hidden context, unified offsets, explicit submit and stale-source rejection.',
+    'DiffView passed: agent events omit annotation ids, internal ids survive editing/submission, refs and raw ranges stay intact, test-only submission page covers old/new text and replacement/addition/deletion blocks; generic/falsy refs, scoped reveal, unified offsets and stale-source rejection preserved.',
   );
 } finally {
   await browser?.close();

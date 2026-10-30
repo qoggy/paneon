@@ -249,6 +249,7 @@ try {
   const first = (await fixture.events(fixture.table))[0];
   assert.equal(first.type, 'table-submitted');
   assert.equal(first.payload.annotations.length, 7);
+  for (const annotation of first.payload.annotations) assert.equal('id' in annotation, false);
   assert.equal('comment' in first.payload, false);
   assert.deepEqual(first.payload.annotations[0].targets, [
     { ref: { kind: 'header', columnKey: 'name' }, text: { start: 0, end: 2, quote: '说明' } },
@@ -266,7 +267,6 @@ try {
     },
   ]);
   assert.deepEqual(first.payload.annotations[3], {
-    id: first.payload.annotations[3].id,
     targets: [
       {
         ref: { kind: 'cell', rowIndex: 0, columnKey: 'name' },
@@ -293,7 +293,6 @@ try {
     [6, 1, 'b', 'false'],
   ])
     assert.deepEqual(first.payload.annotations[index], {
-      id: first.payload.annotations[index].id,
       targets: [
         {
           ref: { kind: 'cell', rowIndex, columnKey },

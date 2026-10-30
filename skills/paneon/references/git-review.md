@@ -68,7 +68,6 @@ The human can add and remove repositories within the page; added ones are lost o
   - `file`: the whole file.
   - `hunk`: the unified `patch`, including its `@@` header.
   - `lines`: `side` (`old` or `new`), one-based inclusive `startLine` / `endLine`, the original lines in `text` including their separators, and `selection`. `selection.start` / `end` are UTF-16 offsets into `text`; `quote` is present only for a partial selection.
-- Identical line text appears once. A later target has `textRef: {file, annotation, target}` instead of `text`: zero-based indexes of the target holding that text, `files[file].annotations[annotation].targets[target].text`.
 - A file records `repositoryPath` (the Git root) and the actual `view` with complete commit IDs:
   - `changes`: `area` (`staged`, `unstaged` or `untracked`) and optional `headCommit`;
   - `history`: `commit` and its `parent` (`null` for a root commit);

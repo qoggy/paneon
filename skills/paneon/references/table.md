@@ -1,6 +1,6 @@
 # Table
 
-Run `<skill>/assets/panels/table/panel.tsx`. The human can search, filter, sort and page the rows, select text in column labels or string cells, annotate it, and submit all annotations together.
+Run `<skill>/assets/panels/table/panel.tsx`. The human can search, filter, sort and page the rows, select text in the title, description, column labels or cells, annotate it, and submit all annotations together.
 
 ```json
 {
@@ -31,7 +31,6 @@ Input:
 {
   "annotations": [
     {
-      "id": "generated-stable-id",
       "targets": [
         {
           "ref": { "kind": "header", "columnKey": "description" },
@@ -41,7 +40,6 @@ Input:
       "comment": "Please clarify this column."
     },
     {
-      "id": "another-stable-id",
       "targets": [
         {
           "ref": { "kind": "cell", "rowIndex": 1, "columnKey": "description" },
@@ -54,6 +52,7 @@ Input:
 }
 ```
 
-- `ref` is `{kind:'header',columnKey}` for a column label or `{kind:'cell',rowIndex,columnKey}` for a string cell. `rowIndex` is the index in the input `rows`, unaffected by sorting, filtering or paging.
-- `text` gives UTF-16 offsets into the original label or cell string.
+- `ref` is `{kind:'title'}` for the title, `{kind:'description'}` for the description, `{kind:'header',columnKey}` for a column label or `{kind:'cell',rowIndex,columnKey}` for a cell. `rowIndex` is the index in the input `rows`, unaffected by sorting, filtering or paging.
+- `text` gives UTF-16 offsets into the original title, label or cell text; a number or boolean cell's text is `String(value)`, such as `120` or `true`.
+- A selection across several cells is one annotation with one target per cell.
 - A correction carrying `replacesEventId` may have no annotations, which withdraws all earlier feedback.

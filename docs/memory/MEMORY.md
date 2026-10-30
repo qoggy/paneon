@@ -21,5 +21,6 @@
 - [Components in built-in panels](ui-builtin-panel-components.md) — Compose paneon/ui components such as Empty, Spinner and toast; ask the user before developing or adopting a missing component
 - [Desktop page scope](ui-desktop-scope.md) — Default to desktop development and acceptance; mobile-specific adaptation and testing require an explicit task requirement
 - [Shared selection and annotations](ui-selection-feedback.md) — Use 批注 / annotation; document-wide opinions use selected heading text without a separate page-level comment entry; retain explicit submission and correction
+- [Annotation payload format](ui-annotation-payload-format.md) — Send agents compact annotation data nested by source, without page-internal fields such as id/fileIndex or repeated long values
 - [Runtime home](tech-runtime-home.md) — PANEON_HOME is an internal constant fixed to ~/.paneon, without a user-facing override
 - [Panel instance IDs](tech-panel-instance-ids.md) — SQLite autoincrement IDs are exposed as decimal strings; old UUID instances are not migrated

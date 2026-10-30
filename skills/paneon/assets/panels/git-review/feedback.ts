@@ -200,8 +200,7 @@ export function validateGitFeedback(
 export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitted {
   type File = GitReviewSubmitted['files'][number];
   type Target = File['annotations'][number]['targets'][number];
-  const files = new Map<string, { index: number; file: File }>();
-  const texts = new Map<string, { file: number; annotation: number; target: number }>();
+  const files = new Map<string, File>();
   const sourceFor = (id: string) => {
     const { repositoryId: _repositoryId, evidence: _evidence, ...source } = feedback.sources[id];
     return source;
@@ -209,19 +208,12 @@ export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitt
   for (const annotation of feedback.annotations) {
     const first = annotation.targets[0];
     const key = first.ref.sourceId;
-    let group = files.get(key);
-    if (!group) {
-      group = {
-        index: files.size,
-        file: {
-          ...sourceFor(key),
-          annotations: [],
-        },
-      };
-      files.set(key, group);
+    let file = files.get(key);
+    if (!file) {
+      file = { ...sourceFor(key), annotations: [] };
+      files.set(key, file);
     }
-    const file = group.file;
-    const targets = annotation.targets.map((target, targetIndex): Target => {
+    const targets = annotation.targets.map((target): Target => {
       const { sourceId, ...ref } = target.ref;
       let published: Target;
       if (ref.kind === 'file') published = { kind: 'file' };
@@ -235,16 +227,9 @@ export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitt
             item.endLine === ref.endLine,
         )!;
         const { start, end, quote } = target.text!;
-        const textRef = texts.get(evidence.text);
-        if (!textRef)
-          texts.set(evidence.text, {
-            file: group.index,
-            annotation: file.annotations.length,
-            target: targetIndex,
-          });
         published = {
           ...ref,
-          ...(textRef ? { textRef } : { text: evidence.text }),
+          text: evidence.text,
           selection: {
             start,
             end,
@@ -261,7 +246,7 @@ export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitt
     file.annotations.push({ targets, comment: annotation.comment });
   }
   return gitReviewSubmittedSchema.parse({
-    files: [...files.values()].map((group) => group.file),
+    files: [...files.values()],
     ...(feedback.replacesEventId === undefined
       ? {}
       : { replacesEventId: feedback.replacesEventId }),

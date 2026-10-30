@@ -207,43 +207,60 @@ void test('agent output retains a partial selection in an unchanged right-side l
   assert.equal(selected(target), 'orders');
 });
 
-void test('repeated long source lines are preserved once and remain under the event limit', () => {
-  const text = 'a'.repeat(40000) + '\n';
+function repeatedLineFeedback(length: number) {
+  const text = 'a'.repeat(length) + '\n';
   const s = snapshot(text + 'old\n', text + 'new\n');
   const raw = buildGitFeedback(
     {
-      annotations: [0, 1].map((start) => ({
-        id: `annotation-${start}`,
-        comment: `opinion ${start}`,
-        targets: [
-          {
-            ref: {
-              sourceId: s.id,
-              kind: 'lines' as const,
-              side: 'new' as const,
-              startLine: 1,
-              endLine: 1,
-            },
-            text: { start, end: start + 1, quote: 'a' },
-          },
-        ],
+      annotations: [0, 1].map((occurrence) => ({
+        id: `annotation-${occurrence}`,
+        comment: `opinion ${occurrence}`,
+        targets: [lines(s, 'new', 1, 'a', occurrence)],
       })),
     },
     new Map([[s.id, s]]),
   );
-  const checked = validateGitFeedback({ repositories: [{ id: 'repo', path: '/work/demo' }] }, raw);
-  const result = publicGitFeedback(checked);
-  const [first, second] = result.files[0].annotations.map((annotation) => annotation.targets[0]);
-  assert.ok('kind' in first && first.kind === 'lines' && 'text' in first);
-  assert.ok('kind' in second && second.kind === 'lines' && 'textRef' in second);
-  assert.equal(first.text, text);
-  assert.deepEqual(second.textRef, { file: 0, annotation: 0, target: 0 });
-  assert.equal('text' in second, false);
-  assert.equal(first.text.slice(second.selection.start, second.selection.end), 'a');
-  assert.ok(JSON.stringify(result).length < 65536);
+  return { text, raw };
+}
+
+for (const length of [2, 16000]) {
+  void test(`each target carries repeated ${length}-character source lines inline`, () => {
+    const { text, raw } = repeatedLineFeedback(length);
+    const checked = validateGitFeedback(
+      { repositories: [{ id: 'repo', path: '/work/demo' }] },
+      raw,
+    );
+    const result = publicGitFeedback(checked);
+    const targets = result.files[0].annotations.map((annotation) => annotation.targets[0]);
+    for (const [index, target] of targets.entries()) {
+      assert.ok('kind' in target && target.kind === 'lines');
+      assert.equal(target.text, text);
+      assert.equal('textRef' in target, false);
+      assert.equal(target.selection.start, index);
+      assert.equal(selected(target), 'a');
+    }
+    assert.ok(JSON.stringify(result).length < 65536);
+  });
+}
+
+void test('repeated inline text still uses the existing published event-size limit', () => {
+  const { text, raw } = repeatedLineFeedback(40000);
+  const before = structuredClone(raw);
+  const result = publicGitFeedback(raw);
+  for (const annotation of result.files[0].annotations) {
+    const target = annotation.targets[0];
+    assert.ok('kind' in target && target.kind === 'lines');
+    assert.equal(target.text, text);
+  }
+  assert.ok(JSON.stringify(result).length > 65536);
+  assert.throws(
+    () => validateGitFeedback({ repositories: [{ id: 'repo', path: '/work/demo' }] }, raw),
+    /65536/,
+  );
+  assert.deepEqual(raw, before, 'size rejection must preserve the original feedback');
 });
 
-void test('shared text references preserve cross-file and multi-target opinion relationships', () => {
+void test('repeated inline text preserves cross-file and multi-target opinion relationships', () => {
   const a = snapshot(),
     b = snapshot(original, updated, true);
   const raw = buildGitFeedback(
@@ -264,8 +281,10 @@ void test('shared text references preserve cross-file and multi-target opinion r
   const targets = result.files[1].annotations[0].targets;
   assert.equal(targets.length, 2);
   for (const target of targets) {
-    assert.ok('kind' in target && target.kind === 'lines' && 'textRef' in target);
-    assert.deepEqual(target.textRef, { file: 0, annotation: 0, target: 0 });
+    assert.ok('kind' in target && target.kind === 'lines');
+    assert.equal(target.text, sourceLines(updated)[0].text);
+    assert.equal('textRef' in target, false);
+    assert.equal(selected(target), original.split('\n')[0]);
   }
   assert.equal(targets[1].source?.new?.path, 'src/request.ts');
 });

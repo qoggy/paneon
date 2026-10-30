@@ -11,10 +11,12 @@ import {
   comparisonSchema,
   diffReviewParamsSchema,
   diffReviewSubmittedSchema,
+  diffFeedbackResultSchema,
   validateRanges,
   validateSources,
 } from './schema';
 import type { DiffRef, Snapshot } from './schema';
+import { publicDiffFeedback } from './feedback';
 import {
   Button,
   DiffView,
@@ -58,7 +60,7 @@ export const validateFeedback = serverAction({
   input: z
     .object({
       params: diffReviewParamsSchema,
-      feedback: diffReviewSubmittedSchema,
+      feedback: diffFeedbackResultSchema,
     })
     .strict(),
   handler: (_ctx, { params, feedback }) => validateSources(params, feedback),
@@ -363,7 +365,7 @@ function DiffReviewPanel() {
           throw new Error('Comparison snapshot identity does not match its content.');
       }
       const validated = await validateFeedback({ params: value, feedback: result });
-      return agent.emit('diff-review-submitted', validated);
+      return agent.emit('diff-review-submitted', publicDiffFeedback(value, validated));
     },
     { successToast: 'Annotations submitted.' },
   );

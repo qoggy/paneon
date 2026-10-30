@@ -133,19 +133,22 @@ try {
   assert.equal(first.length, 1);
   assert.equal(first[0].type, 'diff-review-submitted');
   const payload = first[0].payload;
-  assert.equal(payload.annotations.length, 2);
+  assert.equal(payload.files.length, 2);
   assert.deepEqual(
-    payload.annotations.map((a) => a.targets[0].text.quote),
+    payload.files.flatMap((file) => file.annotations.map((a) => a.targets[0].text.quote)),
     ['value', 'added'],
   );
   assert.deepEqual(
-    payload.sources.map((s) => s.fileIndex),
-    [0, 1],
+    payload.files.map((file) => file.newPath),
+    ['proposed.ts', 'added.ts'],
   );
-  assert.equal(payload.sources[0].newPath, 'proposed.ts');
-  assert.match(payload.sources[0].snapshotId, /^sha256:[a-f0-9]{64}$/);
-  assert.equal(payload.annotations[0].targets[0].ref.snapshotId, payload.sources[0].snapshotId);
-  assert.equal('newText' in payload.sources[0], false);
+  assert.match(payload.files[0].snapshotId, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(payload.files[0].annotations[0].targets[0].side, 'new');
+  assert.equal('newText' in payload.files[0], false);
+  assert.equal('fileIndex' in payload.files[0], false);
+  assert.equal('id' in payload.files[0].annotations[0], false);
+  assert.equal('ref' in payload.files[0].annotations[0].targets[0], false);
+  assert.equal('sources' in payload, false);
 
   await annotations.edit(1);
   await annotations.write('更正后的意见');
@@ -155,9 +158,22 @@ try {
     .events;
   assert.equal(second.length, 2);
   assert.equal(second[1].payload.replacesEventId, first[0].id);
-  assert.equal(second[1].payload.annotations[0].comment, '更正后的意见');
+  assert.equal(second[1].payload.files[0].annotations[0].comment, '更正后的意见');
   await page.screenshot({
     path: '/private/tmp/paneon-neutral-tree-evidence/builtin-diff-review.png',
+  });
+  await annotations.remove(2);
+  await annotations.remove(1);
+  await submitAnnotations(frame);
+  const withdrawn = await service.runtime.events(
+    instance.instanceId,
+    'diff-review-test',
+    100,
+    1000,
+  );
+  assert.deepEqual(withdrawn.events[2].payload, {
+    files: [],
+    replacesEventId: second[1].id,
   });
 
   // Resolve unopened files, including failures and empty additions/deletions. Hold the
@@ -245,7 +261,7 @@ try {
   await submitAnnotations(frame);
   const delivered = await service.runtime.events(large.instanceId, 'large-diff-review', 100, 1000);
   assert.equal(delivered.events.length, 1);
-  assert.equal(delivered.events[0].payload.annotations[0].targets[0].text.quote, 'new');
+  assert.equal(delivered.events[0].payload.files[0].annotations[0].targets[0].text.quote, 'new');
   assert.ok(submissions.length > 0);
   for (const body of submissions) {
     assert.ok(Buffer.byteLength(JSON.stringify(body)) < 4096);

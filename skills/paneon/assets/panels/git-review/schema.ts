@@ -194,9 +194,6 @@ const publishedTarget = z.intersection(
     z.object({ kind: z.literal('file') }),
     z.object({ kind: z.literal('hunk'), patch: z.string() }),
     publishedLines.extend({ text: z.string() }),
-    publishedLines.extend({
-      textRef: z.object({ file: z.number(), annotation: z.number(), target: z.number() }),
-    }),
   ]),
   // A target in another snapshot keeps its source alongside that target.
   z.object({ source: publishedSource.optional() }),

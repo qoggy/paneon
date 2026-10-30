@@ -1,0 +1,48 @@
+import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { DiffView, Page, usePageAnnotations } from '@qoggy/paneon/ui';
+
+const refSchema = z.object({ id: z.string(), side: z.enum(['old', 'new']) });
+type Ref = z.infer<typeof refSchema>;
+const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
+const resultSchema = z.object({
+  annotations: z.array(
+    z.object({
+      targets: draftAnnotation.shape.targets,
+      comment: draftAnnotation.shape.comment,
+    }),
+  ),
+});
+
+function Panel() {
+  const { oldText, newText } = usePanelInput<{ oldText: string; newText: string }>();
+  usePageAnnotations<Ref>({
+    onSubmit: async (value) => {
+      await agent.emit('diff-annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+      });
+    },
+  });
+  return (
+    <Page title="Review file changes">
+      <DiffView
+        oldText={oldText}
+        newText={newText}
+        oldPath="request.ts"
+        newPath="request.ts"
+        annotationTargets={{
+          old: { id: 'request-v1', side: 'old' },
+          new: { id: 'request-v1', side: 'new' },
+        }}
+        defaultExpanded
+      />
+    </Page>
+  );
+}
+
+export default definePanel({
+  id: 'diff-annotations',
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
+  input: z.object({ oldText: z.string(), newText: z.string() }),
+  events: { 'diff-annotations-submitted': resultSchema },
+  render: Panel,
+});

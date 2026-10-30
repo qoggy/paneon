@@ -6,11 +6,13 @@ import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import { resolvePRTarget } from './model.ts';
+import { publicPRFeedback } from './feedback.ts';
 import {
   oidSchema,
   repositorySchema,
   prFeedbackSchema,
   prFeedbackSubmittedSchema,
+  prResolvedFeedbackSchema,
   prReviewRequestedSchema,
   prSourceSchema,
 } from './schema.ts';
@@ -760,12 +762,13 @@ export class GitHubReview {
         targets: [...new Map(targets.map((target) => [JSON.stringify(target), target])).values()],
       };
     });
-    const result = prFeedbackSubmittedSchema.parse({
+    const resolved = prResolvedFeedbackSchema.parse({
       repository,
       ...feedback,
       annotations,
       sources,
     });
+    const result = prFeedbackSubmittedSchema.parse(publicPRFeedback(resolved));
     if (JSON.stringify(result).length > 65536)
       throw new Error('Annotations exceed the 65536-character event limit. Draft retained.');
     return result;

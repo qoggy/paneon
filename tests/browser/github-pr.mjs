@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, realpath, writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { startGithubPRFixture } from './github-pr-fixture.mjs';
@@ -18,6 +18,131 @@ const until = async (check, message) => {
   }
   throw new Error(message);
 };
+
+await test('PR publishes grouped descriptions, both diff sides, change blocks and linked local files', async () => {
+  const f = await startGithubPRFixture();
+  let browser;
+  try {
+    const markdown = body() + '\n[本地文件](./linked.txt)\n';
+    await writeFile(join(f.root, 'linked.txt'), 'const timeout = 5000;\n');
+    await f.state({ body: markdown });
+    browser = await chromium.launch({
+      headless: true,
+      channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
+    });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+    page.setDefaultTimeout(15000);
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(f.url());
+    const frame = page.frameLocator('iframe');
+    const comments = annotationTools(frame, page);
+    const save = async (comment) => {
+      await comments.write(comment);
+      await comments.save();
+    };
+    await frame.locator('[data-markdown-annotation] h1').waitFor();
+    await selectAnnotationText(frame, '[data-markdown-annotation] h1');
+    await save('标题意见');
+    const paragraph = '[data-markdown-annotation] p:first-of-type';
+    const end = (await frame.locator(paragraph).textContent()).length;
+    await selectAnnotationText(frame, '[data-markdown-annotation] h1', 0, end, paragraph);
+    await save('跨段意见');
+    await frame.getByRole('link', { name: '本地文件', exact: true }).click();
+    const fileLine = '[data-slot="file-preview-source"] [data-code-line="1"]';
+    await frame.locator(fileLine).waitFor();
+    await selectAnnotationText(frame, fileLine, 6, 13);
+    await save('本地文件意见');
+    await frame.locator('[data-slot="file-preview"]').press('Escape');
+    await frame.locator('[data-slot="file-preview"]').waitFor({ state: 'hidden' });
+    await frame.getByRole('tab', { name: '文件改动', exact: true }).click();
+    await frame.locator('[data-code-side="new"][data-line="2"]').waitFor();
+    await selectAnnotationText(frame, '[data-code-side="old"][data-line="2"]', 6, 11);
+    await save('旧侧文字');
+    await selectDiffLines(frame, 'new', 2);
+    await save('新侧整行');
+    await frame.locator('[data-diff-block-action="0"]').click();
+    await save('替换块');
+    for (const [path, comment] of [
+      ['added.txt', '新增块'],
+      ['deleted.txt', '删除块'],
+    ]) {
+      await frame.getByRole('button', { name: new RegExp(path.replace('.', '\\.') + '$') }).click();
+      await frame
+        .locator(`[data-code-side="${path === 'added.txt' ? 'new' : 'old'}"][data-line="1"]`)
+        .filter({ hasText: path === 'added.txt' ? 'added' : 'deleted' })
+        .waitFor();
+      await frame.locator('[data-diff-block-action="0"]').waitFor();
+      await frame.locator('[data-diff-block-action="0"]').click();
+      await save(comment);
+    }
+    assert.equal((await f.events()).length, 0);
+    await submitAnnotations(frame);
+    await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
+    const [event] = await f.events();
+    assert.equal(event.type, 'pr-feedback-submitted');
+    const sources = event.payload.sources;
+    assert.equal(sources.length, 5);
+    const description = sources.find((source) => source.kind === 'description');
+    assert.equal(description.annotations.length, 2);
+    for (const annotation of description.annotations)
+      for (const target of annotation.targets)
+        assert.equal(markdown.slice(target.text.start, target.text.end), target.text.quote);
+    assert.equal(description.annotations[0].targets[0].text.quote, 'PR 说明');
+    assert.equal(description.annotations[1].targets[0].text.quote, 'PR 说明');
+    assert.ok(
+      description.annotations[1].targets.some((target) => target.text.quote.includes('重复')),
+      JSON.stringify(description.annotations[1].targets),
+    );
+    const local = sources.find((source) => source.path);
+    assert.equal(local.path, await realpath(join(f.root, 'linked.txt')));
+    assert.deepEqual(local.annotations[0], {
+      targets: [{ text: { start: 6, end: 13, quote: 'timeout' } }],
+      comment: '本地文件意见',
+    });
+    const changed = sources.find(
+      (source) => source.kind === 'diff' && source.new?.path === 'src/a.ts',
+    );
+    assert.equal(changed.headCommit, ids.head);
+    assert.equal(changed.mergeBaseCommit, ids.merge);
+    assert.equal(changed.annotations.length, 3);
+    assert.deepEqual(changed.annotations[0].targets[0], {
+      kind: 'lines',
+      side: 'old',
+      startLine: 2,
+      endLine: 2,
+      text: { start: 6, end: 11, quote: 'n = 1' },
+    });
+    assert.equal(changed.annotations[1].targets[0].side, 'new');
+    assert.deepEqual(
+      changed.annotations[2].targets.map((target) => target.side),
+      ['old', 'new'],
+    );
+    for (const [path, side] of [
+      ['added.txt', 'new'],
+      ['deleted.txt', 'old'],
+    ]) {
+      const source = sources.find(
+        (source) => source.kind === 'diff' && source[side]?.path === path,
+      );
+      assert.equal(source.annotations[0].targets.length, 1);
+      assert.equal(source.annotations[0].targets[0].side, side);
+    }
+    const inspect = (value) => {
+      if (!value || typeof value !== 'object') return;
+      for (const [key, item] of Object.entries(value)) {
+        assert.ok(!['id', 'sourceId', 'sourceRef', 'ref'].includes(key), `Internal field ${key}`);
+        inspect(item);
+      }
+    };
+    inspect(event.payload);
+    assert.deepEqual(errors, []);
+    console.log('PR six format cases passed through the actual page and persisted event.');
+  } finally {
+    await browser?.close();
+    await f.stop();
+  }
+});
 async function completeAcceptance() {
   const f = await startGithubPRFixture();
   let browser, page;
@@ -303,24 +428,21 @@ async function completeAcceptance() {
     await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
-    assert.equal(first.payload.annotations.length, 4);
-    assert.equal(Object.keys(first.payload.sources).length, 3);
-    const phrase = first.payload.annotations[0].targets[0],
+    assert.equal(first.payload.sources.flatMap((source) => source.annotations).length, 4);
+    assert.equal(first.payload.sources.length, 3);
+    const phrase = first.payload.sources[0].annotations[0].targets[0],
       start = body().indexOf('缓存', body().indexOf('缓存') + 1);
     assert.deepEqual(phrase.text, { start, end: start + 2, quote: '缓存' });
     assert.equal(
-      first.payload.annotations[1].targets[0].text.quote,
+      first.payload.sources[0].annotations[1].targets[0].text.quote,
       body().slice(body().indexOf('重复'), -1),
     );
-    const diff = first.payload.annotations[2].targets[0];
-    assert.equal(diff.ref.startLine, 2);
-    assert.equal(diff.ref.endLine, 2);
+    const diff = first.payload.sources[1].annotations[0].targets[0];
+    assert.equal(diff.startLine, 2);
+    assert.equal(diff.endLine, 2);
     assert.equal(diff.text.quote, 'const n = 2;\r\n');
-    assert.equal(first.payload.sources[diff.ref.sourceId].headCommit, ids.head);
-    assert.equal(
-      first.payload.sources[first.payload.annotations[3].targets[0].ref.sourceId].number,
-      202,
-    );
+    assert.equal(first.payload.sources[1].headCommit, ids.head);
+    assert.equal(first.payload.sources[2].number, 202);
     await comments.edit(1);
     await comment().fill('更正说明');
     await finish();
@@ -328,8 +450,8 @@ async function completeAcceptance() {
     await submitAnnotations(frame);
     await until(async () => (await f.events()).length === 3, 'explicit corrected feedback missing');
     const corrected = (await f.events())[2];
-    assert.equal(corrected.payload.annotations[0].id, first.payload.annotations[0].id);
-    assert.equal(corrected.payload.annotations[0].comment, '更正说明');
+    assert.equal('id' in corrected.payload.sources[0].annotations[0], false);
+    assert.equal(corrected.payload.sources[0].annotations[0].comment, '更正说明');
     assert.equal(corrected.payload.replacesEventId, undefined);
     const execute = promisify(execFile),
       cli = async (...args) => {
@@ -509,20 +631,16 @@ await test('independent PR delivery, old sources, transport limits and failures'
     await frame.locator('[data-slot="toast"]').filter({ hasText: '批注已提交。' }).waitFor();
     const first = (await f.events())[1];
     assert.equal(first.type, 'pr-feedback-submitted');
-    assert.equal(first.payload.annotations.length, 3);
-    assert.equal(Object.keys(first.payload.sources).length, 3);
-    const oldDescription =
-      first.payload.sources[first.payload.annotations[0].targets[0].ref.sourceId];
+    assert.equal(first.payload.sources.flatMap((source) => source.annotations).length, 3);
+    assert.equal(first.payload.sources.length, 3);
+    const oldDescription = first.payload.sources[0];
     assert.equal(oldDescription.kind, 'description');
     assert.equal(oldDescription.headCommit, ids.head);
-    const oldDiff = first.payload.annotations[1].targets[0];
-    assert.equal(oldDiff.ref.startLine, 2);
+    const oldDiff = first.payload.sources[1].annotations[0].targets[0];
+    assert.equal(oldDiff.startLine, 2);
     assert.equal(oldDiff.text.quote, 'const n = 2;\r\n');
-    assert.equal(first.payload.sources[oldDiff.ref.sourceId].headCommit, ids.head);
-    assert.equal(
-      first.payload.sources[first.payload.annotations[2].targets[0].ref.sourceId].number,
-      202,
-    );
+    assert.equal(first.payload.sources[1].headCommit, ids.head);
+    assert.equal(first.payload.sources[2].number, 202);
     await comments.edit(1);
     await comments.write('明确更正');
     await finish();
@@ -533,8 +651,8 @@ await test('independent PR delivery, old sources, transport limits and failures'
       'independent corrected feedback missing',
     );
     const corrected = (await f.events())[2];
-    assert.equal(corrected.payload.annotations[0].id, first.payload.annotations[0].id);
-    assert.equal(corrected.payload.annotations[0].comment, '明确更正');
+    assert.equal('id' in corrected.payload.sources[0].annotations[0], false);
+    assert.equal(corrected.payload.sources[0].annotations[0].comment, '明确更正');
     assert.equal(corrected.payload.replacesEventId, undefined);
     const execute = promisify(execFile),
       cli = async (...args) => {

@@ -42,14 +42,38 @@ export const diffSourceSchema = z
     newPath: path.nullable(),
   })
   .strict();
-export const diffReviewSubmittedSchema = annotationValueSchema(diffRefSchema).safeExtend({
+const annotationsSchema = annotationValueSchema(diffRefSchema);
+export const diffFeedbackResultSchema = annotationsSchema.safeExtend({
   sources: z.array(diffSourceSchema),
+  replacesEventId: z.number().int().positive().optional(),
+});
+export type DiffFeedbackResult = z.infer<typeof diffFeedbackResultSchema>;
+
+const publishedSource = diffSourceSchema.omit({ fileIndex: true });
+const targetShape = annotationsSchema.shape.annotations.element.shape.targets.element.shape;
+export const diffReviewSubmittedSchema = z.object({
+  files: z.array(
+    publishedSource.extend({
+      annotations: z.array(
+        z.object({
+          targets: z.array(
+            z.object({
+              side: diffRefSchema.shape.side,
+              text: targetShape.text,
+              sourceRef: targetShape.sourceRef,
+            }),
+          ),
+          comment: z.string(),
+        }),
+      ),
+    }),
+  ),
   replacesEventId: z.number().int().positive().optional(),
 });
 export type DiffReviewSubmitted = z.infer<typeof diffReviewSubmittedSchema>;
 
 /** Source checks need only the path manifest and feedback, never complete file contents. */
-export function validateSources(params: DiffReviewParams, feedback: DiffReviewSubmitted) {
+export function validateSources(params: DiffReviewParams, feedback: DiffFeedbackResult) {
   const seen = new Set<string>();
   for (const source of feedback.sources) {
     const key = `${source.fileIndex}:${source.snapshotId}`;
@@ -84,7 +108,7 @@ export function validateSources(params: DiffReviewParams, feedback: DiffReviewSu
 /** Validate retained browser text, never reread current files to reinterpret an old annotation. */
 export function validateRanges(
   params: DiffReviewParams,
-  feedback: DiffReviewSubmitted,
+  feedback: DiffFeedbackResult,
   snapshots: Record<string, Snapshot>,
 ) {
   validateSources(params, feedback);

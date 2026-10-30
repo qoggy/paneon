@@ -3,15 +3,16 @@ import { test } from 'node:test';
 import { z } from '@qoggy/paneon/sdk';
 import {
   tableParamsSchema,
-  tableSubmittedSchema,
   completeTableSchema,
   tableTargetError,
+  tableSubmittedSchema,
   visibleRows,
 } from '../skills/paneon/assets/panels/table/schema.ts';
 import {
   reviewParamsSchema,
   completeReviewSchema,
 } from '../skills/paneon/assets/panels/review/schema.ts';
+import { publicTableFeedback } from '../skills/paneon/assets/panels/table/feedback.ts';
 import { markdownOffsets } from '../src/ui/markdown-annotation-mapper.ts';
 const table = () =>
   tableParamsSchema.parse({
@@ -121,49 +122,97 @@ void test('table complete result validates mixed targets, independent entries, o
       null,
     );
 });
-void test('review accepts only a nonblank title and Markdown file path', () => {
-  const params = {
-    title: 'Review',
-    markdownFilePath: 'docs/审阅 方案.md',
+void test('Table annotates displayed number and boolean text without changing input types', () => {
+  const values = [120, 0, -12.5, true, false, '120'];
+  const params = tableParamsSchema.parse({
+    title: 'Cell types',
+    columns: [{ key: 'value', label: 'Value' }],
+    rows: [...values, null].map((value) => ({ value })),
+  });
+  const targets = values.map((value, rowIndex) => ({
+    ref: { kind: 'cell' as const, rowIndex, columnKey: 'value' },
+    text: { start: 0, end: String(value).length, quote: String(value) },
+  }));
+  // Selecting only part of a displayed value works just like selecting part of a string.
+  targets.push({
+    ref: { kind: 'cell', rowIndex: 0, columnKey: 'value' },
+    text: { start: 1, end: 3, quote: '20' },
+  });
+  const published = publicTableFeedback(
+    completeTableSchema(params).parse({
+      annotations: [{ id: 'mixed', targets, comment: 'Check these values' }],
+    }),
+  );
+  assert.deepEqual(tableSubmittedSchema.parse(published).annotations[0], {
+    targets,
+    comment: 'Check these values',
+  });
+  assert.deepEqual(
+    params.rows.map((row) => row.value),
+    [...values, null],
+  );
+});
+
+void test('Table publishes header, cell and multi-cell opinions without editing ids', () => {
+  const params = tableParamsSchema.parse({
+    title: 'Services',
+    columns: [
+      { key: 'name', label: 'Service' },
+      { key: 'description', label: '说明' },
+    ],
+    rows: [{ name: 'API', description: '同步请求🙂' }],
+  });
+  const name = {
+    ref: { kind: 'cell' as const, rowIndex: 0, columnKey: 'name' },
+    text: { start: 0, end: 3, quote: 'API' },
   };
-  assert.deepEqual(reviewParamsSchema.parse(params), params);
-  assert.equal(
-    reviewParamsSchema.safeParse({ ...params, markdownFilePath: '/tmp/plan.md' }).success,
-    true,
-  );
-  for (const input of [
-    { title: 'Review', markdown: 'Old inline content' },
-    { title: 'Review' },
-    { ...params, title: ' ' },
-    { ...params, markdownFilePath: '' },
-    { ...params, markdownFilePath: ' ' },
-    { ...params, markdown: '' },
-    { ...params, sections: [] },
-  ])
-    assert.equal(reviewParamsSchema.safeParse(input).success, false);
+  const description = {
+    ref: { kind: 'cell' as const, rowIndex: 0, columnKey: 'description' },
+    text: { start: 0, end: 6, quote: '同步请求🙂' },
+  };
+  const header = {
+    ref: { kind: 'header' as const, columnKey: 'description' },
+    text: { start: 0, end: 2, quote: '说明' },
+  };
+  const draft = completeTableSchema(params).parse({
+    annotations: [
+      { id: 'header', targets: [header], comment: '列名意见' },
+      { id: 'cell', targets: [description], comment: '' },
+      { id: 'multiple', targets: [name, description], comment: '同一条意见' },
+      { id: 'independent', targets: [description], comment: '另一条独立意见' },
+    ],
+    replacesEventId: 12,
+  });
+  const original = structuredClone(draft);
+  const published = publicTableFeedback(draft);
+  assert.deepEqual(published, {
+    annotations: [
+      { targets: [header], comment: '列名意见' },
+      { targets: [description], comment: '' },
+      { targets: [name, description], comment: '同一条意见' },
+      { targets: [description], comment: '另一条独立意见' },
+    ],
+    replacesEventId: 12,
+  });
+  assert.deepEqual(tableSubmittedSchema.parse(published), published);
+  assert.deepEqual(draft, original, 'Publishing preserves draft ids for editing and navigation');
+  assert.doesNotThrow(() => z.toJSONSchema(tableSubmittedSchema));
 });
-void test('review validates grapheme boundaries and clearing revisions against the document snapshot', () => {
-  const schema = completeReviewSchema('**中文🙂** repeat repeat');
-  const target = { ref: { kind: 'document' }, text: { start: 2, end: 6, quote: '中文🙂' } };
-  assert.equal(
-    schema.safeParse({ annotations: [{ id: 'a', targets: [target], comment: '' }] }).success,
-    true,
+
+void test('Table publishes initial results and complete empty corrections', () => {
+  const draft = completeTableSchema(table()).parse({
+    annotations: [
+      { id: 'header', targets: [{ ref: { kind: 'header', columnKey: 'name' } }], comment: '' },
+    ],
+  });
+  assert.equal('replacesEventId' in publicTableFeedback(draft), false);
+  const cleared = publicTableFeedback(
+    completeTableSchema(table()).parse({ annotations: [], replacesEventId: 13 }),
   );
-  assert.equal(
-    schema.safeParse({
-      annotations: [
-        {
-          id: 'a',
-          targets: [{ ...target, text: { start: 2, end: 5, quote: '中文\ud83d' } }],
-          comment: '',
-        },
-      ],
-    }).success,
-    false,
-  );
-  assert.equal(schema.safeParse({ annotations: [] }).success, false);
-  assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
+  assert.deepEqual(cleared, { annotations: [], replacesEventId: 13 });
+  assert.deepEqual(tableSubmittedSchema.parse(cleared), cleared);
 });
+
 void test('Markdown mapping is parser-range based for escapes, entities, code and Unicode without first-match search', () => {
   const raw = 'repeat **repeat** &amp; \\* 中文🙂';
   assert.deepEqual(markdownOffsets(raw, 9, 15, 'repeat'), [9, 10, 11, 12, 13, 14, 15]);
@@ -316,32 +365,46 @@ void test('table and Markdown review validate page targets alongside page-define
   assert.deepEqual(review.annotations[0].targets[1], { ...common, ref: { kind: 'document' } });
 });
 
-void test('Table annotates displayed number and boolean text without changing input types', () => {
-  const values = [120, 0, -12.5, true, false, '120'];
-  const params = tableParamsSchema.parse({
-    title: 'Cell types',
-    columns: [{ key: 'value', label: 'Value' }],
-    rows: [...values, null].map((value) => ({ value })),
-  });
-  const targets = values.map((value, rowIndex) => ({
-    ref: { kind: 'cell' as const, rowIndex, columnKey: 'value' },
-    text: { start: 0, end: String(value).length, quote: String(value) },
-  }));
-  // Selecting only part of a displayed value works just like selecting part of a string.
-  targets.push({
-    ref: { kind: 'cell', rowIndex: 0, columnKey: 'value' },
-    text: { start: 1, end: 3, quote: '20' },
-  });
-  const published = completeTableSchema(params).parse({
-    annotations: [{ id: 'mixed', targets, comment: 'Check these values' }],
-  });
-  assert.deepEqual(tableSubmittedSchema.parse(published).annotations[0], {
-    id: 'mixed',
-    targets,
-    comment: 'Check these values',
-  });
-  assert.deepEqual(
-    params.rows.map((row) => row.value),
-    [...values, null],
+void test('review accepts only a nonblank title and Markdown file path', () => {
+  const params = {
+    title: 'Review',
+    markdownFilePath: 'docs/审阅 方案.md',
+  };
+  assert.deepEqual(reviewParamsSchema.parse(params), params);
+  assert.equal(
+    reviewParamsSchema.safeParse({ ...params, markdownFilePath: '/tmp/plan.md' }).success,
+    true,
   );
+  for (const input of [
+    { title: 'Review', markdown: 'Old inline content' },
+    { title: 'Review' },
+    { ...params, title: ' ' },
+    { ...params, markdownFilePath: '' },
+    { ...params, markdownFilePath: ' ' },
+    { ...params, markdown: '' },
+    { ...params, sections: [] },
+  ])
+    assert.equal(reviewParamsSchema.safeParse(input).success, false);
+});
+void test('review validates grapheme boundaries and clearing revisions against the document snapshot', () => {
+  const schema = completeReviewSchema('**中文🙂** repeat repeat');
+  const target = { ref: { kind: 'document' }, text: { start: 2, end: 6, quote: '中文🙂' } };
+  assert.equal(
+    schema.safeParse({ annotations: [{ id: 'a', targets: [target], comment: '' }] }).success,
+    true,
+  );
+  assert.equal(
+    schema.safeParse({
+      annotations: [
+        {
+          id: 'a',
+          targets: [{ ...target, text: { start: 2, end: 5, quote: '中文\ud83d' } }],
+          comment: '',
+        },
+      ],
+    }).success,
+    false,
+  );
+  assert.equal(schema.safeParse({ annotations: [] }).success, false);
+  assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
 });

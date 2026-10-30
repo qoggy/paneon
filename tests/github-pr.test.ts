@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { GitHubReview } from '../skills/paneon/assets/examples/github-pr/github.ts';
-import { githubPRParamsSchema } from '../skills/paneon/assets/examples/github-pr/schema.ts';
+import {
+  githubPRParamsSchema,
+  prFeedbackSubmittedSchema,
+} from '../skills/paneon/assets/examples/github-pr/schema.ts';
+import { diffAnnotationTargets } from '../skills/paneon/assets/shared/diff-schema.ts';
 import { resolvePRTarget, safeLink } from '../skills/paneon/assets/examples/github-pr/model.ts';
 import { body, code, ids, routeGh } from './github-pr-fixture.ts';
 import type { PRFixtureState } from './github-pr-fixture.ts';
@@ -105,10 +109,16 @@ void test('description and stable-ID check observations survive same-head change
       },
     ],
   });
-  assert.equal(result.annotations[0].id, 'original');
-  assert.equal(Object.keys(result.sources).length, 3);
-  assert.equal(result.sources[oldBody.id].kind, 'description');
-  assert.equal(result.sources[second.detail.overviewSourceId].number, 202);
+  assert.equal(result.sources.length, 1);
+  assert.ok('kind' in result.sources[0]);
+  assert.equal(result.sources[0].kind, 'description');
+  assert.equal('id' in result.sources[0].annotations[0], false);
+  assert.deepEqual(result.sources[0].annotations[0].targets[0], { text: target.text });
+  assert.deepEqual(result.sources[0].annotations[0].targets[1].source, checks.snapshots[0].source);
+  assert.deepEqual(
+    result.sources[0].annotations[0].targets[2].source,
+    second.snapshots.find((s) => s.source.kind === 'pull-request')?.source,
+  );
   assert.equal(resolvePRTarget(oldBody, target), body());
   assert.throws(
     () =>
@@ -180,12 +190,18 @@ void test('fixed merge-base/head raw blobs generate exact diff, even after head 
     ],
   };
   const result = f.client.feedback(f.repository, f.session, value);
-  assert.deepEqual(result.annotations[0].targets[0].text, { start: 6, end: 11, quote: 'n = 2' });
-  assert.equal(
-    result.annotations[0].targets[0].ref.kind === 'lines' &&
-      result.annotations[0].targets[0].ref.startLine,
-    2,
-  );
+  assert.deepEqual(result.sources[0].annotations[0].targets[0].text, {
+    start: 6,
+    end: 11,
+    quote: 'n = 2',
+  });
+  assert.deepEqual(result.sources[0].annotations[0].targets[0], {
+    kind: 'lines',
+    side: 'new',
+    startLine: 2,
+    endLine: 2,
+    text: { start: 6, end: 11, quote: 'n = 2' },
+  });
   const renamed = await f.client.diff(f.repository, f.session, comparison.id, 'src/new name\n.ts');
   assert.equal(renamed.source.kind === 'diff' && renamed.source.old?.path, 'src/old name\n.ts');
   assert.ok(renamed.notes?.some((n) => n.includes('API 未提供 patch')));
@@ -308,7 +324,11 @@ void test('fresh PR readers use browser evidence for checks, fixed diffs, review
       },
     ],
   });
-  assert.equal(Object.keys(result.sources).length, 4);
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].annotations[0].targets.length, 4);
+  assert.deepEqual(result.sources[0].annotations[0].targets[1].source, checks.snapshots[0].source);
+  assert.deepEqual(result.sources[0].annotations[0].targets[2].source, overview.source);
+  assert.deepEqual(result.sources[0].annotations[0].targets[3].source, snapshot.source);
   assert.throws(
     () =>
       new GitHubReview(read).withEvidence('another/project', session, { snapshots: [overview] }),
@@ -361,6 +381,191 @@ void test('PR feedback preserves local file targets separately from commit-backe
       },
     ],
   });
-  assert.deepEqual(result.annotations[0].targets[1], common);
-  assert.deepEqual(Object.keys(result.sources), [description.id]);
+  assert.deepEqual(result.sources[0].annotations[0].targets[1], {
+    text: common.text,
+    source: common.sourceRef,
+  });
+  assert.ok('kind' in result.sources[0]);
+  assert.equal(result.sources[0].kind, 'description');
+});
+
+void test('PR description opinions share source metadata and retain heading and cross-paragraph ranges', async () => {
+  const f = fixture();
+  const detail = await f.client.detail(f.repository, f.session, 101);
+  const snapshot = detail.snapshots.find((s) => s.source.kind === 'description');
+  assert.ok(snapshot);
+  const ranges = [
+    { start: 2, end: 7, quote: body().slice(2, 7) },
+    { start: 2, end: body().length - 1, quote: body().slice(2, -1) },
+  ];
+  const draft = {
+    annotations: ranges.map((text, index) => ({
+      id: `draft-${index}`,
+      targets: [{ ref: { sourceId: snapshot.id, kind: 'description' }, text }],
+      comment: index ? '跨段意见' : '',
+    })),
+  };
+  const before = structuredClone(draft);
+  const result = f.client.feedback(f.repository, f.session, draft);
+  assert.deepEqual(result, {
+    repository: f.repository,
+    sources: [
+      {
+        ...snapshot.source,
+        annotations: ranges.map((text, index) => ({
+          targets: [{ text }],
+          comment: index ? '跨段意见' : '',
+        })),
+      },
+    ],
+  });
+  assert.deepEqual(draft, before);
+  assert.deepEqual(prFeedbackSubmittedSchema.parse(result), result);
+});
+
+void test('PR diff groups old/new text, replacement, addition and deletion opinions without losing coordinates', async () => {
+  const f = fixture();
+  const detail = await f.client.detail(f.repository, f.session, 101);
+  const comparison = await f.client.comparison(f.repository, f.session, detail.detail.id);
+  const changed = await f.client.diff(f.repository, f.session, comparison.id, 'src/a.ts');
+  const added = await f.client.diff(f.repository, f.session, comparison.id, 'added.txt');
+  const deleted = await f.client.diff(f.repository, f.session, comparison.id, 'deleted.txt');
+  assert.ok(changed.model);
+  assert.ok(added.model);
+  assert.ok(deleted.model);
+  const refs = diffAnnotationTargets(changed.model, changed.id);
+  assert.ok(refs.old);
+  assert.ok(refs.new);
+  const oldText = {
+    start: code(1).indexOf('n = 1'),
+    end: code(1).indexOf('n = 1') + 5,
+    quote: 'n = 1',
+  };
+  const newText = {
+    start: code(2).indexOf('n = 2'),
+    end: code(2).indexOf('n = 2') + 5,
+    quote: 'n = 2',
+  };
+  const oldBlock = {
+    start: code(1).indexOf('const n'),
+    end: code(1).indexOf('last'),
+    quote: 'const n = 1;\r\n',
+  };
+  const newBlock = {
+    start: code(2).indexOf('const n'),
+    end: code(2).indexOf('last'),
+    quote: 'const n = 2;\r\n',
+  };
+  const draft = {
+    annotations: [
+      { id: 'old', comment: '旧侧', targets: [{ ref: refs.old, text: oldText }] },
+      { id: 'new', comment: '新侧', targets: [{ ref: refs.new, text: newText }] },
+      {
+        id: 'replace',
+        comment: '一条替换意见',
+        targets: [
+          { ref: refs.old, text: oldBlock },
+          { ref: refs.new, text: newBlock },
+        ],
+      },
+      {
+        id: 'add',
+        comment: '新增',
+        targets: [
+          {
+            ref: diffAnnotationTargets(added.model, added.id).new,
+            text: { start: 0, end: 6, quote: 'added\n' },
+          },
+        ],
+      },
+      {
+        id: 'delete',
+        comment: '删除',
+        targets: [
+          {
+            ref: diffAnnotationTargets(deleted.model, deleted.id).old,
+            text: { start: 0, end: 8, quote: 'deleted\n' },
+          },
+        ],
+      },
+    ],
+  };
+  const result = f.client.feedback(f.repository, f.session, draft);
+  const line = (side: string, start: number, end: number, quote: string, number = 2) => ({
+    kind: 'lines',
+    side,
+    startLine: number,
+    endLine: number,
+    text: { start, end, quote },
+  });
+  assert.deepEqual(result, {
+    repository: f.repository,
+    sources: [
+      {
+        ...changed.source,
+        annotations: [
+          { targets: [line('old', 6, 11, 'n = 1')], comment: '旧侧' },
+          { targets: [line('new', 6, 11, 'n = 2')], comment: '新侧' },
+          {
+            targets: [
+              line('old', 0, 14, 'const n = 1;\r\n'),
+              line('new', 0, 14, 'const n = 2;\r\n'),
+            ],
+            comment: '一条替换意见',
+          },
+        ],
+      },
+      {
+        ...added.source,
+        annotations: [{ targets: [line('new', 0, 6, 'added\n', 1)], comment: '新增' }],
+      },
+      {
+        ...deleted.source,
+        annotations: [{ targets: [line('old', 0, 8, 'deleted\n', 1)], comment: '删除' }],
+      },
+    ],
+  });
+});
+
+void test('PR linked-file opinions share local snapshots without an unresolved description source', async () => {
+  const f = fixture();
+  await f.client.detail(f.repository, f.session, 101);
+  const sourceRef = { path: '/work/request.ts', snapshotId: 'sha256:local' };
+  const annotation = (id: string, source = sourceRef) => ({
+    id,
+    comment: id,
+    targets: [
+      {
+        ref: { sourceId: 'unavailable-description', kind: 'description' },
+        sourceRef: source,
+        text: { start: 0, end: 5, quote: 'local' },
+      },
+    ],
+  });
+  const result = f.client.feedback(f.repository, f.session, {
+    annotations: [
+      annotation('first'),
+      annotation('second'),
+      annotation('new-version', { ...sourceRef, snapshotId: 'sha256:new' }),
+    ],
+  });
+  assert.deepEqual(result, {
+    repository: f.repository,
+    sources: [
+      {
+        ...sourceRef,
+        annotations: ['first', 'second'].map((comment) => ({
+          targets: [{ text: { start: 0, end: 5, quote: 'local' } }],
+          comment,
+        })),
+      },
+      {
+        ...sourceRef,
+        snapshotId: 'sha256:new',
+        annotations: [
+          { targets: [{ text: { start: 0, end: 5, quote: 'local' } }], comment: 'new-version' },
+        ],
+      },
+    ],
+  });
 });

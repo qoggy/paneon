@@ -9,6 +9,17 @@ import {
 } from '@qoggy/paneon/ui';
 
 type Ref = { documentId: string; version: string } | boolean | null;
+const draftAnnotation = annotationValueSchema(
+  z.union([z.object({ documentId: z.string(), version: z.string() }), z.boolean(), z.null()]),
+).shape.annotations.element;
+const resultSchema = z.object({
+  annotations: z.array(
+    z.object({
+      targets: draftAnnotation.shape.targets,
+      comment: draftAnnotation.shape.comment,
+    }),
+  ),
+});
 const before = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
 const after = before.replace('line 80', 'changed 80');
 const quote = '重复';
@@ -52,7 +63,9 @@ function Annotated() {
   const [geometry, setGeometry] = useState('');
   usePageAnnotations<Ref>({
     onSubmit: async (value) => {
-      await agent.emit('annotations-submitted', value);
+      await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+      });
     },
   });
   return (
@@ -152,9 +165,7 @@ export default definePanel({
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
   events: {
-    'annotations-submitted': annotationValueSchema(
-      z.union([z.object({ documentId: z.string(), version: z.string() }), z.boolean(), z.null()]),
-    ),
+    'annotations-submitted': resultSchema,
   },
   render: Panel,
 });

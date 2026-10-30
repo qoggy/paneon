@@ -17,12 +17,31 @@ const refSchema = z.union([
   }),
 ]);
 type Ref = z.infer<typeof refSchema>;
-const resultSchema = annotationValueSchema(refSchema);
+const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
+const resultSchema = z.object({
+  annotations: z.array(
+    z.object({
+      targets: draftAnnotation.shape.targets,
+      comment: draftAnnotation.shape.comment,
+    }),
+  ),
+});
+
+function Draft() {
+  const { value } = useAnnotations<Ref>();
+  return (
+    <output data-draft hidden>
+      {JSON.stringify(value)}
+    </output>
+  );
+}
 
 function Panel() {
   usePageAnnotations<Ref>({
     onSubmit: async (value) => {
-      const receipt = await agent.emit('annotations-submitted', value);
+      const receipt = await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+      });
       toast.add({ title: `Saved as event ${receipt.id}.`, type: 'success' });
     },
   });
@@ -36,6 +55,7 @@ function Panel() {
         <Card className="p-4">
           <AnnotationText target="redis-plan">{source}</AnnotationText>
         </Card>
+        <Draft />
       </>
     </Page>
   );

@@ -3,25 +3,26 @@ import type { AnnotationTarget } from '@qoggy/paneon/sdk';
 import type { DiffLocation } from '@qoggy/paneon/ui';
 import { sourceLines } from './diff-model.ts';
 import type { DiffModel } from './diff-model.ts';
+export const gitLocationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('file') }),
+  z.object({
+    kind: z.literal('hunk'),
+    oldStart: z.number().int().nonnegative(),
+    oldLines: z.number().int().nonnegative(),
+    newStart: z.number().int().nonnegative(),
+    newLines: z.number().int().nonnegative(),
+    patch: z.string(),
+  }),
+  z.object({
+    kind: z.literal('lines'),
+    side: z.enum(['old', 'new']),
+    startLine: z.number().int().positive(),
+    endLine: z.number().int().positive(),
+  }),
+]);
 export const gitRefSchema = z.intersection(
   z.object({ sourceId: z.string().min(1) }),
-  z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('file') }),
-    z.object({
-      kind: z.literal('hunk'),
-      oldStart: z.number().int().nonnegative(),
-      oldLines: z.number().int().nonnegative(),
-      newStart: z.number().int().nonnegative(),
-      newLines: z.number().int().nonnegative(),
-      patch: z.string(),
-    }),
-    z.object({
-      kind: z.literal('lines'),
-      side: z.enum(['old', 'new']),
-      startLine: z.number().int().positive(),
-      endLine: z.number().int().positive(),
-    }),
-  ]),
+  gitLocationSchema,
 );
 export type GitRef = z.infer<typeof gitRefSchema>;
 /** The Git/PR page owns its references; DiffView only registers them unchanged. */
