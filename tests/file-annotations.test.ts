@@ -45,6 +45,7 @@ const { AnnotationStore, fileSourceOffsets } = (await import(
     closeFile(): void;
     openAnnotation(id?: string): void;
     changeEditor(comment: string): void;
+    cancelEditor(): void;
     getFileView(): {
       id: number;
       reference: { href: string };
@@ -303,16 +304,24 @@ void test('snapshot locate encodes literal URI characters in the real filename',
   store.fileMounted(view.id);
   await locating;
 });
-void test('closing a file saves an open editor and deleting its last draft releases the snapshot', async () => {
+void test('file navigation preserves an open editor and deletion after cancel releases the snapshot', async () => {
   const store = new AnnotationStore({ onSubmit: () => Promise.resolve() });
   store.openFile({ href: file.path }, ref);
   store.retainFile({ ref, sourceRef, file });
   const id = store.getSnapshot().createAnnotation([target], 'before');
   store.openAnnotation(id);
   store.changeEditor('preserved input');
+  const view = store.getFileView();
   store.closeFile();
-  assert.equal(store.getSnapshot().editor, null);
-  assert.equal(store.getSnapshot().value.annotations[0].comment, 'preserved input');
+  assert.deepEqual(store.getFileView(), view);
+  assert.equal(store.getSnapshot().editor?.comment, 'preserved input');
+  assert.equal(store.getSnapshot().value.annotations[0].comment, 'before');
+  store.openFile({ href: '/other.ts' }, ref);
+  assert.deepEqual(store.getFileView(), view);
+  assert.equal(store.getSnapshot().editor?.comment, 'preserved input');
+  store.cancelEditor();
+  store.closeFile();
+  assert.equal(store.getFileView()?.open, false);
   store.getSnapshot().removeAnnotation(id);
   await assert.rejects(store.getSnapshot().locate(target), /not registered/);
 });

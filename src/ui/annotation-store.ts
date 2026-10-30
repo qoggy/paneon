@@ -13,7 +13,7 @@ import type {
   AnnotationUI,
 } from './annotation-types';
 import { selectedTextTargets, validTextRange } from './annotation-selection';
-import { createRectClipper } from './annotation-geometry';
+import { createRectClipper, waitForAnnotationLocation } from './annotation-geometry';
 import type { ClippedRect } from './annotation-geometry';
 import { indexTextSegments, textSegmentsInRange } from './annotation-text-index';
 
@@ -81,6 +81,7 @@ export class AnnotationStore<TRef> {
     this.state = {
       pending: [],
       editor: null,
+      editorAttention: 0,
       uiError: null,
       value: frozen({ annotations: [] }),
       activeAnnotationId: null,
@@ -109,6 +110,10 @@ export class AnnotationStore<TRef> {
     trigger?: HTMLElement,
     reader?: ReadFileReference,
   ) => {
+    if (this.state.editor) {
+      this.requestEditorAttention();
+      return;
+    }
     this.fileReady?.();
     this.fileReady = undefined;
     this.dismissSelection();
@@ -124,7 +129,10 @@ export class AnnotationStore<TRef> {
     this.publish({});
   };
   closeFile = () => {
-    if (this.state.editor && !this.disabled) this.saveEditor();
+    if (this.state.editor) {
+      this.requestEditorAttention();
+      return;
+    }
     this.dismissSelection();
     if (this.fileView) this.fileView = { ...this.fileView, open: false };
     this.fileReady?.();
@@ -276,6 +284,13 @@ export class AnnotationStore<TRef> {
   };
   removeAnnotation: AnnotationController<TRef>['removeAnnotation'] = (id) => {
     this.assertEditable();
+    if (this.state.editor) {
+      this.requestEditorAttention();
+      return;
+    }
+    this.removeSavedAnnotation(id);
+  };
+  private removeSavedAnnotation(id: string) {
     this.save(
       {
         ...this.state.value,
@@ -283,7 +298,7 @@ export class AnnotationStore<TRef> {
       },
       this.state.activeAnnotationId === id ? null : this.state.activeAnnotationId,
     );
-  };
+  }
   registerText: AnnotationController<TRef>['registerText'] = (registration) => {
     sourceKey(registration);
     const nodes = new Set<Text>();
@@ -315,6 +330,7 @@ export class AnnotationStore<TRef> {
       ref: copy(registration.ref),
       ...(registration.sourceRef === undefined ? {} : { sourceRef: copy(registration.sourceRef) }),
       source: registration.source,
+      locate: registration.locate,
       presentation: registration.presentation,
       segments,
       index: indexTextSegments(segments),
@@ -360,8 +376,9 @@ export class AnnotationStore<TRef> {
     this.stageSources(targets);
     this.publish({
       pending: targets,
-      uiError: targets.length && this.state.editor ? '请先保存或取消正在编辑的批注。' : null,
+      uiError: null,
     });
+    if (targets.length && this.state.editor) this.requestEditorAttention();
   };
 
   mountSurface = () => {
@@ -418,6 +435,9 @@ export class AnnotationStore<TRef> {
     );
     this.openAnnotation(existing?.id, targets);
   };
+  private requestEditorAttention() {
+    this.publish({ editorAttention: this.state.editorAttention + 1, uiError: null });
+  }
   openAnnotation = (
     id?: string,
     selected = this.state.pending,
@@ -425,7 +445,7 @@ export class AnnotationStore<TRef> {
   ) => {
     if (this.disabled) return;
     if (this.state.editor) {
-      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
+      this.requestEditorAttention();
       return;
     }
     const annotation = id ? this.state.value.annotations.find((entry) => entry.id === id) : null;
@@ -488,7 +508,7 @@ export class AnnotationStore<TRef> {
   deleteEditor = () => {
     this.assertEditable();
     const editor = this.state.editor;
-    if (editor?.id) this.removeAnnotation(editor.id);
+    if (editor?.id) this.removeSavedAnnotation(editor.id);
     this.cancelEditor();
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
@@ -613,7 +633,16 @@ export class AnnotationStore<TRef> {
         'The target text is stale or its range no longer matches the original source.',
       );
   }
+  locateAndEdit = async (id: string, target: AnnotationTarget<TRef>) => {
+    const request = this.locating + 1;
+    await this.locate(target);
+    if (request === this.locating) this.openAnnotation(id);
+  };
   locate: AnnotationController<TRef>['locate'] = async (target) => {
+    if (this.state.editor) {
+      this.requestEditorAttention();
+      throw new Error('Cannot navigate while an annotation editor is open.');
+    }
     const request = ++this.locating;
     try {
       const fileSnapshot = this.fileSnapshots.get(sourceKey(target));
@@ -625,18 +654,26 @@ export class AnnotationStore<TRef> {
       else {
         if (this.fileView?.open) this.closeFile();
         if (this.options?.adapter) await this.options.adapter.locate(copy(target));
+        else {
+          const registration = [...this.texts.values()].find(
+            (item) => sourceKey(item) === sourceKey(target) && item.source === source,
+          );
+          await registration?.locate?.(copy(target));
+        }
       }
       if (request !== this.locating) return;
       const key = sourceKey(target);
-      const registration = [...this.texts.values()].find(
+      const registrations = [...this.texts.values()].filter(
         (item) => sourceKey(item) === key && (!target.text || item.source === source),
       );
-      const segments =
-        registration && target.text
+      // One source may be registered in several blocks; search all of them.
+      const segments = registrations.flatMap((registration) =>
+        target.text
           ? textSegmentsInRange(registration.index, target.text.start, target.text.end)
-          : registration?.segments;
+          : registration.segments,
+      );
       const text = target.text;
-      const textElement = segments?.find(
+      const textElement = segments.find(
         (segment) =>
           segment.node.isConnected &&
           (!text ||
@@ -651,11 +688,13 @@ export class AnnotationStore<TRef> {
           'The target is not displayed. Supply an adapter whose locate shows its view.',
         );
       element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (target.text) this.highlightText(target, source);
+      if (element) await waitForAnnotationLocation(element);
+      if (request !== this.locating) return;
       element?.animate?.(
         [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],
         1200,
       );
-      if (target.text) this.highlightText(target, source);
       this.publish({ error: null });
     } catch (error) {
       if (request === this.locating)
@@ -671,13 +710,17 @@ export class AnnotationStore<TRef> {
     const segments = registrations.flatMap((item) => item.segments);
     const start = segments.find(
       (segment) =>
-        segment.node.isConnected && segment.sourceOffsets.includes(target.text?.start ?? -1),
+        segment.node.isConnected &&
+        segment.sourceOffsets.some(
+          (offset, index) => offset === target.text?.start && index < segment.node.length,
+        ),
     );
     const end = [...segments]
       .reverse()
       .find(
         (segment) =>
-          segment.node.isConnected && segment.sourceOffsets.includes(target.text?.end ?? -1),
+          segment.node.isConnected &&
+          segment.sourceOffsets.some((offset, index) => offset === target.text?.end && index > 0),
       );
     if (!start || !end) return;
     const range = start.node.ownerDocument.createRange();
@@ -691,7 +734,7 @@ export class AnnotationStore<TRef> {
     const options = this.options;
     if (!options || this.disabled) return;
     if (this.state.editor) {
-      this.publish({ uiError: '请先保存或取消正在编辑的批注。' });
+      this.requestEditorAttention();
       return;
     }
     this.publish({ submitting: true, error: null, pending: [], uiError: null });

@@ -151,33 +151,48 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   )) as {
     AnnotationStore: new (options: {
       onSubmit(value: unknown): Promise<void>;
-      adapter: { resolve(): { status: 'ready' }; locate(): void };
+      adapter: { resolve(): { status: 'ready' }; locate(): void | Promise<void> };
     }) => {
       mountSurface(): () => void;
       createAnnotation(targets: CardTarget[], comment?: string): string;
       changeEditor(comment: string): void;
       submit(): Promise<void>;
+      locate(target: CardTarget): Promise<void>;
+      locateAndEdit(id: string, target: CardTarget): Promise<void>;
       cancelEditor(): void;
       saveEditor(): void;
       openAnnotation(id?: string): void;
       deleteEditor(): void;
+      removeAnnotation(id: string): void;
       numberFor(id: string): number;
       getSnapshot(): {
         value: {
           annotations: { id: string; targets: CardTarget[]; comment: string }[];
         };
         selectionTargets: readonly CardTarget[];
+        editorAttention: number;
+        editor: { id?: string; comment: string } | null;
         uiError: string | null;
       };
     };
   };
   const delivered: unknown[] = [];
+  let resolutions = 0;
+  let locations = 0;
   const store = new module.AnnotationStore({
     onSubmit: (value) => {
       delivered.push(value);
       return Promise.resolve();
     },
-    adapter: { resolve: () => ({ status: 'ready' }), locate: () => {} },
+    adapter: {
+      resolve: () => {
+        resolutions++;
+        return { status: 'ready' };
+      },
+      locate: () => {
+        locations++;
+      },
+    },
   });
   const unmount = store.mountSurface();
   const id = store.createAnnotation([target, { ref: 'card:b' }]);
@@ -186,10 +201,24 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   assert.equal(store.getSnapshot().value.annotations[0].comment, '');
   assert.equal(store.getSnapshot().selectionTargets.length, 2);
   await store.submit();
-  assert.match(store.getSnapshot().uiError ?? '', /请先保存或取消/);
+  assert.equal(store.getSnapshot().editorAttention, 1);
+  assert.equal(store.getSnapshot().uiError, null);
   assert.equal(delivered.length, 0);
+  await assert.rejects(
+    store.locate({ ref: 'card:c' }),
+    /Cannot navigate while an annotation editor is open/,
+  );
+  assert.equal(store.getSnapshot().editorAttention, 2);
+  assert.equal(store.getSnapshot().uiError, null);
+  store.openAnnotation(id);
+  assert.equal(store.getSnapshot().editorAttention, 3);
+  assert.equal(store.getSnapshot().uiError, null);
+  assert.equal(resolutions, 0, 'An open editor blocks navigation before resolving another target.');
+  assert.equal(locations, 0, 'An open editor must not navigate away from its source.');
   store.cancelEditor();
   assert.equal(store.getSnapshot().value.annotations[0].comment, '');
+  await store.locate({ ref: 'card:c' });
+  assert.equal(locations, 1, 'Cancelling the editor allows navigation again.');
   const saved = store.getSnapshot().value.annotations[0];
   assert.equal(saved.targets.length, 2);
   assert.equal(saved.comment, '');
@@ -206,6 +235,17 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   store.createAnnotation([{ ref: 'card:c' }]);
   const secondId = store.getSnapshot().value.annotations[1].id;
   store.openAnnotation(saved.id);
+  store.changeEditor('删除操作不能丢失这段输入');
+  const beforeDeletion = store.getSnapshot();
+  for (const annotationId of [saved.id, secondId]) {
+    const attention = store.getSnapshot().editorAttention;
+    store.removeAnnotation(annotationId);
+    assert.deepEqual(store.getSnapshot().value, beforeDeletion.value);
+    assert.deepEqual(store.getSnapshot().editor, beforeDeletion.editor);
+    assert.equal(store.getSnapshot().selectionTargets.length, 2);
+    assert.equal(store.getSnapshot().editorAttention, attention + 1);
+    assert.equal(store.getSnapshot().uiError, null);
+  }
   store.deleteEditor();
   assert.equal(
     store.numberFor(secondId),
@@ -217,4 +257,27 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   assert.equal(delivered.length, 1);
   assert.equal(Object.isFrozen(delivered[0]), true);
   unmount();
+
+  // Waiting for location must retain the existing latest-request-wins behavior.
+  const pendingLocations: (() => void)[] = [];
+  const racing = new module.AnnotationStore({
+    onSubmit: () => Promise.resolve(),
+    adapter: {
+      resolve: () => ({ status: 'ready' }),
+      locate: () => new Promise<void>((resolve) => pendingLocations.push(resolve)),
+    },
+  });
+  const firstId = racing.createAnnotation([target], 'first');
+  const latestId = racing.createAnnotation([{ ref: 'card:c' }], 'latest');
+  const firstEdit = racing.locateAndEdit(firstId, target);
+  await new Promise(setImmediate);
+  const latestEdit = racing.locateAndEdit(latestId, { ref: 'card:c' });
+  await new Promise(setImmediate);
+  pendingLocations[1]();
+  await latestEdit;
+  assert.equal(racing.getSnapshot().editor?.id, latestId);
+  pendingLocations[0]();
+  await firstEdit;
+  assert.equal(racing.getSnapshot().editor?.id, latestId);
+  assert.equal(racing.getSnapshot().editorAttention, 0, 'An obsolete edit cannot open an editor');
 });

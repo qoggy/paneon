@@ -1,5 +1,31 @@
 export type ClippedRect = { rect: DOMRect; clip: DOMRect };
 
+/** Wait for native scrolling and ancestor transitions to reach their painted positions. */
+export function waitForAnnotationLocation(element: HTMLElement): Promise<void> {
+  const ancestors: HTMLElement[] = [];
+  for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement)
+    ancestors.push(parent);
+  const view = window;
+  return new Promise((resolve) => {
+    let previous: number[] = [];
+    let stable = 0;
+    const measure = () => {
+      const target = element.getBoundingClientRect();
+      const positions = ancestors.flatMap((parent) => {
+        const rect = parent.getBoundingClientRect();
+        return [parent.scrollLeft, parent.scrollTop, rect.x, rect.y];
+      });
+      // Ancestors may grow below a stationary target; only the target's size affects its anchor.
+      positions.push(target.width, target.height);
+      stable = positions.every((position, index) => position === previous[index]) ? stable + 1 : 0;
+      previous = positions;
+      if (stable === 3) resolve();
+      else view.requestAnimationFrame(measure);
+    };
+    view.requestAnimationFrame(measure);
+  });
+}
+
 /** Cache ancestor clipping once for one synchronous geometry measurement.
  * Never retain it across scroll/resize/layout changes. */
 export function createRectClipper() {

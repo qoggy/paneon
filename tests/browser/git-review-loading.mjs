@@ -114,7 +114,15 @@ try {
   );
   assert.equal(calls.length, queriesBefore, 'Collapse and reopen do not read blobs again.');
   assert.equal(await comments.count(), 1);
+  await button('收起文件差异').click();
   await comments.edit(1);
+  await frame.locator('[data-git-diff-scroll]').waitFor({ state: 'visible' });
+  const annotationLine = frame.locator('[data-code-side="new"][data-line="320"]');
+  const lineBox = await annotationLine.boundingBox();
+  const editBox = await frame.locator('[data-annotation-editor]').boundingBox();
+  const viewportBox = await frame.locator('[data-diff-viewport]').boundingBox();
+  assert.ok(lineBox.y >= viewportBox.y && lineBox.y < viewportBox.y + viewportBox.height);
+  assert.ok(Math.abs(editBox.y - lineBox.y) < editBox.height + 60);
   assert.equal(
     await frame.getByLabel('批注内容', { exact: true }).inputValue(),
     'Preserved across collapse',

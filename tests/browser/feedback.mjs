@@ -150,7 +150,9 @@ try {
   await fillEditor('暂不保存');
   // The fixture shortcut invokes submit without moving focus or dismissing the editor.
   await input.press('ControlOrMeta+Shift+Enter');
-  await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
+  await input.and(frame.locator(':focus')).waitFor();
+  assert.equal(await input.inputValue(), '暂不保存');
+  assert.equal(await frame.getByRole('alert').count(), 0);
   assert.equal((await draft()).annotations.length, 0);
   assert.equal((await read()).events.length, 0);
   await input.press('Escape');
@@ -190,7 +192,8 @@ try {
   await fillEditor('尚未保存的原批注');
   await selectText(plain, 20, 24);
   // Selection itself raises the unsaved-editor guard; no second action is required.
-  await frame.getByRole('alert').filter({ hasText: '请先保存或取消' }).waitFor();
+  await input.and(frame.locator(':focus')).waitFor();
+  assert.equal(await frame.getByRole('alert').count(), 0);
   assert.equal(await input.inputValue(), '尚未保存的原批注');
   assert.equal((await draft()).annotations.length, 1);
   assert.equal((await draft()).annotations[0].targets.length, 1);

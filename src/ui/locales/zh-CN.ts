@@ -149,8 +149,6 @@ const zh: Record<keyof typeof en, string> = {
   'Locate annotation {number}': '定位批注 {number}',
   仅选择: '仅选择',
   'Locate annotation {number}, location {index}': '定位批注 {number} 的位置 {index}',
-  'Save or cancel the annotation being edited first.': '请先保存或取消正在编辑的批注。',
-  '请先保存或取消正在编辑的批注。': '请先保存或取消正在编辑的批注。',
   '请至少选择一个位置。': '请至少选择一个位置。',
   Action: '操作',
   Revision: '版本',

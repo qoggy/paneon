@@ -5,9 +5,12 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { fileSourceCases, startFileReferenceFixture } from './file-reference-fixture.mjs';
 import {
+  assertAnnotationEditorOpensAfterLocate,
+  assertEditorBlocksAnnotationNavigation,
   openAnnotationDirectory,
   selectAnnotationText,
   submitAnnotations,
+  waitForAnnotationScrollIdle,
 } from './annotation-tools.mjs';
 
 const fixture = await startFileReferenceFixture();
@@ -225,8 +228,14 @@ try {
   assert.match(await source.textContent(), /export const line153 = 153;/);
   assert.equal(reads.length, readsBeforeLocate);
   await close();
-  await openAnnotationDirectory(frame);
-  await frame.getByRole('button', { name: '编辑批注 1', exact: true }).click();
+  await assertAnnotationEditorOpensAfterLocate(
+    frame,
+    '[data-slot="file-preview-source"] [data-code-line="153"]',
+    async () => {
+      await openAnnotationDirectory(frame);
+      await frame.getByRole('button', { name: '编辑批注 1', exact: true }).click();
+    },
+  );
   await frame.locator('[data-annotation-editor] textarea').fill('Corrected file annotation');
   await frame.locator('[data-annotation-editor] textarea').press('Enter');
   await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
@@ -299,6 +308,104 @@ try {
     },
   ]);
 
+  // An unsaved file editor must block navigation to another file and back to Markdown.
+  await selectAnnotationText(frame, 'h1 [data-source-leaf]', 0, 8);
+  await frame.locator('[data-annotation-action]').click();
+  const input = frame.locator('[data-annotation-editor] textarea');
+  const assertFileCloseBlocked = async () => {
+    const comment = await input.inputValue();
+    const text = await source.textContent();
+    const eventCount = (await events()).length;
+    const control = frame.getByRole('button', { name: '关闭', exact: true, includeHidden: true });
+    const bounds = await control.boundingBox();
+    // Exercise the actual pointer attempt; do not force a click through the modal editor.
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await input.and(frame.locator(':focus')).waitFor();
+    await input.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    assert.equal(await preview.isVisible(), true, 'An open editor blocks closing its source file');
+    assert.equal(await input.inputValue(), comment);
+    assert.equal(await source.textContent(), text);
+    assert.equal((await events()).length, eventCount);
+    assert.equal(await frame.locator('[data-annotation-editor] [role="alert"]').count(), 0);
+  };
+  await input.fill('Document annotation 3');
+  await input.press('Enter');
+  await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: '编辑批注 1', exact: true }).click();
+  await input.fill('Unsaved file correction');
+  await waitForAnnotationScrollIdle(frame);
+  const fileText = await source.textContent();
+  const fileScroll = await source.evaluate((element) => element.scrollTop);
+  const eventCount = (await events()).length;
+  const readCount = reads.length;
+  for (const number of [2, 3]) {
+    await assertEditorBlocksAnnotationNavigation(frame, number, async () => {
+      assert.equal(await preview.isVisible(), true, 'Blocked navigation keeps the file open');
+      assert.equal(
+        await source.textContent(),
+        fileText,
+        'Blocked navigation keeps the same snapshot',
+      );
+      assert.equal(await source.evaluate((element) => element.scrollTop), fileScroll);
+      assert.equal((await events()).length, eventCount);
+      assert.equal(reads.length, readCount, 'Blocked navigation never reads another file');
+    });
+  }
+  await assertFileCloseBlocked();
+  await input.press('Escape');
+  await close();
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: '编辑批注 3', exact: true }).click();
+  assert.equal(await preview.isVisible(), false, 'Cancel allows returning to Markdown');
+  assert.equal(await input.inputValue(), 'Document annotation 3');
+  await input.press('Escape');
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: '编辑批注 1', exact: true }).click();
+  assert.equal(
+    await input.inputValue(),
+    'Corrected file annotation',
+    'Blocked navigation never autosaves',
+  );
+  await input.fill('Saved file correction');
+  await input.press('Enter');
+  await close();
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: '编辑批注 2', exact: true }).click();
+  assert.equal(await input.inputValue(), '重复文本的第二处及末尾空行');
+  await input.press('Escape');
+  await close();
+
+  // A newly created, never-saved file annotation has the same navigation protection.
+  const countBeforeNew = await frame.locator('[data-annotation-launcher] button').textContent();
+  await open(boundary.label);
+  await selectAnnotationText(frame, '[data-slot="file-preview-source"] [data-code-line="1"]', 0, 5);
+  await frame.locator('[data-annotation-action]').click();
+  await input.fill('Never-saved file annotation');
+  await waitForAnnotationScrollIdle(frame);
+  const newFileText = await source.textContent();
+  const newFileScroll = await source.evaluate((element) => element.scrollTop);
+  for (const number of [1, 3]) {
+    await assertEditorBlocksAnnotationNavigation(frame, number, async () => {
+      assert.equal(await preview.isVisible(), true);
+      assert.equal(await source.textContent(), newFileText);
+      assert.equal(await source.evaluate((element) => element.scrollTop), newFileScroll);
+      assert.equal(
+        await frame.locator('[data-annotation-launcher] button').textContent(),
+        countBeforeNew,
+      );
+      assert.equal((await events()).length, eventCount);
+    });
+  }
+  await assertFileCloseBlocked();
+  await input.press('Escape');
+  await close();
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: '编辑批注 3', exact: true }).click();
+  assert.equal(await input.inputValue(), 'Document annotation 3');
+  await input.press('Escape');
   assert.deepEqual(errors, []);
   console.log(
     'File references passed: path bases, Unicode, line ranges, focus return, resize, bounded read errors, reader snapshots, exact file annotations, retained-source locate and explicit edit/resubmit events.',

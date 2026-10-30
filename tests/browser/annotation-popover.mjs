@@ -5,7 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
-import { selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
+import {
+  assertAnnotationEditorOpensAfterLocate,
+  assertEditorBlocksAnnotationNavigation,
+  openAnnotationDirectory,
+  selectAnnotationText,
+  submitAnnotations,
+} from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-annotation-popover-'));
 let browser, service;
@@ -153,6 +159,31 @@ try {
   await editor.waitFor({ state: 'hidden' });
   assert.equal((await draft()).annotations[0].id, previewId);
   assert.equal(await marker.getAttribute('data-annotation-number'), previewNumber);
+  // Editing from the directory must return to the source and anchor there, even offscreen.
+  await content.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: 'Edit annotation 1', exact: true }).click();
+  await input.and(frame.locator(':focus')).waitFor();
+  await content.waitForFunction(() => {
+    const rect = document.querySelector('[data-testid=target]').getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  });
+  await editor.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  const locatedBox = await target.boundingBox();
+  const locatedEditor = await editor.boundingBox();
+  assert.ok(
+    locatedEditor.x < locatedBox.x + locatedBox.width / 2,
+    'Directory editor must anchor to the selected text, not the directory edit button',
+  );
+  assert.ok(
+    Math.abs(locatedEditor.y - locatedBox.y) < locatedEditor.height + locatedBox.height + 40,
+    'Directory editor stays beside the located source',
+  );
+  assert.equal(await input.inputValue(), 'Unsaved text survives scrolling');
+  await input.press('Escape');
+  await editor.waitFor({ state: 'hidden' });
   await marker.click();
   await input.fill('Saved with check');
   await editor.evaluate((element) =>
@@ -227,6 +258,20 @@ try {
     await editor.waitFor({ state: 'hidden' });
   }
   const [first, second, third] = (await draft()).annotations;
+  const savedAnnotations = await draft();
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: 'Edit annotation 1', exact: true }).click();
+  for (const comment of [first.comment, 'Keep annotation 1 while deleting from the list']) {
+    await input.fill(comment);
+    for (const number of [1, 2]) {
+      await assertEditorBlocksAnnotationNavigation(frame, number, async () => {
+        assert.deepEqual(await draft(), savedAnnotations);
+      });
+    }
+  }
+  await cancel.click();
+  await editor.waitFor({ state: 'hidden' });
+  await page.keyboard.press('Escape');
   await frame.getByRole('button', { name: 'Annotations (3)', exact: true }).click();
   await frame.getByRole('button', { name: 'Delete annotation 2', exact: true }).click();
   await frame
@@ -279,6 +324,31 @@ try {
     resubmitted.events[1].payload.annotations.some((entry) => 'number' in entry),
     false,
   );
+  // A stationary target must remain editable while unrelated content below it changes height.
+  const tail = frame.locator('main > div[aria-hidden="true"]').last();
+  await tail.evaluate((element) =>
+    element.animate([{ height: '1200px' }, { height: '1400px' }], {
+      duration: 800,
+      iterations: Infinity,
+      direction: 'alternate',
+    }),
+  );
+  try {
+    await assertAnnotationEditorOpensAfterLocate(
+      frame,
+      '[data-testid="target"] [data-annotation-text]',
+      async () => {
+        await openAnnotationDirectory(frame);
+        await frame.getByRole('button', { name: 'Edit annotation 1', exact: true }).click();
+      },
+    );
+    assert.equal(await input.inputValue(), first.comment);
+    await input.press('Escape');
+  } finally {
+    await tail.evaluate((element) =>
+      element.getAnimations().forEach((animation) => animation.cancel()),
+    );
+  }
   assert.deepEqual(errors, []);
   console.log(
     'PASS compact annotation editor: auto rows, check/Enter save, explicit cancel/delete, Shift+Enter, IME, preview highlight/number, outside click blocking/shake/draft retention, focus trap, scrolling, contiguous numbers after deletion/cancel, exact mapping and unchanged event history.',

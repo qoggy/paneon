@@ -183,26 +183,30 @@ function StringDiffView<TRef>({
   const initialLocation = useRef<DiffModel | null>(null);
   const pendingReveal = useRef<{ location: DiffLocation; resolve: () => void } | null>(null);
   const cancelHighlight = useRef<(() => void) | undefined>(undefined);
+  const reveal = useCallback(
+    (location: DiffLocation) =>
+      new Promise<void>((resolve) => {
+        pendingReveal.current?.resolve();
+        cancelHighlight.current?.();
+        initialLocation.current = model;
+        pendingReveal.current = { location, resolve };
+        setView((current) => ({
+          ...current,
+          unified: false,
+          expanded: location.kind === 'text',
+          reveal: current.reveal + 1,
+        }));
+      }),
+    [model],
+  );
   useImperativeHandle(
     ref,
     () => ({
       getRanges: (location) =>
         root.current ? diffLocationRanges(root.current, model, location) : [],
-      reveal: (location) =>
-        new Promise<void>((resolve) => {
-          pendingReveal.current?.resolve();
-          cancelHighlight.current?.();
-          initialLocation.current = model;
-          pendingReveal.current = { location, resolve };
-          setView((current) => ({
-            ...current,
-            unified: false,
-            expanded: location.kind === 'text',
-            reveal: current.reveal + 1,
-          }));
-        }),
+      reveal,
     }),
-    [model],
+    [model, reveal],
   );
   useLayoutEffect(() => {
     const request = pendingReveal.current;
@@ -287,6 +291,17 @@ function StringDiffView<TRef>({
             ref: target,
             source,
             segments,
+            locate: (target) =>
+              reveal(
+                target.text
+                  ? {
+                      kind: 'text',
+                      side,
+                      ...target.text,
+                      quote: source.slice(target.text.start, target.text.end),
+                    }
+                  : { kind: 'file' },
+              ),
             presentation,
           }),
         );
@@ -299,7 +314,7 @@ function StringDiffView<TRef>({
       observer.disconnect();
       removers.forEach((remove) => remove());
     };
-  }, [targets, model, unified, expanded, registerText, presentation]);
+  }, [targets, model, unified, expanded, registerText, presentation, reveal]);
   function code(side: 'old' | 'new', cell: DiffCell, endingNote: boolean) {
     const { line, kind, spans } = cell;
     const changed = kind !== 'context';

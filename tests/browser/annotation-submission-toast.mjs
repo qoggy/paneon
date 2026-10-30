@@ -98,9 +98,11 @@ try {
     assert.equal(await frame.getByText(/Saved as event|已保存为事件/).count(), 0);
     const [first] = await fixture.events(panel);
     const annotations = (event) =>
-      event.type === 'git-review-submitted'
+      event.type === 'git-review-submitted' || event.type === 'file-review-submitted'
         ? event.payload.files.flatMap((file) => file.annotations)
-        : event.payload.annotations;
+        : event.type === 'pr-feedback-submitted'
+          ? event.payload.sources.flatMap((source) => source.annotations)
+          : event.payload.annotations;
     assert.equal(annotations(first)[0].comment, 'Review this text');
     await page.unroute(eventURL);
     await toast.locator('[data-slot="toast-close"]').click();
@@ -112,7 +114,12 @@ try {
     await toast.waitFor();
     const events = await fixture.events(panel);
     assert.equal(events.length, 2);
-    if (first.type === 'git-review-submitted')
+    if (
+      first.type === 'git-review-submitted' ||
+      first.type === 'file-review-submitted' ||
+      first.type === 'table-submitted' ||
+      first.type === 'pr-feedback-submitted'
+    )
       assert.equal('id' in annotations(events[1])[0], false);
     else assert.equal(annotations(events[1])[0].id, annotations(first)[0].id);
     assert.equal(events[1].payload.replacesEventId, replacesEvent ? first.id : undefined);
@@ -155,9 +162,9 @@ try {
   fixtures.push(standard);
   const markdownFilePath = join(standard.root, 'review.md');
   await writeFile(markdownFilePath, 'Review this paragraph.');
-  const review = await standard.run('review', {
+  const review = await standard.run('file-review', {
     title: 'Submission toast review',
-    markdownFilePath,
+    files: [markdownFilePath],
   });
   const table = await standard.run('table', {
     title: 'Submission toast table',

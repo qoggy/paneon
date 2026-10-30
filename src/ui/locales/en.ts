@@ -153,9 +153,6 @@ const en = {
   'Locate annotation {number}': 'Locate annotation {number}',
   仅选择: 'Selection only',
   'Locate annotation {number}, location {index}': 'Locate annotation {number}, location {index}',
-  'Save or cancel the annotation being edited first.':
-    'Save or cancel the annotation being edited first.',
-  '请先保存或取消正在编辑的批注。': 'Save or cancel the annotation being edited first.',
   '请至少选择一个位置。': 'Select at least one location.',
   Action: 'Action',
   Revision: 'Revision',

@@ -1,5 +1,13 @@
 import { useUI } from './use-ui';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronUp, MessageSquareText, Pencil, Send, Trash2, X } from 'lucide-react';
@@ -36,6 +44,19 @@ export function AnnotationSurface() {
   const shake = useRef<Animation | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const blocked = disabled || state.submitting;
+  const requestAttention = useCallback(() => {
+    input.current?.focus({ preventScroll: true });
+    shake.current?.cancel();
+    shake.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? null
+      : (editor.current?.animate(
+          [0, -6, 6, -4, 4, 0].map((x) => ({ translate: `${x}px 0` })),
+          { duration: 300, easing: 'ease-in-out' },
+        ) ?? null);
+  }, []);
+  useEffect(() => {
+    if (state.editorAttention > 0) requestAttention();
+  }, [state.editorAttention, requestAttention]);
   const editorAnchor = useMemo(
     () => ({
       current: {
@@ -246,14 +267,7 @@ export function AnnotationSurface() {
             if (details.reason === 'escape-key' || details.reason === 'close-press') close();
             else if (details.reason === 'outside-press') {
               details.cancel();
-              input.current?.focus({ preventScroll: true });
-              shake.current?.cancel();
-              if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-                shake.current =
-                  editor.current?.animate(
-                    [0, -6, 6, -4, 4, 0].map((x) => ({ translate: `${x}px 0` })),
-                    { duration: 300, easing: 'ease-in-out' },
-                  ) ?? null;
+              requestAttention();
             } else details.cancel();
           }}
         >
@@ -655,6 +669,9 @@ export function AnnotationMenu() {
                     number: store.numberFor(entry.id),
                   })}
                   onClick={() => {
+                    // A hover-opened menu must not refocus the old tab after locating elsewhere.
+                    if (!store.getSnapshot().editor)
+                      launcher.current?.querySelector('button')?.focus({ preventScroll: true });
                     close();
                     void feedback.locate(entry.targets[0]).catch(() => {});
                   }}
@@ -701,13 +718,13 @@ export function AnnotationMenu() {
                           className="text-muted-foreground"
                           aria-label={`${t('编辑批注')} ${store.numberFor(entry.id)}`}
                           disabled={blocked}
-                          onClick={(event) => {
-                            const anchor = event.currentTarget.getBoundingClientRect();
+                          onClick={() => {
+                            if (!store.getSnapshot().editor)
+                              launcher.current
+                                ?.querySelector('button')
+                                ?.focus({ preventScroll: true });
                             close();
-                            void feedback
-                              .locate(entry.targets[0])
-                              .then(() => store.openAnnotation(entry.id, undefined, anchor))
-                              .catch(() => {});
+                            void store.locateAndEdit(entry.id, entry.targets[0]).catch(() => {});
                           }}
                         >
                           <Pencil aria-hidden="true" />
@@ -726,7 +743,10 @@ export function AnnotationMenu() {
                           className="text-muted-foreground hover:text-destructive"
                           aria-label={`${t('删除批注')} ${store.numberFor(entry.id)}`}
                           disabled={blocked}
-                          onClick={() => feedback.removeAnnotation(entry.id)}
+                          onClick={() => {
+                            if (store.getSnapshot().editor) close();
+                            feedback.removeAnnotation(entry.id);
+                          }}
                         >
                           <Trash2 aria-hidden="true" />
                         </Button>

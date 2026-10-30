@@ -40,6 +40,8 @@ export type AnnotationTextRegistration<TRef = JsonValue> = {
   sourceRef?: JsonValue;
   source: string;
   segments: { node: Text; sourceOffsets: (number | null)[] }[];
+  /** Reveal renderer-owned content, including text hidden by collapsed context. */
+  locate?: (target: AnnotationTarget<TRef>) => void | Promise<void>;
   presentation?: (targets: readonly AnnotationTarget<TRef>[]) => AnnotationPresentation | undefined;
 };
 export type AnnotationController<TRef = JsonValue> = {
@@ -71,5 +73,6 @@ export type AnnotationEditor<TRef> = {
 export type AnnotationUI<TRef> = {
   pending: AnnotationTarget<TRef>[];
   editor: AnnotationEditor<TRef> | null;
+  editorAttention: number;
   uiError: string | null;
 };

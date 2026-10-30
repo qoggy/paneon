@@ -149,12 +149,34 @@ UI and guides SHALL call this feature 批注 in Chinese and annotation (annotati
 
 ### Requirement: Separate saving an annotation from submitting feedback
 
-Supplied pages SHALL place explicit submission in their own toolbar and compose the shared surface. Saving one annotation SHALL not submit feedback. Pending unsaved edits SHALL block overall submission with a clear request to save or cancel, without discarding or implicitly saving them. Existing failure retention, submission locking, and page-specific complete corrections SHALL be preserved. Popovers and markers SHALL remain anchored during scrolling, resizing and reflow without modifying registered source text nodes or interfering with normal controls and copying.
+Supplied pages SHALL place explicit submission in their own toolbar and compose the shared surface. Saving one annotation SHALL not submit feedback. An open annotation editor SHALL block overall submission and navigation to another annotation without discarding or implicitly saving its buffer. Blocked actions SHALL refocus the existing editor and briefly shake it, without adding instructional text. Reduced-motion preferences SHALL suppress the shake while preserving focus and the editing buffer. Existing failure retention, submission locking, and page-specific complete corrections SHALL be preserved. Popovers and markers SHALL remain anchored during scrolling, resizing and reflow without modifying registered source text nodes or interfering with normal controls and copying.
 
 #### Scenario: Submit while editing
 
 - **WHEN** a person presses Submit to AI with an unsaved editor buffer
-- **THEN** the page requests saving or cancelling that edit and emits no event
+- **THEN** the existing editor regains focus and briefly shakes without adding instructional text or emitting an event
+
+#### Scenario: Edit after locating the target
+
+- **WHEN** a person edits a saved annotation through the annotation list
+- **THEN** its editor opens and receives focus beside the target after content expansion, scrolling and file-preview movement have settled
+
+#### Scenario: Navigate while editing
+
+- **WHEN** a person locates or edits another annotation while an editor is open
+- **THEN** the current source, scroll position and editing buffer remain unchanged, and the existing editor regains focus and briefly shakes without adding instructional text
+
+#### Scenario: Delete from the list while editing
+
+- **WHEN** a person deletes the current or another annotation from the list while an editor is open
+- **THEN** all saved annotations and the editing buffer remain unchanged, and the existing editor regains focus and briefly shakes without adding instructional text
+- **AND** explicit deletion inside the editor still removes that annotation and closes the editor
+
+#### Scenario: Close or replace a referenced file while editing
+
+- **WHEN** a person closes a referenced file or opens another file while its annotation editor is open
+- **THEN** the current file and editing buffer remain unchanged without implicit saving, and the existing editor regains focus and briefly shakes without adding instructional text
+- **AND** closing or replacing the file is allowed after explicit Save or Cancel
 
 #### Scenario: Save and submit
 

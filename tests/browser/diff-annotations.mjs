@@ -5,7 +5,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
-import { annotationTools, selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
+import {
+  assertAnnotationEditorOpensAfterLocate,
+  annotationTools,
+  assertEditorBlocksAnnotationNavigation,
+  openAnnotationDirectory,
+  selectAnnotationText,
+  submitAnnotations,
+  waitForAnnotationScrollIdle,
+} from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-diff-annotations-'));
 let service, browser;
@@ -102,6 +110,44 @@ try {
     assert.equal(source.slice(target.text.start, target.text.end), target.text.quote);
   }
   const beforeMode = await draft();
+  await button('Reveal hunk').click();
+  assert.equal(await diff.locator('[data-code-side="old"][data-line="12"]').count(), 0);
+  await annotations.locate(1);
+  await waitForAnnotationScrollIdle(frame);
+  assert.equal(
+    await diff.evaluate(() => document.getSelection().isCollapsed),
+    true,
+    'Diff location uses scoped CSS highlights without leaving a native cross-column selection',
+  );
+  await button('Reveal hunk').click();
+  await assertAnnotationEditorOpensAfterLocate(
+    frame,
+    '[data-testid="annotated"] [data-code-side="old"][data-line="12"]',
+    async () => {
+      await openAnnotationDirectory(frame);
+      await button('编辑批注 1').click();
+    },
+  );
+  await diff.locator('[data-code-side="old"][data-line="12"]').waitFor();
+  const editInput = frame.getByLabel('批注内容', { exact: true });
+  await editInput.and(frame.locator(':focus')).waitFor();
+  assert.equal(await editInput.inputValue(), 'old');
+  const sourceBox = await diff.locator('[data-code-side="old"][data-line="12"]').boundingBox();
+  const editBox = await frame.locator('[data-annotation-editor]').boundingBox();
+  assert.ok(Math.abs(editBox.y - sourceBox.y) < editBox.height + 60);
+  await editInput.fill('Unsaved old-side correction');
+  await waitForAnnotationScrollIdle(frame);
+  const scroll = await diff
+    .locator('[data-diff-viewport]')
+    .evaluate((element) => element.scrollTop);
+  await assertEditorBlocksAnnotationNavigation(frame, 2, async () => {
+    assert.deepEqual(await draft(), beforeMode, 'Blocked navigation never saves an editor buffer');
+    assert.equal(
+      await diff.locator('[data-diff-viewport]').evaluate((element) => element.scrollTop),
+      scroll,
+    );
+  });
+  await editInput.press('Escape');
   await diff.getByRole('button', { name: '单列对比', exact: true }).click();
   await save('[data-testid="annotated"] [data-code-side="new"][data-line="12"]', 'unified');
   assert.deepEqual((await draft()).annotations[2].targets, beforeMode.annotations[1].targets);
