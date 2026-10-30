@@ -1,6 +1,7 @@
 // Regenerate README media after `npm run build`:
 // node docs/readme/capture.mjs (requires Chrome and ffmpeg).
 // Add --explanation-only to replace just the opening GIF.
+// Add --git-review-only to replace just git-review.png (no ffmpeg needed).
 // Uses real panels, demonstration data, and an isolated temporary service.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -13,15 +14,27 @@ import { chromium } from 'playwright';
 import { startServer } from '../../dist/runtime/server.js';
 
 const execute = promisify(execFile);
+const explanationOnly = process.argv.includes('--explanation-only');
+const gitReviewOnly = process.argv.includes('--git-review-only');
+assert.ok(!(explanationOnly && gitReviewOnly), 'Choose only one capture target.');
 const root = await mkdtemp(join(tmpdir(), 'paneon-readme-'));
 const output = fileURLToPath(new URL('./', import.meta.url));
 const skill = join(root, 'skill');
 let service, browser;
 try {
   await cp(new URL('../../skills/paneon/', import.meta.url), skill, { recursive: true });
-  service = await startServer(join(root, 'runtime'));
+  const home = join(root, 'runtime');
+  await mkdir(home, { recursive: true });
+  await writeFile(
+    join(home, 'config.json'),
+    JSON.stringify({ server: { port: 0 }, ui: { language: 'en', theme: 'light' } }),
+  );
+  service = await startServer(home);
   browser = await chromium.launch({ headless: true, channel: 'chrome' });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 2,
+  });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const frame = page.frameLocator('iframe');
@@ -42,69 +55,72 @@ try {
     await page.screenshot({ path, clip, animations: 'disabled' });
   }
 
-  console.log('Capturing left-fork-first execution: consecutive steps 7–15');
-  const example = join(skill, 'assets/examples/dining-philosophers');
-  const simulation = await service.runtime.run(join(example, 'panel.tsx'), root, {}, false);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${simulation.instanceId}`);
-  await frame.getByRole('heading', { name: 'Dining philosophers', exact: true }).waitFor();
-  const frames = [];
-  const still = async (seconds) => {
-    const filename = join(root, `explain-${frames.length}.png`);
-    await shot(filename, { x: 48, y: 0, width: 1184, height: 880 });
-    frames.push({ filename, seconds });
-  };
-  const strategy = frame.getByRole('radio', { name: 'Left fork first', exact: true });
-  await strategy.click();
-  assert.equal(await strategy.getAttribute('aria-checked'), 'true');
-  // Prepare steps 1–6 off camera, then capture every consecutive step from 7–15.
-  // Keep the strategy and framing fixed throughout the recording.
-  for (let step = 1; step <= 15; step++) {
-    await button('Next step').click();
-    assert.equal(await frame.getByTestId('step-counter').textContent(), `${step} / 15`);
+  if (!gitReviewOnly) {
+    console.log('Capturing left-fork-first execution: consecutive steps 7–15');
+    const example = join(skill, 'assets/examples/dining-philosophers');
+    const simulation = await service.runtime.run(join(example, 'panel.tsx'), root, {}, false);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${simulation.instanceId}`);
+    await frame.getByRole('heading', { name: 'Dining philosophers', exact: true }).waitFor();
+    const frames = [];
+    const still = async (seconds) => {
+      const filename = join(root, `explain-${frames.length}.png`);
+      await shot(filename, { x: 48, y: 0, width: 1184, height: 880 });
+      frames.push({ filename, seconds });
+    };
+    const strategy = frame.getByRole('radio', { name: 'Left fork first', exact: true });
+    await strategy.click();
     assert.equal(await strategy.getAttribute('aria-checked'), 'true');
-    if (step >= 7) await still(step === 15 ? 3 : 1);
+    // Prepare steps 1–6 off camera, then capture every consecutive step from 7–15.
+    // Keep the strategy and framing fixed throughout the recording.
+    for (let step = 1; step <= 15; step++) {
+      await button('Next step').click();
+      assert.equal(await frame.getByTestId('step-counter').textContent(), `${step} / 15`);
+      assert.equal(await strategy.getAttribute('aria-checked'), 'true');
+      if (step >= 7) await still(step === 15 ? 3 : 1);
+    }
+    assert.equal(await frame.locator('[data-next-edge][data-edge-state="deadlock"]').count(), 5);
+    assert.match(await frame.getByTestId('simulation-status').textContent(), /Deadlock/);
+    assert.equal(
+      (await service.runtime.events(simulation.instanceId, 'readme', 10, 0)).events.length,
+      0,
+    );
+    if (process.env.PANEON_README_ARTIFACTS) {
+      await mkdir(process.env.PANEON_README_ARTIFACTS, { recursive: true });
+      for (const index of [0, 3, 8])
+        await cp(
+          frames[index].filename,
+          join(process.env.PANEON_README_ARTIFACTS, `frame-${index}.png`),
+        );
+    }
+    const manifest = join(root, 'frames.txt');
+    await writeFile(
+      manifest,
+      frames.map(({ filename, seconds }) => `file '${filename}'\nduration ${seconds}\n`).join('') +
+        `file '${frames.at(-1).filename}'\n`,
+    );
+    await execute('ffmpeg', [
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      manifest,
+      '-filter_complex',
+      '[0:v]fps=8,scale=1080:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3',
+      '-t',
+      String(frames.reduce((duration, frame) => duration + frame.seconds, 0)),
+      '-loop',
+      '0',
+      join(output, 'interactive-explanation.gif'),
+    ]);
+    await page.setViewportSize({ width: 1280, height: 800 });
   }
-  assert.equal(await frame.locator('[data-next-edge][data-edge-state="deadlock"]').count(), 5);
-  assert.match(await frame.getByTestId('simulation-status').textContent(), /Deadlock/);
-  assert.equal(
-    (await service.runtime.events(simulation.instanceId, 'readme', 10, 0)).events.length,
-    0,
-  );
-  if (process.env.PANEON_README_ARTIFACTS) {
-    await mkdir(process.env.PANEON_README_ARTIFACTS, { recursive: true });
-    for (const index of [0, 3, 8])
-      await cp(
-        frames[index].filename,
-        join(process.env.PANEON_README_ARTIFACTS, `frame-${index}.png`),
-      );
-  }
-  const manifest = join(root, 'frames.txt');
-  await writeFile(
-    manifest,
-    frames.map(({ filename, seconds }) => `file '${filename}'\nduration ${seconds}\n`).join('') +
-      `file '${frames.at(-1).filename}'\n`,
-  );
-  await execute('ffmpeg', [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    manifest,
-    '-filter_complex',
-    '[0:v]fps=8,scale=1080:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3',
-    '-t',
-    String(frames.reduce((duration, frame) => duration + frame.seconds, 0)),
-    '-loop',
-    '0',
-    join(output, 'interactive-explanation.gif'),
-  ]);
-  await page.setViewportSize({ width: 1280, height: 800 });
 
-  if (!process.argv.includes('--explanation-only')) {
+  if (!explanationOnly) {
     console.log('Capturing real Git history and annotation');
+    await page.setViewportSize({ width: 1440, height: 960 });
     const repository = join(root, 'search-app');
     await mkdir(join(repository, 'src'), { recursive: true });
     const git = (...args) => execute('git', ['-C', repository, ...args]);
@@ -151,9 +167,13 @@ try {
     const tip = (await git('rev-parse', 'HEAD')).stdout.trim();
     await git('update-ref', 'refs/remotes/origin/main', 'main');
     await open('git-review', {
-      title: 'Review search input validation',
-      repositories: [{ id: 'search', path: './search-app', label: 'Search app' }],
-      initialView: { repositoryId: 'search', type: 'history', commit: tip, file: 'src/search.ts' },
+      repositories: [repository],
+      initialView: {
+        repositoryPath: repository,
+        type: 'history',
+        commit: tip,
+        file: 'src/search.ts',
+      },
     });
     await frame.locator('[data-code-side="new"][data-line="8"]').waitFor();
     const code = frame.locator('[data-code-side="new"][data-line="9"]');
