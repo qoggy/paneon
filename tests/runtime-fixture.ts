@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { measureTestStep } from './test-timing.ts';
 
 /** Isolate test listeners while retaining explicitly configured port/error scenarios. */
 export function prepareRuntimeHome(home: string): string {
@@ -25,5 +26,10 @@ export async function startServer(
     process.env.PANEON_TEST_RUNTIME_ENTRY ??
       new URL('../dist/runtime/server.js', import.meta.url).href
   )) as typeof import('../src/runtime/server.js');
-  return runtime.startServer(home, args[1]);
+  const service = await measureTestStep('runtime.start', () => runtime.startServer(home, args[1]));
+  if (process.env.PANEON_TEST_TIMINGS === '1') {
+    const run = service.runtime.run.bind(service.runtime);
+    service.runtime.run = (...parameters) => measureTestStep('panel.run', () => run(...parameters));
+  }
+  return service;
 }

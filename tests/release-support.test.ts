@@ -1,7 +1,38 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { deduplicateJobs, runJobs } from './release-support.ts';
+
+void test('release CLI keeps package concurrency at two and allows explicit worker overrides', async () => {
+  const execute = promisify(execFile);
+  const list = async (...options: string[]) => {
+    const { stdout } = await execute(
+      process.execPath,
+      ['tests/release-test.mjs', '--list', '--match=media-annotations', ...options],
+      { cwd: fileURLToPath(new URL('../', import.meta.url)) },
+    );
+    return JSON.parse(stdout) as {
+      jobs: number;
+      concurrency: { browser: number; package: number };
+      commands: { phase: string }[];
+    };
+  };
+  const defaults = await list();
+  assert.deepEqual(defaults.concurrency, { browser: 3, package: 2 });
+  assert.deepEqual(
+    defaults.commands.map((command) => command.phase),
+    ['browser', 'package'],
+  );
+  const browser = await list('--phase=browser');
+  assert.equal(browser.jobs, 3);
+  const overridden = await list('--jobs=1');
+  assert.deepEqual(overridden.concurrency, { browser: 1, package: 1 });
+  assert.equal(overridden.jobs, 1);
+  await assert.rejects(list('--jobs=0'), /--jobs must be an integer from 1 to 6/);
+});
 
 void test('release jobs overlap independent work while serializing shared resources', async () => {
   const active = new Set<string>();

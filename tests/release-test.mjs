@@ -1,4 +1,6 @@
 import { deduplicateJobs, runJobs } from './release-support.ts';
+import { packageDownloadCache } from './package-fixture.mjs';
+import { readTestTimings, summarizeTestTimings } from './test-timing.ts';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import {
@@ -138,11 +140,13 @@ const options = new Set(process.argv.slice(2));
 const phase = [...options].find((arg) => arg.startsWith('--phase='))?.slice(8) ?? 'all';
 const match = [...options].find((arg) => arg.startsWith('--match='))?.slice(8) ?? '';
 const patterns = match.split(',').filter(Boolean);
-const jobs = Number([...options].find((arg) => arg.startsWith('--jobs='))?.slice(7) ?? 2);
+const jobsOption = [...options].find((arg) => arg.startsWith('--jobs='));
+const jobs = Number(jobsOption?.slice(7) ?? (phase === 'browser' ? 3 : 2));
 assert.ok(
   Number.isSafeInteger(jobs) && jobs >= 1 && jobs <= 6,
   '--jobs must be an integer from 1 to 6.',
 );
+const concurrency = { browser: jobsOption ? jobs : 3, package: jobsOption ? jobs : 2 };
 const phases = ['checks', 'unit', 'acceptance', 'browser', 'package', 'live'];
 assert.ok(phase === 'all' || phases.includes(phase), `Unknown phase: ${phase}`);
 for (const arg of options)
@@ -234,6 +238,7 @@ if (options.has('--list')) {
       {
         nodeTestFiles: nodeTestFiles.length,
         jobs,
+        concurrency,
         covered: selectedCommands
           .filter((test) => !commands.includes(test))
           .map((test) => test.name),
@@ -253,6 +258,8 @@ console.log(`Release test PID: ${process.pid}; temporary directory: ${scratch}`)
 const temporary = join(scratch, 'tmp');
 const home = join(scratch, 'home');
 const artifacts = join(scratch, 'artifacts');
+const npmCache = packageDownloadCache();
+console.log(`Retained npm download cache: ${npmCache}`);
 await Promise.all([temporary, home, artifacts].map((path) => mkdir(path)));
 const env = {
   ...process.env,
@@ -267,7 +274,10 @@ const env = {
   PANEON_TEST_SCREENSHOTS: artifacts,
   PANEON_TEST_DESKTOP_ONLY: '1',
   PANEON_PR_TEST_LIVE: '0',
-  npm_config_cache: join(scratch, 'npm-cache'),
+  PANEON_TEST_TIMINGS: '1',
+  PANEON_TEST_NPM_CACHE: npmCache,
+  npm_config_cache: npmCache,
+  npm_config_logs_dir: join(scratch, 'npm-logs'),
   npm_config_userconfig: process.env.npm_config_userconfig ?? join(process.env.HOME, '.npmrc'),
 };
 delete env.PANEON_HOME;
@@ -297,6 +307,8 @@ const backups = [];
 const directorySnapshots = [];
 const active = new Set();
 const jobHomes = [];
+const phaseTimings = [];
+let setupMilliseconds = 0;
 let interrupted = false;
 function stopActive() {
   for (const child of active) {
@@ -374,9 +386,10 @@ async function isolatedEnvironment() {
     CLAUDE_CONFIG_DIR: join(home, '.claude'),
     PANEON_TEST_ARTIFACTS: artifacts,
     PANEON_TEST_SCREENSHOTS: artifacts,
+    npm_config_logs_dir: join(root, 'npm-logs'),
   };
 }
-async function run(test, environment = env) {
+async function run(test, environment = env, queueMilliseconds = 0) {
   const started = Date.now();
   console.log(`\n[${test.phase}] ${test.name}`);
   const log = join(
@@ -406,11 +419,25 @@ async function run(test, environment = env) {
   } finally {
     await output.close();
   }
-  const seconds = Math.round((Date.now() - started) / 1000);
+  const milliseconds = Date.now() - started;
+  const seconds = Math.round(milliseconds / 1000);
+  const captured = await readFile(log, 'utf8');
+  const steps = summarizeTestTimings(readTestTimings(captured));
   console.log(
-    `[${result.code === 0 ? 'PASS' : 'FAIL'} ${test.phase}] ${test.name} (${seconds}s)\n${await readFile(log, 'utf8')}`,
+    `[${result.code === 0 ? 'PASS' : 'FAIL'} ${test.phase}] ${test.name} (${seconds}s)\n${captured}`,
   );
-  results.push({ phase: test.phase, name: test.name, ...result, seconds });
+  console.log(
+    `Test timing: ${JSON.stringify({ name: test.name, milliseconds, queueMilliseconds, steps })}`,
+  );
+  results.push({
+    phase: test.phase,
+    name: test.name,
+    ...result,
+    seconds,
+    milliseconds,
+    queueMilliseconds,
+    steps,
+  });
   return result.code === 0;
 }
 
@@ -426,6 +453,7 @@ try {
     assert.ok(stdout.trim(), 'The existing GitHub login did not provide a token.');
     env.GH_TOKEN = stdout.trim();
   }
+  const setupStarted = performance.now();
   await preserve(join(repository, 'dist'));
   for (const path of ['tmp', 'node_modules/.vite', 'node_modules/.vite-temp', 'tests']) {
     const absolute = join(repository, path);
@@ -453,6 +481,7 @@ try {
     (path, _, all) => !all.some((parent) => path.startsWith(`${parent}/`)),
   ))
     await preserve(path);
+  setupMilliseconds = Math.round(performance.now() - setupStarted);
   const built =
     options.has('--skip-build') ||
     (await run({ phase: 'build', name: 'build', command: 'npm', args: ['run', 'build'] }));
@@ -488,34 +517,45 @@ try {
         if (interrupted) break;
         const group = commands.filter((test) => test.phase === currentPhase);
         if (!group.length) continue;
-        if (currentPhase === 'package') {
-          const base = join(scratch, 'package-base');
-          if (
-            !(await run({
-              phase: 'prepare',
-              name: 'package-baseline',
-              command: process.execPath,
-              args: ['tests/package-fixture.mjs', base],
-            }))
-          )
-            break;
-          env.PANEON_TEST_PACKAGE_BASE = base;
+        const phaseStarted = performance.now();
+        try {
+          if (currentPhase === 'package') {
+            const base = join(scratch, 'package-base');
+            if (
+              !(await run({
+                phase: 'prepare',
+                name: 'package-baseline',
+                command: process.execPath,
+                args: ['tests/package-fixture.mjs', base],
+              }))
+            )
+              break;
+            env.PANEON_TEST_PACKAGE_BASE = base;
+          }
+          for (const test of group) {
+            const entry = test.args.find((arg) => /^tests\/.*\.mjs$/.test(arg));
+            test.resources = entry ? await resourcesFor(resolve(repository, entry)) : [];
+          }
+          const queuedAt = performance.now();
+          await runJobs(
+            group,
+            concurrency[currentPhase] ?? 1,
+            async (test) => {
+              const queueMilliseconds = Math.round(performance.now() - queuedAt);
+              await run(test, await isolatedEnvironment(), queueMilliseconds);
+            },
+            () => interrupted,
+          );
+        } finally {
+          phaseTimings.push({
+            phase: currentPhase,
+            milliseconds: Math.round(performance.now() - phaseStarted),
+          });
         }
-        for (const test of group) {
-          const entry = test.args.find((arg) => /^tests\/.*\.mjs$/.test(arg));
-          test.resources = entry ? await resourcesFor(resolve(repository, entry)) : [];
-        }
-        await runJobs(
-          group,
-          ['browser', 'package'].includes(currentPhase) ? jobs : 1,
-          async (test) => {
-            await run(test, await isolatedEnvironment());
-          },
-          () => interrupted,
-        );
       }
   }
 } finally {
+  const cleanupStarted = performance.now();
   // Tests own their service shutdown; also stop an isolated CLI daemon if a test left it running.
   for (const isolatedHome of [home, ...jobHomes]) {
     if (await exists(join(isolatedHome, '.paneon/runtime.json')))
@@ -547,10 +587,14 @@ try {
     if (existed) await cp(backup, path, { recursive: true, verbatimSymlinks: true });
   }
   await writeFile(join(artifacts, 'results.json'), JSON.stringify(results, null, 2));
+  console.log(
+    `Release phase timings: ${JSON.stringify({ setupMilliseconds, phases: phaseTimings })}`,
+  );
   console.log(`\nRelease test results:\n${JSON.stringify(results, null, 2)}`);
   await rm(scratch, { recursive: true, force: true });
+  console.log(`Release cleanup time: ${Math.round(performance.now() - cleanupStarted)}ms.`);
   console.log(
-    'Temporary HOME, fixtures, screenshots and reports removed; previous dist and fixed screenshot paths restored.',
+    'Temporary HOME, fixtures, screenshots and reports removed; previous dist and fixed screenshot paths restored. Dedicated npm download cache retained.',
   );
   console.log(`Release test wall time: ${Math.round((Date.now() - runStarted) / 1000)}s.`);
 }
