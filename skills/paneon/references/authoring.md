@@ -215,10 +215,8 @@ Import `annotationValueSchema` and data types from `@qoggy/paneon/sdk`; import c
 ### Complete annotation panel
 
 ```tsx
-import { useMemo, useRef } from 'react';
 import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
 import { Card, AnnotationText, toast, usePageAnnotations } from '@qoggy/paneon/ui';
-import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
 const source = 'Use Redis for shared cache storage.';
 const refSchema = z.literal('redis-plan');
@@ -226,29 +224,14 @@ type Ref = z.infer<typeof refSchema>;
 const resultSchema = annotationValueSchema(refSchema);
 
 function Panel() {
-  const card = useRef<HTMLDivElement>(null);
-  const adapter = useMemo<AnnotationAdapter<Ref>>(
-    () => ({
-      resolve(target) {
-        return refSchema.safeParse(target.ref).success
-          ? { status: 'ready', text: source }
-          : { status: 'missing', message: 'Unknown plan.' };
-      },
-      locate() {
-        card.current?.scrollIntoView({ block: 'center' });
-      },
-    }),
-    [],
-  );
   usePageAnnotations<Ref>({
-    adapter,
     onSubmit: async (value) => {
       await agent.emit('annotations-submitted', value);
       toast.add({ title: 'Annotations submitted.', type: 'success' });
     },
   });
   return (
-    <Card ref={card} className="p-4">
+    <Card className="p-4">
       <AnnotationText target="redis-plan">{source}</AnnotationText>
     </Card>
   );
@@ -281,7 +264,7 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 - `usePageAnnotations<TRef>({ onSubmit, adapter?, disabled?, allowEmptySubmit?, onRequestEdit? })` turns on annotations for the page: Paneon supplies the editor and a floating annotation list with the submit action. Call it once in the page component; nested components read the state with `useAnnotations`. Without it the page has no annotation controls.
 - `onSubmit` receives the complete annotation list; the page emits the event itself.
-- `adapter` is needed only for paginated, virtualized or versioned content; see [adapters](#adapters).
+- `adapter` is needed to locate content the page may not be displaying; see [adapters](#adapters).
 - `disabled` blocks editing and submission while saved annotations stay readable. To lock feedback after a successful submission, set `disabled` and pass `onRequestEdit`, which the list offers as a correction action that should unlock editing.
 - `allowEmptySubmit` (default `false`) permits submitting an empty list, such as a correction that withdraws all feedback.
 - `AnnotationText` takes `target`, plain-string `children` and optional `className`. JSX children are not supported. Unregistered DOM and graphics cannot be annotated.
@@ -298,7 +281,28 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 ### Adapters
 
-Registered plain strings resolve and locate without an adapter. Paginated, virtualized or versioned content needs one:
+Registered text validates and locates without an adapter while it is displayed. After it unmounts, such as in an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, its annotations still submit, but locating them fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned content needs an adapter as well. With an adapter, Paneon resolves every target through it:
+
+```tsx
+// Each Tabs value is also the annotation ref of the Markdown rendered in that panel.
+const [tab, setTab] = useState('plan');
+const adapter = useMemo<AnnotationAdapter<string>>(
+  () => ({
+    resolve: (target) =>
+      target.ref in sections
+        ? { status: 'ready', text: sections[target.ref] }
+        : { status: 'missing', message: 'Unknown section.' },
+    async locate(target) {
+      setTab(target.ref);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    },
+  }),
+  [],
+);
+usePageAnnotations({ adapter, onSubmit });
+```
+
+The full type:
 
 ```ts
 type AnnotationAdapter<TRef> = {

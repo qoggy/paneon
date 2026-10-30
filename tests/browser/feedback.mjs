@@ -358,8 +358,9 @@ try {
   await button('Toggle mapped').click();
   const beforeMissing = await draft();
   await markerFor(mappedId).waitFor({ state: 'hidden' });
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: 'not mounted' }).waitFor();
+  // Unmounted content stays valid for submission, but only an adapter can bring it back.
+  await button('Locate mapped').click();
+  await frame.getByRole('alert').filter({ hasText: 'not displayed' }).waitFor();
   assert.deepEqual(await draft(), beforeMissing);
   assert.equal(await frame.getByTestId('attempts').textContent(), '0');
   await button('Toggle mapped').click();
@@ -372,8 +373,8 @@ try {
   await familyMarker.waitFor({ state: 'hidden' });
   await button('Change source').click();
   await button('Toggle B').click();
-  await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: 'not mounted' }).waitFor();
+  await button('Locate second target').click();
+  await frame.getByRole('alert').filter({ hasText: 'not displayed' }).waitFor();
   assert.equal((await draft()).annotations[0].targets.length, 2);
   await button('Adapter enabled no').click();
   await button('Change source').click();

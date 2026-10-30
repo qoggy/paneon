@@ -177,7 +177,7 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
     },
   });
   api.updateAnnotation(id, { targets: [{ ref: 'one' }], comment: 'corrected' });
-  await assert.rejects(api.submit(), /not mounted/);
+  await assert.rejects(api.submit(), /not registered/);
   assert.equal(count, 1);
 });
 
@@ -221,4 +221,75 @@ void test('text registration checks every UTF-16 boundary and supports explicit 
   });
   assert.doesNotThrow(unregister);
   assert.doesNotThrow(unregister);
+});
+
+void test('annotations on content that later unmounts still submit, but cannot be located without an adapter', async () => {
+  const submitted: AnnotationValue[] = [];
+  const store = new AnnotationStore({
+    onSubmit: (value) => {
+      submitted.push(value);
+      return Promise.resolve();
+    },
+  });
+  const api = store.getSnapshot() as unknown as {
+    registerText(registration: unknown): () => void;
+    createAnnotation(targets: unknown[], comment?: string): string;
+    locate(target: unknown): Promise<void>;
+    submit(): Promise<void>;
+  };
+  const node = { nodeType: 3, data: 'Use Redis.', isConnected: true };
+  const unregister = api.registerText({
+    ref: 'tab:plan',
+    source: 'Use Redis.',
+    segments: [{ node, sourceOffsets: Array.from({ length: 11 }, (_, index) => index) }],
+  });
+  const text = { ref: 'tab:plan', text: { start: 4, end: 9, quote: 'Redis' } };
+  api.createAnnotation([text], 'Why Redis?');
+  api.createAnnotation([{ ref: 'tab:plan' }], 'Whole plan');
+  // Switching tabs unmounts the registered text.
+  node.isConnected = false;
+  unregister();
+  await assert.rejects(api.locate(text), /not displayed/);
+  await store.getSnapshot().submit();
+  assert.equal(submitted.length, 1);
+  assert.deepEqual(
+    submitted[0].annotations.map((entry) => entry.targets),
+    [[text], [{ ref: 'tab:plan' }]],
+  );
+});
+
+void test('a source changed before unmounting stays stale after unmounting', async () => {
+  let count = 0;
+  const store = new AnnotationStore({
+    onSubmit: () => {
+      count++;
+      return Promise.resolve();
+    },
+  });
+  const api = store.getSnapshot() as unknown as {
+    registerText(registration: unknown): () => void;
+    createAnnotation(targets: unknown[], comment?: string): string;
+  };
+  const register = (source: string) => {
+    const node = { nodeType: 3, data: source, isConnected: true };
+    const unregister = api.registerText({
+      ref: 'tab:plan',
+      source,
+      segments: [
+        { node, sourceOffsets: Array.from({ length: source.length + 1 }, (_, index) => index) },
+      ],
+    });
+    return () => {
+      node.isConnected = false;
+      unregister();
+    };
+  };
+  const unmountOld = register('Use Redis.');
+  api.createAnnotation([{ ref: 'tab:plan', text: { start: 4, end: 9, quote: 'Redis' } }], 'Why?');
+  unmountOld();
+  const unmountNew = register('Use MySQL.');
+  await assert.rejects(store.getSnapshot().submit(), /stale/);
+  unmountNew();
+  await assert.rejects(store.getSnapshot().submit(), /stale/);
+  assert.equal(count, 0);
 });

@@ -314,7 +314,7 @@ void test('closing a file saves an open editor and deleting its last draft relea
   assert.equal(store.getSnapshot().editor, null);
   assert.equal(store.getSnapshot().value.annotations[0].comment, 'preserved input');
   store.getSnapshot().removeAnnotation(id);
-  await assert.rejects(store.getSnapshot().locate(target), /not mounted/);
+  await assert.rejects(store.getSnapshot().locate(target), /not registered/);
 });
 void test('a later page locate releases an unfinished file locate', async () => {
   let pageLocated = 0;

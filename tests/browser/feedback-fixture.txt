@@ -156,6 +156,16 @@ function Contents({
         >
           Locate family
         </Button>
+        <Button
+          onClick={() => {
+            const target = feedback.value.annotations
+              .flatMap((entry) => entry.targets)
+              .find((target) => target.ref === 'mapped:one');
+            if (target) void feedback.locate(target).catch(() => {});
+          }}
+        >
+          Locate mapped
+        </Button>
       </div>
 
       <Card data-testid="outer">

@@ -58,6 +58,8 @@ export class AnnotationStore<TRef> {
     }
   >();
   private sources = new Map<string, string>();
+  /** Latest registered source per identity, kept after unmount so changes stay detectable. */
+  private lastSources = new Map<string, string>();
   private fileSnapshots = new Map<string, FileSnapshot<TRef>>();
   private fileView: FileAnnotationView<TRef> | null = null;
   private fileSequence = 0;
@@ -317,6 +319,7 @@ export class AnnotationStore<TRef> {
       segments,
       index: indexTextSegments(segments),
     });
+    this.lastSources.set(sourceKey(registration), registration.source);
     this.registryChanged();
     return () => {
       this.texts.delete(id);
@@ -587,9 +590,14 @@ export class AnnotationStore<TRef> {
       return { status: 'ready', text: texts[0].source };
     }
     if (!target.text && texts.length) return { status: 'ready' };
+    // Content may since have unmounted, such as an inactive tab: validate against the source it
+    // last displayed, so a change made before unmounting is still reported as stale.
+    const last = this.lastSources.get(key);
+    if (last !== undefined)
+      return target.text ? { status: 'ready', text: last } : { status: 'ready' };
     return {
       status: 'missing',
-      message: 'The target is not mounted. Supply an adapter to validate and locate it.',
+      message: 'The target is not registered. Supply an adapter to validate and locate it.',
     };
   }
   private checkResolution(target: AnnotationTarget<TRef>, resolution: AnnotationTargetResolution) {
@@ -637,6 +645,11 @@ export class AnnotationStore<TRef> {
             )),
       )?.node.parentElement;
       const element = textElement;
+      // Without an adapter, Paneon cannot bring back content that the page unmounted.
+      if (!element && !fileSnapshot && !this.options?.adapter)
+        throw new Error(
+          'The target is not displayed. Supply an adapter whose locate shows its view.',
+        );
       element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       element?.animate?.(
         [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],
