@@ -80,7 +80,7 @@ export async function startTableReviewFixture() {
       table,
       markdownFilePath,
       runReview: (path = '审阅 方案.md') =>
-        run('review', { title: 'Markdown review acceptance', markdownFilePath: path }),
+        run('file-review', { title: 'Markdown review acceptance', files: [path] }),
       cli,
       url: (panel) => `http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`,
       async events(panel) {

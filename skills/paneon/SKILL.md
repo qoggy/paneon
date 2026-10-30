@@ -1,6 +1,6 @@
 ---
 name: paneon
-description: Turns agent output that would be tiring to read as long text into local interactive Paneon pages, and brings the human's choices, inputs and precise feedback back to the agent. Use proactively when explaining code, mechanisms or plans that read better with diagrams, tables or interactive views; showing changed files, commits or PR diffs; presenting data or metrics; illustrating a data model or design; asking several related questions or requesting missing parameters; or collecting line-level feedback on a document. Ready-made pages cover choices, forms, tables, Markdown review, file diff review and Git review; other needs can be built as custom TSX pages. Not for prototyping the product under development.
+description: Turns agent output that would be tiring to read as long text into local interactive Paneon pages, and brings the human's choices, inputs and precise feedback back to the agent. Use proactively when explaining code, mechanisms or plans that read better with diagrams, tables or interactive views; showing changed files, commits or PR diffs; presenting data or metrics; illustrating a data model or design; asking several related questions or requesting missing parameters; or collecting line-level feedback on a document. Ready-made pages cover choices, forms, tables, file review, file diff review and Git review; other needs can be built as custom TSX pages. Not for prototyping the product under development.
 compatibility: Requires the Paneon CLI and Node.js 24.
 ---
 
@@ -21,14 +21,14 @@ Then pick the source by purpose. Built-in pages collect input or feedback on con
 
 `<skill>` stands for the absolute path of this skill directory.
 
-| Need                                                         | Contract                                 | Entry                                         |
-| ------------------------------------------------------------ | ---------------------------------------- | --------------------------------------------- |
-| Sequential questions with options or custom answers          | [Choose](references/choose.md)           | `<skill>/assets/panels/choose/panel.tsx`      |
-| Related parameters on one form                               | [Form](references/form.md)               | `<skill>/assets/panels/form/panel.tsx`        |
-| Tabular data to search, filter and sort                      | [Table](references/table.md)             | `<skill>/assets/panels/table/panel.tsx`       |
-| A Markdown document to annotate, such as a spec or doc       | [Review](references/review.md)           | `<skill>/assets/panels/review/panel.tsx`      |
-| Original and proposed files, without Git                     | [Diff review](references/diff-review.md) | `<skill>/assets/panels/diff-review/panel.tsx` |
-| Working changes, history and comparisons across repositories | [Git review](references/git-review.md)   | `<skill>/assets/panels/git-review/panel.tsx`  |
+| Need                                                            | Contract                                 | Entry                                         |
+| --------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
+| Sequential questions with options or custom answers             | [Choose](references/choose.md)           | `<skill>/assets/panels/choose/panel.tsx`      |
+| Related parameters on one form                                  | [Form](references/form.md)               | `<skill>/assets/panels/form/panel.tsx`        |
+| Tabular data to search, filter and sort                         | [Table](references/table.md)             | `<skill>/assets/panels/table/panel.tsx`       |
+| Complete text files to read and annotate, such as docs and code | [File review](references/file-review.md) | `<skill>/assets/panels/file-review/panel.tsx` |
+| Original and proposed files, without Git                        | [Diff review](references/diff-review.md) | `<skill>/assets/panels/diff-review/panel.tsx` |
+| Working changes, history and comparisons across repositories    | [Git review](references/git-review.md)   | `<skill>/assets/panels/git-review/panel.tsx`  |
 
 ## Run and deliver
 

@@ -109,50 +109,41 @@ The panel SHALL emit form-submitted with a values object keyed by field name, wi
 - **WHEN** saving a submitted form event fails
 - **THEN** the panel retains the entered values and allows another explicit submission without claiming success
 
-### Requirement: Review a complete Markdown document with precise feedback
+### Requirement: Supply File Review as the standard content-review entry
 
-The skill SHALL provide a content-review panel accepting a nonblank title and markdownFilePath for a local UTF-8 Markdown file without requiring callers to pass inline content, split the document into sections or assign paragraph identifiers. Absolute paths SHALL be accepted; relative paths SHALL resolve against the panel's working directory. Inline markdown and extra input fields SHALL be rejected. The panel SHALL render that document using the existing Markdown presentation and allow annotations on selected heading text, body paragraphs, words or phrases. A person MAY express an opinion about the whole document by selecting its heading text and annotating it. The panel SHALL NOT provide a separate action or editor for commenting without selecting text. It SHALL preserve ordinary reading and text copying and allow editing or deleting feedback drafts before explicit submission.
+The product skill SHALL ship `assets/panels/file-review/panel.tsx` with definition id `file-review` and event type `file-review-submitted` as its standard content-review panel, following the file-review capability. It SHALL replace the former `assets/panels/review/panel.tsx`, `review` definition and `review-submitted` event without a legacy alias or acceptance of markdownFilePath. Existing stored historical events SHALL NOT be rewritten or relabeled as the new event type, and existing instances SHALL NOT be automatically migrated.
 
-The panel SHALL use the common annotations structure, including empty annotations for selection without an opinion, and SHALL emit review-submitted only on explicit submission. Targets created from text selection SHALL use a document reference with source Markdown UTF-16 offsets and an exact quote matching the saved file snapshot substring, including when a selected heading carries an opinion about the whole document. A Markdown-specific adapter SHALL map rendered selections to their original source ranges rather than treating display offsets as source offsets. A discontiguous source mapping SHALL use multiple targets in the same entry without silently dropping selected content. This requirement SHALL NOT imply selecting arbitrary internal coordinates of rendered diagrams.
+The built-in panel table SHALL direct one or more complete text files to File Review, original/proposed pairs to Diff Review and repository changes/history to Git Review. A dedicated `references/file-review.md` SHALL document when to use the panel, what it achieves, its strict input and complete submission contract, original snapshot offsets, linked-file source groups and correction/withdrawal semantics using `files: []` for withdrawal. Public examples SHALL nest annotations under file metadata without internal annotation ids, fileIndex/ref, duplicated snapshot ids or separate sources lookup tables. The old review reference SHALL be removed. Agent-facing references SHALL NOT document panel layout specifications or recommend private shared asset modules as public APIs. Existing CodeBlock authoring guidance and public API SHALL remain unchanged by this panel integration.
 
-The page SHALL read the file on load and retain the resulting content snapshot while being reviewed. Later file changes or deletion SHALL NOT change the open document or cause submission or annotation location to reread the file. Reloading the page SHALL read the current file. Results SHALL NOT duplicate the complete Markdown. Event-saving failures SHALL preserve feedback drafts and SHALL NOT be shown as successful submissions. The page SHALL collect opinions while leaving edits to the document itself to the agent.
+#### Scenario: Discover the correct panel for a mixed deliverable
 
-#### Scenario: Open a document without splitting it
+- **WHEN** an agent needs a person to review a Markdown plan plus a code or configuration file without a before/after comparison
+- **THEN** the skill points to File Review with an explicit file manifest and its input/result reference
 
-- **WHEN** an agent supplies a title and markdownFilePath pointing to a readable Markdown file
-- **THEN** the panel reads the file as UTF-8 and displays it for review without requiring inline content, sections or paragraph identifiers
+#### Scenario: Migrate a single-document call
 
-#### Scenario: Read an empty or unavailable file
+- **WHEN** an agent follows the updated skill for an existing Markdown document
+- **THEN** it uses the file-review entry with a one-item files array containing the Markdown path string and consumes file-review-submitted with annotations nested under the actual file's metadata
 
-- **WHEN** the file is empty
-- **THEN** the panel displays an empty document without a read error
-- **WHEN** the file is missing or unreadable
-- **THEN** the panel shows the read error without rendering a reviewable document or emitting feedback
+#### Scenario: Interpret linked-file feedback directly
 
-#### Scenario: Preserve the reviewed snapshot
+- **WHEN** the submitted opinion addresses a file opened through a Markdown link
+- **THEN** the reference explains that its file group's path/snapshotId and nested text ranges describe that linked file, without requiring an internal Markdown ref or source-table join
 
-- **WHEN** the file changes or is deleted after it has been read
-- **THEN** the open page still displays the original snapshot and validates, locates and submits annotations against that snapshot
+#### Scenario: Interpret a selected path annotation
 
-#### Scenario: Annotate a body phrase
+- **WHEN** a submitted target contains `{path: {quote}}`
+- **THEN** the reference explains that quote is selected path text under the enclosing file group, while body annotations retain their existing text ranges and no pathText or displayPath is introduced
 
-- **WHEN** a person selects a phrase in the rendered body and writes an opinion
-- **THEN** the feedback identifies the corresponding original Markdown range and exact quote rather than an unrelated DOM character offset
+#### Scenario: Read old persisted feedback
 
-#### Scenario: Express an opinion about the whole document
+- **WHEN** a consumer reads a historical review-submitted event after the new panel is introduced
+- **THEN** the old record retains its original event type and payload, and no automatic conversion or instance migration is claimed
 
-- **WHEN** a person selects heading text in the rendered Markdown and annotates it with an opinion about the whole document
-- **THEN** the annotation targets that heading's original Markdown range and exact quote through the ordinary text-annotation flow, without a separate whole-document comment action or editor
+#### Scenario: Run the installed skill outside the source repository
 
-#### Scenario: Select across Markdown formatting
-
-- **WHEN** a selected body phrase crosses inline formatting markers
-- **THEN** the adapter retains the appropriate source range or ranges and can associate the feedback with the original rendered selection
-
-#### Scenario: Submit several opinions together
-
-- **WHEN** a person adds or revises several annotations and explicitly submits
-- **THEN** one review-submitted event contains the current annotations with per-entry comments and selected-text targets, without a top-level comment, and editing alone does not emit feedback
+- **WHEN** the matching packaged skill is installed and its file-review entry is run from another cwd with valid input
+- **THEN** the entry compiles against public SDK/UI exports, resolves relative file paths against that cwd and supports reading and submitting precise file feedback
 
 ### Requirement: Keep the GitHub PR example read-only and deliver opinions to the agent
 

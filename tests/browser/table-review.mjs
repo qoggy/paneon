@@ -425,9 +425,9 @@ try {
     await submitAnnotations(frame);
     await waitForSubmitted();
     const result = (await fixture.events(review))[0];
-    assert.equal(result.payload.annotations.length, 4);
+    assert.equal(result.payload.files[0].annotations.length, 4);
     assert.equal('comment' in result.payload, false);
-    const [second, cross, inline, fenced] = result.payload.annotations;
+    const [second, cross, inline, fenced] = result.payload.files[0].annotations;
     const secondStart = markdown.indexOf('**repeat**') + 2;
     assert.deepEqual(second.targets[0].text, {
       start: secondStart,
@@ -437,7 +437,7 @@ try {
     assert.equal(inline.targets[0].text.quote, 'a  b');
     assert.equal(fenced.targets[0].text.quote, 'const x = 1;\n');
     await unlink(fixture.markdownFilePath);
-    for (const entry of result.payload.annotations)
+    for (const entry of result.payload.files[0].annotations)
       for (const target of entry.targets)
         if (target.text)
           assert.equal(markdown.slice(target.text.start, target.text.end), target.text.quote);
@@ -476,7 +476,7 @@ try {
     await waitForSubmitted();
     const reviewEvents = await fixture.events(review);
     assert.deepEqual(reviewEvents[1].payload, {
-      annotations: [],
+      files: [],
       replacesEventId: result.id,
     });
 

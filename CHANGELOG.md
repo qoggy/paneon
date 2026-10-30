@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** File review replaces the Markdown review panel. Run `assets/panels/file-review/panel.tsx` with optional `title` and `files: string[]` instead of the old `review` entry and `markdownFilePath`. Review Markdown, code and configuration together, retain annotations across files, and consume `file-review-submitted` with annotations nested under each file's absolute path and snapshot. Historical events and existing instances are not migrated.
+
 ## [0.1.0] - 2026-10-30
 
 ### Added

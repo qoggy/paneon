@@ -8,10 +8,6 @@ import {
   tableSubmittedSchema,
   visibleRows,
 } from '../skills/paneon/assets/panels/table/schema.ts';
-import {
-  reviewParamsSchema,
-  completeReviewSchema,
-} from '../skills/paneon/assets/panels/review/schema.ts';
 import { publicTableFeedback } from '../skills/paneon/assets/panels/table/feedback.ts';
 import { markdownOffsets } from '../src/ui/markdown-annotation-mapper.ts';
 const table = () =>
@@ -319,8 +315,8 @@ void test('table header references distinguish labels from full columns and pres
   assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
 });
 
-void test('table and review reject page-level comments even on corrections', () => {
-  const schemas = [completeTableSchema(table()), completeReviewSchema('Source')];
+void test('table rejects page-level comments even on corrections', () => {
+  const schemas = [completeTableSchema(table())];
   for (const schema of schemas) {
     assert.equal(schema.safeParse({ annotations: [], comment: 'removed' }).success, false);
     assert.equal(
@@ -331,7 +327,7 @@ void test('table and review reject page-level comments even on corrections', () 
   }
 });
 
-void test('table and Markdown review validate page targets alongside page-defined local file targets', () => {
+void test('table validates page targets alongside page-defined local file targets', () => {
   const common = {
     ref: { kind: 'header', columnKey: 'name' },
     sourceRef: { path: '/local.txt', snapshotId: 'local' },
@@ -350,61 +346,4 @@ void test('table and Markdown review validate page targets alongside page-define
     ],
   });
   assert.deepEqual(result.annotations[0].targets[1], common);
-  const review = completeReviewSchema('# Body').parse({
-    annotations: [
-      {
-        id: 'mixed',
-        comment: '',
-        targets: [
-          { ref: { kind: 'document' }, text: { start: 2, end: 6, quote: 'Body' } },
-          { ...common, ref: { kind: 'document' } },
-        ],
-      },
-    ],
-  });
-  assert.deepEqual(review.annotations[0].targets[1], { ...common, ref: { kind: 'document' } });
-});
-
-void test('review accepts only a nonblank title and Markdown file path', () => {
-  const params = {
-    title: 'Review',
-    markdownFilePath: 'docs/审阅 方案.md',
-  };
-  assert.deepEqual(reviewParamsSchema.parse(params), params);
-  assert.equal(
-    reviewParamsSchema.safeParse({ ...params, markdownFilePath: '/tmp/plan.md' }).success,
-    true,
-  );
-  for (const input of [
-    { title: 'Review', markdown: 'Old inline content' },
-    { title: 'Review' },
-    { ...params, title: ' ' },
-    { ...params, markdownFilePath: '' },
-    { ...params, markdownFilePath: ' ' },
-    { ...params, markdown: '' },
-    { ...params, sections: [] },
-  ])
-    assert.equal(reviewParamsSchema.safeParse(input).success, false);
-});
-void test('review validates grapheme boundaries and clearing revisions against the document snapshot', () => {
-  const schema = completeReviewSchema('**中文🙂** repeat repeat');
-  const target = { ref: { kind: 'document' }, text: { start: 2, end: 6, quote: '中文🙂' } };
-  assert.equal(
-    schema.safeParse({ annotations: [{ id: 'a', targets: [target], comment: '' }] }).success,
-    true,
-  );
-  assert.equal(
-    schema.safeParse({
-      annotations: [
-        {
-          id: 'a',
-          targets: [{ ...target, text: { start: 2, end: 5, quote: '中文\ud83d' } }],
-          comment: '',
-        },
-      ],
-    }).success,
-    false,
-  );
-  assert.equal(schema.safeParse({ annotations: [] }).success, false);
-  assert.equal(schema.safeParse({ annotations: [], replacesEventId: 2 }).success, true);
 });

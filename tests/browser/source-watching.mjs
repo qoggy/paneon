@@ -73,7 +73,7 @@ try {
   assert.equal(await frame.getByRole('textbox', { name: 'Draft' }).inputValue(), 'clicked');
   await frame.getByText('Local Markdown', { exact: true }).waitFor();
   await until(
-    async () => (await frame.locator('pre code span').count()) > 0,
+    async () => (await frame.locator('pre [data-shiki-token]').count()) > 0,
     'Code highlighting must work from the built UI package',
   );
   const originalChild = service.runtime.live.get(id).execution.child,

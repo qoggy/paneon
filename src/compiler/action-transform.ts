@@ -137,7 +137,12 @@ export function parseModule(
   const host = ts.createCompilerHost({ noLib: true, noResolve: true });
   host.getSourceFile = (name) => (name === file ? source : undefined);
   const checker = ts
-    .createProgram([file], { noLib: true, noResolve: true, jsx: ts.JsxEmit.ReactJSX }, host)
+    // Local helpers may be .js; they must be bound before symbol-based capture analysis.
+    .createProgram(
+      [file],
+      { noLib: true, noResolve: true, allowJs: true, jsx: ts.JsxEmit.ReactJSX },
+      host,
+    )
     .getTypeChecker();
   const symbols = new Map<ts.Symbol, string>();
   for (const [name, statement] of names) {

@@ -140,9 +140,6 @@ const en = {
   '编辑批注 {number}': 'Edit annotation {number}',
   'Locate annotation {number}, location {index}': 'Locate annotation {number}, location {index}',
   '定位批注 {number} 的位置 {index}': 'Locate annotation {number}, location {index}',
-  'Save or cancel the annotation being edited first.':
-    'Save or cancel the annotation being edited first.',
-  '请先保存或取消正在编辑的批注。': 'Save or cancel the annotation being edited first.',
   'Select at least one location.': 'Select at least one location.',
   '请至少选择一个位置。': 'Select at least one location.',
   Description: 'Description',

@@ -29,7 +29,7 @@
     "dev": "vite --host 127.0.0.1",
     "dev:cli": "node src/cli/index.ts",
     "build": "npm run build:cli && npm run build:ui && npm run typecheck && npm run build:web",
-    "build:cli": "tsc -p tsconfig.cli.json && node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
+    "build:cli": "tsc -p tsconfig.cli.json && node -e \"const fs=require('node:fs');fs.chmodSync('dist/cli/index.js',0o755);for(const ext of ['js','d.ts'])fs.copyFileSync('dist/runtime/read-text-file.'+ext,'skills/paneon/assets/shared/read-text-file.'+ext)\" && prettier --write skills/paneon/assets/shared/read-text-file.js skills/paneon/assets/shared/read-text-file.d.ts",
     "build:web": "vite build",
     "prepack": "npm run build",
     "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=6 tests/*.test.ts",

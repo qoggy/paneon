@@ -35,6 +35,8 @@ const browserScripts = [
   'skill-pages',
   'choose-review-interactions',
   'table-review',
+  'markdown-review',
+  'file-review',
   'table-layout',
   'table-header-themes',
   'feedback',
@@ -104,6 +106,7 @@ const packageScripts = [
   'preferences-pack.mjs',
   'browser/skill-pages-pack.mjs',
   'browser/table-review-pack.mjs',
+  'browser/file-review-pack.mjs',
   'browser/code-block-pack.mjs',
   'browser/feedback-pack.mjs',
   'browser/git-review-pack.mjs',
@@ -461,7 +464,7 @@ try {
           import {validateRequirement} from './dist/compiler/index.js';
           import {PACKAGE_VERSION} from './dist/shared/paths.js';
           for (const path of ${JSON.stringify([
-            ...['choose', 'form', 'table', 'review', 'git-review', 'diff-review'].map(
+            ...['choose', 'form', 'table', 'file-review', 'git-review', 'diff-review'].map(
               (name) => `skills/paneon/assets/panels/${name}/panel.tsx`,
             ),
             ...['github-pr', 'dining-philosophers', 'sentinel-leap-array'].map(

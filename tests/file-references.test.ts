@@ -161,6 +161,8 @@ void test('preview resolves cwd/document bases and reads fresh, bounded UTF-8 so
     assert.equal((await readFilePreview(root, { href: './source.ts' })).text, 'changed');
     await writeFile(join(root, 'empty'), '');
     assert.equal((await readFilePreview(root, { href: './empty' })).text, '');
+    await writeFile(join(root, 'bom'), '\uFEFForiginal');
+    assert.equal((await readFilePreview(root, { href: './bom' })).text, 'original');
     await writeFile(join(root, 'binary'), Buffer.from([0, 1, 2]));
     await writeFile(join(root, 'invalid-utf8'), Buffer.from([0xff, 0xfe]));
     await writeFile(join(root, 'large'), Buffer.alloc(FILE_PREVIEW_MAX_BYTES + 1, 65));

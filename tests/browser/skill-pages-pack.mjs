@@ -24,6 +24,7 @@ try {
     'references/diff-review.md',
     'assets/panels/diff-review/panel.tsx',
     'assets/panels/diff-review/schema.ts',
+    'assets/panels/diff-review/feedback.ts',
     'assets/panels/diff-review/model.ts',
     'assets/panels/diff-review/icons.tsx',
     'assets/panels/diff-review/icons.LICENSE',

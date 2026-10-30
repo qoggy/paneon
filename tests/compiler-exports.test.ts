@@ -58,6 +58,20 @@ async function evaluate(entry: string, graph = createGraph(entry, 'client')) {
 }
 const panel = (imports: string, expression: string) =>
   `${imports}export default {render:()=>(${expression})};`;
+void test('JavaScript helpers bind object shorthand dependencies during action extraction', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel("import {make} from './helper.js';", "make('source').value"),
+      'helper.js':
+        'const wrap=(value)=>({value}); export function make(value){return wrap(value);}',
+    },
+    async (_root, entry) => {
+      assert.equal(await evaluate(entry), 'source');
+      const server = createGraph(entry, 'server', undefined, undefined, { entryExports: ['*'] });
+      assert.ok([...server.sources.values()].some((source) => source.includes('wrap')));
+    },
+  );
+});
 void test('named barrel exports prune the declaration and forward exactly the requested binding', async () => {
   await fixture(
     {
