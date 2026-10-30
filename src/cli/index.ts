@@ -251,6 +251,22 @@ execute(ack, async () => {
     },
   });
 });
+const checkAnnotationsCommand = panel
+  .command('check-annotations <entry.tsx>')
+  .description('Statically find content in a panel source that the human cannot annotate');
+execute(checkAnnotationsCommand, async () => {
+  const entryPath = resolve(checkAnnotationsCommand.args[0]);
+  try {
+    if (!statSync(entryPath).isFile()) invalid('The entry must be a file.');
+  } catch {
+    invalid('The entry must exist and be accessible.');
+  }
+  const path = import.meta.url.endsWith('.ts')
+    ? new URL('../../dist/cli/annotation-check.js', import.meta.url).href
+    : './annotation-check.js';
+  const { checkAnnotations } = (await import(path)) as typeof import('./annotation-check.js');
+  return checkAnnotations(entryPath);
+});
 const config = program.command('config').description('Read and update user interface preferences');
 const configGet = config.command('get').description('Read effective UI preferences');
 execute(configGet, async () => {

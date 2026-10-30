@@ -70,4 +70,6 @@ Give each page its own directory, so its relative modules stay together. Choose 
 
 Read [Authoring](references/authoring.md) before writing a page. It covers the complete source, events, server actions, queries, components, theme and language, annotations for pages that collect precise opinions, and examples to run as-is or borrow techniques from: two explanations (dining philosophers, Sentinel LeapArray) and a read-only GitHub PR workspace through the local `gh` CLI.
 
+For a page that collects annotations, run `paneon panel check-annotations <entry.tsx>` before giving the human its link.
+
 Built-in pages and examples are for running and reading, not importing. Build custom pages on `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and the page's own modules.
