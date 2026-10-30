@@ -6,9 +6,12 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
 import {
+  assertAnnotationEditorOpensAfterLocate,
+  assertEditorBlocksAnnotationNavigation,
   openAnnotationDirectory,
   selectAnnotationText,
   submitAnnotations,
+  waitForAnnotationScrollIdle,
 } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-frontmatter-'));
@@ -113,6 +116,67 @@ export default definePanel({id:'frontmatter-acceptance',requires:{paneon:'${PACK
     all[1].payload.annotations.map((x) => x.targets),
     first.payload.annotations.map((x) => x.targets),
   );
+
+  // A directory edit returns to offscreen Markdown body text and opens beside it.
+  await document.evaluate((element) => {
+    element.style.marginTop = '1200px';
+    window.scrollTo(0, 0);
+  });
+  await assertAnnotationEditorOpensAfterLocate(
+    frame,
+    '[data-testid="annotated"] strong [data-source-leaf]',
+    async () => {
+      await openAnnotationDirectory(frame);
+      await frame.getByRole('button', { name: 'Edit annotation 2', exact: true }).click();
+    },
+  );
+  const bodyText = document.locator('strong [data-source-leaf]');
+  const content = page.frames().find((candidate) => candidate.url().endsWith('/frame.html'));
+  await content.waitForFunction(() => {
+    const rect = document
+      .querySelector('[data-testid="annotated"] strong [data-source-leaf]')
+      .getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  });
+  const editor = frame.locator('[data-annotation-editor]');
+  const editInput = editor.locator('textarea');
+  await editInput.and(frame.locator(':focus')).waitFor();
+  assert.equal(await editInput.inputValue(), 'Body annotation');
+  await content.waitForFunction(() => {
+    const text = document
+      .querySelector('[data-testid="annotated"] strong [data-source-leaf]')
+      .getBoundingClientRect();
+    const editor = document.querySelector('[data-annotation-editor]').getBoundingClientRect();
+    return Math.abs(editor.y - text.y) < editor.height + 60 && editor.x < text.right;
+  });
+  const bodyBox = await bodyText.boundingBox();
+  const editBox = await editor.boundingBox();
+  assert.ok(Math.abs(editBox.y - bodyBox.y) < editBox.height + 60);
+  assert.ok(editBox.x < bodyBox.x + bodyBox.width);
+  await editInput.fill('Unsaved body correction');
+  await waitForAnnotationScrollIdle(frame);
+  const scroll = await bodyText.evaluate(() => window.scrollY);
+  await assertEditorBlocksAnnotationNavigation(frame, 1, async () => {
+    assert.equal(await bodyText.evaluate(() => window.scrollY), scroll);
+    assert.equal((await events()).length, 2, 'Blocked navigation never submits feedback');
+  });
+  await editInput.press('Escape');
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: 'Edit annotation 2', exact: true }).click();
+  assert.equal(
+    await editInput.inputValue(),
+    'Body annotation',
+    'Cancel discards the unsaved buffer',
+  );
+  await editInput.fill('Saved body correction');
+  await editInput.press('Enter');
+  await openAnnotationDirectory(frame);
+  await frame.getByRole('button', { name: 'Edit annotation 1', exact: true }).click();
+  assert.equal(await editInput.inputValue(), 'Corrected metadata annotation');
+  await editInput.press('Escape');
+  await document.evaluate((element) => {
+    element.style.marginTop = '';
+  });
 
   for (const [index, example] of examples.entries()) {
     await frame.getByRole('button', { name: 'Next YAML case', exact: true }).click();

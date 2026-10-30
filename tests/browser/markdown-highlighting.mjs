@@ -41,7 +41,13 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
   const errors = [];
+  const externalRequests = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (/^https?:$/.test(url.protocol) && url.hostname !== '127.0.0.1')
+      externalRequests.push(url.href);
+  });
   await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`);
   const frame = page.frameLocator('iframe');
   const annotated = frame.getByTestId('annotated');
@@ -81,7 +87,21 @@ try {
   const long = longBlock.locator('pre');
   const wrapButton = longBlock.getByRole('button', { name: 'Word wrap', exact: true });
   assert.equal(await wrapButton.getAttribute('aria-pressed'), 'true');
-  assert.ok(await long.evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
+  const wrapMetrics = await long.evaluate((el) => {
+    const code = el.querySelector('code');
+    const content = code.firstElementChild;
+    return {
+      width: el.clientWidth,
+      scroll: el.scrollWidth,
+      whiteSpace: getComputedStyle(el).whiteSpace,
+      overflowWrap: getComputedStyle(el).overflowWrap,
+      codeWidth: code.clientWidth,
+      codeMinWidth: getComputedStyle(code).minWidth,
+      contentWidth: content.clientWidth,
+      contentWhiteSpace: getComputedStyle(content).whiteSpace,
+    };
+  });
+  assert.ok(wrapMetrics.scroll <= wrapMetrics.width + 1, JSON.stringify(wrapMetrics));
   const longText = await long.textContent();
   await wrapButton.click();
   assert.equal(await wrapButton.getAttribute('aria-label'), 'Word wrap');
@@ -115,6 +135,9 @@ try {
       await frame.getByTestId(name).locator('[data-slot="markdown-code-block"]').count(),
       0,
     );
+
+  await annotated.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, 'light.png') });
 
   await annotated.getByRole('button', { name: 'Copy code', exact: true }).hover();
   const copyTooltip = frame
@@ -187,7 +210,6 @@ try {
   await annotated.getByRole('button', { name: 'Word wrap', exact: true }).click();
   assert.equal(await annotated.locator('code').textContent(), renderedCode);
   const lightColor = await keyword.evaluate((el) => getComputedStyle(el).color);
-  await page.screenshot({ path: join(artifacts, 'light.png') });
 
   // This range crosses multiple tokens, a surrogate pair, a blank line and indentation.
   const from = renderedCode.indexOf('const');
@@ -260,6 +282,7 @@ try {
     'Native selection excludes toolbar labels.',
   );
   assert.deepEqual(errors, []);
+  assert.deepEqual(externalRequests, [], 'Code, themes and Mermaid use packaged local assets.');
   console.log(
     'Markdown highlighting passed: toolbar, language labels, wrap and horizontal scrolling, real clipboard and failure feedback, keyboard focus and toggle semantics, tooltips, themes, custom renderers, Mermaid, updates and exact CRLF annotation selection/locate/submit.',
   );

@@ -4,6 +4,28 @@
   "baseColor": "neutral",
   "items": [
     {
+      "name": "markdown-code-block-primitives",
+      "retrievedAt": "2026-10-31",
+      "url": "https://github.com/shadcn-ui/ui/blob/b8d7baa15b1dca5716f13153e63795fc3d741f6b/apps/v4/registry/bases/base/ui/code-block.tsx",
+      "sha256": "66ae50e6a08ca54a0ffd8be7f71cb4f60002a0e0cb592910d85e8e2d839cca0a",
+      "dependencies": ["cn", "class-variance-authority"],
+      "registryDependencies": [],
+      "styles": {
+        "url": "https://github.com/shadcn-ui/ui/blob/b8d7baa15b1dca5716f13153e63795fc3d741f6b/apps/v4/registry/styles/style-nova.css",
+        "sha256": "fd9803ec398290c306b377a46a769cad0c7ff024bf6a626993c113cacc20f16e",
+        "subset": "Code Block rules, excluding unused footer/copy-button and footer-dependent spacing."
+      },
+      "adaptations": [
+        "Keep root, header, title, actions, content and line as internal exports; use the local cn helper and existing MIT license.",
+        "Center title icons and text with flex alignment rather than inline vertical-align: middle; keep icons from shrinking and preserve text truncation.",
+        "Retain the existing host clipboard action and its observable errors instead of the upstream copy button; omit unused footer and scroll-fade/scrollbar utility dependencies.",
+        "Accept original code-element props/ref and group unnumbered syntax nodes to preserve Markdown author markup and source mappings.",
+        "Markdown keeps its existing markdown-code-block root slot and header-contained actions; upstream direct-root floating actions are not used. File content without a root supplies a matching keyboard focus ring inset within the scrolling pane.",
+        "Leave exact line splitting, newlines and empty-line text to callers instead of trimming a trailing LF or synthesizing a newline; file source annotations retain raw UTF-16 coordinates.",
+        "Bundle only the matching Nova Code Block style subset; isolate GitHub pre/code rules with revert-layer without upgrading the global theme."
+      ]
+    },
+    {
       "name": "button",
       "url": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
       "sha256": "4b8d7d848742727973c1b088af8d15f0b628272a1316f2d2fa344e73ddff9e9c",

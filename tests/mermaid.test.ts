@@ -83,7 +83,11 @@ void test('Markdown keeps ordinary code, inline code, GFM, and raw HTML disabled
     }),
   );
   assert.match(html, /<code>mermaid<\/code>/);
-  assert.match(html, /<pre><code class="language-typescript">/);
+  assert.match(
+    html,
+    /<pre\b[^>]*data-slot="code-block-content"[^>]*><code\b[^>]*class="[^"]*\blanguage-typescript\b[^"]*"[^>]*>/,
+  );
+  assert.match(html, /const mermaid = &quot;plain code&quot;;/);
   assert.match(html, /<table>/);
   assert.match(html, /type="checkbox"/);
   assert.match(html, /disabled=""/);

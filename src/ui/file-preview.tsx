@@ -9,7 +9,7 @@ import { useFileReference } from './file-reference-context';
 import type { ReadFileReference } from './file-reference-context';
 import { useBrowserAction } from './browser-action-context';
 import { Button } from './button';
-import { CodeText } from './code-text';
+import { FileSourceCode } from './file-source-code';
 import { Empty, EmptyDescription, EmptyHeader } from './empty';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './sheet';
 import { Spinner } from './spinner';
@@ -313,13 +313,11 @@ function PreviewSource({
             </EmptyHeader>
           </Empty>
         ) : (
-          <CodeText
+          <FileSourceCode
             code={code}
             onReady={ready}
             language={language}
-            lineNumbers
             highlightedLines={lines}
-            className="m-0 min-h-full w-max max-w-none min-w-full overflow-visible rounded-none border-0 bg-background p-0"
           />
         )}
       </div>

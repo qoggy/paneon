@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { Button, CodeBlock, Page, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
+import type { CodeBlockProps } from '@qoggy/paneon/ui';
+
+const draftAnnotation = annotationValueSchema(z.json()).shape.annotations.element;
+const resultSchema = z.object({
+  annotations: z.array(z.object({
+    targets: draftAnnotation.shape.targets,
+    comment: draftAnnotation.shape.comment,
+  })),
+  replacesEventId: z.number().optional(),
+});
+
+function Draft() {
+  const { value } = useAnnotations();
+  return <output data-draft hidden>{JSON.stringify(value)}</output>;
+}
+
+function Panel() {
+  const { source, cases } = usePanelInput<{ source: string; cases: string[] }>();
+  const [language, setLanguage] = useState('text');
+  const [initialWrap, setInitialWrap] = useState(false);
+  const [numbered, setNumbered] = useState(true);
+  const [header, setHeader] = useState<boolean | string>('重试策略');
+  const [next, setNext] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [receipt, setReceipt] = useState<number>();
+  usePageAnnotations({
+    disabled: locked,
+    allowEmptySubmit: receipt !== undefined,
+    onRequestEdit: locked ? () => setLocked(false) : undefined,
+    onSubmit: async value => {
+      const result = await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+        ...(receipt === undefined ? {} : { replacesEventId: receipt }),
+      });
+      setReceipt(result.id);
+      setLocked(true);
+    },
+  });
+  const settings: CodeBlockProps = {
+    code: source,
+    language,
+    header,
+    lineNumbers: numbered,
+    defaultWrap: initialWrap,
+    highlightedLines: { start: 2, end: 3 },
+    annotationTarget: { kind: 'snippet', id: 'main', version: 1 },
+    className: 'max-w-160',
+  };
+  return <Page title="独立 CodeBlock 验收">
+    <Draft />
+    <div data-testid="default"><CodeBlock code={'<script>window.executed=true</script>\n' + 'abcdefgh'.repeat(60)} /></div>
+    <div data-testid="annotated"><CodeBlock {...settings} /></div>
+    <div className="flex gap-2">
+      <Button onClick={() => setLanguage('ts')}>启用高亮</Button>
+      <Button onClick={() => setInitialWrap(value => !value)}>修改初始换行</Button>
+      <Button onClick={() => setNumbered(value => !value)}>切换行号</Button>
+      <Button onClick={() => setHeader(value => value === false ? '重试策略' : false)}>切换标题栏</Button>
+      <Button onClick={() => setNext(value => !value)}>切换内容</Button>
+    </div>
+    <div data-testid="identical"><CodeBlock code={source} language="ts" annotationTarget="identical" /></div>
+    <div data-testid="unregistered"><CodeBlock code={source} language="ts" /></div>
+    <div data-testid="changing"><CodeBlock code={next ? '{"next":true}\n' : 'const before = 1;'} language={next ? 'json' : 'ts'} annotationTarget={next ? 'next' : 'before'} /></div>
+    <div data-testid="unknown"><CodeBlock code="const raw = 1;" language="unknown" /></div>
+    <div data-testid="bash"><CodeBlock code={'echo "hello"'} language="sh" /></div>
+    <div data-testid="explicit-header"><CodeBlock code="const explicit = true;" language="ts" header /></div>
+    {cases.map((code, index) => <div key={index} data-testid={`case-${index}`}><CodeBlock code={code} language={index % 2 ? undefined : 'ts'} lineNumbers annotationTarget={`case-${index}`} /></div>)}
+  </Page>;
+}
+
+export default definePanel({
+  id: 'code-block-verification',
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
+  input: z.object({ source: z.string(), cases: z.array(z.string()) }),
+  events: { 'annotations-submitted': resultSchema },
+  render: Panel,
+});

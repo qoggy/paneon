@@ -13,7 +13,7 @@ export default function Variants() {
  <U.Pagination aria-label="Single page"><U.PaginationContent><U.PaginationItem><U.PaginationLink href="#" isActive onClick={e=>e.preventDefault()}>Only page</U.PaginationLink></U.PaginationItem></U.PaginationContent></U.Pagination><section aria-label="Empty pagination">No results</section>
  <U.CodeBlock code={'<script>window.executed=true</script>\n  whitespace preserved'} language="unknown-language"/>
  {['javascript','js','typescript','ts','jsx','tsx','json','bash','sh','yaml','yml','diff'].map(language=><U.CodeBlock key={language} code={language==='json'?'{"value": 1}':language==='yaml'||language==='yml'?'value: 1':language==='diff'?'+ added\n- removed':'const value = 1'} language={language}/>)}
- <U.CodeBlock code={'x'.repeat(500)} />
+ <U.CodeBlock code={'x'.repeat(500)} defaultWrap={false} />
  <U.Markdown>{'<script>window.executed=true</script>\n\n<img src="https://invalid.example/test" onerror="window.executed=true"/>\n\n**Safe content**'}</U.Markdown>
  </U.Page>;
 }

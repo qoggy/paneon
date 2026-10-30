@@ -184,7 +184,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Popover`, `Tooltip` | Floating content, hover hint |
 | `DropdownMenu`, `ContextMenu` | Click menu, right-click menu |
 | `Separator` | Divider |
-| `CodeBlock` | Highlighted code |
+| `CodeBlock` | Read-only highlighted code with optional annotations |
 | `Markdown` | GFM Markdown, including Mermaid fences |
 | `Image` | Remote or local image |
 | `Mermaid` | Diagram |
@@ -194,12 +194,12 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](#annotations) |
 
 - `Select` needs `items` to display labels for values.
-- `CodeBlock` takes `code` and `language`: javascript/js, typescript/ts, jsx, tsx, json, bash/sh, yaml/yml, diff, python, java, css, html or markdown. Other languages render as plain text.
+- `CodeBlock`: `<CodeBlock code={source} language="ts" header="Retry strategy" />`. Only `code` is required. `header` defaults to `true` for the language title; pass a string for a custom title, or `false` to hide the title bar. Use `lineNumbers` when line references help the explanation, or `highlightedLines={{ start: 3, end: 5 }}` to emphasize a range (1-based, both endpoints included). Line numbers default to `false`; wrapping defaults to `true`, with `defaultWrap={false}` for initial horizontal scrolling. To collect feedback on code, see [annotations](#markdown-codeblock-and-diffview).
 - `Markdown` renders GFM without raw HTML. Replacing `pre` through `components` also drops Mermaid rendering.
 - `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath` and `className`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component.
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
 - `Mermaid` is bundled; never load Mermaid from a CDN.
-- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [Markdown and DiffView](#markdown-and-diffview).
+- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [annotations](#markdown-codeblock-and-diffview).
 
 ## Theme and language
 
@@ -319,9 +319,10 @@ type AnnotationAdapter<TRef> = {
 - `locate` restores the right page or view before highlighting. Ignore obsolete async responses.
 - `targetRanges` positions highlights for references that do not equal a registration, such as a line range within one diff side. Return `[]` when the source is not mounted; never search for the first matching quote.
 
-### Markdown and DiffView
+### Markdown, CodeBlock and DiffView
 
 - `<Markdown annotationTarget="plan-a">{source}</Markdown>` registers the document; the target becomes `ref` unchanged. Give each document its own target, even when texts are identical. Offsets address the Markdown source, so a quote can include Markdown syntax, and a selection across separate source fragments becomes several targets.
+- `<CodeBlock code={source} language="ts" annotationTarget="example-v1" />` registers the code with the same page session. Offsets address the exact original `code`, including CRLF/CR line endings. Use different targets for distinct snippets, and include a version for changing content.
 - `<DiffView oldText="before" newText="after" annotationTargets={{ old: refA, new: refB }} />` registers each side; its reference becomes `ref` unchanged. The two sides need different references. Omit a side to disable annotations on it. Offsets address that side's complete original string.
 - With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side. Page validation must accept annotations spanning both sides.
 - A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.

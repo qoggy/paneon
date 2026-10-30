@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { startFileReferenceFixture } from './file-reference-fixture.mjs';
+import { fileSourceCases, startFileReferenceFixture } from './file-reference-fixture.mjs';
 import {
   openAnnotationDirectory,
   selectAnnotationText,
@@ -150,6 +150,24 @@ try {
     }),
     true,
   );
+  await preview.getByRole('button', { name: /^(复制路径|Copy path)$/ }).press('Tab');
+  const keyboardFocus = await source.locator('pre').evaluate((element) => ({
+    focused: element === element.ownerDocument.activeElement,
+    visible: element.matches(':focus-visible'),
+    shadow: getComputedStyle(element).boxShadow,
+    outline: getComputedStyle(element).outlineStyle,
+  }));
+  assert.equal(keyboardFocus.focused && keyboardFocus.visible, true);
+  assert.notEqual(keyboardFocus.shadow, 'none', JSON.stringify(keyboardFocus));
+  assert.ok(keyboardFocus.shadow.includes('inset'), 'Focus ring stays inside the scrolling pane.');
+  if (process.env.PANEON_TEST_ARTIFACTS) {
+    await preview.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    await page.screenshot({
+      path: join(process.env.PANEON_TEST_ARTIFACTS, 'file-code-keyboard-focus.png'),
+    });
+  }
   const resize = preview.getByRole('button', { name: '调整文件预览宽度', exact: true });
   const before = (await preview.boundingBox()).width;
   await resize.press('ArrowLeft');
@@ -223,6 +241,64 @@ try {
   await open('相对路径');
   await source.getByText('export const changedOnDisk = true;', { exact: false }).waitFor();
   await close();
+
+  for (const example of fileSourceCases) {
+    await open(example.label);
+    await source.locator('[data-code-line="1"]').waitFor();
+    if (example.file.endsWith('.ts')) await source.locator('[data-shiki-token]').first().waitFor();
+    const displayed = example.text.replace(/\r\n?/g, '\n');
+    assert.equal(await source.locator('code').textContent(), displayed, example.label);
+    assert.equal(await source.locator('[data-code-line]').count(), displayed.split('\n').length);
+    assert.equal(await source.locator('[data-line-highlighted]').count(), example.anchor ? 2 : 0);
+    // A whitespace-only file has no visible text anchor for the contextual action.
+    if (displayed.trim()) {
+      await selectAnnotationText(
+        frame,
+        '[data-slot="file-preview-source"] code',
+        0,
+        displayed.length,
+      );
+      assert.equal(
+        await source.evaluate((el) => el.ownerDocument.getSelection().getRangeAt(0).toString()),
+        displayed,
+        'Selection boundaries retain all source characters and exclude CSS line numbers.',
+      );
+    }
+    await close();
+  }
+
+  const boundary = fileSourceCases[0];
+  const displayed = boundary.text.replace(/\r\n?/g, '\n');
+  await open(boundary.label);
+  await source.locator('[data-shiki-token]').first().waitFor();
+  await selectAnnotationText(
+    frame,
+    '[data-slot="file-preview-source"] code',
+    displayed.lastIndexOf('const repeated'),
+    displayed.length,
+  );
+  await frame.locator('[data-annotation-action]').click();
+  await frame.locator('[data-annotation-editor] textarea').fill('重复文本的第二处及末尾空行');
+  await frame.locator('[data-annotation-editor] textarea').press('Enter');
+  await close();
+  await submit();
+  const last = (await events()).at(-1).payload.annotations.at(-1);
+  assert.equal(last.comment, '重复文本的第二处及末尾空行');
+  assert.deepEqual(last.targets, [
+    {
+      ref: 'main',
+      sourceRef: {
+        path: join(await realpath(fixture.root), boundary.file),
+        snapshotId: 'sha256:' + createHash('sha256').update(boundary.text).digest('hex'),
+      },
+      text: {
+        start: boundary.text.lastIndexOf('const repeated'),
+        end: boundary.text.length,
+        quote: boundary.text.slice(boundary.text.lastIndexOf('const repeated')),
+      },
+    },
+  ]);
+
   assert.deepEqual(errors, []);
   console.log(
     'File references passed: path bases, Unicode, line ranges, focus return, resize, bounded read errors, reader snapshots, exact file annotations, retained-source locate and explicit edit/resubmit events.',

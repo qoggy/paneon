@@ -4,6 +4,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+export const fileSourceCases = [
+  {
+    file: 'source-boundaries.ts',
+    label: '空行与重复文本',
+    text: '// 中文🙂\r\n\rconst repeated = 1;\r\nconst repeated = 1;\r\n\r\n',
+    anchor: '#L3-L4',
+  },
+  {
+    file: 'source-no-eol.ts',
+    label: '没有末尾换行',
+    text: 'const title = "中文🙂";\n\nconst final = true;',
+    anchor: '',
+  },
+  { file: 'blank-lines.note', label: '连续空行', text: '\n\n\n', anchor: '' },
+];
+
 export async function startFileReferenceFixture() {
   const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
   const root = await mkdtemp(join(tmpdir(), 'paneon-file-references-'));
@@ -24,6 +40,7 @@ export async function startFileReferenceFixture() {
     await writeFile(join(root, 'empty.txt'), '');
     await writeFile(join(root, 'binary.bin'), Buffer.from([0, 1, 2]));
     await writeFile(join(root, 'large.txt'), Buffer.alloc(1024 * 1024 + 1, 65));
+    for (const example of fileSourceCases) await writeFile(join(root, example.file), example.text);
     const entry = join(root, 'panel.tsx');
     const markdown = [
       '# Markdown 文件引用',
@@ -37,6 +54,9 @@ export async function startFileReferenceFixture() {
       '## 异常情况',
       '[不存在](./missing.ts) · [空文件](./empty.txt) · [二进制](./binary.bin) · [过大文件](./large.txt) · [超出行号](./source.ts#L999) · [目录](./docs/)',
       '[中文路径](./文件%20名.ts#L1) · [CR 换行](./source-cr.ts#L2) · [纯文本与 CRLF](./plain.txt)',
+      fileSourceCases
+        .map(({ label, file, anchor }) => `[${label}](./${file}${anchor})`)
+        .join(' · '),
     ].join('\n\n');
     await writeFile(
       entry,

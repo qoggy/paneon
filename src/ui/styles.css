@@ -3,6 +3,7 @@
 @import './upstream-tailwind.css';
 @import './markdown-theme.css';
 @import './markdown-frontmatter.css';
+@import './code-block-primitives.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -146,28 +147,14 @@
   }
 }
 
-/* Keep the toolbar outside the code viewport and override GitHub's pre/code defaults. */
-:root .markdown-body [data-slot='markdown-code-block'] {
+/* Keep Markdown flow spacing while letting the bundled shadcn layers style code. */
+.markdown-body [data-slot='markdown-code-block'] {
   margin-bottom: 1rem;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  background: color-mix(in srgb, var(--muted) 60%, var(--background));
 }
 
-:root .markdown-body [data-slot='markdown-code-block'] > pre {
-  margin: 0;
-  padding: 0.25rem 1.25rem 1.25rem;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-:root .markdown-body [data-slot='markdown-code-block'][data-wrap='true'] > pre,
-:root .markdown-body [data-slot='markdown-code-block'][data-wrap='true'] > pre > code {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: normal;
+:root .markdown-body [data-slot='markdown-code-block'] [data-slot='code-block-content'],
+:root .markdown-body [data-slot='markdown-code-block'] [data-slot='code-block-code'] {
+  all: revert-layer;
 }
 
 [data-shiki-token] {

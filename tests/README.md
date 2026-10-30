@@ -31,6 +31,16 @@ the filesystem supports it. Package scripts still pack and install independently
 when run directly. Package contents, browser interactions and CLI assertions stay
 in their existing suites.
 
+`browser/code-block-pack.mjs` reuses the complete CodeBlock and Markdown highlighting
+interaction suites against the installed runtime from an external cwd. Its fresh
+browser pages block external HTTP(S) requests and fail if any are attempted, while
+retaining real copy/wrap controls, themes and exact annotation assertions. Run it
+through the release runner to isolate HOME, serialize clipboard use and clean up:
+
+```bash
+npm run test:release -- --phase=package --match=code-block-pack
+```
+
 The full Git layout suite runs through `git-review`, so the release runner omits
 its duplicate standalone invocation when both are selected. A targeted layout
 run still works, and the separate history/annotation assertions remain enabled.
