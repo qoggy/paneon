@@ -15,6 +15,13 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
   const [error, setError] = useState<string>();
   const [connected, setConnected] = useState<boolean>();
   const [missing, setMissing] = useState(false);
+  const definitionId = panel?.definitionId;
+  useEffect(() => {
+    document.title = definitionId ? `${definitionId} - paneon` : 'paneon';
+    return () => {
+      document.title = 'paneon';
+    };
+  }, [definitionId]);
   const refreshGeneration = useRef(0);
   const refresh = useCallback(() => {
     const generation = ++refreshGeneration.current;

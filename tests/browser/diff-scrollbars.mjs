@@ -18,6 +18,17 @@ const modified = original
   .replace('const line60 = 60;', 'const line60 = changed(60);')
   .replace('const line100', '// inserted first\n// inserted second\nconst line100')
   .replace('const line160 = 160;', 'const line160 = call(\n  first,\n  second,\n);');
+const shortOriginal = `export type ImageProps = {
+  src: string;
+  alt: string;
+  sourcePath?: string;
+  className?: string;
+};
+export function Image(props: ImageProps) { /* ... */ }`;
+const shortModified = shortOriginal
+  .replace('ImageProps =', 'ImageProps<TRef = JsonValue> =')
+  .replace('};', '  /** Annotation reference. */\n  annotationTarget?: TRef;\n};')
+  .replace('Image(props: ImageProps)', 'Image<TRef = JsonValue>(props: ImageProps<TRef>)');
 let service, browser;
 try {
   await mkdir(artifacts, { recursive: true });
@@ -30,11 +41,17 @@ try {
     import {Button, DiffView} from '@qoggy/paneon/ui';
     function Panel() {
       const [bounded, setBounded] = useState(true);
+      const [short, setShort] = useState(false);
+      const [swapped, setSwapped] = useState(false);
+      const before = short ? ${JSON.stringify(shortOriginal)} : ${JSON.stringify(original)};
+      const after = short ? ${JSON.stringify(shortModified)} : ${JSON.stringify(modified)};
       return <><Button onClick={() => setBounded(!bounded)}>Toggle document</Button>
+        <Button onClick={() => setShort(true)}>Short source</Button>
+        <Button onClick={() => setSwapped(!swapped)}>Swap sources</Button>
         <div data-test-host className={bounded ? 'flex h-[36rem] flex-col border' : 'border'}>
           <DiffView layout={bounded ? 'bounded' : 'document'}
             oldPath="source.ts" newPath="source.ts"
-            oldText={${JSON.stringify(original)}} newText={${JSON.stringify(modified)}} />
+            oldText={swapped ? after : before} newText={swapped ? before : after} />
         </div></>;
     }
     export default definePanel({id:'diff-scrollbars',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});
@@ -241,9 +258,55 @@ try {
     assert.equal(await thumb(side).isVisible(), false);
     assert.ok((await rail(side).locator('[data-diff-scrollbar-mark]').count()) > 0);
   }
+
+  await frame.getByRole('button', { name: 'Short source', exact: true }).click();
+  await frame.locator('[data-test-host]').evaluate((element) => {
+    element.style.height = '24rem';
+  });
+  async function assertShortOverview(side, kind) {
+    await settle();
+    const geometry = await source.evaluate(
+      (element, { side, kind }) => {
+        const table = element.querySelector(`[data-diff-table="${side}"]`);
+        const rows = [...table.querySelectorAll('tr')];
+        const rail = element.querySelector(`[data-diff-scrollbar="${side}"]`);
+        const modified = [...rail.querySelectorAll('[data-diff-scrollbar-mark="modify"]')];
+        const empty = rail.querySelector(`[data-diff-scrollbar-mark="${kind}"]`);
+        const boundary = table.querySelector('[data-line="6"]').closest('tr');
+        return {
+          maximum: rail.getAttribute('aria-valuemax'),
+          firstTop: modified[0].getBoundingClientRect().top - rows[0].getBoundingClientRect().top,
+          lastTop:
+            modified.at(-1).getBoundingClientRect().top - rows.at(-1).getBoundingClientRect().top,
+          lastBottom:
+            modified.at(-1).getBoundingClientRect().bottom - table.getBoundingClientRect().bottom,
+          emptyTop: empty.getBoundingClientRect().top - boundary.getBoundingClientRect().top,
+        };
+      },
+      { side, kind },
+    );
+    assert.equal(geometry.maximum, '0', 'The shorter source fits without scrolling.');
+    for (const [name, offset] of Object.entries(geometry)) {
+      if (name !== 'maximum') {
+        assert.ok(Math.abs(offset) < 1, `${side} ${name} stays aligned with its source: ${offset}`);
+      }
+    }
+  }
+  await assertShortOverview('old', 'add');
+  await source.screenshot({ path: join(artifacts, 'short-source.png') });
+  await frame.getByRole('button', { name: 'Swap sources', exact: true }).click();
+  await assertShortOverview('new', 'delete');
+  // The short side still fits when the other source needs vertical scrolling.
+  await frame.locator('[data-test-host]').evaluate((element) => {
+    element.style.height = '17rem';
+  });
+  await assertShortOverview('new', 'delete');
+  assert.ok(Number(await rail('old').getAttribute('aria-valuemax')) > 0);
+  await rail('old').press('End');
+  await assertShortOverview('new', 'delete');
   assert.deepEqual(errors, []);
   console.log(
-    'PASS Diff scrollbars: decorative marks, both thumb drags, track clicks, linked wheel/keyboard scrolling, source preservation, modes, resize and document layout.',
+    'PASS Diff scrollbars: decorative marks, both thumb drags, track clicks, linked wheel/keyboard scrolling, source preservation, modes, resize, document layout and short-source alignment.',
   );
 } finally {
   await browser?.close();

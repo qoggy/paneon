@@ -74,10 +74,11 @@ export function DiffScrollbars({
           thumb.style.top = `${maximum > 0 ? (current / maximum) * (next.height - size) : 0}px`;
           thumb.hidden = maximum === 0;
           const marks = rail.querySelectorAll<HTMLElement>('[data-diff-scrollbar-mark]');
+          // Compress long sources into the rail, but keep short sources at their actual size.
+          const scale = Math.min(1, next.height / total);
           markers[side].forEach(({ start, end }, index) => {
-            const height = Math.max(2, ((points[end] - points[start]) / total) * next.height);
-            marks[index].style.top =
-              `${Math.min((points[start] / total) * next.height, next.height - height)}px`;
+            const height = Math.max(2, (points[end] - points[start]) * scale);
+            marks[index].style.top = `${Math.min(points[start] * scale, next.height - height)}px`;
             marks[index].style.height = `${height}px`;
           });
         });
