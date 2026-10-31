@@ -17,6 +17,8 @@ Then pick the source by purpose. Built-in pages collect input or feedback on con
 1. A [built-in page](#built-in-pages) fits: run it with JSON input, without writing TSX.
 2. Otherwise write a [custom page](#custom-pages), for example an explanation of code, a mechanism or a plan, a data model diagram, a metrics view, or a control surface over a local CLI or HTTP service.
 
+Before writing page content, whether a custom page or a built-in page's input, and before revising a page after feedback, read [Presenting](references/presenting.md).
+
 ## Built-in pages
 
 `<skill>` stands for the absolute path of this skill directory.
