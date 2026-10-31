@@ -7,9 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
+### Added
+
+- Annotate whole images and Mermaid diagrams, including those embedded in Markdown and opened in expanded viewers.
+- Annotate page and section titles and descriptions, table titles, descriptions and numeric or boolean cells, and GitHub pull request titles.
+- Build custom pages with an enhanced `CodeBlock` supporting copy, word wrapping, line numbers, highlighted lines and annotations on the original source.
+- Navigate Markdown with an automatic heading outline that follows the reading position and adapts to the available width.
+- Check annotation coverage before sharing a page with `paneon panel check-annotations <entry.tsx>`.
+
 ### Changed
 
 - **Breaking:** File review replaces the Markdown review panel. Run `assets/panels/file-review/panel.tsx` with optional `title` and `files: string[]` instead of the old `review` entry and `markdownFilePath`. Review Markdown, code and configuration together, retain annotations across files, and consume `file-review-submitted` with annotations nested under each file's absolute path and snapshot. Historical events and existing instances are not migrated.
+- **Breaking:** Diff review now nests annotations under `files` instead of publishing separate `annotations` and `sources`. GitHub PR feedback nests annotations under a `sources` array instead of a source map and separate annotations. Table feedback omits annotation IDs, and Git review line targets include their source text directly instead of `textRef` references. Update consumers of these events for the new formats.
+- Use a consistent code block presentation across Markdown, linked file previews and custom pages.
+- Identify each panel's browser tab by its definition name.
+- Expand the bundled agent skill with guidance for presenting explanations, choosing visual formats and revising pages after feedback.
+
+### Fixed
+
+- Preserve saved annotations for submission when their content is no longer displayed, such as after switching tabs or closing a section.
+- Wait for annotation targets to be revealed and scrolling to settle before opening their editor. Prevent conflicting annotation actions and linked-file navigation from discarding or implicitly saving an open edit.
+- Align diff scrollbar change markers with the content when a source is shorter than the viewport.
 
 ## [0.1.0] - 2026-10-30
 
@@ -58,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.1.0...0.1.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.2.0...0.2.x
+[0.2.0]: https://github.com/qoggy/paneon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/qoggy/paneon/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/qoggy/paneon/releases/tag/v0.0.1
