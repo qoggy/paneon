@@ -306,7 +306,7 @@ function FormPanel() {
 }
 export default definePanel({
   id: 'form',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: formParamsSchema,
   events: { 'form-submitted': formSubmittedSchema },
   render: FormPanel,

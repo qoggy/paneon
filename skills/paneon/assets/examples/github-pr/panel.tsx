@@ -1201,7 +1201,7 @@ function GithubPR() {
 }
 export default definePanel({
   id: 'github-pr',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: githubPRParamsSchema,
   events: {
     'review-requested': prReviewRequestedSchema,

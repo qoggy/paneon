@@ -596,7 +596,7 @@ function DiffReviewPanel() {
 
 export default definePanel({
   id: 'diff-review',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: diffReviewParamsSchema,
   events: { 'diff-review-submitted': diffReviewSubmittedSchema },
   render: DiffReviewPanel,

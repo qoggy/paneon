@@ -443,7 +443,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: tableParamsSchema,
   events: { 'table-submitted': tableSubmittedSchema },
   render: TablePanel,

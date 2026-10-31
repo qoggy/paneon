@@ -6,20 +6,24 @@ import { test } from 'node:test';
 import { validateRequirement } from '../dist/compiler/index.js';
 import { PACKAGE_VERSION, copyPanelFixtures, readPanelFixture } from './panel-fixture.ts';
 
-void test('browser fixture templates follow the current package and future release versions', async () => {
+// Synthetic versions are fixed test data; only PACKAGE_VERSION follows releases.
+const FIXTURE_VERSIONS = [PACKAGE_VERSION, '0.2.0', '0.3.0'];
+const UNSUPPORTED_VERSION = '0.0.0';
+
+void test('browser fixture templates follow the current package and synthetic versions', async () => {
   const directory = new URL('./browser/', import.meta.url);
   const templates = (await readdir(directory)).filter((name) => name.endsWith('-fixture.txt'));
   assert.ok(templates.length > 0);
   for (const name of templates) {
     const path = new URL(name, directory);
-    for (const version of [PACKAGE_VERSION, '0.1.0', '0.2.0']) {
+    for (const version of FIXTURE_VERSIONS) {
       const source = await readPanelFixture(path, version);
       assert.equal(
         validateRequirement('fixture.tsx', version, () => source),
         version,
         name,
       );
-      assert.throws(() => validateRequirement('fixture.tsx', '0.0.0', () => source), {
+      assert.throws(() => validateRequirement('fixture.tsx', UNSUPPORTED_VERSION, () => source), {
         code: 'PANEON_VERSION_UNSUPPORTED',
       });
     }
@@ -39,7 +43,7 @@ void test('copied acceptance fixtures resolve versions without changing their so
     const originals = await Promise.all(
       panels.map((name) => readFile(new URL(name, source), 'utf8')),
     );
-    for (const version of [PACKAGE_VERSION, '0.1.0', '0.2.0']) {
+    for (const version of FIXTURE_VERSIONS) {
       const destination = join(root, version);
       await copyPanelFixtures(source, destination, version);
       for (const name of panels)

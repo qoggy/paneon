@@ -31,6 +31,15 @@ const execute = promisify(execFile);
 const packageRoot = join(import.meta.dirname, '..');
 const builtCli = join(packageRoot, 'dist/cli/index.js');
 const sourceCli = join(packageRoot, 'src/cli/index.ts');
+
+// Synthetic versions exercise compatibility independently of the release version.
+const TEST_VERSION = '0.2.0';
+const UPGRADED_VERSION = '0.2.1';
+const NEXT_MINOR_VERSION = '0.3.0';
+const TEST_RANGE = `>=${TEST_VERSION} <${NEXT_MINOR_VERSION}`;
+const PRERELEASE_VERSION = `${TEST_VERSION}-beta.1`;
+const LATER_PRERELEASE_VERSION = `${TEST_VERSION}-beta.2`;
+const PRERELEASE_RANGE = `>=${PRERELEASE_VERSION} <${TEST_VERSION}`;
 type Envelope = {
   ok: boolean;
   data?: Record<string, unknown>;
@@ -185,22 +194,22 @@ void test('semver preflight covers 0.x, prereleases, missing/empty/illegal/dynam
   const entry = join(root, 'panel.tsx');
   const marker = join(root, 'must-not-execute');
   try {
-    const valid = source('semver', '>=0.0.0 <0.1.0', { moduleMarker: marker });
+    const valid = source('semver', TEST_RANGE, { moduleMarker: marker });
     writeFileSync(entry, valid);
-    assert.equal(validateRequirement(entry, '0.0.1'), '>=0.0.0 <0.1.0');
-    assert.throws(() => validateRequirement(entry, '0.1.0'), {
+    assert.equal(validateRequirement(entry, TEST_VERSION), TEST_RANGE);
+    assert.throws(() => validateRequirement(entry, NEXT_MINOR_VERSION), {
       code: 'PANEON_VERSION_UNSUPPORTED',
     });
-    assert.throws(() => validateRequirement(entry, '0.0.1-beta.1'), {
+    assert.throws(() => validateRequirement(entry, PRERELEASE_VERSION), {
       code: 'PANEON_VERSION_UNSUPPORTED',
     });
-    writeFileSync(entry, valid.replace('>=0.0.0 <0.1.0', '>=0.0.1-beta.1 <0.0.1'));
-    assert.equal(validateRequirement(entry, '0.0.1-beta.2'), '>=0.0.1-beta.1 <0.0.1');
+    writeFileSync(entry, valid.replace(TEST_RANGE, PRERELEASE_RANGE));
+    assert.equal(validateRequirement(entry, LATER_PRERELEASE_VERSION), PRERELEASE_RANGE);
     const badSources = [
-      valid.replace('requires:{paneon:">=0.0.0 <0.1.0"},', ''),
-      valid.replace('>=0.0.0 <0.1.0', ''),
-      valid.replace('>=0.0.0 <0.1.0', 'not-a-semver-range'),
-      valid.replace('paneon:">=0.0.0 <0.1.0"', 'paneon:process.env.PANEON_RANGE'),
+      valid.replace(`requires:{paneon:${JSON.stringify(TEST_RANGE)}},`, ''),
+      valid.replace(TEST_RANGE, ''),
+      valid.replace(TEST_RANGE, 'not-a-semver-range'),
+      valid.replace(`paneon:${JSON.stringify(TEST_RANGE)}`, 'paneon:process.env.PANEON_RANGE'),
     ];
     for (const bad of badSources) {
       writeFileSync(entry, bad);
@@ -456,8 +465,6 @@ void test(
   'a copied upgraded package rebuilds on first use and preserves incompatible instance history',
   { timeout: 120000 },
   async () => {
-    const oldVersion = '0.0.0';
-    const upgradedVersion = '0.0.1';
     const root = directory('paneon-upgrade-');
     const home = join(root, 'home');
     mkdirSync(home);
@@ -469,11 +476,11 @@ void test(
     const called = join(root, 'handler-called');
     writeFileSync(
       exact,
-      source('exact', oldVersion, { marker: called, moduleMarker: exactLoaded }),
+      source('exact', TEST_VERSION, { marker: called, moduleMarker: exactLoaded }),
     );
     writeFileSync(
       broad,
-      source('broad', '>=0.0.0 <0.1.0', { marker: called, moduleMarker: broadLoaded }),
+      source('broad', TEST_RANGE, { marker: called, moduleMarker: broadLoaded }),
     );
     const copyPackage = (version: string, name: string) => {
       const copy = join(root, name);
@@ -487,7 +494,7 @@ void test(
       symlinkSync(join(packageRoot, 'node_modules'), join(copy, 'node_modules'), 'dir');
       return copy;
     };
-    const oldPackage = copyPackage(oldVersion, 'old-package');
+    const oldPackage = copyPackage(TEST_VERSION, 'old-package');
     const oldCli = join(oldPackage, 'dist/cli/index.js');
     const old = (args: string[]) => cli(home, args, oldCli);
     let upgraded: ChildProcess | undefined;
@@ -520,7 +527,7 @@ void test(
       const exactEvaluations = readFileSync(exactLoaded, 'utf8');
       const broadEvaluations = readFileSync(broadLoaded, 'utf8');
       await stop(home, oldCli);
-      const copy = copyPackage(upgradedVersion, 'upgraded-package');
+      const copy = copyPackage(UPGRADED_VERSION, 'upgraded-package');
       const upgradedCli = join(copy, 'dist/cli/index.js');
       upgraded = spawn(process.execPath, [join(copy, 'dist/runtime/index.js')], {
         env: { ...process.env, HOME: home },
@@ -532,11 +539,11 @@ void test(
         'upgraded service did not publish a descriptor',
         45000,
       );
-      assert.equal(descriptor(home).paneonVersion, upgradedVersion);
+      assert.equal(descriptor(home).paneonVersion, UPGRADED_VERSION);
       const coldExact = await cli(home, ['panel', 'inspect', exactId], upgradedCli);
       const coldBroad = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
-      assert.equal(coldExact.result.data?.paneonVersion, oldVersion);
-      assert.equal(coldBroad.result.data?.paneonVersion, oldVersion);
+      assert.equal(coldExact.result.data?.paneonVersion, TEST_VERSION);
+      assert.equal(coldBroad.result.data?.paneonVersion, TEST_VERSION);
       assert.equal(readFileSync(exactLoaded, 'utf8'), exactEvaluations);
       assert.equal(readFileSync(broadLoaded, 'utf8'), broadEvaluations);
       const upgradedDescriptor = descriptor(home);
@@ -554,7 +561,7 @@ void test(
         'PANEON_VERSION_UNSUPPORTED',
       );
       assert.equal(incompatible.result.data?.revision, created[0]?.revision);
-      assert.equal(incompatible.result.data?.paneonVersion, oldVersion);
+      assert.equal(incompatible.result.data?.paneonVersion, TEST_VERSION);
       assert.equal(readFileSync(exactLoaded, 'utf8'), exactEvaluations);
       const events = await cli(
         home,
@@ -574,15 +581,15 @@ void test(
       );
       const compatible = await cli(home, ['panel', 'inspect', broadId], upgradedCli);
       assert.equal(compatible.result.data?.status, 'running');
-      assert.equal(compatible.result.data?.paneonVersion, upgradedVersion);
+      assert.equal(compatible.result.data?.paneonVersion, UPGRADED_VERSION);
       assert.notEqual(compatible.result.data?.revision, created[1]?.revision);
       assert.ok(readFileSync(broadLoaded, 'utf8').length > broadEvaluations.length);
       const current = descriptor(home);
       const detail = await request(current, `/api/panels/${broadId}`);
       const manifest = detail.data?.manifest as Manifest;
-      assert.equal(manifest.paneonVersion, upgradedVersion);
+      assert.equal(manifest.paneonVersion, UPGRADED_VERSION);
       assert.equal(manifest.revision, compatible.result.data?.revision);
-      assert.equal(manifest.requires.paneon, '>=0.0.0 <0.1.0');
+      assert.equal(manifest.requires.paneon, TEST_RANGE);
       assert.ok(manifest.inputSchema);
       assert.equal(existsSync(called), false);
       assert.equal(

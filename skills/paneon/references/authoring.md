@@ -44,7 +44,7 @@ function Review() {
 
 export default definePanel({
   id: 'review-panel',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: z.object({ topic: z.string() }),
   events: { 'review-requested': z.object({ topic: z.string() }) },
   render: Review,
@@ -56,7 +56,7 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 ```
 
 - `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
-- `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.1.0 <0.2.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
+- `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.2.0 <0.3.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
 ## Deliver events
 
@@ -239,7 +239,7 @@ function Panel() {
 
 export default definePanel({
   id: 'custom-annotations',
-  requires: { paneon: '>=0.1.0 <0.2.0' },
+  requires: { paneon: '>=0.2.0 <0.3.0' },
   input: z.object({}).strict(),
   events: { 'annotations-submitted': resultSchema },
   render: Panel,
