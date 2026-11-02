@@ -147,6 +147,10 @@ const en = {
   'Questionnaire description': 'Questionnaire description',
   问卷说明: 'Questionnaire description',
   'Answer summary': 'Answer summary',
+  'Question directory': 'Question directory',
+  Questions: 'Questions',
+  Answered: 'Answered',
+  Unanswered: 'Unanswered',
   答案汇总: 'Answer summary',
   'Multiple choice': 'Multiple choice',
   多选: 'Multiple choice',
@@ -174,8 +178,9 @@ const en = {
   我的答案: 'My answer',
   'Write your own answer…': 'Write your own answer…',
   '填写自己的答案…': 'Write your own answer…',
-  'Draft kept. Select Other to include it.': 'Draft kept. Select Other to include it.',
-  '草稿已保留。选择“其他”以包含它。': 'Draft kept. Select Other to include it.',
+  'Draft kept. Select Other to include it.':
+    'This answer is not selected and will not be submitted.',
+  '草稿已保留。选择“其他”以包含它。': 'This answer is not selected and will not be submitted.',
   Answers: 'Answers',
   答案: 'Answers',
   answered: 'answered',
@@ -213,9 +218,9 @@ const en = {
   提交表单: 'Submit form',
   'Annotations submitted.': 'Annotations submitted.',
   'Saved as event {id}. Edit and explicitly submit again to save a correction.':
-    'Saved as event {id}. Edit and explicitly submit again to save a correction.',
+    'Submitted. Submit again if you make changes.',
   '已保存为事件 {id}。修改后请再次明确提交以保存更正。':
-    'Saved as event {id}. Edit and explicitly submit again to save a correction.',
+    'Submitted. Submit again if you make changes.',
   'Not saved. {error} The draft is still available.':
     'Not saved. {error} The draft is still available.',
   '未保存。{error} 草稿仍可使用。': 'Not saved. {error} The draft is still available.',
@@ -649,7 +654,7 @@ const en = {
   'deleted user': 'deleted user',
   'No newline at end of file': 'No newline at end of file',
   'Close details: {label}': 'Close details: {label}',
-  'Not answered': 'Not answered',
+  'Not answered': 'Unanswered',
   'Enter your own answer': 'Enter your own answer',
   'Incomplete answer': 'Incomplete answer',
   'Edit answer: {question}': 'Edit answer: {question}',

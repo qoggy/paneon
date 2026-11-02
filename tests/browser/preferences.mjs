@@ -59,7 +59,7 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
   await ff.getByRole('button', { name: 'Submit form', exact: true }).click();
   await ff
     .getByRole('status')
-    .getByText(/Saved as event/)
+    .getByText('Submitted. Submit again if you make changes.', { exact: true })
     .waitFor();
   const probe = await context.newPage();
   await probe.goto(f.url(custom));
@@ -138,7 +138,12 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
     );
     await ff
       .getByRole('status')
-      .getByText(language === 'en' ? /Saved as event/ : /已保存为事件/)
+      .getByText(
+        language === 'en'
+          ? 'Submitted. Submit again if you make changes.'
+          : '已提交。修改后需再次提交。',
+        { exact: true },
+      )
       .waitFor();
     assert.equal(
       await token.evaluate((element) => element.firstChild === window.__originalToken),

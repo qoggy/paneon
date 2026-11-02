@@ -26,6 +26,14 @@ import {
   usePageAnnotations,
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  X,
+} from '../../shared/icons';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   cellText,
@@ -103,7 +111,7 @@ function DataTable({
                 aria-label={t('清除搜索')}
                 onClick={() => update({ ...view, search: '' })}
               >
-                <span aria-hidden="true">×</span>
+                <X />
               </Button>
             )}
           </div>
@@ -150,14 +158,14 @@ function DataTable({
               type="button"
               size="xs"
               variant="outline"
-              className="h-auto min-h-7 max-w-full whitespace-normal"
+              className="h-auto min-h-7 max-w-full whitespace-normal has-[>svg]:px-2"
               aria-label={t('Remove filter {label}', { label: column.label })}
               onClick={() => removeFilter(column.key)}
             >
               <span className="min-w-0 text-left break-all">
                 {column.label}：{view.filters[column.key]}
               </span>
-              <span aria-hidden="true">×</span>
+              <X className="size-4" />
             </Button>
           ))}
           <Button type="button" size="xs" variant="ghost" onClick={() => update(initialView)}>
@@ -209,9 +217,15 @@ function DataTable({
                         })
                       }
                     >
-                      <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
-                        {view.sort?.key === column.key ? (view.sort.descending ? '↓' : '↑') : '↕'}
-                      </span>
+                      {view.sort?.key === column.key ? (
+                        view.sort.descending ? (
+                          <ArrowDown />
+                        ) : (
+                          <ArrowUp />
+                        )
+                      ) : (
+                        <ChevronsUpDown />
+                      )}
                     </Button>
                   </div>
                 </TableHead>
@@ -275,7 +289,7 @@ function DataTable({
                 disabled={currentPage === 0}
                 onClick={() => setPage(currentPage - 1)}
               >
-                <span aria-hidden="true">‹</span>
+                <ChevronLeft />
               </Button>
             </PaginationItem>
             <PaginationItem>
@@ -292,7 +306,7 @@ function DataTable({
                 disabled={currentPage + 1 >= pageCount}
                 onClick={() => setPage(currentPage + 1)}
               >
-                <span aria-hidden="true">›</span>
+                <ChevronRight />
               </Button>
             </PaginationItem>
           </PaginationContent>
@@ -418,7 +432,7 @@ function TablePanel() {
                   className="max-h-[min(28rem,var(--available-height))] w-96 max-w-[calc(100vw-2rem)] overflow-auto"
                   aria-label={t('表格说明')}
                 >
-                  <Markdown annotationTarget={{ kind: 'description' }}>
+                  <Markdown className="bg-transparent!" annotationTarget={{ kind: 'description' }}>
                     {params.description}
                   </Markdown>
                 </PopoverContent>

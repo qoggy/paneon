@@ -106,23 +106,20 @@ try {
   const contextBox = await frame
     .getByRole('heading', { name: choices.title, exact: true })
     .boundingBox();
-  const progressBox = await frame.getByText('1 / 3', { exact: true }).boundingBox();
+  assert.equal(await frame.getByText('1 / 3', { exact: true }).count(), 0);
   const headingBox = await frame
     .getByRole('heading', { name: 'Storage', exact: true })
     .boundingBox();
   const descriptionBox = await description.boundingBox();
-  assert.ok(contextBox && progressBox && headingBox && descriptionBox);
+  assert.ok(contextBox && headingBox && descriptionBox);
   assert.ok(
-    Math.abs(contextBox.y - progressBox.y) <= 2,
-    'Short context and progress share one row.',
-  );
-  assert.ok(
-    descriptionBox.y > progressBox.y && headingBox.y > descriptionBox.y,
+    descriptionBox.y > contextBox.y && headingBox.y > descriptionBox.y,
     'Readable body description sits between compact context and question.',
   );
   await screenshot('choose-description-desktop.png');
   const choiceLayout = await frame.locator('main').evaluate((element) => {
     const main = element.getBoundingClientRect();
+    const content = element.querySelector('[data-choice-content]').getBoundingClientRect();
     const row = element.querySelector('[data-choice-option] > label').getBoundingClientRect();
     const custom = element.querySelector('[data-custom-answer] textarea').getBoundingClientRect();
     const actions = element.querySelector('[data-choice-actions]');
@@ -130,37 +127,36 @@ try {
       button.getBoundingClientRect(),
     );
     return {
-      width: main.width,
+      width: content.width,
       centered: Math.abs(main.left * 2 + main.width - innerWidth),
       rowHeight: row.height,
       customHeight: custom.height,
       actionsAligned:
-        Math.abs(previous.left - main.left - 16) <= 2 &&
-        Math.abs(next.right - main.right + 16) <= 2,
+        Math.abs(previous.left - content.left) <= 2 && Math.abs(next.right - content.right) <= 2,
     };
   });
   assert.ok(
     choiceLayout.width >= 480 && choiceLayout.width <= 640,
-    'Desktop uses a narrow column.',
+    'Desktop keeps a narrow question column beside the directory.',
   );
-  assert.ok(choiceLayout.centered <= 2, 'Questionnaire is centered inside its own iframe.');
+  assert.ok(choiceLayout.centered <= 2, 'Directory and question layout is centered in its iframe.');
   assert.ok(choiceLayout.rowHeight <= 80, 'A short choice stays a compact row.');
   assert.ok(choiceLayout.customHeight <= 44, 'An empty custom answer is a compact input.');
   assert.equal(choiceLayout.actionsAligned, true, 'Previous and Next align to opposite edges.');
   await screenshot('choose-desktop.png');
   await next();
   await frame.getByRole('heading', { name: 'Features', exact: true }).waitFor();
-  await frame.getByText('2 / 3', { exact: true }).waitFor();
+  assert.equal(await frame.getByText('2 / 3', { exact: true }).count(), 0);
   assert.equal(await frame.getByRole('alert').count(), 0, 'Unanswered questions allow browsing.');
   await next();
   await frame.getByRole('heading', { name: 'Delivery', exact: true }).waitFor();
   await next();
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   await frame.getByRole('region', { name: 'Answer summary', exact: true }).waitFor();
   assert.equal(await frame.getByText(/4 \/ 3/).count(), 0);
   const emptySummary = frame.getByRole('region', { name: 'Answer summary' });
   await emptySummary.getByText('0 / 3 answered', { exact: true }).waitFor();
-  assert.equal(await emptySummary.getByText('Not answered', { exact: true }).count(), 3);
+  assert.equal(await emptySummary.getByText('Unanswered', { exact: true }).count(), 3);
   await screenshot('choose-unanswered-review-desktop.png');
   await page.setViewportSize({ width: 390, height: 844 });
   await screenshot('choose-unanswered-review-mobile.png');
@@ -170,12 +166,12 @@ try {
     await frame.getByRole('alert').innerText(),
     'Complete all answers before submitting (3 incomplete).',
   );
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   await until(
     () => frame.getByRole('alert').evaluate((element) => element === document.activeElement),
     'Invalid submission focuses the inline summary error.',
   );
-  assert.equal(await emptySummary.getByText('Not answered', { exact: true }).count(), 3);
+  assert.equal(await emptySummary.getByText('Unanswered', { exact: true }).count(), 3);
   await emptySummary.getByRole('button', { name: 'Edit answer: Storage', exact: true }).click();
   assert.equal((await fixture.events(fixture.choose)).length, 0);
   await next();
@@ -280,7 +276,9 @@ try {
   assert.equal(await note('SQLite').count(), 0);
   await radio('SQLite').check();
   assert.equal(await mine().inputValue(), 'Temporary custom draft');
-  await frame.getByText('Draft kept. Select Other to include it.', { exact: true }).waitFor();
+  await frame
+    .getByText('This answer is not selected and will not be submitted.', { exact: true })
+    .waitFor();
   assert.equal(await note('SQLite').inputValue(), '  Keep backups 中文🙂  ');
   const nestedComment = await note('SQLite').evaluate((element) =>
     element.closest('[data-slot="card"]').textContent.includes('SQLite'),
@@ -335,7 +333,7 @@ try {
     await frame.getByRole('alert').innerText(),
     'Complete all answers before submitting (2 incomplete).',
   );
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   await frame.getByRole('button', { name: 'Edit answer: Features', exact: true }).click();
   assert.equal((await fixture.events(fixture.choose)).length, 0);
   assert.equal(await checkbox('Feature A').isChecked(), true);
@@ -350,7 +348,9 @@ try {
   await mine().fill('  Extra feature  ');
   await checkbox('Other').uncheck();
   assert.equal(await mine().inputValue(), '  Extra feature  ');
-  await frame.getByText('Draft kept. Select Other to include it.', { exact: true }).waitFor();
+  await frame
+    .getByText('This answer is not selected and will not be submitted.', { exact: true })
+    .waitFor();
   await checkbox('Other').check();
   await previous();
   assert.equal(await note('SQLite').inputValue(), '  Keep backups 中文🙂  ');
@@ -389,7 +389,7 @@ try {
   assert.equal(await frame.getByRole('alert').count(), 0);
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   await frame.getByRole('alert').waitFor();
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   await frame.getByRole('button', { name: 'Edit answer: Delivery', exact: true }).click();
   assert.equal(await mine().inputValue(), '   ');
   // Typing and then clearing an active custom answer must not restore an old supplied selection.
@@ -397,7 +397,7 @@ try {
   await mine().fill('');
   assert.equal(await radio('Other').isChecked(), true);
   await next();
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   await frame
     .getByRole('region', { name: 'Answer summary' })
     .getByText('Enter your own answer', { exact: true })
@@ -415,7 +415,7 @@ try {
   await frame.getByRole('button', { name: 'Edit answer: Delivery', exact: true }).click();
   await mine().fill('  Internal center  ');
   await next();
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
   assert.equal(
     await frame.getByRole('radio').count(),
     0,

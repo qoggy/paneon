@@ -199,9 +199,11 @@ try {
     .getByText(choices.description, { exact: true })
     .waitFor();
   assert.equal(await summary.locator('[data-answer-incomplete="true"]').count(), 2);
+  assert.equal(await summary.locator('[data-answer-error="true"]').count(), 0);
+  assert.equal(await summary.getByText('!', { exact: true }).count(), 0);
   await summary.getByText('Feature A', { exact: true }).waitFor();
   await summary.getByText('Keep this explanation too', { exact: true }).waitFor();
-  assert.equal(await summary.getByText('Not answered', { exact: true }).count(), 1);
+  assert.equal(await summary.getByText('Unanswered', { exact: true }).count(), 1);
   assert.equal(await summary.getByText('Enter your own answer', { exact: true }).count(), 1);
   assert.equal(await summary.getByText('No answer', { exact: true }).count(), 0);
   assert.equal(await summary.getByText('Incomplete answer', { exact: true }).count(), 0);
@@ -215,7 +217,8 @@ try {
     .getByRole('alert')
     .getByText('Complete all answers before submitting (2 incomplete).', { exact: true })
     .waitFor();
-  await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
+  assert.equal(await summary.locator('[data-answer-error="true"]').count(), 2);
   assert.equal(await mine().count(), 0);
   assert.equal((await fixture.events(round)).length, 0);
 
@@ -239,12 +242,18 @@ try {
     await frame.locator(`html[lang="${language}"][data-theme="${theme}"]`).waitFor();
     await frame
       .getByRole('heading', {
-        name: language === 'en' ? 'Review all answers' : '检查全部答案',
+        name: language === 'en' ? 'Answer summary' : '答案汇总',
         exact: true,
       })
       .waitFor();
     assert.equal(
-      await frame.getByText(language === 'en' ? 'Not answered' : '未回答', { exact: true }).count(),
+      await frame
+        .getByRole('region', {
+          name: language === 'en' ? 'Answer summary' : '答案汇总',
+          exact: true,
+        })
+        .getByText(language === 'en' ? 'Unanswered' : '未答', { exact: true })
+        .count(),
       1,
     );
     assert.equal(
@@ -258,7 +267,10 @@ try {
     assert.equal(await frame.getByText(/^(Single choice|Multiple choice|单选|多选)/).count(), 0);
     for (const width of widths) await checkDetails(width, language);
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await button(language === 'en' ? 'Return to summary' : '返回汇总').click();
+    await frame
+      .getByRole('navigation', { name: language === 'en' ? 'Question directory' : '问题目录' })
+      .getByRole('button', { name: language === 'en' ? 'Answer summary' : '答案汇总', exact: true })
+      .click();
     for (const width of widths) {
       await page.setViewportSize({ width, height: 1000 });
       assert.equal(
@@ -312,8 +324,11 @@ try {
       await mine().fill('Additional feature');
     }
     if (title === 'Delivery') await mine().fill('Custom delivery');
-    await button('Return to summary').click();
-    await frame.getByRole('heading', { name: 'Review all answers', exact: true }).waitFor();
+    await frame
+      .getByRole('navigation', { name: 'Question directory', exact: true })
+      .getByRole('button', { name: 'Answer summary', exact: true })
+      .click();
+    await frame.getByRole('heading', { name: 'Answer summary', exact: true }).waitFor();
     assert.equal((await fixture.events(round)).length, 0);
   }
   await summary.getByText('3 / 3 answered', { exact: true }).waitFor();

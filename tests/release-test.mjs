@@ -72,6 +72,7 @@ const browserScripts = [
   'markdown-highlighting',
   'code-block',
   'markdown-anchors',
+  'markdown-layout',
   'markdown-images',
   'file-references',
   'local-resources',

@@ -99,7 +99,7 @@ function Preview({
       </EmptyHeader>
     </Empty>
   ) : isMarkdown(snapshot.path) ? (
-    <div className="p-4">
+    <div className="min-h-full bg-markdown-background p-4">
       <Markdown sourcePath={snapshot.path} annotationTarget={target}>
         {snapshot.text}
       </Markdown>

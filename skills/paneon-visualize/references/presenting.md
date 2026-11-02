@@ -64,7 +64,7 @@ When the options of one decision depend on the answer to another, ask the first 
 ## Iterate after feedback
 
 - Ask the human about anything unclear.
-- Apply clear feedback directly to the existing content, so the page always shows the current recommendation. Edit a custom page's source in place; run a built-in page again with revised input.
+- Apply clear feedback directly to the existing content, so the page always shows the current recommendation.
 - Keep replies and history out of the page. A section answering each annotation, or a revised plan placed beside the old one, makes the human untangle versions instead of reading the plan. Summarize what changed in a sentence or two in chat when it helps.
 
 ## Write the text

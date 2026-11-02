@@ -26,6 +26,7 @@ Input:
 - `title`: optional string.
 - `files`: nonempty. Each entry has `oldPath` and `newPath` (relative to `--cwd`, or absolute; UTF-8 files) and an optional `displayPath` for the tree, defaulting to the old file's name, else the new one's.
 - `null` means that side is absent: `oldPath: null` is an added file, `newPath: null` a deleted one. Both cannot be `null`. A path that does not exist is shown as an error, not as an absent side.
+- Both sides are read each time the page loads, so a reload of the same URL shows their current content and discards unsubmitted annotations.
 
 `diff-review-submitted` contains complete feedback grouped by file pair as read:
 

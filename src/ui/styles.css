@@ -9,6 +9,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-markdown-background: var(--markdown-background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -46,6 +47,7 @@
 }
 
 :root {
+  --markdown-background: #ffffff;
   --diff-delete: #eeeeee;
   --diff-add: #e8f7e8;
   --diff-modify: #e7effa;
@@ -93,6 +95,7 @@
 }
 
 .dark {
+  --markdown-background: #0d1117;
   --diff-delete: #303033;
   --diff-add: #20382a;
   --diff-modify: #253448;

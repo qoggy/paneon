@@ -95,7 +95,12 @@ try {
       toastBox.y + toastBox.height <= launcherBox.y - 8,
       'Toast stays above the floating entry',
     );
-    assert.equal(await frame.getByText(/Saved as event|已保存为事件/).count(), 0);
+    assert.equal(
+      await frame
+        .getByText(/Submitted\. Submit again if you make changes\.|已提交。修改后需再次提交。/)
+        .count(),
+      0,
+    );
     const [first] = await fixture.events(panel);
     const annotations = (event) =>
       event.type === 'git-review-submitted' || event.type === 'file-review-submitted'
@@ -123,7 +128,12 @@ try {
       assert.equal('id' in annotations(events[1])[0], false);
     else assert.equal(annotations(events[1])[0].id, annotations(first)[0].id);
     assert.equal(events[1].payload.replacesEventId, replacesEvent ? first.id : undefined);
-    assert.equal(await frame.getByText(/Saved as event|已保存为事件/).count(), 0);
+    assert.equal(
+      await frame
+        .getByText(/Submitted\. Submit again if you make changes\.|已提交。修改后需再次提交。/)
+        .count(),
+      0,
+    );
     console.log(`PASS ${first.type}: failure, receipt-only toast, retained draft and correction`);
     if (replacesEvent) {
       await toast.locator('[data-slot="toast-close"]').click();
@@ -192,7 +202,10 @@ try {
     await frame.getByRole('button', { name: 'Next', exact: true }).click();
   }
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
-  await frame.getByRole('status').filter({ hasText: 'Saved as event' }).waitFor();
+  await frame
+    .getByRole('status')
+    .getByText('Submitted. Submit again if you make changes.', { exact: true })
+    .waitFor();
   assert.equal(await frame.locator('[data-slot="toast"]').count(), 0);
   assert.equal(
     await frame.locator('[data-annotation-launcher]').count(),
@@ -204,7 +217,10 @@ try {
   await frame.getByLabel('Project name', { exact: false }).fill('Toast scope');
   await frame.getByRole('radio', { name: 'Normal', exact: true }).check();
   await frame.getByRole('button', { name: 'Submit form', exact: true }).click();
-  await frame.getByRole('status').filter({ hasText: 'Saved as event' }).waitFor();
+  await frame
+    .getByRole('status')
+    .getByText('Submitted. Submit again if you make changes.', { exact: true })
+    .waitFor();
   assert.equal(await frame.locator('[data-slot="toast"]').count(), 0);
   assert.equal(
     await frame.locator('[data-annotation-launcher]').count(),

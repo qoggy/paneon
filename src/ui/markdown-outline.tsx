@@ -180,8 +180,8 @@ export function MarkdownOutline({
     setOpen(false);
   }
 
-  const hasHeadings = outline.flat.length > 0;
-  const sidebar = wide && hasHeadings;
+  const showOutline = outline.flat.length > 1;
+  const sidebar = wide && showOutline;
   const tree = (
     <Tree
       items={outline.tree}
@@ -206,7 +206,7 @@ export function MarkdownOutline({
     <div
       ref={scope}
       className={cn('markdown-body min-w-0 overflow-x-auto', className)}
-      data-toc-mode={hasHeadings ? (wide ? 'sidebar' : 'popup') : 'none'}
+      data-toc-mode={showOutline ? (wide ? 'sidebar' : 'popup') : 'none'}
       style={
         sidebar
           ? {
@@ -241,12 +241,12 @@ export function MarkdownOutline({
         }}
       />
       {sidebar && (
-        <div ref={lane} className="min-w-0">
+        <div ref={lane} className="min-w-0 bg-inherit">
           {placement && (
             <nav
               aria-label={t('On this page')}
               data-toc-sidebar=""
-              className="markdown-toc fixed z-20 w-55 overflow-y-auto overscroll-contain border-l bg-background pl-4"
+              className="markdown-toc fixed z-20 w-55 overflow-y-auto overscroll-contain border-l bg-inherit pl-4"
               style={{ left: placement.left, top: placement.top, maxHeight: placement.height }}
             >
               <div className="mb-3 text-sm font-medium">{t('On this page')}</div>
@@ -255,7 +255,7 @@ export function MarkdownOutline({
           )}
         </div>
       )}
-      {!wide && hasHeadings && placement && (
+      {!wide && showOutline && placement && (
         <Popover
           open={open}
           onOpenChange={(value) => {

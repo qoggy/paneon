@@ -349,7 +349,7 @@ function PanelList({
                               {t('Open panel')}
                             </a>
                           }
-                          variant="outline"
+                          variant="default"
                         />
                         <Button
                           variant="outline"
@@ -370,8 +370,8 @@ function PanelList({
                           )}
                         </Button>
                         <Button
-                          variant="destructive"
-                          className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                          variant="ghost"
+                          className="text-muted-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50"
                           disabled={closing.includes(panel.instanceId)}
                           aria-disabled={deleting.includes(panel.instanceId)}
                           aria-busy={deleting.includes(panel.instanceId)}

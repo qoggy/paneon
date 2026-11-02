@@ -41,7 +41,7 @@ paneon panel run <entry.tsx> --cwd <working-directory> --json
 - Pass input with `--params '<json>'`, or write large input to a file and use `--params-file <file>`.
 - Give the human the returned `data.url`. Keep `data.instanceId` for later commands.
 
-Source watching is on by default: editing a custom page's TSX updates the open page at the same URL, so refine an explanation in place. Input is fixed per instance, so new questions or new data need another `panel run` and a new link.
+Source watching is on by default: editing a custom page's TSX updates the open page at the same URL, so refine an explanation in place. Input is fixed per instance; changing it needs another `panel run` and a new link.
 
 ## Read results
 

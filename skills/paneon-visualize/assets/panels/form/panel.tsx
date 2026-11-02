@@ -28,6 +28,7 @@ import {
   Textarea,
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
+import { X } from '../../shared/icons';
 import {
   collectForm,
   completeFormSchema,
@@ -75,7 +76,7 @@ function FormPanel() {
   }
   return (
     <Page title={params.title} className="max-w-160 min-w-0 [overflow-wrap:anywhere] md:p-6">
-      {params.description && <Markdown>{params.description}</Markdown>}
+      {params.description && <Markdown className="bg-transparent!">{params.description}</Markdown>}
       <form
         ref={form}
         noValidate
@@ -130,7 +131,7 @@ function FormPanel() {
                     requestAnimationFrame(() => document.getElementById(id)?.focus());
                   }}
                 >
-                  <span aria-hidden="true">×</span>
+                  <X />
                 </Button>
               );
               if (field.type === 'checkbox' || field.type === 'switch') {
@@ -230,7 +231,7 @@ function FormPanel() {
                             />
                             <label
                               htmlFor={`${id}-${at}`}
-                              className="min-w-0 cursor-pointer leading-snug break-words"
+                              className="min-w-0 cursor-pointer text-sm leading-snug break-words"
                             >
                               {option.label}
                             </label>
@@ -269,7 +270,7 @@ function FormPanel() {
                           />
                           <label
                             htmlFor={`${id}-${at}`}
-                            className="min-w-0 cursor-pointer leading-snug break-words"
+                            className="min-w-0 cursor-pointer text-sm leading-snug break-words"
                           >
                             {option.label}
                           </label>

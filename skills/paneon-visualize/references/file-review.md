@@ -13,7 +13,7 @@ Input:
 
 - `title`: optional nonblank string.
 - `files`: nonempty array of paths, absolute or relative to `--cwd`. Each must be a regular UTF-8 text file of at most 1 MiB; empty files are fine. `.md` / `.markdown` files are rendered, others shown as source.
-- Files are read when the page opens; an unreadable file appears as an error in the page, not as a `panel run` failure. Pass the files under review; write a temporary file only for content that exists nowhere on disk.
+- Files are read each time the page loads, so a reload of the same URL shows their current content and discards unsubmitted annotations. An unreadable file appears as an error in the page, not as a `panel run` failure. Pass the files under review; write a temporary file only for content that exists nowhere on disk.
 
 `file-review-submitted` groups annotations by file:
 
