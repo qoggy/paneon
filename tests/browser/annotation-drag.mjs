@@ -27,7 +27,7 @@ try {
   await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`);
   const frame = page.frameLocator('iframe');
   const launcher = frame.locator('[data-annotation-launcher]');
-  const trigger = launcher.getByRole('button');
+  const trigger = launcher.getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/ });
   const directory = frame.getByRole('dialog', { name: /^(批注目录|Annotation directory)$/ });
   await trigger.waitFor();
   const bounds = () =>

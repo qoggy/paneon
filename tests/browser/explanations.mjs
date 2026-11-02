@@ -42,10 +42,14 @@ try {
     '--wait-ms',
     '0',
   );
-  assert.equal(read.events.length, 0, 'dining philosophers has no feedback events');
+  assert.deepEqual(
+    read.events.map((event) => event.type),
+    ['annotations-submitted'],
+    'dining philosophers delivers only the submitted element annotation',
+  );
   assert.deepEqual(errors, []);
   console.log(
-    'Chrome: copied examples render; dining philosophers with three acquisition strategies, playback/rewind, local-only exploration + no annotation controls or events; Sentinel editable requests, QPS checks, time scrubbing, playback, strict expiration and lazy reset pass.',
+    'Chrome: copied examples render; dining philosophers with three acquisition strategies, playback/rewind, local-only exploration and element annotations on the fork diagram; Sentinel editable requests, QPS checks, time scrubbing, playback, strict expiration and lazy reset pass.',
   );
 } finally {
   await browser?.close();

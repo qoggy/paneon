@@ -3,7 +3,7 @@
 - [Documentation audiences](documentation-audiences.md) — README.md is user-facing; AGENTS.md is developer-facing
 - [README language](documentation-readme-language.md) — Write README.md in English
 - [Changelog language](documentation-changelog-language.md) — Write changelogs in English
-- [Built-in panel references](documentation-panel-contracts.md) — Skill references cover when to use a panel, what it achieves and how to use it; no interface specifications
+- [Built-in panel references](documentation-panel-contracts.md) — Skill references describe usage and input in full; results get only semantics an agent would misread, never interface specifications
 - [Skill public surface](documentation-skill-public-surface.md) — Document only paneon/sdk and paneon/ui for custom pages; leave assets/shared and built-in panel internals unmentioned, neither recommended nor forbidden
 - [Skill facts and guidance](documentation-skill-facts-and-guidance.md) — Keep objective facts and model guidance apart; guidance lives only in references/presenting.md with inline examples
 - [Versioned releases](workflow-versioned-releases.md) — Develop on separate branches, merge into MAJOR.MINOR.x for release, tag releases with vMAJOR.MINOR.PATCH, and keep main at the highest released version

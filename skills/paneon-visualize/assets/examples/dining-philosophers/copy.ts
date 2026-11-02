@@ -34,6 +34,9 @@ const en = {
   orderedNote:
     'A fixed fork order prevents circular waiting. It does not by itself guarantee fairness.',
   source: 'Classic problem',
+  table: 'Table',
+  forks: 'Forks',
+  submitted: 'Annotations submitted.',
 };
 const zh: typeof en = {
   title: '哲学家就餐',
@@ -69,6 +72,9 @@ const zh: typeof en = {
   code: '下一行 → · 刚执行 ✓',
   orderedNote: '按编号取叉消除了循环等待，但不单独保证公平性。',
   source: '经典问题',
+  table: '餐桌',
+  forks: '叉子',
+  submitted: '批注已提交。',
 };
 const strategies: Record<Strategy, [string, string, string, string]> = {
   left: [

@@ -2,8 +2,8 @@ import { useLocale } from '../../shared/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw } from './icons';
 import { z } from 'zod';
-import { definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button, Page } from '@qoggy/paneon/ui';
+import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
+import { Badge, Button, Page, toast, usePageAnnotations } from '@qoggy/paneon/ui';
 import {
   PHILOSOPHERS,
   STRATEGIES,
@@ -21,6 +21,14 @@ import {
 import type { Language, SimulationRef, Snapshot, Strategy } from './model';
 import { simulationCopy, strategyCopy } from './copy';
 
+// The page registers no text of its own: every annotation is a picked element.
+const draftAnnotation = annotationValueSchema(z.never()).shape.annotations.element;
+const annotationsSchema = z.object({
+  annotations: z.array(
+    z.object({ targets: draftAnnotation.shape.targets, comment: draftAnnotation.shape.comment }),
+  ),
+  replacesEventId: z.number().int().optional(),
+});
 const position = (id: number, radius: number) => {
   const angle = ((-90 + id * 72) * Math.PI) / 180;
   return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
@@ -30,11 +38,13 @@ function Table({
   selected,
   select,
   language,
+  at,
 }: {
   state: Snapshot;
   selected: number | null;
   select: (id: number) => void;
   language: Language;
+  at: string;
 }) {
   const copy = simulationCopy(language);
   const cycle = deadlockCycle(state);
@@ -56,9 +66,16 @@ function Table({
     <div
       ref={tableRef}
       className="relative mx-auto aspect-square w-full max-w-[520px]"
+      role="group"
+      aria-label={`${at} · ${copy.table}`}
       data-dining-table
     >
-      <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" aria-hidden="true">
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute inset-0 size-full"
+        role="img"
+        aria-label={`${at} · ${copy.forks}`}
+      >
         <defs>
           {(['planned', 'blocked', 'deadlock'] as const).map((tone) => (
             <marker
@@ -227,11 +244,13 @@ function Details({
   selected,
   language,
   pause,
+  at,
 }: {
   state: Snapshot;
   selected: number | null;
   language: Language;
   pause: () => void;
+  at: string;
 }) {
   const copy = simulationCopy(language);
   const description = strategyCopy(state.strategy, language);
@@ -253,7 +272,7 @@ function Details({
   return (
     <aside
       className="flex flex-col gap-6 border-l p-5"
-      aria-label={copy.details}
+      aria-label={`${at} · ${selected === null ? copy.details : `P${selected}`}`}
       onPointerDown={pause}
     >
       <div className="space-y-2">
@@ -327,6 +346,20 @@ function DiningPhilosophersPanel() {
   const end = step === trace.length - 1;
   const moving = playing && !end;
   const summary: SimulationRef = { kind: 'summary', strategy, step };
+  // Put the state first in labels: a picked element's excerpt keeps only 30 characters.
+  const at = `${strategyCopy(strategy, language).label} #${step}`;
+  const [receipt, setReceipt] = useState<number>();
+  usePageAnnotations({
+    allowEmptySubmit: receipt !== undefined,
+    onSubmit: async (value) => {
+      const { id } = await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+        ...(receipt === undefined ? {} : { replacesEventId: receipt }),
+      });
+      setReceipt(id);
+      toast.add({ title: copy.submitted, type: 'success' });
+    },
+  });
   useEffect(() => {
     if (!moving) return;
     const timer = window.setInterval(
@@ -410,6 +443,7 @@ function DiningPhilosophersPanel() {
               state={state}
               selected={focused}
               language={language}
+              at={at}
               select={(id) => {
                 setPlaying(false);
                 setSelected(id);
@@ -438,6 +472,7 @@ function DiningPhilosophersPanel() {
             state={state}
             selected={focused}
             language={language}
+            at={at}
             pause={() => setPlaying(false)}
           />
         </div>
@@ -527,5 +562,6 @@ export default definePanel({
   id: 'dining-philosophers-explanation',
   requires: { paneon: '>=0.2.0 <0.3.0' },
   input: z.object({}).strict(),
+  events: { 'annotations-submitted': annotationsSchema },
   render: DiningPhilosophersPanel,
 });

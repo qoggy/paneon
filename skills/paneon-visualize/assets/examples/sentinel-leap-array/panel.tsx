@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
-import { definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button, Input, Label, Page } from '@qoggy/paneon/ui';
+import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
+import { Badge, Button, Input, Label, Page, toast, usePageAnnotations } from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { SOURCE_COMMIT, SOURCE_ROOT } from './model';
 import {
@@ -17,6 +17,14 @@ import type { Bucket, Config, Preset, RequestBatch } from './simulation';
 import { simulationCopy } from './copy';
 import type { Copy } from './copy';
 
+// The page registers no text of its own: every annotation is a picked element.
+const draftAnnotation = annotationValueSchema(z.never()).shape.annotations.element;
+const annotationsSchema = z.object({
+  annotations: z.array(
+    z.object({ targets: draftAnnotation.shape.targets, comment: draftAnnotation.shape.comment }),
+  ),
+  replacesEventId: z.number().int().optional(),
+});
 type Row = { at: string; count: string };
 const rowsFor = (requests: RequestBatch[]): Row[] =>
   requests.map((r) => ({ at: String(r.at), count: String(r.count) }));
@@ -50,6 +58,18 @@ function SentinelPanel() {
   const [error, setError] = useState<ReturnType<typeof validate>>(null);
   const [dirty, setDirty] = useState(false);
   const [focusRequest, setFocusRequest] = useState<number | undefined>(undefined);
+  const [receipt, setReceipt] = useState<number>();
+  usePageAnnotations({
+    allowEmptySubmit: receipt !== undefined,
+    onSubmit: async (value) => {
+      const { id } = await agent.emit('annotations-submitted', {
+        annotations: value.annotations.map(({ targets, comment }) => ({ targets, comment })),
+        ...(receipt === undefined ? {} : { replacesEventId: receipt }),
+      });
+      setReceipt(id);
+      toast.add({ title: c.submitted, type: 'success' });
+    },
+  });
   const state = useMemo(
     () => snapshotAt(trace, cursor, focusRequest),
     [trace, cursor, focusRequest],
@@ -363,7 +383,7 @@ function SentinelPanel() {
                 <svg
                   viewBox="0 0 1000 120"
                   role="img"
-                  aria-label={`${c.mapping}: ${Math.floor(Math.max(0, cursor))}ms → ${c.slot} ${mapped.slot}`}
+                  aria-label={`${Math.floor(Math.max(0, cursor))}ms → ${c.slot} ${mapped.slot} · ${c.mapping}`}
                   className="mt-4 w-full"
                 >
                   {visibleSegments.map((segment, i) => (
@@ -598,5 +618,6 @@ export default definePanel({
   id: 'sentinel-leap-array-explanation',
   requires: { paneon: '>=0.2.0 <0.3.0' },
   input: z.object({}).strict(),
+  events: { 'annotations-submitted': annotationsSchema },
   render: SentinelPanel,
 });

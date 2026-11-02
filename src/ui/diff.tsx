@@ -13,7 +13,7 @@ import { Button } from './button';
 import { CodeText } from './code-text';
 import { useAnnotations } from './annotation-context';
 import { annotationKey } from '../sdk/annotation';
-import type { JsonValue } from '../sdk/annotation';
+import type { ElementAnnotationRef, JsonValue } from '../sdk/annotation';
 import { createDiffModel, diffChanges } from '../shared/diff-model';
 import type { DiffModel } from '../shared/diff-model';
 import { diffPresentation } from './diff-presentation';
@@ -163,7 +163,9 @@ function StringDiffView<TRef>({
         : ['old', 'new'];
   const sideBySide = !unified && sides.length === 2;
   const columns = sideBySide ? 'var(--diff-columns, 50% 50%)' : 'minmax(0,1fr)';
-  const presentation = useCallback<NonNullable<AnnotationTextRegistration<TRef>['presentation']>>(
+  const presentation = useCallback<
+    NonNullable<AnnotationTextRegistration<TRef | ElementAnnotationRef>['presentation']>
+  >(
     (selected) => {
       const block = blockLookup.get(diffBlockKey(selected));
       return block

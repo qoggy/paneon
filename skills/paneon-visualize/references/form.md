@@ -31,11 +31,4 @@ Input:
 - `checkbox` / `switch`: optional boolean `defaultValue`, default false.
 - Option values must be unique per field. Lower bounds must not exceed upper bounds. A default must match its field's type, bounds and options.
 
-`form-submitted` returns values keyed by field name:
-
-```json
-{ "values": { "project": "demo", "replicas": 0, "notify": false } }
-```
-
-- `checkbox` and `switch` always appear. Other optional fields left empty are omitted.
-- `required` on a boolean field does not mean it must be true; `false` is a valid answer.
+`form-submitted` returns values keyed by field name. Optional fields left empty are omitted. `checkbox` and `switch` always appear, and `false` is a valid answer even when the field is `required`.

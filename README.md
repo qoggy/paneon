@@ -19,7 +19,7 @@ Watch each philosopher take a fork, then see why everyone gets stuck.
 
 Your agent could write a one-off HTML page. With Paneon:
 
-- **Your feedback reaches the agent.** Answers, form input and annotations on a specific line go straight back to the conversation.
+- **Your feedback reaches the agent.** Answers, form input and annotations on text or selected page elements go straight back to the conversation.
 - **Pages take less to build.** The agent uses ready-made pages and components instead of hand-writing UI, so pages come faster, use fewer tokens and look consistent.
 - **Pages work with your local files.** They can read your repositories, files and command-line tools, and are served only on your machine.
 

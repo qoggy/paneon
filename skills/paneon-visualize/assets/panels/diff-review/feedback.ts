@@ -4,6 +4,7 @@ import type {
   DiffReviewParams,
   DiffReviewSubmitted,
 } from './schema.ts';
+import { splitElementAnnotations } from '../../shared/element-annotations.ts';
 
 /** Publish validated feedback next to its file, keeping draft identities internal. */
 export function publicDiffFeedback(
@@ -14,7 +15,8 @@ export function publicDiffFeedback(
   const files = new Map<string, File>();
   const key = (ref: DiffRef) => `${ref.fileIndex}:${ref.snapshotId}`;
   const source = (ref: DiffRef) => ({ ...params.files[ref.fileIndex], snapshotId: ref.snapshotId });
-  for (const annotation of feedback.annotations) {
+  const { source: annotations, published } = splitElementAnnotations<DiffRef>(feedback);
+  for (const annotation of annotations) {
     const first = annotation.targets[0].ref;
     const fileKey = key(first);
     let file = files.get(fileKey);
@@ -32,6 +34,7 @@ export function publicDiffFeedback(
   }
   return {
     files: [...files.values()],
+    ...(published.length ? { annotations: published } : {}),
     ...(feedback.replacesEventId === undefined
       ? {}
       : { replacesEventId: feedback.replacesEventId }),

@@ -297,6 +297,7 @@ void test('real multi-repository working snapshots, rename/NUL paths, ignore rul
       buildGitFeedback(gitFeedbackSchema.parse(value), displayed),
     );
     assert.equal(Object.keys(result.sources).length, 2);
+    assert.ok('kind' in result.annotations[0].targets[0].ref);
     assert.equal(result.annotations[0].targets[0].ref.kind, 'lines');
     assert.deepEqual(result.annotations[0].targets[0].text, { start: 6, end: 11, quote: 'n = 4' });
     const duplicated = structuredClone(value);

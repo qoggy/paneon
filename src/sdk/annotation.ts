@@ -3,6 +3,15 @@ import type { JsonValue } from '../shared/types.js';
 
 export type { JsonValue } from '../shared/types.js';
 export type AnnotationTextRange = { start: number; end: number; quote: string };
+export const elementAnnotationRefSchema = z
+  .object({
+    element: z.object({ path: z.string(), tag: z.string(), excerpt: z.string() }).strict(),
+  })
+  .strict();
+export type ElementAnnotationRef = z.infer<typeof elementAnnotationRefSchema>;
+export function isElementAnnotationRef(ref: unknown): ref is ElementAnnotationRef {
+  return elementAnnotationRefSchema.safeParse(ref).success;
+}
 export type AnnotationTarget<TRef = JsonValue> = {
   ref: TRef;
   /** Original src supplied to a standalone Image. */
@@ -88,7 +97,7 @@ export function annotationTargetKey(target: {
 export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
   const reference = z
     .custom<unknown>(isAnnotationJson, 'Reference must be finite, acyclic JSON.')
-    .pipe(refSchema);
+    .pipe(z.union([elementAnnotationRefSchema, refSchema]));
   const text = z
     .object({
       start: z.number().int().nonnegative(),
@@ -131,7 +140,8 @@ export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
         });
     });
   // Preserve object-shape composition while exposing the refined target union to consumers.
-  const target = targetSchema as typeof targetSchema & z.ZodType<AnnotationTarget<TRef>>;
+  const target = targetSchema as typeof targetSchema &
+    z.ZodType<AnnotationTarget<TRef | ElementAnnotationRef>>;
   const annotation = z
     .object({
       id: z.string().min(1),

@@ -262,6 +262,7 @@ void test('path selections validate against the supplied path and publish only p
   wrong.annotations[0].targets[0].text!.quote = '缓存方案';
   assert.throws(() => validateRanges(wrong, evidence, paths), /range/);
   const bodyAsPath = structuredClone(draft);
+  assert.ok('fileIndex' in bodyAsPath.annotations[1].targets[0].ref);
   bodyAsPath.annotations[1].targets[0].ref.part = 'path';
   assert.throws(() => validateRanges(bodyAsPath, evidence, paths), /range/);
   const absoluteDraft = structuredClone(draft);

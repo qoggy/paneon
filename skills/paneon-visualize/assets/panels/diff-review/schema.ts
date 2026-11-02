@@ -1,4 +1,5 @@
-import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { annotationValueSchema, isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
+import { publishedElementAnnotationsSchema } from '../../shared/element-annotations.ts';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 
 const path = z.string().min(1);
@@ -52,6 +53,7 @@ export type DiffFeedbackResult = z.infer<typeof diffFeedbackResultSchema>;
 const publishedSource = diffSourceSchema.omit({ fileIndex: true });
 const targetShape = annotationsSchema.shape.annotations.element.shape.targets.element.shape;
 export const diffReviewSubmittedSchema = z.object({
+  annotations: publishedElementAnnotationsSchema.optional(),
   files: z.array(
     publishedSource.extend({
       annotations: z.array(
@@ -90,7 +92,7 @@ export function validateSources(params: DiffReviewParams, feedback: DiffFeedback
   }
   for (const annotation of feedback.annotations) {
     for (const target of annotation.targets) {
-      if (target.sourceRef !== undefined) continue;
+      if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
       const { fileIndex, snapshotId, side } = target.ref;
       const key = `${fileIndex}:${snapshotId}`;
       const file = params.files[fileIndex];
@@ -119,7 +121,7 @@ export function validateRanges(
   }
   for (const annotation of feedback.annotations) {
     for (const target of annotation.targets) {
-      if (target.sourceRef !== undefined) continue;
+      if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
       const { fileIndex, snapshotId, side } = target.ref;
       const snapshot = snapshots[`${fileIndex}:${snapshotId}`];
       if (!target.text || !validSourceRange(snapshot[`${side}Text`], target))

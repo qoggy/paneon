@@ -1,4 +1,5 @@
 import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { publishedElementAnnotationsSchema } from '../../shared/element-annotations.ts';
 import { gitRefSchema } from '../../shared/diff-schema.ts';
 export type { GitRef } from '../../shared/diff-schema.ts';
 const nonempty = z.string().refine((s) => s.trim().length > 0, 'Must not be blank.');
@@ -199,6 +200,7 @@ const publishedTarget = z.intersection(
   z.object({ source: publishedSource.optional() }),
 );
 export const gitReviewSubmittedSchema = z.object({
+  annotations: publishedElementAnnotationsSchema.optional(),
   files: z.array(
     publishedSource.extend({
       annotations: z.array(z.object({ targets: z.array(publishedTarget), comment: z.string() })),

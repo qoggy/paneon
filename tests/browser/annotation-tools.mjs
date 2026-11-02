@@ -163,7 +163,10 @@ export async function assertEditorBlocksAnnotationNavigation(frame, number, veri
       measure();
     });
     const editorText = await editor.textContent();
-    await frame.locator('[data-annotation-launcher] button').hover();
+    // Modal editors hide background controls from the accessibility tree; this is a pointer test.
+    await frame
+      .getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/, includeHidden: true })
+      .hover();
     const entries = await frame.locator('[data-annotation-id]').evaluateAll((elements) =>
       elements.map((element) => ({
         id: element.dataset.annotationId,
@@ -201,7 +204,9 @@ export async function assertEditorBlocksAnnotationNavigation(frame, number, veri
       `${label} ${number} preserves the unsaved input`,
     );
     await verify?.(`${label} ${number}`);
-    await frame.locator('[data-annotation-launcher] button').hover();
+    await frame
+      .getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/, includeHidden: true })
+      .hover();
     assert.deepEqual(
       await frame.locator('[data-annotation-id]').evaluateAll((elements) =>
         elements.map((element) => ({

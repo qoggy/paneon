@@ -1,5 +1,5 @@
-import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
-import type { AnnotationTarget } from '@qoggy/paneon/sdk';
+import { annotationValueSchema, isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
+import type { AnnotationTarget, ElementAnnotationRef } from '@qoggy/paneon/sdk';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 const label = z.string().refine((value) => value.trim().length > 0, 'Must not be blank.');
 const cell = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
@@ -122,8 +122,9 @@ export function tableTargetText(params: TableParams, ref: TableRef): string | un
 }
 export function tableTargetError(
   params: TableParams,
-  target: AnnotationTarget<TableRef>,
+  target: AnnotationTarget<TableRef | ElementAnnotationRef>,
 ): string | null {
+  if (isElementAnnotationRef(target.ref)) return null;
   const ref = tableRefSchema.safeParse(target.ref);
   if (!ref.success) return 'Invalid table reference.';
   const value = ref.data;

@@ -15,7 +15,14 @@ import {
   X,
 } from './icons';
 import { useEffect, useRef, useState } from 'react';
-import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
+import {
+  agent,
+  definePanel,
+  isElementAnnotationRef,
+  serverAction,
+  usePanelInput,
+  z,
+} from '@qoggy/paneon/sdk';
 import type { AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Alert,
@@ -453,7 +460,9 @@ function GithubPR() {
       const ids = new Set(
         feedback.annotations.flatMap((annotation) =>
           annotation.targets.flatMap((target) =>
-            target.sourceRef !== undefined ? [] : [target.ref.sourceId],
+            target.sourceRef !== undefined || isElementAnnotationRef(target.ref)
+              ? []
+              : [target.ref.sourceId],
           ),
         ),
       );

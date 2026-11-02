@@ -2,7 +2,7 @@ import { useContext, useSyncExternalStore } from 'react';
 import { AnnotationEnvironmentContext } from './annotation-environment';
 import { AnnotationStore } from './annotation-store';
 import type { AnnotationController } from './annotation-types';
-import type { JsonValue } from '../sdk/annotation.js';
+import type { JsonValue, ElementAnnotationRef } from '../sdk/annotation.js';
 
 export function useAnnotationContext<TRef = JsonValue>() {
   const environment = useContext(AnnotationEnvironmentContext);
@@ -12,7 +12,9 @@ export function useAnnotationContext<TRef = JsonValue>() {
   ) as unknown as AnnotationStore<TRef>;
   return { store, environment, disabled: store.disabled };
 }
-export function useAnnotations<TRef = JsonValue>(): AnnotationController<TRef> {
-  const { store } = useAnnotationContext<TRef>();
+export function useAnnotations<TRef = JsonValue>(): AnnotationController<
+  TRef | ElementAnnotationRef
+> {
+  const { store } = useAnnotationContext<TRef | ElementAnnotationRef>();
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 }

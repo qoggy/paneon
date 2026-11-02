@@ -248,10 +248,16 @@ export default definePanel({
 
 ### Result data
 
-- `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading. A target is `{ref, src?, sourceRef?, type?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
+- `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading or on the [picked element](#element-annotations). A target is `{ref, src?, sourceRef?, type?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
 - `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`. A target with `type: 'mermaid'` is a diagram; its `text`, when present, is `{start, end}` without `quote`.
 - `ref` is any finite JSON value. For ordinary content use a stable string: `target="redis-plan"` is delivered as `ref: "redis-plan"`. For dynamic content include the source version. Functions, DOM elements and screen coordinates are not references.
-- `annotationValueSchema(refSchema)` checks structure only.
+- `annotationValueSchema(refSchema)` checks structure only. It also accepts [element targets](#element-annotations), so event schemas derived from it, as in the complete example, accept them too. A hand-written target schema needs `elementAnnotationRefSchema` beside its own ref schema. `onSubmit` and `useAnnotations<TRef>()` values include `ElementAnnotationRef`; check `isElementAnnotationRef(target.ref)` before reading a ref as the page's own.
+
+### Element annotations
+
+`usePageAnnotations` also lets the human pick any rendered element, such as an SVG diagram, a card or a step view, and annotate it as a whole. The element needs no registration; its target is `{ref: {element: {path, tag, excerpt}}}` without `text`.
+
+`excerpt` is the element's `aria-label`, otherwise its text, captured when the human picks it and cut to 30 characters. Graphics and state-dependent views often carry little or no text: give them a short `aria-label` that starts with the current state, such as ``aria-label={`Step ${step} · forks`}``, so the agent can tell what was picked.
 
 ### File annotations
 
@@ -266,7 +272,7 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 - `adapter` is needed to locate content the page may not be displaying; see [adapters](#adapters).
 - `disabled` blocks editing and submission while saved annotations stay readable. To lock feedback after a successful submission, set `disabled` and pass `onRequestEdit`, which the list offers as a correction action that should unlock editing.
 - `allowEmptySubmit` (default `false`) permits submitting an empty list, such as a correction that withdraws all feedback.
-- `AnnotationText` takes `target`, plain-string `children` and optional `className`. Unregistered DOM and graphics cannot be annotated.
+- `AnnotationText` takes `target`, plain-string `children` and optional `className`. It makes plain text annotatable by exact range; other content can still be [picked as a whole](#element-annotations).
 - Add `annotationTarget="api"` to `Page` or `Section` to annotate its title and description; refs are `{id: "api", field: "title" | "description"}`, with `id` holding the given reference unchanged. Content inside uses its own targets.
 
 ### Controller
@@ -281,7 +287,7 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 ### Adapters
 
-Registered text validates and locates without an adapter while it is displayed. After it unmounts, such as in an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, its annotations still submit, but locating them fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned content needs an adapter as well. With an adapter, Paneon resolves every target through it:
+Registered text validates and locates without an adapter while it is displayed. After it unmounts, such as in an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, its annotations still submit, but locating them fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned source content needs an adapter as well. With an adapter, Paneon resolves every target through it except element targets, which Paneon locates itself:
 
 ```tsx
 // Each Tabs value is also the annotation ref of the Markdown rendered in that panel.
@@ -356,7 +362,7 @@ Each example is a complete custom page. Run it as-is, or read its source to borr
 paneon panel run <skill>/assets/examples/dining-philosophers/panel.tsx --cwd /work/project --json
 ```
 
-Borrow: a deterministic page-local state model in plain TypeScript, play/pause/step/timeline controls, an SVG diagram derived from the same state. No input, no events.
+Borrow: a deterministic page-local state model in plain TypeScript, play/pause/step/timeline controls, an SVG diagram derived from the same state, and `aria-label`s that carry the strategy and step, so element annotations tell the agent what the human saw. No input. It emits `annotations-submitted` with element annotations; a resubmission carries `replacesEventId`.
 
 ### Sentinel LeapArray
 
@@ -366,7 +372,7 @@ Borrow: a deterministic page-local state model in plain TypeScript, play/pause/s
 paneon panel run <skill>/assets/examples/sentinel-leap-array/panel.tsx --cwd /work/project --json
 ```
 
-Borrow: links to real source at a fixed commit, editable scenario parameters validated before applying, a recorded trace replayed with a time slider. No input, no events.
+Borrow: links to real source at a fixed commit, editable scenario parameters validated before applying, a recorded trace replayed with a time slider. No input. It emits `annotations-submitted` like the dining philosophers example.
 
 ### GitHub PR
 

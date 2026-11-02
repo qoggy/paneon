@@ -1,9 +1,108 @@
 export type ClippedRect = { rect: DOMRect; clip: DOMRect };
+export type AnnotationViewport = (element?: Element) => DOMRect;
+const ANNOTATION_VIEWPORT_MARGIN = 12;
+const TOP_BAR_GAP = 16;
+
+/** A small heuristic for common top bars, not arbitrary floating-content detection. */
+export function createAnnotationViewport() {
+  let candidates: Element[] = [];
+  return {
+    refresh(root: Element = document.body) {
+      candidates = [root, ...root.querySelectorAll('*')].filter((element) => {
+        if (element.closest('[data-annotation-controls]')) return false;
+        const style = getComputedStyle(element);
+        return style.position === 'fixed' || (style.position === 'sticky' && style.top !== 'auto');
+      });
+      return candidates;
+    },
+    measure(): AnnotationViewport {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const bars = candidates
+        .flatMap((element) => {
+          if (!element.isConnected || !element.checkVisibility({ visibilityProperty: true }))
+            return [];
+          const rect = element.getBoundingClientRect();
+          return rect.width >= width / 2 &&
+            rect.height > 0 &&
+            rect.height <= height / 3 &&
+            rect.bottom > 0
+            ? [{ element, rect }]
+            : [];
+        })
+        .sort((a, b) => a.rect.top - b.rect.top);
+      return (target) => {
+        let top = 0;
+        for (const bar of bars) {
+          // A top bar can itself be annotated; do not clip away its own targets.
+          if (target && bar.element.contains(target)) continue;
+          if (bar.rect.top <= top + TOP_BAR_GAP) top = Math.max(top, bar.rect.bottom);
+        }
+        if (top) top += ANNOTATION_VIEWPORT_MARGIN;
+        return new DOMRect(0, top, width, Math.max(0, height - top));
+      };
+    },
+  };
+}
+
+/** Let native scrolling handle nested containers; retain the author's inline margins afterward. */
+export async function scrollElementAnnotationIntoView(element: Element, root?: Element) {
+  const viewport = createAnnotationViewport();
+  viewport.refresh(root);
+  const scroll = (behavior: ScrollBehavior) => {
+    const area = viewport.measure()(element);
+    const rect = element.getBoundingClientRect();
+    const start = Math.max(area.top, ANNOTATION_VIEWPORT_MARGIN);
+    const height = Math.max(0, area.bottom - start - ANNOTATION_VIEWPORT_MARGIN);
+    const tall = rect.height > height;
+    const top = start + (tall ? height / 4 : 0);
+    const style = (element as HTMLElement | SVGElement).style;
+    const properties = ['scroll-margin-top', 'scroll-margin-bottom'] as const;
+    const previous = properties.map(
+      (property) =>
+        [style.getPropertyValue(property), style.getPropertyPriority(property)] as const,
+    );
+    style.setProperty('scroll-margin-top', `${top}px`);
+    style.setProperty('scroll-margin-bottom', `${ANNOTATION_VIEWPORT_MARGIN}px`);
+    element.scrollIntoView({ block: tall ? 'start' : 'center', behavior });
+    return () =>
+      properties.forEach((property, index) => {
+        const [value, priority] = previous[index];
+        if (value) style.setProperty(property, value, priority);
+        else style.removeProperty(property);
+      });
+  };
+  const before = viewport.measure()(element).top;
+  let restore = scroll('smooth');
+  try {
+    await waitForAnnotationLocation(element);
+    // Scrolling can pin a previously unpinned sticky bar. Measure once after it settles.
+    if (viewport.measure()(element).top !== before) {
+      restore();
+      restore = scroll('instant');
+      await waitForAnnotationLocation(element);
+    }
+  } finally {
+    restore();
+  }
+}
+
+/** Fixed annotation rectangles use viewport coordinates inside the translated media dialog. */
+export function annotationOverlayStyle(container: HTMLElement | null) {
+  if (!container) return undefined;
+  const origin = container.getBoundingClientRect();
+  return {
+    left: -origin.left - container.clientLeft + container.scrollLeft,
+    top: -origin.top - container.clientTop + container.scrollTop,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
 
 /** Wait for native scrolling and ancestor transitions to reach their painted positions. */
-export function waitForAnnotationLocation(element: HTMLElement): Promise<void> {
-  const ancestors: HTMLElement[] = [];
-  for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement)
+export function waitForAnnotationLocation(element: Element): Promise<void> {
+  const ancestors: Element[] = [];
+  for (let parent: Element | null = element; parent; parent = parent.parentElement)
     ancestors.push(parent);
   const view = window;
   return new Promise((resolve) => {
@@ -28,13 +127,10 @@ export function waitForAnnotationLocation(element: HTMLElement): Promise<void> {
 
 /** Cache ancestor clipping once for one synchronous geometry measurement.
  * Never retain it across scroll/resize/layout changes. */
-export function createRectClipper() {
-  const clips = new Map<
-    HTMLElement,
-    { left: number; top: number; right: number; bottom: number }
-  >();
+export function createRectClipper(viewport?: AnnotationViewport) {
+  const clips = new Map<Element, { left: number; top: number; right: number; bottom: number }>();
   const clipFor = (
-    element: HTMLElement,
+    element: Element,
   ): { left: number; top: number; right: number; bottom: number } => {
     const cached = clips.get(element);
     if (cached) return cached;
@@ -65,7 +161,7 @@ export function createRectClipper() {
     clips.set(element, clip);
     return clip;
   };
-  return (rect: DOMRect, element: HTMLElement): ClippedRect | null => {
+  return (rect: DOMRect, element: Element): ClippedRect | null => {
     const view = element.ownerDocument.defaultView;
     if (!view) return null;
     // Most text in a long Diff is offscreen; no ancestor style reads are needed.
@@ -76,9 +172,18 @@ export function createRectClipper() {
       rect.top >= view.innerHeight
     )
       return null;
-    const clip = element.parentElement
+    const ancestorClip = element.parentElement
       ? clipFor(element.parentElement)
       : { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight };
+    const area = viewport?.(element);
+    const clip = area
+      ? {
+          left: Math.max(ancestorClip.left, area.left),
+          top: Math.max(ancestorClip.top, area.top),
+          right: Math.min(ancestorClip.right, area.right),
+          bottom: Math.min(ancestorClip.bottom, area.bottom),
+        }
+      : ancestorClip;
     const left = Math.max(0, rect.left, clip.left);
     const top = Math.max(0, rect.top, clip.top);
     const right = Math.min(view.innerWidth, rect.right, clip.right);

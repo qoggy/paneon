@@ -41,26 +41,4 @@ Input:
 - Each option has an `id` unique within its question, a nonblank `label`, an optional plain `description`, optional Markdown `details` (shown on demand; supports code, tables and Mermaid) and optional `recommended`. Recommendation marks an option but never selects it.
 - `selectedIds` preselects options of that question, without duplicates and at most one in single mode.
 
-`answers-submitted` contains exactly one answer per question, in input order:
-
-```json
-{
-  "answers": [
-    {
-      "questionId": "storage",
-      "selections": [{ "kind": "option", "optionId": "sqlite", "comment": "Keep the backup plan." }]
-    },
-    {
-      "questionId": "features",
-      "selections": [
-        { "kind": "option", "optionId": "backup", "comment": "" },
-        { "kind": "custom", "text": "Also support data export." }
-      ]
-    }
-  ]
-}
-```
-
-- A selection is `{kind:'option',optionId,comment}` or `{kind:'custom',text}`, the human's own answer typed under **Other**.
-- `comment` is the human's explanation of that option, possibly `""`.
-- A single-choice answer has exactly one selection. A multiple-choice answer has at least one, with supplied options in input order and at most one custom answer last.
+`answers-submitted` contains one answer per question, in input order.

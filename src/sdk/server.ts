@@ -37,12 +37,17 @@ export type PanelDefinition<I = unknown> = {
 export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<I> {
   return definition;
 }
-export { annotationValueSchema } from './annotation.js';
+export {
+  annotationValueSchema,
+  elementAnnotationRefSchema,
+  isElementAnnotationRef,
+} from './annotation.js';
 export type {
   AnnotationValue,
   AnnotationTarget,
   Annotation,
   AnnotationTextRange,
+  ElementAnnotationRef,
   JsonValue,
 } from './annotation.js';
 

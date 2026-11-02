@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import { isAbsolute, relative, resolve } from 'node:path';
 
-/** Static, best-effort check that annotation pages give every content source a target. */
+/** Static, best-effort check of original-source and precise-text annotation coverage. */
 
 const UNKNOWN = Symbol('unknown');
 const PRESENT = Symbol('present');
@@ -325,7 +325,7 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
   }
 
   function text(node: ts.Node, value: string) {
-    if (hasLetter(value)) report(node, 'text', 'Text is not annotatable.');
+    if (hasLetter(value)) report(node, 'text', 'Text has no precise text-range mapping.');
   }
 
   function children(nodes: readonly ts.Node[], env: Env) {
@@ -351,7 +351,7 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
                 ),
             );
             if (parts.length && parts.every((item) => item.flags & ts.TypeFlags.StringLike))
-              report(node, 'text', 'Text is not annotatable.');
+              report(node, 'text', 'Text has no precise text-range mapping.');
           }
         }
       } else walk(node, env);
@@ -434,12 +434,12 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
       }
       return;
     } else if (literal === 'svg') {
-      return; // Icons and drawings; neither can carry annotations.
+      return; // Whole SVGs can be picked; this check does not map their text to source ranges.
     } else if (literal === 'img' || literal === 'canvas') {
       report(
         opening,
         'unchecked',
-        `<${literal}> cannot be annotated; use Image or Mermaid if it is content.`,
+        `<${literal}> has no original-source mapping; whole-element picking remains available when page annotations are enabled.`,
       );
       return;
     }
@@ -502,8 +502,8 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
   const summary =
     [
       missing.length &&
-        `${missing.length} annotatable component(s) or heading(s) have no annotation target.`,
-      plain.length && `${plain.length} piece(s) of text are not annotatable.`,
+        `${missing.length} component(s) or heading(s) have no original-source annotation target.`,
+      plain.length && `${plain.length} piece(s) of text have no precise text-range mapping.`,
       unchecked.length && `${unchecked.length} item(s) could not be checked statically.`,
     ]
       .filter(Boolean)
@@ -511,9 +511,9 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
   const next =
     [
       missing.length &&
-        'Add a target to each listed item the human should be able to annotate, then rerun.',
+        'Add targets only where original-source annotations are needed; whole-element picking needs no per-element registration.',
       plain.length &&
-        'Wrap listed text that is page content in AnnotationText or a targeted component; leave interface text such as labels and status messages as is.',
+        'Use AnnotationText or a targeted component only where precise text-range selection is needed; ordinary content already supports whole-element picking when page annotations are enabled; leave interface text such as labels and status messages as is.',
       unchecked.length && 'Inspect the unchecked items in source.',
     ]
       .filter(Boolean)

@@ -3,6 +3,7 @@ import { useAnnotationContext } from './annotation-context';
 import { AnnotationMenu, AnnotationSurface } from './annotation-surface';
 import { FilePreviewSheet } from './file-preview';
 import { textControlSelector } from './annotation-selection';
+import { ElementAnnotationPicker } from './element-annotation-picker';
 
 /** Internal controls mounted once when the page enables annotations. */
 export function AnnotationControls() {
@@ -29,7 +30,7 @@ export function AnnotationControls() {
     };
   }, [store]);
   return (
-    <>
+    <ElementAnnotationPicker>
       {file && (
         <FilePreviewSheet
           key={file.id}
@@ -46,6 +47,6 @@ export function AnnotationControls() {
       )}
       <AnnotationSurface />
       <AnnotationMenu />
-    </>
+    </ElementAnnotationPicker>
   );
 }

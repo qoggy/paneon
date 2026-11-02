@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { agent, definePanel, usePanelInput, useQuery } from '@qoggy/paneon/sdk';
-import type { AnnotationValue } from '@qoggy/paneon/sdk';
+import {
+  agent,
+  definePanel,
+  isElementAnnotationRef,
+  usePanelInput,
+  useQuery,
+} from '@qoggy/paneon/sdk';
+import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -196,11 +202,12 @@ function FileReviewPanel() {
     };
   }, []);
 
-  const submission = useSubmission<AnnotationValue<FileRef>>(
+  const submission = useSubmission<AnnotationValue<FileRef | ElementAnnotationRef>>(
     async (feedback) => {
       const sources = new Map<string, Snapshot>();
       for (const annotation of feedback.annotations)
         for (const target of annotation.targets) {
+          if (isElementAnnotationRef(target.ref)) continue;
           const key = snapshotKey(target.ref);
           const snapshot = snapshots.current.get(key);
           if (!snapshot) throw new Error('Missing original file snapshot. Draft retained.');

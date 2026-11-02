@@ -1,9 +1,10 @@
-import type { AnnotationValue } from '@qoggy/paneon/sdk';
+import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
+import { isElementAnnotationRef } from '@qoggy/paneon/sdk';
 import { buildGitFeedback } from './feedback.ts';
 import type { GitSnapshot } from './git.ts';
 import type { GitRef, GitFeedbackResult } from './schema.ts';
 
-type Draft = AnnotationValue<GitRef>;
+type Draft = AnnotationValue<GitRef | ElementAnnotationRef>;
 const empty = (): GitFeedbackResult => ({ annotations: [], sources: {} });
 function belongsTo(
   draft: Draft['annotations'][number],
@@ -11,7 +12,9 @@ function belongsTo(
   snapshots: ReadonlyMap<string, GitSnapshot>,
 ) {
   return draft.targets.some(
-    (target) => snapshots.get(target.ref.sourceId)?.source.repositoryId === repositoryId,
+    (target) =>
+      !isElementAnnotationRef(target.ref) &&
+      snapshots.get(target.ref.sourceId)?.source.repositoryId === repositoryId,
   );
 }
 
@@ -58,7 +61,11 @@ export class RepositoryFeedback {
       belongsTo(annotation, repositoryId, snapshots),
     );
     const sourceIds = new Set(
-      annotations.flatMap((annotation) => annotation.targets.map((target) => target.ref.sourceId)),
+      annotations.flatMap((annotation) =>
+        annotation.targets.flatMap((target) =>
+          isElementAnnotationRef(target.ref) ? [] : [target.ref.sourceId],
+        ),
+      ),
     );
     this.retired = {
       annotations: [...this.retired.annotations, ...annotations],

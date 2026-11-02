@@ -3,7 +3,7 @@ import { useLocale } from '../../shared/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from '../../shared/icons.tsx';
 import { agent, definePanel, usePanelInput } from '@qoggy/paneon/sdk';
-import type { AnnotationValue } from '@qoggy/paneon/sdk';
+import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -147,7 +147,7 @@ function Review() {
   const [fileReveal, setFileReveal] = useState(0);
   const [fileGrouping, setFileGrouping] = useState<Record<string, boolean>>({});
   const feedbackState = useRef(new RepositoryFeedback());
-  const submission = useSubmission<AnnotationValue<GitRef>>(
+  const submission = useSubmission<AnnotationValue<GitRef | ElementAnnotationRef>>(
     async ({ replacesEventId, ...feedback }) => {
       if (replacesEventId === undefined && feedback.annotations.length === 0)
         throw new SubmissionError('Save at least one annotation before submitting.');

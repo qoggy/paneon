@@ -12,7 +12,7 @@ compatibility: Requires the Paneon CLI and Node.js 24.
 
 Judge by the shape of the content, not its length. Prefer a page for several files or diffs, tabular data, flows and structures that need diagrams, mechanisms that unfold step by step, or several related questions. Keep short answers in chat. A page is a convenience, never an obligation: chat or the agent's own question tool remains valid.
 
-Then pick the source by purpose. Built-in pages collect input or feedback on content that already exists. To make the human understand something, such as a plan, a mechanism, code or a design, write a custom page with diagrams, steps or views, even when a Markdown draft exists.
+Then pick the source by purpose. Built-in pages collect input or feedback on content that already exists. To make the human understand something, such as a plan, a mechanism, code or a design, write a custom page with diagrams, steps or views, even when a Markdown draft exists. Turn on [annotations](references/authoring.md#annotations) on such a page, so the human can point at any part with a comment: an objection to a plan or design, a question about an explanation.
 
 1. A [built-in page](#built-in-pages) fits: run it with JSON input, without writing TSX.
 2. Otherwise write a [custom page](#custom-pages), for example an explanation of code, a mechanism or a plan, a data model diagram, a metrics view, or a control surface over a local CLI or HTTP service.
@@ -52,7 +52,8 @@ paneon panel events <instance-id> --consumer <stable-name> --wait-ms 60000 --jso
 ```
 
 - Reading does not acknowledge. If nothing arrives, tell the human to say when they have submitted, then read again.
-- A target with `sourceRef: {path, snapshotId}` annotates a local file the human opened from a link in an annotated Markdown; its `ref` is that Markdown's. Its offsets refer to that file as read then, not to the Markdown. `path` is a local path, not a Git commit or PR revision.
+- A target with `sourceRef` annotates the local file at `sourceRef.path`, opened from a link in the Markdown named by its `ref`; its offsets refer to that local file as read then, not to the Markdown or a Git or PR revision.
+- A target with `ref.element` is a page element the human picked as a whole. Its `excerpt` is the element's `aria-label` or text when picked; its `path` may no longer match after a reload or a layout change.
 - A result carrying `replacesEventId` replaces that earlier result entirely; do not merge the two. If work was already done based on the earlier result, tell the human what the correction affects before adjusting it.
 - After handling, acknowledge: `paneon panel ack <instance-id> --consumer <stable-name> --through <event-id> --json`.
 
@@ -70,7 +71,7 @@ Give each page its own directory, so its relative modules stay together. Choose 
 - Reused by the human across tasks: `~/.paneon/library/<panel-name>/`. Check there for an existing page before writing a new one.
 - Reused within a specific project: inside that project.
 
-Read [Authoring](references/authoring.md) before writing a page. It covers the complete source, events, server actions, queries, components, theme and language, annotations for pages that collect precise opinions, and examples to run as-is or borrow techniques from: two explanations (dining philosophers, Sentinel LeapArray) and a read-only GitHub PR workspace through the local `gh` CLI.
+Read [Authoring](references/authoring.md) before writing a page. It covers the complete source, events, server actions, queries, components, theme and language, annotations, and examples to run as-is or borrow techniques from: two explanations (dining philosophers, Sentinel LeapArray) and a read-only GitHub PR workspace through the local `gh` CLI.
 
 For a page that collects annotations, run `paneon panel check-annotations <entry.tsx>` before giving the human its link.
 

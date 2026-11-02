@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronsDownUp, ChevronsUpDown, FileDiff, FolderTree, TreeIcon } from './icons';
-import { agent, definePanel, serverAction, usePanelInput, useQuery, z } from '@qoggy/paneon/sdk';
+import {
+  agent,
+  definePanel,
+  isElementAnnotationRef,
+  serverAction,
+  usePanelInput,
+  useQuery,
+  z,
+} from '@qoggy/paneon/sdk';
 import { readFile } from 'node:fs/promises';
-import type { AnnotationValue } from '@qoggy/paneon/sdk';
+import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
 import type { DiffViewHandle } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import { FileReviewSplit } from '../../shared/file-review-split';
@@ -331,7 +339,7 @@ function DiffReviewPanel() {
     setPreserved(null);
     setOpened(comparison);
   }
-  const submission = useSubmission<AnnotationValue<DiffRef>>(
+  const submission = useSubmission<AnnotationValue<DiffRef | ElementAnnotationRef>>(
     async (feedback) => {
       const sources = new Map<
         string,
@@ -346,7 +354,7 @@ function DiffReviewPanel() {
       const retained: Record<string, Snapshot> = {};
       for (const annotation of feedback.annotations)
         for (const target of annotation.targets) {
-          if (target.sourceRef !== undefined) continue;
+          if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
           const { fileIndex, snapshotId } = target.ref;
           const key = `${fileIndex}:${snapshotId}`;
           const snapshot = snapshots.current.get(key);

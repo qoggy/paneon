@@ -253,7 +253,7 @@ execute(ack, async () => {
 });
 const checkAnnotationsCommand = panel
   .command('check-annotations <entry.tsx>')
-  .description('Statically find content in a panel source that the human cannot annotate');
+  .description('Statically check original-source and precise-text annotation coverage');
 execute(checkAnnotationsCommand, async () => {
   const entryPath = resolve(checkAnnotationsCommand.args[0]);
   try {

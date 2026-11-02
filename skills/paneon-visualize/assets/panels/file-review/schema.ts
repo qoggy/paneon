@@ -1,4 +1,5 @@
-import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { annotationValueSchema, isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
+import { publishedElementAnnotationsSchema } from '../../shared/element-annotations.ts';
 import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 
 const nonblank = z.string().refine((value) => !!value.trim(), 'Must not be blank.');
@@ -32,6 +33,7 @@ export const evidenceSchema = z.object({ files: z.array(snapshotSchema) }).stric
 export type Evidence = z.infer<typeof evidenceSchema>;
 const target = fileFeedbackSchema.shape.annotations.element.shape.targets.element;
 export const fileReviewSubmittedSchema = z.object({
+  annotations: publishedElementAnnotationsSchema.optional(),
   files: z.array(
     z.object({
       path: z.string(),
@@ -69,6 +71,7 @@ export function validateRanges(feedback: FileFeedback, evidence: Evidence, paths
   if (files.size !== evidence.files.length) throw new Error('Duplicate snapshot evidence.');
   for (const annotation of feedback.annotations) {
     for (const target of annotation.targets) {
+      if (isElementAnnotationRef(target.ref)) continue;
       const main = files.get(snapshotKey(target.ref));
       if (!main) throw new Error('Missing original file snapshot. Draft retained.');
       // The shared annotation session validates retained linked-file sources before onSubmit.

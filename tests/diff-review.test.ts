@@ -219,9 +219,11 @@ void test('source validation accepts feedback without full files and rejects inc
   wrongPath.sources[0].newPath = '/another-file';
   assert.throws(() => validateSources({ files: [file] }, wrongPath), /inconsistent/);
   const unknown = structuredClone(feedback);
+  assert.ok('snapshotId' in unknown.annotations[0].targets[0].ref);
   unknown.annotations[0].targets[0].ref.snapshotId = `sha256:${'b'.repeat(64)}`;
   assert.throws(() => validateSources({ files: [file] }, unknown), /Missing original/);
   const absent = structuredClone(feedback);
+  assert.ok('side' in absent.annotations[0].targets[0].ref);
   absent.annotations[0].targets[0].ref.side = 'old';
   assert.throws(() => validateSources({ files: [file] }, absent), /Missing original/);
   const withoutText = structuredClone(feedback);

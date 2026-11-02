@@ -45,6 +45,8 @@ const browserScripts = [
   'table-header-themes',
   'feedback',
   'annotation-api',
+  'element-annotations',
+  'annotation-positioning',
   'media-annotations',
   'annotation-editor',
   'annotation-popover',

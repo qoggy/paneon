@@ -70,8 +70,12 @@ void test('reports content components and headings without targets, with locatio
   ]);
   assert.match(report.missingTargets[0].location, /^panel\.tsx:5:5$/);
   assert.deepEqual(report.unannotatedText, []);
-  assert.match(report.summary, /^7 annotatable component\(s\) or heading\(s\) have no annotation/);
-  assert.match(report.next, /Add a target to each listed item/);
+  assert.match(
+    report.summary,
+    /^7 component\(s\) or heading\(s\) have no original-source annotation/,
+  );
+  assert.match(report.next, /only where original-source annotations are needed/);
+  assert.match(report.next, /whole-element picking needs no per-element registration/);
 });
 
 void test('a fully covered page reports nothing, including falsy targets and spreads', async () => {
@@ -241,7 +245,7 @@ declare const External: unknown;`,
     'Markdown with custom components may not map annotations.',
     'Cannot determine the annotation target of DiffView old side.',
     'Cannot determine the annotation target of DiffView new side.',
-    '<canvas> cannot be annotated; use Image or Mermaid if it is content.',
+    '<canvas> has no original-source mapping; whole-element picking remains available when page annotations are enabled.',
     'Cannot inspect component External.',
   ]);
   assert.match(report.summary, /6 item\(s\) could not be checked statically/);

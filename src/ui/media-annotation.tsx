@@ -73,6 +73,10 @@ export function useMediaAnnotation(
       return store.registerObject({
         ...descriptor,
         element: options.ready === false ? undefined : (element.current ?? undefined),
+        bounds: () =>
+          descriptor.target.type === 'mermaid'
+            ? element.current?.querySelector('svg')?.getBoundingClientRect()
+            : element.current?.getBoundingClientRect(),
         error: options.error,
         anchor: () =>
           trigger.current?.isConnected ? trigger.current.getBoundingClientRect() : undefined,

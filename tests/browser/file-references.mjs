@@ -90,6 +90,19 @@ try {
   const relativeLink = await open('相对路径');
   await source.getByText('export const line1 = 1;', { exact: false }).first().waitFor();
   assert.ok((await preview.textContent()).includes(fixture.root));
+  await frame.getByRole('button', { name: /^(Select content to annotate|选取批注)$/ }).click();
+  await source.getByText('export const line1 = 1;', { exact: false }).first().click();
+  await frame.locator('[data-element-annotation-picker="review"]').waitFor();
+  await page.keyboard.press('Enter');
+  const elementEditor = frame.locator('[data-annotation-editor]');
+  await elementEditor.locator('textarea').fill('File preview element');
+  await elementEditor.locator('textarea').press('Enter');
+  await elementEditor.waitFor({ state: 'hidden' });
+  await frame.locator('[data-annotation-outline]').waitFor();
+  await frame.locator('[data-annotation-marker]').click();
+  await elementEditor.getByRole('button', { name: /^(Delete annotation|删除批注)$/ }).click();
+  await elementEditor.waitFor({ state: 'hidden' });
+  assert.deepEqual(await events(), [], 'Preview element opinions remain local until submission');
   await close();
   assert.equal(await relativeLink.evaluate((element) => element === document.activeElement), true);
   assert.equal(page.url(), fixture.url, 'Preview does not navigate or reload the panel');
@@ -379,7 +392,9 @@ try {
   await close();
 
   // A newly created, never-saved file annotation has the same navigation protection.
-  const countBeforeNew = await frame.locator('[data-annotation-launcher] button').textContent();
+  const countBeforeNew = await frame
+    .getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/ })
+    .textContent();
   await open(boundary.label);
   await selectAnnotationText(frame, '[data-slot="file-preview-source"] [data-code-line="1"]', 0, 5);
   await frame.locator('[data-annotation-action]').click();
@@ -393,7 +408,9 @@ try {
       assert.equal(await source.textContent(), newFileText);
       assert.equal(await source.evaluate((element) => element.scrollTop), newFileScroll);
       assert.equal(
-        await frame.locator('[data-annotation-launcher] button').textContent(),
+        await frame
+          .getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/, includeHidden: true })
+          .textContent(),
         countBeforeNew,
       );
       assert.equal((await events()).length, eventCount);

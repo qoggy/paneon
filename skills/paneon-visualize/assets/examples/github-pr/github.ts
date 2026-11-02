@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { z } from '@qoggy/paneon/sdk';
+import { isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { normalizeDiffTarget } from '../../shared/diff-schema.ts';
@@ -741,7 +741,7 @@ export class GitHubReview {
       throw new Error('Save at least one annotation before submitting.');
     const annotations = feedback.annotations.map((entry) => {
       const targets = entry.targets.map((target) => {
-        if (target.sourceRef !== undefined) return target;
+        if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) return target;
         const snapshot = session.snapshots.get(target.ref.sourceId);
         if (!snapshot)
           throw new Error(

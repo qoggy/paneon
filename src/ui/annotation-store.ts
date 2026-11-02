@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { annotationTargetKey, annotationValueSchema } from '../sdk/annotation.js';
+import {
+  annotationTargetKey,
+  annotationValueSchema,
+  isElementAnnotationRef,
+} from '../sdk/annotation.js';
 import type { AnnotationValue, AnnotationTarget, JsonValue } from '../sdk/annotation.js';
 import type { FilePreview, FileReferenceRequest } from '../shared/file-references';
 import type { ReadFileReference } from './file-reference-context';
@@ -13,8 +17,12 @@ import type {
   AnnotationUI,
 } from './annotation-types';
 import { selectedTextTargets, validTextRange } from './annotation-selection';
-import { createRectClipper, waitForAnnotationLocation } from './annotation-geometry';
-import type { ClippedRect } from './annotation-geometry';
+import {
+  createRectClipper,
+  scrollElementAnnotationIntoView,
+  waitForAnnotationLocation,
+} from './annotation-geometry';
+import type { AnnotationViewport, ClippedRect } from './annotation-geometry';
 import { indexTextSegments, textSegmentsInRange } from './annotation-text-index';
 
 export type FileSnapshot<TRef = unknown> = {
@@ -53,7 +61,8 @@ const targetsKey = (targets: readonly AnnotationTarget<unknown>[]) =>
 export type AnnotationObjectRegistration<TRef> = {
   target: AnnotationTarget<TRef>;
   source: string;
-  element?: HTMLElement;
+  element?: Element;
+  bounds?: () => DOMRect | undefined;
   error?: string;
   summary: string;
   anchor?: () => DOMRect | undefined;
@@ -91,6 +100,8 @@ export class AnnotationStore<TRef> {
   constructor(options?: PageAnnotationOptions<TRef>) {
     this.options = options;
     this.state = {
+      hoveredAnnotationId: null,
+      focusedAnnotationId: null,
       pending: [],
       editor: null,
       editorAttention: 0,
@@ -375,9 +386,11 @@ export class AnnotationStore<TRef> {
     const key = annotationTargetKey(target);
     const modal = this.overlayContainer?.closest('[role="dialog"]') ?? this.overlayContainer;
     return [...this.objects.values()].filter(
-      (item): item is AnnotationObjectRegistration<TRef> & { element: HTMLElement } =>
+      (item): item is AnnotationObjectRegistration<TRef> & { element: Element } =>
         annotationTargetKey(item.target) === key &&
         !!item.element?.isConnected &&
+        (!isElementAnnotationRef(target.ref) ||
+          item.element.checkVisibility({ visibilityProperty: true })) &&
         (!modal || modal.contains(item.element)),
     );
   }
@@ -411,6 +424,14 @@ export class AnnotationStore<TRef> {
     }
   }
   isMediaTarget = (target: AnnotationTarget<TRef>) => this.objectPresentations(target).length > 0;
+  targetBorderRadius = (target: AnnotationTarget<TRef>) => {
+    const element = this.objectPresentations(target)[0]?.element;
+    return element ? getComputedStyle(element).borderRadius : '0px';
+  };
+  previewAnnotation = (id: string | null, source: 'hover' | 'focus') => {
+    const key = source === 'hover' ? 'hoveredAnnotationId' : 'focusedAnnotationId';
+    if (this.state[key] !== id) this.publish({ [key]: id });
+  };
   /** Resolve live renderer geometry while retaining readable summaries after unmount. */
   presentation = (
     targets: readonly AnnotationTarget<TRef>[],
@@ -487,7 +508,7 @@ export class AnnotationStore<TRef> {
           ),
         ),
       ]),
-    ].filter((element): element is HTMLElement => !!element?.isConnected);
+    ].filter((element): element is Element => !!element?.isConnected);
   numberFor = (id: string) =>
     this.numbers.get(id) ??
     (this.state.editor && !this.state.editor.id && this.state.editor.draftId === id
@@ -594,28 +615,32 @@ export class AnnotationStore<TRef> {
     this.cancelEditor();
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */
-  targetRects = (target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] => {
+  targetRects = (
+    target: AnnotationTarget<TRef>,
+    firstOnly = false,
+    viewport?: AnnotationViewport,
+  ): ClippedRect[] => {
     if (
       this.mediaViewTarget &&
+      !isElementAnnotationRef(target.ref) &&
       annotationTargetKey(this.mediaViewTarget) !== annotationTargetKey(target)
     )
       return [];
     const key = sourceKey(target);
     if (
       this.fileView?.open &&
+      !isElementAnnotationRef(target.ref) &&
       (!this.fileView.snapshot || key !== sourceKey(this.fileView.snapshot))
     )
       return [];
-    const clipRect = createRectClipper();
+    const clipRect = createRectClipper(viewport);
     const object = this.objectPresentations(target)[0];
     if (object) {
-      const bounds =
-        object.element.querySelector?.('svg')?.getBoundingClientRect() ??
-        object.element.getBoundingClientRect();
+      const bounds = object.bounds?.() ?? object.element.getBoundingClientRect();
       const visible = clipRect(bounds, object.element);
       return visible ? [visible] : [];
     }
-    if (!target.text) return this.adapterRects(target, firstOnly);
+    if (!target.text) return this.adapterRects(target, firstOnly, viewport);
     const text = target.text;
     const original =
       this.sources.get(annotationTargetKey(target)) ??
@@ -662,12 +687,17 @@ export class AnnotationStore<TRef> {
         }
       }
     }
-    return mapped ? rects : this.adapterRects(target, firstOnly);
+    return mapped ? rects : this.adapterRects(target, firstOnly, viewport);
   };
-  private adapterRects(target: AnnotationTarget<TRef>, firstOnly = false): ClippedRect[] {
+  private adapterRects(
+    target: AnnotationTarget<TRef>,
+    firstOnly = false,
+    viewport?: AnnotationViewport,
+  ): ClippedRect[] {
     const rects: ClippedRect[] = [];
-    const clipRect = createRectClipper();
-    if (this.fileSnapshots.has(sourceKey(target))) return rects;
+    const clipRect = createRectClipper(viewport);
+    if (this.fileSnapshots.has(sourceKey(target)) || isElementAnnotationRef(target.ref))
+      return rects;
     for (const range of this.options?.adapter?.targetRanges?.(target) ?? []) {
       if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
       const element =
@@ -689,7 +719,8 @@ export class AnnotationStore<TRef> {
   private async resolve(target: AnnotationTarget<TRef>): Promise<AnnotationTargetResolution> {
     const snapshot = this.fileSnapshots.get(sourceKey(target));
     if (snapshot) return { status: 'ready', text: snapshot.file.text };
-    if (this.options?.adapter) return this.options.adapter.resolve(target);
+    if (this.options?.adapter && !isElementAnnotationRef(target.ref))
+      return this.options.adapter.resolve(target);
     const key = sourceKey(target);
     const texts = [...this.texts.values()].filter(
       (item) =>
@@ -729,9 +760,14 @@ export class AnnotationStore<TRef> {
       );
   }
   locateAndEdit = async (id: string, target: AnnotationTarget<TRef>) => {
+    if (isElementAnnotationRef(target.ref) && !this.objectPresentations(target).length) {
+      this.openAnnotation(id, undefined, 'bottom-right');
+      return;
+    }
     const request = this.locating + 1;
     await this.locate(target);
-    if (request === this.locating) this.openAnnotation(id);
+    if (request === this.locating)
+      this.openAnnotation(id, undefined, { marker: annotationTargetKey(target) });
   };
   locate: AnnotationController<TRef>['locate'] = async (target) => {
     if (this.state.editor) {
@@ -746,7 +782,7 @@ export class AnnotationStore<TRef> {
       const source = resolution.status === 'ready' ? resolution.text : undefined;
       if (request !== this.locating) return;
       if (fileSnapshot) await this.showFile(fileSnapshot);
-      else {
+      else if (!isElementAnnotationRef(target.ref)) {
         if (this.fileView?.open) this.closeFile();
         if (this.options?.adapter) await this.options.adapter.locate(copy(target));
         else {
@@ -788,11 +824,17 @@ export class AnnotationStore<TRef> {
       // Without an adapter, Paneon cannot bring back content that the page unmounted.
       if (!element && !fileSnapshot && !this.options?.adapter)
         throw new Error(
-          'The target is not displayed. Supply an adapter whose locate shows its view.',
+          isElementAnnotationRef(target.ref)
+            ? 'The annotated element is hidden or removed. Edit its annotation from the list.'
+            : 'The target is not displayed. Supply an adapter whose locate shows its view.',
         );
-      element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      if (target.text && !this.isMediaTarget(target)) this.highlightText(target, source);
-      if (element) await waitForAnnotationLocation(element);
+      if (element && isElementAnnotationRef(target.ref)) {
+        await scrollElementAnnotationIntoView(element, this.overlayContainer ?? undefined);
+      } else {
+        element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (target.text && !this.isMediaTarget(target)) this.highlightText(target, source);
+        if (element) await waitForAnnotationLocation(element);
+      }
       if (request !== this.locating) return;
       element?.animate?.(
         [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],

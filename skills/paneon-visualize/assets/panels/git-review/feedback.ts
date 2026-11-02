@@ -1,4 +1,5 @@
-import type { AnnotationValue, AnnotationTarget } from '@qoggy/paneon/sdk';
+import type { AnnotationValue, AnnotationTarget, ElementAnnotationRef } from '@qoggy/paneon/sdk';
+import { splitElementAnnotations } from '../../shared/element-annotations.ts';
 import { sourceLines } from '../../shared/diff-model.ts';
 import { diffTargetText, normalizeDiffTarget } from '../../shared/diff-schema.ts';
 import type { GitSnapshot } from './git.ts';
@@ -18,11 +19,12 @@ import type {
 type Evidence = GitSnapshotSource['evidence'][number];
 /** Build only the source fragments required by this explicit submission. Browser memory owns them. */
 export function buildGitFeedback(
-  feedback: AnnotationValue<GitRef> & { replacesEventId?: number },
+  feedback: AnnotationValue<GitRef | ElementAnnotationRef> & { replacesEventId?: number },
   snapshots: ReadonlyMap<string, GitSnapshot>,
 ): GitFeedbackResult {
   const sources: Record<string, GitSnapshotSource> = {};
-  const annotations = feedback.annotations.map((annotation) => {
+  const { source: sourceAnnotations, elements } = splitElementAnnotations<GitRef>(feedback);
+  const annotations = sourceAnnotations.map((annotation) => {
     const targets = annotation.targets.map((target) => {
       const snapshot = snapshots.get(target.ref.sourceId);
       if (!snapshot) throw new Error('Original snapshot is missing. Draft retained.');
@@ -64,7 +66,11 @@ export function buildGitFeedback(
       targets: [...new Map(targets.map((target) => [JSON.stringify(target), target])).values()],
     };
   });
-  return gitFeedbackResultSchema.parse({ ...feedback, annotations, sources });
+  return gitFeedbackResultSchema.parse({
+    ...feedback,
+    annotations: [...annotations, ...elements],
+    sources,
+  });
 }
 function checkHunk(evidence: Extract<Evidence, { kind: 'hunk' }>) {
   const header = `@@ -${evidence.oldStart},${evidence.oldLines} +${evidence.newStart},${evidence.newLines} @@\n`;
@@ -183,7 +189,7 @@ export function validateGitFeedback(
       }
     }
   }
-  for (const annotation of result.annotations)
+  for (const annotation of splitElementAnnotations<GitRef>(result).source)
     for (const target of annotation.targets) {
       const source = result.sources[target.ref.sourceId];
       if (!source) throw new Error('Missing original source. Draft retained.');
@@ -205,7 +211,8 @@ export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitt
     const { repositoryId: _repositoryId, evidence: _evidence, ...source } = feedback.sources[id];
     return source;
   };
-  for (const annotation of feedback.annotations) {
+  const { source: annotations, published } = splitElementAnnotations<GitRef>(feedback);
+  for (const annotation of annotations) {
     const first = annotation.targets[0];
     const key = first.ref.sourceId;
     let file = files.get(key);
@@ -247,6 +254,7 @@ export function publicGitFeedback(feedback: GitFeedbackResult): GitReviewSubmitt
   }
   return gitReviewSubmittedSchema.parse({
     files: [...files.values()],
+    ...(published.length ? { annotations: published } : {}),
     ...(feedback.replacesEventId === undefined
       ? {}
       : { replacesEventId: feedback.replacesEventId }),

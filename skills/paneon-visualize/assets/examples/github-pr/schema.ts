@@ -1,4 +1,5 @@
 import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { publishedElementAnnotationsSchema } from '../../shared/element-annotations.ts';
 import { gitLocationSchema, gitRefSchema } from '../../shared/diff-schema.ts';
 export const repositorySchema = z
   .string()
@@ -95,6 +96,7 @@ const annotations = z.array(
   z.object({ targets: z.array(publishedTargetSchema), comment: z.string() }),
 );
 export const prFeedbackSubmittedSchema = z.object({
+  annotations: publishedElementAnnotationsSchema.optional(),
   repository: repositorySchema,
   sources: z.array(
     z.union([

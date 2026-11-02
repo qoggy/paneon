@@ -3,6 +3,7 @@ import type {
   Annotation,
   AnnotationTarget,
   JsonValue,
+  ElementAnnotationRef,
 } from '../sdk/annotation.js';
 
 export type AnnotationTargetResolution =
@@ -16,7 +17,7 @@ export type AnnotationAdapter<TRef = JsonValue> = {
   targetRanges?(target: AnnotationTarget<TRef>): readonly Range[];
 };
 export type PageAnnotationOptions<TRef = JsonValue> = {
-  onSubmit: (value: AnnotationValue<TRef>) => Promise<unknown>;
+  onSubmit: (value: AnnotationValue<TRef | ElementAnnotationRef>) => Promise<unknown>;
   adapter?: AnnotationAdapter<TRef>;
   disabled?: boolean;
   allowEmptySubmit?: boolean;
@@ -68,9 +69,11 @@ export type AnnotationEditor<TRef> = {
   draftId: string;
   targets: AnnotationTarget<TRef>[];
   comment: string;
-  anchor?: { marker: string } | DOMRect;
+  anchor?: { marker: string } | DOMRect | 'bottom-right';
 };
 export type AnnotationUI<TRef> = {
+  hoveredAnnotationId: string | null;
+  focusedAnnotationId: string | null;
   pending: AnnotationTarget<TRef>[];
   editor: AnnotationEditor<TRef> | null;
   editorAttention: number;

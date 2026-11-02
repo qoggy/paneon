@@ -2,12 +2,17 @@ export { definePanel, serverAction, z } from './server.js';
 export type { PanelDefinition, Action, ActionContext } from './server.js';
 export { usePanelInput, useQuery, agent } from './client.js';
 
-export { annotationValueSchema } from './annotation.js';
+export {
+  annotationValueSchema,
+  elementAnnotationRefSchema,
+  isElementAnnotationRef,
+} from './annotation.js';
 export type {
   AnnotationValue,
   AnnotationTarget,
   Annotation,
   AnnotationTextRange,
+  ElementAnnotationRef,
   JsonValue,
 } from './annotation.js';
 

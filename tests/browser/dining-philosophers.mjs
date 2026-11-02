@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { startExplanationsFixture } from './explanations-fixture.mjs';
+import { submitAnnotations } from './annotation-tools.mjs';
 import { simulationTrace } from '#test-skill/assets/examples/dining-philosophers/model.ts';
 
 export async function verifyDiningPhilosophers(page, fixture) {
@@ -29,7 +30,7 @@ export async function verifyDiningPhilosophers(page, fixture) {
     });
   };
   await frame.getByRole('heading', { name: '哲学家就餐', exact: true }).waitFor();
-  await assertNoAnnotations(frame);
+  await assertNoDraft(frame);
   assert.equal(await frame.locator('[data-philosopher]').count(), 5);
   assert.equal(await frame.locator('[data-fork]').count(), 5);
   assert.equal(await frame.locator('[data-next-edge]').count(), 0);
@@ -141,7 +142,7 @@ export async function verifyDiningPhilosophers(page, fixture) {
     selection.addRange(range);
     element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await assertNoAnnotations(frame);
+  await assertNoDraft(frame);
   for (const strategy of ['serial', 'ordered']) {
     await frame
       .getByRole('radio', { name: strategy === 'serial' ? '依次就餐' : '按编号取叉', exact: true })
@@ -194,8 +195,44 @@ export async function verifyDiningPhilosophers(page, fixture) {
     assert.equal(await frame.locator('[data-next-edge]').count(), 0);
     assert.equal(await frame.locator('[data-fork][data-owner="free"]').count(), 5);
   }
-  await assertNoAnnotations(frame);
+  await assertNoDraft(frame);
   assert.equal((await fixture.events('dining-philosophers')).length, 0);
+  await annotateForks(page, fixture);
+}
+// Picking the fork diagram delivers an excerpt that names the strategy and step it showed.
+// A fresh page keeps this independent of the fake clock installed above.
+async function annotateForks(previous, fixture) {
+  const page = await previous
+    .context()
+    .browser()
+    .newPage({ viewport: { width: 1440, height: 1100 } });
+  try {
+    await page.goto(fixture.url('dining-philosophers'));
+    const frame = page.frameLocator('iframe');
+    await frame.getByRole('heading', { name: '哲学家就餐', exact: true }).waitFor();
+    await frame.getByRole('button', { name: '下一步', exact: true }).click();
+    await frame.getByRole('button', { name: /^(Select content to annotate|选取批注)$/ }).click();
+    await frame.locator('[data-element-annotation-picker="pick"]').waitFor();
+    await frame.getByRole('img', { name: /叉子$/ }).click({ position: { x: 4, y: 4 } });
+    await frame.locator('[data-element-annotation-picker="review"]').waitFor();
+    await page.keyboard.press('Enter');
+    const editor = frame.locator('[data-annotation-editor]');
+    await editor.locator('textarea').fill('为什么先拿左叉会死锁？');
+    await editor.locator('textarea').press('Enter');
+    await editor.waitFor({ state: 'hidden' });
+    await submitAnnotations(frame);
+    const events = await fixture.events('dining-philosophers');
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'annotations-submitted');
+    const [annotation] = events[0].payload.annotations;
+    assert.equal(annotation.comment, '为什么先拿左叉会死锁？');
+    assert.deepEqual(annotation.targets.length, 1);
+    const { element } = annotation.targets[0].ref;
+    assert.equal(element.tag, 'svg');
+    assert.equal(element.excerpt, '先拿左叉 #1 · 叉子');
+  } finally {
+    await page.close();
+  }
 }
 async function assertResourceArrows(frame) {
   const edges = await frame.locator('[data-next-edge]').evaluateAll((lines) =>
@@ -222,9 +259,10 @@ async function assertResourceArrows(frame) {
     if (edge.tone !== 'planned') assert.notEqual(edge.owner, 'free');
   }
 }
-async function assertNoAnnotations(frame) {
-  assert.equal(await frame.getByRole('button', { name: /批注|annotation/i }).count(), 0);
-  assert.equal(await frame.locator('[data-annotation-surface], [data-annotation-text]').count(), 0);
+// Exploring the simulation never opens the annotation editor or creates a draft.
+async function assertNoDraft(frame) {
+  assert.equal(await frame.locator('[data-annotation-editor]:visible').count(), 0);
+  assert.equal(await frame.locator('[data-annotation-number]').count(), 0);
   assert.equal(await frame.getByRole('dialog').count(), 0);
 }
 async function assertOwnershipOutside(frame) {
@@ -307,10 +345,10 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
         fullPage: true,
         animations: 'disabled',
       });
-    await assertNoAnnotations(frame);
+    await assertNoDraft(frame);
     assert.deepEqual(errors, []);
     console.log(
-      'Chrome desktop: six-line execution, next/blocked/deadlock resource arrows, fork release versus permit release, 1-second playback, rewind and no annotations passed.',
+      'Chrome desktop: six-line execution, next/blocked/deadlock resource arrows, fork release versus permit release, 1-second playback, rewind and exploration without drafts passed.',
     );
   } finally {
     await browser?.close();

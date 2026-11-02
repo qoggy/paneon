@@ -1,7 +1,11 @@
 import { useLocale } from '../../shared/i18n';
 import { useMemo, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
-import type { AnnotationValue, AnnotationTarget as Target } from '@qoggy/paneon/sdk';
+import type {
+  AnnotationValue,
+  AnnotationTarget as Target,
+  ElementAnnotationRef,
+} from '@qoggy/paneon/sdk';
 import {
   Button,
   AnnotationText,
@@ -327,7 +331,7 @@ function TablePanel() {
   const headingContainer = useRef<HTMLDivElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const description = useRef<HTMLDivElement>(null);
-  const submission = useSubmission<AnnotationValue<TableRef>>(
+  const submission = useSubmission<AnnotationValue<TableRef | ElementAnnotationRef>>(
     async (feedback) => {
       const validated = await validateTable({ snapshot: params, feedback });
       const receipt = await agent.emit('table-submitted', publicTableFeedback(validated));

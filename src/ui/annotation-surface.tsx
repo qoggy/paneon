@@ -10,10 +10,24 @@ import {
 } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronUp, MessageSquareText, Pencil, Send, Trash2, X } from 'lucide-react';
-import { annotationTargetKey } from '../sdk/annotation.js';
+import {
+  Check,
+  ChevronUp,
+  MessageSquareText,
+  MousePointerSquareDashed,
+  Pencil,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { annotationTargetKey, isElementAnnotationRef } from '../sdk/annotation.js';
 import { useAnnotations, useAnnotationContext } from './annotation-context';
-import { floatingPosition, markerPosition } from './annotation-geometry';
+import {
+  annotationOverlayStyle,
+  createAnnotationViewport,
+  floatingPosition,
+  markerPosition,
+} from './annotation-geometry';
 import { Button } from './button';
 import { Textarea } from './textarea';
 import { cn } from './utils';
@@ -21,11 +35,16 @@ import { Popover, PopoverTrigger, PopoverClose, PopoverContent } from './popover
 import { Tooltip, TooltipTrigger, TooltipContent } from './tooltip';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './empty';
 import { Spinner } from './spinner';
+import { useElementAnnotationPicker } from './element-annotation-context';
 
 type Marker = { id: string; number: number; target: string; rect: DOMRect };
+type Outline = { id: string; target: string; rect: DOMRect; borderRadius: string };
 type Geometry = {
   markers: Marker[];
   highlights: DOMRect[];
+  outlines: Outline[];
+  corner?: boolean;
+  topInset?: number;
   anchor?: DOMRect;
   pendingAnchor?: DOMRect;
   side?: 'top' | 'bottom';
@@ -38,12 +57,14 @@ export function AnnotationSurface() {
   const { t, message } = useUI();
   const { store, disabled } = useAnnotationContext();
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const [geometry, setGeometry] = useState<Geometry>({ markers: [], highlights: [] });
+  const [geometry, setGeometry] = useState<Geometry>({ markers: [], highlights: [], outlines: [] });
   const input = useRef<HTMLTextAreaElement>(null);
   const editor = useRef<HTMLDivElement>(null);
   const shake = useRef<Animation | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const blocked = disabled || state.submitting;
+  const emphasizedId =
+    state.editor?.draftId ?? state.hoveredAnnotationId ?? state.focusedAnnotationId;
   const requestAttention = useCallback(() => {
     input.current?.focus({ preventScroll: true });
     shake.current?.cancel();
@@ -76,6 +97,7 @@ export function AnnotationSurface() {
   useLayoutEffect(() => {
     let frame = 0;
     let registryDirty = true;
+    const viewportTracker = createAnnotationViewport();
     const measure = () => {
       // A view rebuild unregisters and registers multiple sources in one turn.
       // Measure only the settled registry, never each incomplete intermediate state.
@@ -83,10 +105,14 @@ export function AnnotationSurface() {
         resize.disconnect();
         resize.observe(document.body);
         for (const element of store.registeredElements()) resize.observe(element);
+        for (const bar of viewportTracker.refresh(store.overlayContainer ?? document.body))
+          resize.observe(bar);
         registryDirty = false;
       }
+      const viewport = viewportTracker.measure();
       const markers: Marker[] = [];
       const highlights: DOMRect[] = [];
+      const outlines: Outline[] = [];
       const placed: DOMRect[] = [];
       const snapshot = store.getSnapshot();
       const annotations = [...snapshot.value.annotations];
@@ -94,8 +120,17 @@ export function AnnotationSurface() {
         annotations.push({ ...snapshot.editor, id: snapshot.editor.draftId });
       for (const annotation of annotations) {
         for (const target of annotation.targets) {
-          const rects = store.targetRects(target);
-          if (!store.isMediaTarget(target)) highlights.push(...rects.map((item) => item.rect));
+          const rects = store.targetRects(target, false, viewport);
+          if (isElementAnnotationRef(target.ref)) {
+            for (const { rect } of rects)
+              outlines.push({
+                id: annotation.id,
+                target: annotationTargetKey(target),
+                rect,
+                borderRadius: store.targetBorderRadius(target),
+              });
+          } else if (!store.isMediaTarget(target))
+            highlights.push(...rects.map((item) => item.rect));
           const last = rects.at(-1);
           if (!last) continue;
           const position = markerPosition(last, placed);
@@ -112,35 +147,48 @@ export function AnnotationSurface() {
       const targets = snapshot.editor?.targets ?? snapshot.pending;
       const firstRect = (targets: typeof snapshot.pending) => {
         for (const target of targets) {
-          const rect = store.targetRects(target, true)[0];
+          const rect = store.targetRects(target, true, viewport)[0];
           if (rect) return rect.rect;
         }
       };
       const presentation = store.presentation(targets);
       const origin = snapshot.editor?.anchor;
+      const corner = origin === 'bottom-right';
       const clickedAnchor =
-        origin && 'marker' in origin
-          ? markers.find(
-              (marker) => marker.id === snapshot.editor?.draftId && marker.target === origin.marker,
-            )?.rect
-          : origin;
-      const anchor = clickedAnchor ?? presentation?.anchor ?? firstRect(targets);
+        origin && typeof origin !== 'string'
+          ? 'marker' in origin
+            ? markers.find(
+                (marker) =>
+                  marker.id === snapshot.editor?.draftId && marker.target === origin.marker,
+              )?.rect
+            : origin
+          : undefined;
+      const anchor = corner
+        ? new DOMRect(window.innerWidth - 16, window.innerHeight - 16, 0, 0)
+        : (clickedAnchor ?? presentation?.anchor ?? firstRect(targets));
       const pendingAnchor = snapshot.editor ? firstRect(snapshot.pending) : anchor;
       const next = {
         markers,
         highlights,
+        outlines,
+        corner,
+        topInset: viewport().top,
         anchor,
         pendingAnchor,
-        side: clickedAnchor
-          ? ('bottom' as const)
-          : presentation?.anchor
-            ? presentation.side
-            : undefined,
-        align: clickedAnchor
-          ? ('center' as const)
-          : presentation?.anchor
-            ? presentation.align
-            : undefined,
+        side: corner
+          ? ('top' as const)
+          : clickedAnchor
+            ? ('bottom' as const)
+            : presentation?.anchor
+              ? presentation.side
+              : undefined,
+        align: corner
+          ? ('end' as const)
+          : clickedAnchor
+            ? ('center' as const)
+            : presentation?.anchor
+              ? presentation.align
+              : undefined,
       };
       setGeometry((current) => (serialize(current) === serialize(next) ? current : next));
     };
@@ -161,8 +209,10 @@ export function AnnotationSurface() {
               change.target instanceof Element ? change.target : change.target.parentElement
             )?.closest('[data-annotation-controls]'),
         )
-      )
+      ) {
+        registryDirty = true;
         schedule();
+      }
     });
     mutations.observe(document.body, {
       childList: true,
@@ -194,25 +244,32 @@ export function AnnotationSurface() {
   };
   // The viewer's translated dialog is the containing block for fixed descendants.
   // Marker rectangles use viewport coordinates, so remove that containing-block origin.
-  const mediaContainer = store.mediaViewActive ? store.overlayContainer : null;
-  const mediaOrigin = mediaContainer?.getBoundingClientRect();
   return createPortal(
     <div
       data-annotation-controls=""
       data-annotation-surface=""
       className="pointer-events-none fixed inset-0 z-50"
-      style={
-        mediaOrigin && mediaContainer
-          ? {
-              left: -mediaOrigin.left - mediaContainer.clientLeft,
-              top: -mediaOrigin.top - mediaContainer.clientTop,
-              width: window.innerWidth,
-              height: window.innerHeight,
-            }
-          : undefined
-      }
+      style={annotationOverlayStyle(store.mediaViewActive ? store.overlayContainer : null)}
     >
       <div aria-hidden="true">
+        {geometry.outlines.map((outline, index) => (
+          <div
+            key={`${outline.id}:${outline.target}:${index}`}
+            data-annotation-outline={outline.id}
+            data-emphasized={emphasizedId === outline.id ? 'true' : 'false'}
+            className={cn(
+              'pointer-events-none absolute box-border border border-primary/35 transition-colors motion-reduce:transition-none',
+              emphasizedId === outline.id && 'border-2 border-primary',
+            )}
+            style={{
+              left: outline.rect.left,
+              top: outline.rect.top,
+              width: outline.rect.width,
+              height: outline.rect.height,
+              borderRadius: outline.borderRadius,
+            }}
+          />
+        ))}
         {geometry.highlights.map((rect, index) => (
           <div
             key={index}
@@ -233,6 +290,10 @@ export function AnnotationSurface() {
           disabled={blocked}
           className="pointer-events-auto absolute rounded-full transition-colors"
           style={{ left: marker.rect.left, top: marker.rect.top }}
+          onPointerEnter={() => store.previewAnnotation(marker.id, 'hover')}
+          onPointerLeave={() => store.previewAnnotation(null, 'hover')}
+          onFocus={() => store.previewAnnotation(marker.id, 'focus')}
+          onBlur={() => store.previewAnnotation(null, 'focus')}
           onClick={() => {
             if (state.editor?.draftId === marker.id) input.current?.focus({ preventScroll: true });
             else store.openAnnotation(marker.id, undefined, { marker: marker.target });
@@ -290,12 +351,18 @@ export function AnnotationSurface() {
             container={store.overlayContainer ?? undefined}
             data-annotation-controls=""
             data-annotation-editor=""
+            data-annotation-editor-placement={geometry.corner ? 'bottom-right' : 'target'}
             aria-label={t('编辑批注')}
             side={geometry.side ?? 'top'}
             positionMethod="fixed"
             align={geometry.align ?? 'start'}
-            sideOffset={geometry.side ? 8 : 28}
-            collisionPadding={8}
+            sideOffset={geometry.corner ? 0 : geometry.side ? 8 : 28}
+            collisionPadding={{
+              top: Math.max(8, geometry.topInset ?? 0),
+              right: 8,
+              bottom: 8,
+              left: 8,
+            }}
             anchor={editorAnchor.current}
             className="pointer-events-auto max-h-[min(calc(100dvh-16px),var(--available-height))] w-[min(22.5rem,calc(100vw-1rem))] overflow-auto rounded-2xl p-1.5 focus-within:border-ring"
             initialFocus={() => {
@@ -484,6 +551,7 @@ export function AnnotationMenu() {
   const { t } = useUI();
   const { store, disabled } = useAnnotationContext();
   const feedback = useAnnotations();
+  const picker = useElementAnnotationPicker();
   const { allowEmptySubmit = false, onRequestEdit } = store.configuration ?? {};
   const empty = feedback.value.annotations.length === 0;
   const blocked = disabled || feedback.submitting;
@@ -491,6 +559,14 @@ export function AnnotationMenu() {
   const [position, setPosition] = useState<LauncherPosition | null>(null);
   const [dragging, setDragging] = useState(false);
   const launcher = useRef<HTMLDivElement>(null);
+  const setLauncher = picker.setLauncher;
+  const launcherRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      launcher.current = node;
+      setLauncher(node);
+    },
+    [setLauncher],
+  );
   const drag = useRef<{
     pointerId: number;
     x: number;
@@ -507,6 +583,8 @@ export function AnnotationMenu() {
   const close = () => {
     cancelClose();
     pinned.current = false;
+    store.previewAnnotation(null, 'hover');
+    store.previewAnnotation(null, 'focus');
     setMenuOpen(false);
   };
   const scheduleClose = () => {
@@ -540,12 +618,39 @@ export function AnnotationMenu() {
   };
   return createPortal(
     <div
-      ref={launcher}
+      ref={launcherRef}
       data-annotation-controls=""
       data-annotation-launcher=""
-      className="pointer-events-auto fixed right-4 bottom-4 z-50"
+      className="pointer-events-auto fixed right-4 bottom-4 z-50 flex items-center rounded-full border bg-popover text-popover-foreground shadow-md"
       style={position ? { ...position, right: 'auto', bottom: 'auto' } : undefined}
     >
+      <span className="flex items-center border-r px-0.5">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                size="icon-sm"
+                variant={picker.active ? 'default' : 'ghost'}
+                className="rounded-full"
+                aria-label={t(picker.active ? 'Exit selection' : 'Select content to annotate')}
+                aria-pressed={picker.active}
+                disabled={picker.blocked}
+                onClick={() => {
+                  close();
+                  if (picker.active) picker.exit();
+                  else picker.enter();
+                }}
+              >
+                <MousePointerSquareDashed aria-hidden="true" />
+              </Button>
+            }
+          />
+          <TooltipContent sideOffset={8}>
+            {t(picker.active ? 'Exit selection' : 'Select page content and add an annotation')}
+          </TooltipContent>
+        </Tooltip>
+      </span>
       <Popover
         open={menuOpen}
         onOpenChange={(open) => {
@@ -559,7 +664,7 @@ export function AnnotationMenu() {
               type="button"
               variant="outline"
               className={cn(
-                'touch-none rounded-full bg-popover text-popover-foreground shadow-md select-none dark:bg-popover',
+                'touch-none rounded-l-none rounded-r-full border-0 bg-popover text-popover-foreground shadow-none select-none dark:bg-popover',
                 dragging ? 'cursor-grabbing' : 'cursor-grab',
               )}
               disabled={feedback.submitting}
@@ -606,6 +711,7 @@ export function AnnotationMenu() {
               onPointerCancel={finishDrag}
               onLostPointerCapture={finishDrag}
               onMouseMove={(event) => {
+                if (picker.active) return;
                 if (event.buttons !== 0 || drag.current || suppressHover.current) return;
                 cancelClose();
                 if (menuOpen) return;
@@ -623,6 +729,7 @@ export function AnnotationMenu() {
                   suppressClick.current = false;
                   return;
                 }
+                picker.exit();
                 cancelClose();
                 if (pinned.current) close();
                 else {
@@ -663,7 +770,7 @@ export function AnnotationMenu() {
               <EmptyHeader className="min-w-0 items-start gap-1">
                 <EmptyTitle>{t('No annotations yet')}</EmptyTitle>
                 <EmptyDescription className="text-xs leading-5">
-                  {t('Select text on the page, then click “Annotation” to add one.')}
+                  {t('Select text or use the selection icon to annotate page content.')}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -674,6 +781,13 @@ export function AnnotationMenu() {
                 key={entry.id}
                 data-annotation-id={entry.id}
                 className="relative border-b text-sm last:border-b-0"
+                onPointerEnter={() => store.previewAnnotation(entry.id, 'hover')}
+                onPointerLeave={() => store.previewAnnotation(null, 'hover')}
+                onFocusCapture={() => store.previewAnnotation(entry.id, 'focus')}
+                onBlurCapture={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget))
+                    store.previewAnnotation(null, 'focus');
+                }}
               >
                 <button
                   type="button"

@@ -33,46 +33,4 @@ The human can add and remove repositories within the page; added ones are lost o
 
 ## Annotation submission
 
-`git-review-submitted` contains complete feedback grouped by the original file snapshot:
-
-```json
-{
-  "files": [
-    {
-      "repositoryPath": "/work/web",
-      "view": { "type": "changes", "area": "unstaged", "headCommit": "complete-commit-oid" },
-      "old": { "path": "a.ts", "contentHash": "sha256:actual-old-bytes", "type": "text" },
-      "new": { "path": "a.ts", "contentHash": "sha256:actual-new-bytes", "type": "text" },
-      "annotations": [
-        {
-          "targets": [
-            {
-              "kind": "lines",
-              "side": "new",
-              "startLine": 2,
-              "endLine": 2,
-              "text": "const n = 4;\r\n",
-              "selection": { "start": 6, "end": 11, "quote": "n = 4" }
-            }
-          ],
-          "comment": "Check this value."
-        }
-      ]
-    }
-  ]
-}
-```
-
-- Each entry of `files` is one opened file snapshot: its source fields plus `annotations`, each with `targets` and one `comment`.
-- A target has a `kind`:
-  - `file`: the whole file.
-  - `hunk`: the unified `patch`, including its `@@` header.
-  - `lines`: `side` (`old` or `new`), one-based inclusive `startLine` / `endLine`, the original lines in `text` including their separators, and `selection`. `selection.start` / `end` are UTF-16 offsets into `text`; `quote` is present only for a partial selection.
-- A file records `repositoryPath` (the Git root) and the actual `view` with complete commit IDs:
-  - `changes`: `area` (`staged`, `unstaged` or `untracked`) and optional `headCommit`;
-  - `history`: `commit` and its `parent` (`null` for a root commit);
-  - `compare`: `mode`, `baseCommit` (`null` when compared with the empty tree), `headCommit` and optional `mergeBaseCommit`.
-- `old` / `new` give each side's path, `sha256:` content hash and `text` or `binary` type; an added or deleted file omits one side.
-- An annotation spanning several snapshots appears once, under its first target's file; a target from another snapshot carries that snapshot's fields in `source`.
-- Working-tree content is captured when the human opens the file and may since have changed on disk.
-- A correction carrying `replacesEventId` may have `files: []`, which withdraws all earlier feedback.
+`git-review-submitted` groups the annotations by the file snapshot the human opened, with complete commit IDs. Working-tree content is captured when the human opens a file and may since have changed on disk.
