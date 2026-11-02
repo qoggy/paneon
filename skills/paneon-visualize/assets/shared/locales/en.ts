@@ -144,8 +144,6 @@ const en = {
   '请至少选择一个位置。': 'Select at least one location.',
   Description: 'Description',
   说明: 'Description',
-  'Questionnaire description': 'Questionnaire description',
-  问卷说明: 'Questionnaire description',
   'Answer summary': 'Answer summary',
   'Question directory': 'Question directory',
   Questions: 'Questions',

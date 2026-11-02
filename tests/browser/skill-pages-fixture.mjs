@@ -4,12 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const choices = {
-  title: 'Standard choice acceptance',
-  description: 'Compare the choices, then submit one complete result.',
   questions: [
     {
       id: 'storage',
       title: 'Storage',
+      description: 'Compare storage options for the current deployment.',
       options: [
         {
           id: 'sqlite',

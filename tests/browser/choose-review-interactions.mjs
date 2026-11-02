@@ -44,8 +44,8 @@ try {
     frame.getByLabel(`Additional explanation for ${label} (optional)`, { exact: true });
   await frame.getByRole('heading', { name: 'Storage', exact: true }).waitFor();
   await frame
-    .getByLabel('Questionnaire description', { exact: true })
-    .getByText(choices.description, { exact: true })
+    .locator('[data-choice-content] header')
+    .getByText(choices.questions[0].description, { exact: true })
     .waitFor();
   assert.equal(await button('Return to summary').count(), 0);
   await frame.getByRole('radio', { name: 'SQLite', exact: true }).check();
@@ -194,10 +194,8 @@ try {
     0,
   );
   await summary.getByText('1 / 3 answered', { exact: true }).waitFor();
-  await frame
-    .getByLabel('Questionnaire description', { exact: true })
-    .getByText(choices.description, { exact: true })
-    .waitFor();
+  assert.equal(await frame.locator('[data-choice-content] header').count(), 0);
+  await summary.getByRole('heading', { name: 'Answer summary', level: 1, exact: true }).waitFor();
   assert.equal(await summary.locator('[data-answer-incomplete="true"]').count(), 2);
   assert.equal(await summary.locator('[data-answer-error="true"]').count(), 0);
   assert.equal(await summary.getByText('!', { exact: true }).count(), 0);

@@ -82,7 +82,7 @@ try {
     });
     await page.screenshot({ path: join(process.env.PANEON_TEST_ARTIFACTS, name) });
   }
-  await frame.getByRole('heading', { name: choices.title, exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Storage', level: 1, exact: true }).waitFor();
   assert.equal(
     await mine().isVisible(),
     true,
@@ -98,23 +98,21 @@ try {
     0,
     'Recommendation must not preselect.',
   );
-  const description = frame.getByLabel('Questionnaire description', { exact: true });
-  await description.getByText(choices.description, { exact: true }).waitFor();
+  const description = frame.locator('[data-choice-content] header .markdown-body');
+  await description.getByText(choices.questions[0].description, { exact: true }).waitFor();
   assert.equal(await frame.getByRole('button', { name: 'Description', exact: true }).count(), 0);
   assert.equal(await frame.getByText('Question 1 / 3', { exact: true }).count(), 0);
   assert.equal(await frame.getByText('Select one answer or write your own.').count(), 0);
-  const contextBox = await frame
-    .getByRole('heading', { name: choices.title, exact: true })
-    .boundingBox();
   assert.equal(await frame.getByText('1 / 3', { exact: true }).count(), 0);
   const headingBox = await frame
     .getByRole('heading', { name: 'Storage', exact: true })
     .boundingBox();
   const descriptionBox = await description.boundingBox();
-  assert.ok(contextBox && headingBox && descriptionBox);
+  const contentBox = await frame.locator('[data-choice-content]').boundingBox();
+  assert.ok(contentBox && headingBox && descriptionBox);
   assert.ok(
-    descriptionBox.y > contextBox.y && headingBox.y > descriptionBox.y,
-    'Readable body description sits between compact context and question.',
+    Math.abs(headingBox.y - contentBox.y) <= 2 && descriptionBox.y > headingBox.y,
+    'The question starts the answering column, followed by its own description.',
   );
   await screenshot('choose-description-desktop.png');
   const choiceLayout = await frame.locator('main').evaluate((element) => {
@@ -146,6 +144,7 @@ try {
   await screenshot('choose-desktop.png');
   await next();
   await frame.getByRole('heading', { name: 'Features', exact: true }).waitFor();
+  assert.equal(await description.count(), 0, 'Questions without descriptions have no empty block.');
   assert.equal(await frame.getByText('2 / 3', { exact: true }).count(), 0);
   assert.equal(await frame.getByRole('alert').count(), 0, 'Unanswered questions allow browsing.');
   await next();
@@ -534,7 +533,6 @@ try {
     replacesEventId: initial.id,
   });
   const secondRound = await fixture.run('choose', {
-    title: 'New round',
     questions: [choices.questions[0]],
   });
   assert.notEqual(secondRound.instanceId, fixture.choose.instanceId);
@@ -542,16 +540,7 @@ try {
   const secondPage = await browser.newPage();
   await secondPage.goto(fixture.url(secondRound));
   const secondFrame = secondPage.frameLocator('iframe');
-  await secondFrame.getByRole('heading', { name: 'New round', exact: true }).waitFor();
-  assert.equal(
-    await secondFrame.getByRole('button', { name: 'Description', exact: true }).count(),
-    0,
-  );
-  assert.equal(
-    await secondFrame.getByLabel('Questionnaire description', { exact: true }).count(),
-    0,
-    'No empty description block is rendered.',
-  );
+  await secondFrame.getByRole('heading', { name: 'Storage', level: 1, exact: true }).waitFor();
   await secondFrame.getByRole('radio', { name: 'SQLite', exact: true }).check();
   await secondFrame.getByRole('button', { name: 'Next', exact: true }).click();
   await secondFrame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
@@ -564,7 +553,6 @@ try {
   });
   // A multiple-choice custom answer also works alone; cancelled custom text is not emitted.
   const customRound = await fixture.run('choose', {
-    title: 'Multiple custom',
     questions: [choices.questions[1]],
   });
   await secondPage.goto(fixture.url(customRound));
@@ -598,28 +586,21 @@ try {
   );
   await secondPage.close();
 
-  // Header-only long-content case uses the existing fixture's public run helper.
+  // Question titles and descriptions remain readable without a questionnaire header.
   const longQuestionTitle =
     'Choose the storage strategy for the current deployment and future expansion: ' +
     'uninterrupted'.repeat(12);
+  const longDescriptionEnd = 'End of the complete question description.';
   const questionDescription =
-    'Question-specific context remains visible and wraps naturally. '.repeat(5);
-  const longDescriptionEnd = 'End of the complete questionnaire description.';
+    'Question-specific context with **important details**.\n\n'.repeat(25) + longDescriptionEnd;
   const longRound = await fixture.run('choose', {
-    title:
-      'A long questionnaire title with deployment context and ownership ' +
-      'uninterrupted'.repeat(8),
-    description:
-      '# Questionnaire background\n\n' +
-      'Full Markdown context with **important details**.\n\n'.repeat(25) +
-      longDescriptionEnd,
     questions: [
       { ...choices.questions[0], title: longQuestionTitle, description: questionDescription },
     ],
   });
   await page.goto(fixture.url(longRound));
   await frame.getByRole('heading', { name: longQuestionTitle, exact: true }).waitFor();
-  await frame.getByText(questionDescription.trim(), { exact: true }).waitFor();
+  await description.getByText(longDescriptionEnd, { exact: true }).waitFor();
   await screenshot('choose-long-header-desktop.png');
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
@@ -649,7 +630,7 @@ try {
   });
   await touchPage.goto(fixture.url(longRound));
   const touchFrame = touchPage.frameLocator('iframe');
-  const touchDescription = touchFrame.getByLabel('Questionnaire description', { exact: true });
+  const touchDescription = touchFrame.locator('[data-choice-content] header .markdown-body');
   await touchDescription.getByText(longDescriptionEnd, { exact: true }).waitFor();
   assert.equal(
     await touchFrame.getByRole('button', { name: 'Description', exact: true }).count(),
@@ -1041,7 +1022,6 @@ try {
   const longChoiceLabel =
     '支持很长的方案名称与部署路径 ' + 'very-long-unbroken-choice-label'.repeat(5);
   const choiceLayoutRound = await fixture.run('choose', {
-    title: 'Questionnaire layout acceptance',
     questions: [
       {
         id: 'layout',
@@ -1074,7 +1054,7 @@ try {
   await choiceLayoutPage.goto(fixture.url(choiceLayoutRound));
   const choiceLayoutFrame = choiceLayoutPage.frameLocator('iframe');
   await choiceLayoutFrame
-    .getByRole('heading', { name: 'Questionnaire layout acceptance' })
+    .getByRole('heading', { name: 'Which direction should the agent take?', level: 1, exact: true })
     .waitFor();
   const longChoice = choiceLayoutFrame.locator('[data-choice-option="long"]');
   const longChoiceMetrics = await longChoice.evaluate((element) => {
@@ -1181,7 +1161,7 @@ try {
     });
   }
   console.log(
-    'Copied skill: choose compact header, always-readable full Markdown description with touch access, single/multiple/review progress, long header desktop/390px wrapping and untruncated description; choose compact desktop/mobile layout, independent responsive detail pane with focus/scroll/draft checks, always-visible custom answer, per-option explanation drafts, single exclusivity, multiple option/custom combinations, visible invalid rows without forced navigation, durable complete answers, failed corrections and new-round isolation; form compact clear actions, wrapping options, inline boolean labels, desktop/mobile geometry, keyboard and required-clear validation, pending freeze, failure drafts and complete corrections; CLI events/ack passed.',
+    'Copied skill: choose question-only header, question-specific Markdown description, long question desktop/390px wrapping and untruncated description; choose compact desktop/mobile layout, independent responsive detail pane with focus/scroll/draft checks, always-visible custom answer, per-option explanation drafts, single exclusivity, multiple option/custom combinations, visible invalid rows without forced navigation, durable complete answers, failed corrections and new-round isolation; form compact clear actions, wrapping options, inline boolean labels, desktop/mobile geometry, keyboard and required-clear validation, pending freeze, failure drafts and complete corrections; CLI events/ack passed.',
   );
 } finally {
   await browser?.close();

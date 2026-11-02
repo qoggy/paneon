@@ -141,8 +141,6 @@ const zh: Record<keyof typeof en, string> = {
   '请至少选择一个位置。': '请至少选择一个位置。',
   Description: '说明',
   说明: '说明',
-  'Questionnaire description': '问卷说明',
-  问卷说明: '问卷说明',
   'Answer summary': '答案汇总',
   'Question directory': '问题目录',
   Questions: '问题',

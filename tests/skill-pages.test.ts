@@ -17,6 +17,7 @@ const questions = [
   {
     id: 'single',
     title: 'Single',
+    description: 'Question-specific **context**.',
     options: [
       { id: 'a', label: 'A', recommended: true },
       { id: 'b', label: 'B' },
@@ -32,8 +33,9 @@ const questions = [
     ],
   },
 ] as const;
-const choose = () => chooseParamsSchema.parse({ title: 'Choices', questions });
+const choose = () => chooseParamsSchema.parse({ questions });
 void test('choice input rejects invalid scoped IDs, empty content and invalid initial selections', () => {
+  assert.equal(choose().questions[0].description, questions[0].description);
   assert.equal(
     choose().questions[0].selectedIds,
     undefined,
@@ -41,7 +43,9 @@ void test('choice input rejects invalid scoped IDs, empty content and invalid in
   );
   for (const patch of [
     { questions: [] },
-    { title: ' ' },
+    { title: 'Choices' },
+    { description: 'Questionnaire context' },
+    { questions: [{ ...questions[0], title: ' ' }] },
     { questions: [questions[0], questions[0]] },
     {
       questions: [{ ...questions[0], options: [questions[0].options[0], questions[0].options[0]] }],
@@ -50,10 +54,7 @@ void test('choice input rejects invalid scoped IDs, empty content and invalid in
       questions: [{ ...questions[0], selectedIds }],
     })),
   ])
-    assert.equal(
-      chooseParamsSchema.safeParse({ title: 'Choices', questions, ...patch }).success,
-      false,
-    );
+    assert.equal(chooseParamsSchema.safeParse({ questions, ...patch }).success, false);
 });
 void test('complete answers enforce coverage, single/multiple cardinality and canonical selection order', () => {
   const schema = completeAnswersSchema(choose());
@@ -123,7 +124,6 @@ void test('option explanations stay independent and custom answers work alone or
     );
   }
   const scoped = chooseParamsSchema.parse({
-    title: 'Scoped',
     questions: [{ ...questions[0], options: [{ id: 'local', label: 'Local' }] }],
   });
   assert.equal(completeAnswersSchema(scoped).safeParse({ answers: [first] }).success, false);

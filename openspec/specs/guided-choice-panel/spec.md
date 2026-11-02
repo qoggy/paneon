@@ -59,7 +59,12 @@ The page SHALL submit the complete set of answers only after the person explicit
 
 ### Requirement: Validate answers against the original questionnaire
 
-The input SHALL contain nonempty questions and options with unique scoped identifiers and valid initial selections. Final submission SHALL contain exactly one answer for each input question, reject unknown or duplicate identifiers, enforce single/multiple selection cardinality, and reject blank custom answers. Answers and selected options SHALL follow their original input order. Validation SHALL preserve nonempty user text rather than silently rewriting it. Failed validation SHALL retain drafts and identify the relevant question.
+The input SHALL contain only a top-level questions array, with nonempty questions and options, unique scoped identifiers and valid initial selections. Top-level title and description fields SHALL be rejected. Each question SHALL retain its required title and optional Markdown description. Final submission SHALL contain exactly one answer for each input question, reject unknown or duplicate identifiers, enforce single/multiple selection cardinality, and reject blank custom answers. Answers and selected options SHALL follow their original input order. Validation SHALL preserve nonempty user text rather than silently rewriting it. Failed validation SHALL retain drafts and identify the relevant question.
+
+#### Scenario: Provide question content without a questionnaire header
+
+- **WHEN** input contains questions with titles and optional Markdown descriptions, without a top-level title or description
+- **THEN** the input is accepted, while adding either removed top-level field is rejected
 
 #### Scenario: Submit an invalid complete set
 
@@ -96,7 +101,7 @@ Each selected option SHALL display its own optional explanation field within the
 
 ### Requirement: Present a coherent question layout
 
-The page SHALL visually group the questionnaire title and description, and group the question title and description. The answering page SHALL NOT repeat the directory's current-location information as a question-position fraction or show a separate completion counter. It SHALL retain default component styling while avoiding excessive gaps between these related elements.
+The answering column SHALL start with the current question title and group it with its optional description. The page SHALL NOT display a questionnaire-level title or description, or leave an empty header on review. The answering page SHALL NOT repeat the directory's current-location information as a question-position fraction or show a separate completion counter. It SHALL retain default component styling while avoiding excessive gaps between these related elements.
 
 #### Scenario: Read the questionnaire on a narrow screen
 
@@ -117,14 +122,14 @@ The page SHALL treat a selected custom answer as a peer of supplied selections, 
 - **WHEN** a person deselects the custom answer in multiple mode
 - **THEN** its draft text is retained but excluded from submission, and supplied selections remain unchanged
 
-### Requirement: Keep questionnaire guidance visible
+### Requirement: Keep question guidance visible
 
-Optional questionnaire Markdown SHALL be visible on initial display and on review, without a disclosure, truncation, or oversized typography. The compact questionnaire title and question-specific description SHALL remain separate. Long content SHALL wrap and remain fully readable on narrow screens.
+Optional question-specific Markdown SHALL remain visible below its question title while answering, without a disclosure or truncation. Long content SHALL wrap and remain fully readable on narrow screens.
 
-#### Scenario: Read questionnaire guidance before answering and during review
+#### Scenario: Read question guidance before answering
 
-- **WHEN** a questionnaire includes Markdown guidance and a person opens it or enters review
-- **THEN** the complete guidance remains visible without opening a disclosure, and long content wraps within the page
+- **WHEN** a person opens a question with a Markdown description
+- **THEN** the complete question description remains visible without opening a disclosure, and long content wraps within the page
 
 ### Requirement: Toggle independent option details
 

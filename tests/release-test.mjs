@@ -36,6 +36,7 @@ const browserScripts = [
   'panel-status-filter',
   'panel-deletion',
   'skill-pages',
+  'choose-directory',
   'choose-review-interactions',
   'table-review',
   'markdown-review',

@@ -41,8 +41,6 @@ export const chooseQuestionSchema = z
   });
 export const chooseParamsSchema = z
   .strictObject({
-    title: nonblank,
-    description: z.string().optional(),
     questions: z.array(chooseQuestionSchema).min(1),
   })
   .superRefine((params, ctx) => {

@@ -192,7 +192,6 @@ try {
     'A long question title that remains readable in the directory ' + '连续文字'.repeat(12);
   const mediumTitle = 'A moderately long question title';
   const longRound = await fixture.run('choose', {
-    title: 'Long directory acceptance',
     questions: Array.from({ length: 35 }, (_, at) => ({
       id: `question-${at}`,
       title: at === 0 ? longTitle : at === 1 ? mediumTitle : `Question ${at + 1}`,

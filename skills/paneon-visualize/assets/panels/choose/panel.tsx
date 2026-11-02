@@ -255,32 +255,22 @@ function ChoosePanel() {
             </div>
           </nav>
           <div data-choice-content="" className="min-w-0 space-y-5">
-            <header className="space-y-2">
-              <h1 className="text-sm font-medium break-words text-muted-foreground">
-                {params.title}
-              </h1>
-              {params.description && (
-                <div aria-label={t('Questionnaire description')}>
-                  <Markdown className="bg-transparent! text-sm! leading-relaxed! break-words text-muted-foreground! [&_h1]:text-base! [&_h2]:text-sm! [&_h3]:text-sm! [&_h4]:text-sm! [&_h5]:text-sm! [&_h6]:text-sm! [&_p]:my-2! [&_pre]:max-w-full! [&_pre]:overflow-x-auto!">
-                    {params.description}
-                  </Markdown>
-                </div>
-              )}
-              {!reviewing && (
-                <h2
+            {!reviewing && (
+              <header className="space-y-2">
+                <h1
                   ref={heading}
                   tabIndex={-1}
                   className="text-lg font-semibold tracking-tight break-words"
                 >
                   {question.title}
-                </h2>
-              )}
-              {!reviewing && question.description && (
-                <Markdown className="space-y-2 bg-transparent! text-sm! break-words text-muted-foreground! [&_p]:my-0!">
-                  {question.description}
-                </Markdown>
-              )}
-            </header>
+                </h1>
+                {question.description && (
+                  <Markdown className="space-y-2 bg-transparent! text-sm! break-words text-muted-foreground! [&_p]:my-0!">
+                    {question.description}
+                  </Markdown>
+                )}
+              </header>
+            )}
             {!reviewing && (
               <ChoiceGroup
                 value={
@@ -501,9 +491,9 @@ function ChoosePanel() {
                 className="overflow-hidden rounded-xl border"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
-                  <h2 ref={heading} tabIndex={-1} className="text-lg font-semibold tracking-tight">
+                  <h1 ref={heading} tabIndex={-1} className="text-lg font-semibold tracking-tight">
                     {t('Answer summary')}
-                  </h2>
+                  </h1>
                   <span className="text-xs text-muted-foreground">
                     {params.questions.length - incompleteCount}
                     {' / '}
