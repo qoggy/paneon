@@ -402,6 +402,8 @@ Any persisted Paneon skill installation metadata SHALL be stored inside the fixe
 
 Reinstalling a packaged Paneon skill SHALL clean and recreate each ordinary target skill directory before copying the complete packaged resources. This SHALL remove obsolete files and overwrite user modifications instead of merging them. When retaining the symlink installation method, correctly targeted symbolic links SHALL remain in place, with their central skill content refreshed. Cleanup SHALL be limited to the Paneon skill targets rather than their parent skills directories or other skills.
 
+The installer SHALL install every skill directory bundled under the current package's `skills/` directory. Within the matching project or global scope, it SHALL migrate only the selected agents and retain installations and metadata for unselected agents. New installation records SHALL be stored per agent so paths, installation methods and installed versions can be retained independently; existing grouped records SHALL remain readable. The installer SHALL compare recorded target paths with the new installation targets and remove obsolete targets after all new targets have been installed. Migration SHALL use recorded paths rather than a list of historical skill names. Targets still referenced by another installation record SHALL remain available. If a recorded target's parent directory is a symbolic link, cleanup SHALL follow that parent to remove the corresponding old skill at its current location; it SHALL unlink a final skill-directory symlink without deleting its destination. Missing old targets SHALL need no cleanup. The installation summary SHALL show obsolete targets, and the installation result SHALL report removed paths. Updated metadata SHALL be committed only after installation and cleanup succeed; failure SHALL retain the previous metadata and report partial changes.
+
 #### Scenario: A packaged release removes a reference file
 
 - **WHEN** the previous installation contains a reference absent from the packaged skill being installed
@@ -411,6 +413,28 @@ Reinstalling a packaged Paneon skill SHALL clean and recreate each ordinary targ
 
 - **WHEN** reinstallation proceeds after the installation summary and overwrite confirmation
 - **THEN** the installed content is replaced by packaged content rather than merged with local edits
+
+#### Scenario: The bundled skill set changes
+
+- **WHEN** a recorded installation contains skills A and B and the current package bundles B and C
+- **THEN** the installer refreshes B, installs C and removes recorded A targets, without deleting unrecorded skills or targets still referenced by other installation records
+
+#### Scenario: Install for only some previously selected agents
+
+- **WHEN** skills were installed for Codex and Claude Code and the next installation selects only Codex
+- **THEN** Claude Code's installation paths, version and method remain recorded and available, including shared sources needed by its links
+
+The recorded version is the CLI version used for that agent's last installation. Shared skill content may be refreshed by a later installation for another agent. Reference-only lookups of unselected or unrelated installations SHALL preserve the recorded path and report inspection failures without blocking the selected installation; actual write or deletion failures SHALL still be reported as failures.
+
+#### Scenario: A recorded parent directory becomes a symbolic link
+
+- **WHEN** a recorded skill is obsolete and its parent directory now points to another directory
+- **THEN** cleanup removes only the corresponding old skill at that resolved location and preserves other content in the directory
+
+#### Scenario: Installation fails before migration cleanup
+
+- **WHEN** installing the new skill set fails
+- **THEN** obsolete targets have not been removed and the previous installation record remains available for a subsequent installation attempt
 
 ### Requirement: Initialize bundled skill installation through the CLI
 

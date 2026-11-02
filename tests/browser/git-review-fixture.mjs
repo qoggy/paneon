@@ -1,3 +1,4 @@
+import { SKILL_NAME, SKILL_ROOT } from '../skill-paths.ts';
 import { cp, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fixture } from '../git-review-fixture.ts';
@@ -9,12 +10,8 @@ export async function startGitReviewFixture() {
       process.env.PANEON_TEST_RUNTIME_ENTRY ??
         new URL('../../dist/runtime/server.js', import.meta.url).href
     );
-    const skill = join(f.root, 'agent-skills/paneon');
-    await cp(
-      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-      skill,
-      { recursive: true },
-    );
+    const skill = join(f.root, `agent-skills/${SKILL_NAME}`);
+    await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
     const home = join(f.root, '.paneon');
     await mkdir(home, { recursive: true });
     await writeFile(join(home, 'config.json'), JSON.stringify({ server: { port: 0 } }));

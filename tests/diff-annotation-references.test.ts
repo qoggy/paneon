@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createDiffModel } from '../skills/paneon/assets/shared/diff-model.ts';
+import { createDiffModel } from '#test-skill/assets/shared/diff-model.ts';
 import {
   diffAnnotationTargets,
   diffTargetLocation,
   normalizeDiffTarget,
-} from '../skills/paneon/assets/shared/diff-schema.ts';
+} from '#test-skill/assets/shared/diff-schema.ts';
 
 void test('Git references stay page-defined and preserve their existing full-side shape', () => {
   const model = createDiffModel('old\r\nlast', 'new\r\nlast\r\n');

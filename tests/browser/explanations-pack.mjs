@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -19,7 +20,7 @@ try {
     'assets/examples/sentinel-leap-array/panel.tsx',
     'assets/examples/sentinel-leap-array/model.ts',
   ])
-    assert.equal(files.has(`skills/paneon/${file}`), true, `Missing ${file}`);
+    assert.equal(files.has(`${SKILL_PACKAGE_PATH}/${file}`), true, `Missing ${file}`);
   assert.equal((await lstat(installed)).isSymbolicLink(), false);
   assert.equal(
     JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')).version,
@@ -33,7 +34,7 @@ try {
       env: {
         ...process.env,
         PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(installed, 'dist/runtime/server.js')).href,
-        PANEON_TEST_SKILL_SOURCE: join(installed, 'skills/paneon'),
+        PANEON_TEST_SKILL_SOURCE: join(installed, SKILL_PACKAGE_PATH),
         PANEON_TEST_CLI_ENTRY: join(installed, 'dist/cli/index.js'),
       },
       maxBuffer: 4 * 1024 * 1024,

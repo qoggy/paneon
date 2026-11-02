@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, cp, writeFile, rm, mkdir } from 'node:fs/promises';
@@ -11,7 +12,7 @@ const evidence = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-diff-boundari
 let service, browser;
 try {
   const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url));
-  await cp(new URL('../../skills/paneon/assets/shared/', import.meta.url), join(root, 'shared'), {
+  await cp(join(SKILL_ROOT, 'assets/shared'), join(root, 'shared'), {
     recursive: true,
   });
   const entry = join(root, 'panel.tsx');

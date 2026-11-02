@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -31,7 +32,7 @@ async function until(check, description) {
 }
 try {
   await mkdir(join(root, 'installed/assets/panels/example'), { recursive: true });
-  await cp(new URL('../../skills/paneon/assets/shared/', import.meta.url), shared, {
+  await cp(join(SKILL_ROOT, 'assets/shared'), shared, {
     recursive: true,
   });
   await writeFile(join(shared, 'legacy.tsx'), legacy(13));

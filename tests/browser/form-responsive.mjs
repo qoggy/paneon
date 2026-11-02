@@ -95,7 +95,9 @@ try {
   assert.ok(content);
   await frame.locator('#field-0').fill('demo');
   await frame.locator('#field-8').fill('0');
-  await frame.getByRole('button', { name: 'Submit form', exact: true }).click();
+  // Exercise the form through keyboard input; headless Chrome can drop pointer
+  // events near a resized iframe's bottom edge.
+  await frame.getByRole('button', { name: 'Submit form', exact: true }).press('Enter');
   await frame.locator('#field-0-error').waitFor();
   const measurements = [];
   for (const scenario of [
@@ -219,7 +221,7 @@ try {
     }
   }
   // The long selected option stays fully available in the existing option list.
-  await frame.locator('#field-3').click();
+  await frame.locator('#field-3').press('Space');
   await frame
     .getByRole('option', { name: input.fields[3].options[1].label, exact: true })
     .waitFor();
@@ -247,17 +249,17 @@ try {
       path: join(process.env.PANEON_TEST_ARTIFACTS, 'form-mobile-320-select-options.png'),
     });
   await page.keyboard.press('Escape');
-  await frame.getByRole('button', { name: 'Clear 环境 / Environment', exact: true }).click();
+  await frame.getByRole('button', { name: 'Clear 环境 / Environment', exact: true }).press('Enter');
   assert.equal(await frame.locator('#field-0').inputValue(), 'demo');
   assert.equal(await frame.locator('#field-2').inputValue(), '0');
-  await frame.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await frame.getByRole('button', { name: 'Submit form', exact: true }).press('Enter');
   assert.equal(await frame.locator('#field-3').getAttribute('aria-invalid'), 'true');
   assert.equal((await fixture.events(panel)).length, 0);
   await frame.locator('#field-0').fill('  原文 '.repeat(60));
   await frame.locator('#field-1').fill('Keep draft 中文🙂');
   await frame.locator('#field-8').fill('');
-  await frame.locator('#field-3').click();
-  await frame.getByRole('option', { name: '开发 / Local', exact: true }).click();
+  await frame.locator('#field-3').press('Space');
+  await frame.getByRole('option', { name: '开发 / Local', exact: true }).press('Enter');
   const eventUrl = `**/api/panels/${panel.instanceId}/events`;
   const fail = (route) =>
     route.fulfill({
@@ -268,11 +270,11 @@ try {
       }),
     });
   await page.route(eventUrl, fail);
-  await frame.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await frame.getByRole('button', { name: 'Submit form', exact: true }).press('Enter');
   await frame.getByText(/Not saved/).waitFor();
   assert.equal(await frame.locator('#field-1').inputValue(), 'Keep draft 中文🙂');
   await page.unroute(eventUrl, fail);
-  await frame.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await frame.getByRole('button', { name: 'Submit form', exact: true }).press('Enter');
   await until(async () => (await fixture.events(panel)).length === 1, 'Initial submission saved.');
   const first = (await fixture.events(panel))[0];
   assert.equal(first.payload.values.count, 0);
@@ -281,12 +283,12 @@ try {
   assert.equal(first.payload.values.project, '  原文 '.repeat(60));
   await frame.locator('#field-1').fill('Correction draft');
   await page.route(eventUrl, fail);
-  await frame.getByRole('button', { name: 'Submit corrected form', exact: true }).click();
+  await frame.getByRole('button', { name: 'Submit corrected form', exact: true }).press('Enter');
   await frame.getByText(/Not saved/).waitFor();
   assert.equal(await frame.locator('#field-1').inputValue(), 'Correction draft');
   assert.equal((await fixture.events(panel)).length, 1);
   await page.unroute(eventUrl, fail);
-  await frame.getByRole('button', { name: 'Submit corrected form', exact: true }).click();
+  await frame.getByRole('button', { name: 'Submit corrected form', exact: true }).press('Enter');
   await until(async () => (await fixture.events(panel)).length === 2, 'Correction saved.');
   const corrected = (await fixture.events(panel))[1];
   assert.deepEqual(corrected.payload, {

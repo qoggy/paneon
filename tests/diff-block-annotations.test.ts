@@ -8,13 +8,13 @@ import {
   diffAnnotationTargets,
   normalizeDiffTarget,
   diffTargetLocation,
-} from '../skills/paneon/assets/shared/diff-schema.ts';
+} from '#test-skill/assets/shared/diff-schema.ts';
 import {
   diffReviewParamsSchema,
   diffFeedbackResultSchema,
   validateRanges,
-} from '../skills/paneon/assets/panels/diff-review/schema.ts';
-import { publicDiffFeedback } from '../skills/paneon/assets/panels/diff-review/feedback.ts';
+} from '#test-skill/assets/panels/diff-review/schema.ts';
+import { publicDiffFeedback } from '#test-skill/assets/panels/diff-review/feedback.ts';
 
 const compiled = await build({
   stdin: {

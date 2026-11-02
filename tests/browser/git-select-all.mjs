@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { git } from '../git-review-fixture.ts';
-import { sourceLines } from '../../skills/paneon/assets/shared/diff-model.ts';
+import { sourceLines } from '#test-skill/assets/shared/diff-model.ts';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
 import { annotationTools } from './annotation-tools.mjs';
 

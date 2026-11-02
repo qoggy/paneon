@@ -10,8 +10,8 @@ import {
   snapshotName,
   snapshotTitle,
   statusClass,
-} from '../skills/paneon/assets/panels/git-review/file-tree-model.ts';
-import type { TreeSnapshot } from '../skills/paneon/assets/panels/git-review/file-tree-model.ts';
+} from '#test-skill/assets/panels/git-review/file-tree-model.ts';
+import type { TreeSnapshot } from '#test-skill/assets/panels/git-review/file-tree-model.ts';
 const file = (
   path: string,
   id = path,

@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, realpath, rm, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -16,11 +17,7 @@ const artifacts = process.env.PANEON_TEST_ARTIFACTS ?? '/tmp/paneon-file-review-
 let service, browser;
 try {
   const skill = join(root, 'skill');
-  await cp(
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-    skill,
-    { recursive: true },
-  );
+  await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   await mkdir(join(root, 'docs'));
   await mkdir(artifacts, { recursive: true });
   const markdown = '# 缓存方案🙂\n\n正文 **精确范围**。\n\n[关联文件](../linked.ts)\n';

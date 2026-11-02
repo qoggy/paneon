@@ -5,13 +5,10 @@ import {
   buildGitFeedback,
   publicGitFeedback,
   validateGitFeedback,
-} from '../skills/paneon/assets/panels/git-review/feedback.ts';
-import { createDiffModel, sourceLines } from '../skills/paneon/assets/shared/diff-model.ts';
-import type { GitSnapshot } from '../skills/paneon/assets/panels/git-review/git.ts';
-import type {
-  GitRef,
-  GitReviewSubmitted,
-} from '../skills/paneon/assets/panels/git-review/schema.ts';
+} from '#test-skill/assets/panels/git-review/feedback.ts';
+import { createDiffModel, sourceLines } from '#test-skill/assets/shared/diff-model.ts';
+import type { GitSnapshot } from '#test-skill/assets/panels/git-review/git.ts';
+import type { GitRef, GitReviewSubmitted } from '#test-skill/assets/panels/git-review/schema.ts';
 import type { AnnotationTarget } from '../src/sdk/annotation.ts';
 
 const original =

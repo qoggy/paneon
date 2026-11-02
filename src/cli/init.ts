@@ -25,12 +25,13 @@ function invalid(message: string): never {
 }
 
 function summary(plan: InstallPlan): string {
-  return plan.targets
-    .map(
+  return [
+    ...plan.targets.map(
       (target) =>
-        `${target.path}\n  ${target.kind === 'symlink' ? `symlink → ${target.target ?? ''}` : 'copy'}${target.exists ? `\n  overwrites: ${target.path}` : ''}`,
-    )
-    .join('\n\n');
+        `${target.path}\n  ${target.kind === 'symlink' ? `symlink → ${target.target ?? ''}` : 'copy'}${target.exists ? '\n  overwrites existing skill' : ''}`,
+    ),
+    ...plan.obsoleteTargets.map((path) => `${path}\n  removes previous installation`),
+  ].join('\n\n');
 }
 
 /** Environment injection is internal: production always uses the fixed Paneon home. */

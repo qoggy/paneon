@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from './skill-paths.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
@@ -35,7 +36,7 @@ void test('public UI owns rich renderers without depending on installed skill as
   ])
     assert.equal(names.includes(name), false, name + ' stays private');
   assert.equal(
-    Object.keys(result.metafile.inputs).some((path) => path.includes('skills/paneon')),
+    Object.keys(result.metafile.inputs).some((path) => path.includes(SKILL_PACKAGE_PATH)),
     false,
   );
 });

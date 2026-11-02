@@ -8,20 +8,17 @@ import {
   listDirectories,
   repositoryCatalog,
   resolveRepository,
-} from '../skills/paneon/assets/panels/git-review/repositories.ts';
-import {
-  createReviewInput,
-  repositoryLabels,
-} from '../skills/paneon/assets/panels/git-review/input.ts';
-import { RepositoryFeedback } from '../skills/paneon/assets/panels/git-review/repository-feedback.ts';
-import { readGit, readGitFile } from '../skills/paneon/assets/panels/git-review/git.ts';
+} from '#test-skill/assets/panels/git-review/repositories.ts';
+import { createReviewInput, repositoryLabels } from '#test-skill/assets/panels/git-review/input.ts';
+import { RepositoryFeedback } from '#test-skill/assets/panels/git-review/repository-feedback.ts';
+import { readGit, readGitFile } from '#test-skill/assets/panels/git-review/git.ts';
 import {
   publicGitFeedback,
   validateGitFeedback,
-} from '../skills/paneon/assets/panels/git-review/feedback.ts';
-import { gitReviewParamsSchema } from '../skills/paneon/assets/panels/git-review/schema.ts';
+} from '#test-skill/assets/panels/git-review/feedback.ts';
+import { gitReviewParamsSchema } from '#test-skill/assets/panels/git-review/schema.ts';
 import type { AnnotationValue } from '../src/sdk/annotation.ts';
-import type { GitRef } from '../skills/paneon/assets/panels/git-review/schema.ts';
+import type { GitRef } from '#test-skill/assets/panels/git-review/schema.ts';
 import { fixture, git } from './git-review-fixture.ts';
 
 void test('absolute directories resolve subdirectories, aliases and independent worktrees', async (t) => {

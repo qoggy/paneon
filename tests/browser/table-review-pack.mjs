@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -27,7 +28,11 @@ try {
     'assets/shared/markdown-annotation-schema.ts',
     'assets/shared/submission.ts',
   ])
-    assert.equal(files.has(`skills/paneon/${file}`), true, `Missing packaged resource: ${file}`);
+    assert.equal(
+      files.has(`${SKILL_PACKAGE_PATH}/${file}`),
+      true,
+      `Missing packaged resource: ${file}`,
+    );
   assert.equal(
     JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version,
     metadata.version,
@@ -40,7 +45,7 @@ try {
       env: {
         ...process.env,
         PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js')).href,
-        PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+        PANEON_TEST_SKILL_SOURCE: join(packageRoot, SKILL_PACKAGE_PATH),
         PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
       },
       maxBuffer: 4 * 1024 * 1024,

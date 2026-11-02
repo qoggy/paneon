@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,11 +11,7 @@ export async function startExplanationsFixture(
   let service;
   try {
     const skill = join(root, 'copied-skill/paneon');
-    await cp(
-      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-      skill,
-      { recursive: true },
-    );
+    await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
     service = await startServer(join(root, '.paneon'));
     await service.app.inject({
       method: 'POST',

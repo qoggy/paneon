@@ -1,9 +1,21 @@
+import { SKILL_NAME } from './skill-paths.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 
 // Real pseudo-terminal interactions, not mocks of the prompt library. Override
 // the package root to repeat the same acceptance against an independently installed tarball.
@@ -128,8 +140,10 @@ try {
   assert.match(installed, /Symlink \(Recommended\)/);
   assert.match(installed, /Installation Summary/);
   assert.match(installed, /Installation complete/);
-  assert.ok(lstatSync(join(project, '.claude/skills/paneon')).isSymbolicLink());
-  assert.ok(existsSync(join(project, '.agents/skills/paneon/assets/examples/github-pr/github.ts')));
+  assert.ok(lstatSync(join(project, `.claude/skills/${SKILL_NAME}`)).isSymbolicLink());
+  assert.ok(
+    existsSync(join(project, `.agents/skills/${SKILL_NAME}/assets/examples/github-pr/github.ts`)),
+  );
 
   const repeated = terminal(
     ['--agent', 'codex', 'claude-code', '--project'],
@@ -138,8 +152,55 @@ try {
       { wait: 'Proceed with installation?', keys: 'n\r' },
     ],
   );
-  assert.match(repeated, /overwrites:/);
+  assert.match(repeated, /overwrites existing skill/);
   assert.match(repeated, /"cancelled": true/);
+
+  const oldName = 'paneon-old-recorded-skill';
+  const oldCentral = join(project, '.agents/skills', oldName);
+  const oldLink = join(project, '.claude/skills', oldName);
+  renameSync(join(project, '.agents/skills', SKILL_NAME), oldCentral);
+  rmSync(join(project, '.claude/skills', SKILL_NAME));
+  symlinkSync(`../../.agents/skills/${oldName}`, oldLink, 'dir');
+  const recordPath = join(home, '.paneon/skill-installations.json');
+  const previous = JSON.parse(readFileSync(recordPath, 'utf8'));
+  const migrationAgents = [...new Set(previous.installations.flatMap((record) => record.agents))];
+  for (const record of previous.installations)
+    for (const target of record.targets) {
+      target.path = target.path.replace(`/${SKILL_NAME}`, `/${oldName}`);
+      if (target.target) target.target = target.target.replace(`/${SKILL_NAME}`, `/${oldName}`);
+    }
+  writeFileSync(recordPath, JSON.stringify(previous));
+  const beforeMigration = readFileSync(recordPath, 'utf8');
+  const migrationDeclined = terminal(
+    ['--agent', ...migrationAgents, '--project'],
+    [
+      { wait: 'Installation method', keys: '\r' },
+      { wait: 'Proceed with installation?', keys: 'n\r' },
+    ],
+  );
+  assert.match(migrationDeclined, /removes previous installation/);
+  // Clack wraps long paths inside its note box to fit the terminal width.
+  const unwrappedSummary = stripVTControlCharacters(migrationDeclined)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^│ {2}/, '').replace(/ +│$/, ''))
+    .join('');
+  assert.ok(unwrappedSummary.includes(oldCentral), migrationDeclined);
+  assert.ok(unwrappedSummary.includes(oldLink), migrationDeclined);
+  assert.ok(lstatSync(oldLink).isSymbolicLink());
+  assert.ok(existsSync(oldCentral));
+  assert.equal(readFileSync(recordPath, 'utf8'), beforeMigration);
+  const migrated = terminal(
+    ['--agent', ...migrationAgents, '--project'],
+    [
+      { wait: 'Installation method', keys: '\r' },
+      { wait: 'Proceed with installation?', keys: 'y\r' },
+    ],
+  );
+  assert.match(migrated, /Installation complete/);
+  assert.match(migrated, /"removedTargets"/);
+  assert.ok(!existsSync(oldCentral));
+  assert.throws(() => lstatSync(oldLink), { code: 'ENOENT' });
+  assert.ok(lstatSync(join(project, '.claude/skills', SKILL_NAME)).isSymbolicLink());
 
   const copied = terminal(
     ['--agent', 'codex', 'claude-code'],
@@ -152,15 +213,19 @@ try {
   assert.match(copied, /Copy to all agents/);
   assert.match(copied, /"scope": "global"/);
   assert.match(copied, /"method": "copy"/);
-  assert.ok(!lstatSync(join(home, '.claude/skills/paneon')).isSymbolicLink());
-  assert.ok(existsSync(join(home, '.agents/skills/paneon/SKILL.md')));
-  assert.ok(existsSync(join(home, '.claude/skills/paneon/references/authoring.md')));
+  assert.ok(!lstatSync(join(home, `.claude/skills/${SKILL_NAME}`)).isSymbolicLink());
+  assert.ok(existsSync(join(home, `.agents/skills/${SKILL_NAME}/SKILL.md`)));
+  assert.ok(existsSync(join(home, `.claude/skills/${SKILL_NAME}/references/authoring.md`)));
   const records = JSON.parse(readFileSync(join(home, '.paneon/skill-installations.json'), 'utf8'));
-  assert.equal(records.installations.length, 2);
+  assert.equal(
+    records.installations.filter((record) => record.scope === 'project').length,
+    migrationAgents.length,
+  );
+  assert.equal(records.installations.filter((record) => record.scope === 'global').length, 2);
   assert.ok(!existsSync(join(project, '.paneon')));
   assert.ok(!existsSync(join(home, '.paneon/runtime.json')));
   console.log(
-    'Passed 5 real PTY scenarios: cancellation, No, Project/Symlink, overwrite summary, Global/Copy.',
+    'Passed 7 real PTY scenarios: cancellation, No, Project/Symlink, overwrite summary, migration No, migration Yes, Global/Copy.',
   );
 } finally {
   rmSync(directory, { recursive: true, force: true });

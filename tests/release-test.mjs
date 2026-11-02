@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from './skill-paths.ts';
 import { deduplicateJobs, runJobs } from './release-support.ts';
 import { packageDownloadCache } from './package-fixture.mjs';
 import { readTestTimings, summarizeTestTimings } from './test-timing.ts';
@@ -501,10 +502,10 @@ try {
           import {PACKAGE_VERSION} from './dist/shared/paths.js';
           for (const path of ${JSON.stringify([
             ...['choose', 'form', 'table', 'file-review', 'git-review', 'diff-review'].map(
-              (name) => `skills/paneon/assets/panels/${name}/panel.tsx`,
+              (name) => `${SKILL_PACKAGE_PATH}/assets/panels/${name}/panel.tsx`,
             ),
             ...['github-pr', 'dining-philosophers', 'sentinel-leap-array'].map(
-              (name) => `skills/paneon/assets/examples/${name}/panel.tsx`,
+              (name) => `${SKILL_PACKAGE_PATH}/assets/examples/${name}/panel.tsx`,
             ),
           ])}) validateRequirement(path, PACKAGE_VERSION);
           console.log('Bundled panels and examples accept package version ' + PACKAGE_VERSION);

@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH, SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
@@ -17,8 +18,7 @@ import {
 const root = await realpath(await mkdtemp(join(tmpdir(), 'paneon-media-annotations-')));
 let service, browser;
 try {
-  let skillSource =
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url);
+  let skillSource = process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT;
   if (process.argv.includes('--package')) {
     const packageDirectory = join(root, 'package');
     await mkdir(packageDirectory);
@@ -26,7 +26,7 @@ try {
     process.env.PANEON_TEST_RUNTIME_ENTRY = pathToFileURL(
       join(packageRoot, 'dist/runtime/server.js'),
     ).href;
-    skillSource = join(packageRoot, 'skills/paneon');
+    skillSource = join(packageRoot, SKILL_PACKAGE_PATH);
   }
   const entry = join(root, 'panel.tsx');
   await mkdir(join(root, 'tests/fixtures'), { recursive: true });

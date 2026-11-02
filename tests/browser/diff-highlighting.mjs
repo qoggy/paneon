@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -50,11 +51,7 @@ const after = [
 let service, browser, page;
 try {
   const skill = join(root, 'skill');
-  await cp(
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-    skill,
-    { recursive: true },
-  );
+  await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   await writeFile(join(root, 'before.md'), before);
   await writeFile(join(root, 'after.md'), after);
   await writeFile(

@@ -83,7 +83,7 @@ const init = program
   .option('--yes', 'Skip prompts and install using supplied options and defaults')
   .addHelpText(
     'after',
-    '\nAgents: codex, cursor, claude-code, opencode, gemini-cli, github-copilot, cline, windsurf, qwen-code, kiro-cli, roo\n\n--json requires --yes. Installing replaces existing paneon skill directories, discarding local edits without backup.\n\nExamples:\n  paneon init\n  paneon init --agent codex claude-code --project --yes --json\n  paneon init --agent claude-code --global --copy --yes --json',
+    '\nAgents: codex, cursor, claude-code, opencode, gemini-cli, github-copilot, cline, windsurf, qwen-code, kiro-cli, roo\n\n--json requires --yes. Installing replaces Paneon skills and removes obsolete skill directories. Local edits are discarded without backup.\n\nExamples:\n  paneon init\n  paneon init --agent codex claude-code --project --yes --json\n  paneon init --agent claude-code --global --copy --yes --json',
   );
 execute(init, async () => {
   const path = import.meta.url.endsWith('.ts')

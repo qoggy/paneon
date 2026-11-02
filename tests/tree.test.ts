@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { filterTree, indexTree, treeAncestors, visibleTreeIds } from '../src/ui/tree-model.ts';
-import { comparisonStatus, reviewTree } from '../skills/paneon/assets/panels/diff-review/model.ts';
-import type { Comparison } from '../skills/paneon/assets/panels/diff-review/model.ts';
+import { comparisonStatus, reviewTree } from '#test-skill/assets/panels/diff-review/model.ts';
+import type { Comparison } from '#test-skill/assets/panels/diff-review/model.ts';
 
 type Item = { key: string; text: string; nodes?: Item[] };
 const leaf: Item = { key: 'leaf', text: 'Match.ts' };

@@ -1,3 +1,4 @@
+import { SKILL_NAME, SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -7,12 +8,8 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-pr-live-'));
 let service, browser, page;
 try {
   const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
-  const skill = join(root, 'agent-skills/paneon');
-  await cp(
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-    skill,
-    { recursive: true },
-  );
+  const skill = join(root, `agent-skills/${SKILL_NAME}`);
+  await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   service = await startServer(join(root, '.paneon'));
   const preferences = await service.app.inject({
     method: 'POST',

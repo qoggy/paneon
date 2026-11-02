@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -152,14 +153,12 @@ try {
   await frame.getByText('No nodes', { exact: true }).waitFor();
 
   const example = join(root, 'skill/assets/panels/diff-review');
-  await cp(new URL('../../skills/paneon/assets/panels/diff-review', import.meta.url), example, {
+  await cp(join(SKILL_ROOT, 'assets/panels/diff-review'), example, {
     recursive: true,
   });
-  await cp(
-    new URL('../../skills/paneon/assets/shared', import.meta.url),
-    join(root, 'skill/assets/shared'),
-    { recursive: true },
-  );
+  await cp(join(SKILL_ROOT, 'assets/shared'), join(root, 'skill/assets/shared'), {
+    recursive: true,
+  });
   await Promise.all([
     writeFile(join(root, 'original.ts'), 'export const value = 1;\n'),
     writeFile(join(root, 'proposed.ts'), 'export const value = 2;\n'),

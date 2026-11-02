@@ -4,11 +4,11 @@ import { build } from 'esbuild';
 import { z } from 'zod';
 import { annotationTargetKey, annotationValueSchema } from '../src/sdk/annotation.ts';
 import type { AnnotationTarget, AnnotationValue } from '../src/sdk/annotation.ts';
-import { publicFileFeedback } from '../skills/paneon/assets/panels/file-review/feedback.ts';
+import { publicFileFeedback } from '#test-skill/assets/panels/file-review/feedback.ts';
 import {
   fileReviewSubmittedSchema,
   validateRanges,
-} from '../skills/paneon/assets/panels/file-review/schema.ts';
+} from '#test-skill/assets/panels/file-review/schema.ts';
 
 const source =
   '# 😀\r\n\r\n![界面](./screen.svg)\r\n\r\n~~~mermaid\r\nflowchart LR\r\n  A --> B\r\n~~~';

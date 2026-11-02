@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { layoutGitGraph } from '../skills/paneon/assets/panels/git-review/graph.ts';
+import { layoutGitGraph } from '#test-skill/assets/panels/git-review/graph.ts';
 
 void test('commit graph follows merge parents and joins their shared ancestor', () => {
   const commits = [

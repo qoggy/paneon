@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markMainlines } from '../skills/paneon/assets/panels/git-review/branch-model.ts';
-import { readGit } from '../skills/paneon/assets/panels/git-review/git.ts';
-import type { HistoryRef } from '../skills/paneon/assets/panels/git-review/git.ts';
+import { markMainlines } from '#test-skill/assets/panels/git-review/branch-model.ts';
+import { readGit } from '#test-skill/assets/panels/git-review/git.ts';
+import type { HistoryRef } from '#test-skill/assets/panels/git-review/git.ts';
 import { fixture, git } from './git-review-fixture.ts';
 const branch = (name: string): HistoryRef => ({ kind: 'branch', name, ref: `refs/heads/${name}` });
 const remote = (name: string): HistoryRef => ({

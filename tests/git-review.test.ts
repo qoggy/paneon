@@ -8,15 +8,15 @@ import {
   readGitFile,
   readGitRevisions,
   validateGitFeedback,
-} from '../skills/paneon/assets/panels/git-review/git.ts';
-import { buildGitFeedback } from '../skills/paneon/assets/panels/git-review/feedback.ts';
+} from '#test-skill/assets/panels/git-review/git.ts';
+import { buildGitFeedback } from '#test-skill/assets/panels/git-review/feedback.ts';
 import {
   gitFeedbackSchema,
   gitReviewParamsSchema,
-} from '../skills/paneon/assets/panels/git-review/schema.ts';
-import { createDiffModel, sourceLines } from '../skills/paneon/assets/shared/diff-model.ts';
-import { diffTargetText, normalizeDiffTarget } from '../skills/paneon/assets/shared/diff-schema.ts';
-import type { GitRef } from '../skills/paneon/assets/shared/diff-schema.ts';
+} from '#test-skill/assets/panels/git-review/schema.ts';
+import { createDiffModel, sourceLines } from '#test-skill/assets/shared/diff-model.ts';
+import { diffTargetText, normalizeDiffTarget } from '#test-skill/assets/shared/diff-schema.ts';
+import type { GitRef } from '#test-skill/assets/shared/diff-schema.ts';
 import { fixture, git } from './git-review-fixture.ts';
 
 // Existing snapshot semantics are exercised by explicitly opening every listed file.

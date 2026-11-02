@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { GitHubReview } from '../skills/paneon/assets/examples/github-pr/github.ts';
+import { GitHubReview } from '#test-skill/assets/examples/github-pr/github.ts';
 import {
   githubPRParamsSchema,
   prFeedbackSubmittedSchema,
-} from '../skills/paneon/assets/examples/github-pr/schema.ts';
-import { diffAnnotationTargets } from '../skills/paneon/assets/shared/diff-schema.ts';
-import { resolvePRTarget, safeLink } from '../skills/paneon/assets/examples/github-pr/model.ts';
+} from '#test-skill/assets/examples/github-pr/schema.ts';
+import { diffAnnotationTargets } from '#test-skill/assets/shared/diff-schema.ts';
+import { resolvePRTarget, safeLink } from '#test-skill/assets/examples/github-pr/model.ts';
 import { body, code, ids, routeGh } from './github-pr-fixture.ts';
 import type { PRFixtureState } from './github-pr-fixture.ts';
 function fixture() {

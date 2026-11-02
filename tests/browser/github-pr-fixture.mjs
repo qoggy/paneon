@@ -1,3 +1,4 @@
+import { SKILL_NAME, SKILL_ROOT } from '../skill-paths.ts';
 import { cp, mkdtemp, mkdir, writeFile, readFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -18,12 +19,8 @@ export async function startGithubPRFixture() {
     await chmod(join(bin, 'gh'), 0o755);
     process.env.PATH = `${bin}:${previousPath}`;
     const { startServer } = await import(new URL('../runtime-fixture.ts', import.meta.url).href);
-    const skill = join(root, 'agent-skills/paneon');
-    await cp(
-      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-      skill,
-      { recursive: true },
-    );
+    const skill = join(root, `agent-skills/${SKILL_NAME}`);
+    await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
     service = await startServer(join(root, '.paneon'));
     await service.app.inject({
       method: 'POST',

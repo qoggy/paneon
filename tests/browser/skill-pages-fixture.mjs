@@ -1,3 +1,4 @@
+import { SKILL_NAME, SKILL_ROOT } from '../skill-paths.ts';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -94,12 +95,8 @@ export async function startSkillPagesFixture() {
   const root = await mkdtemp(join(tmpdir(), 'paneon-skill-pages-'));
   let service;
   try {
-    const skill = join(root, 'agent-skills/paneon');
-    await cp(
-      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-      skill,
-      { recursive: true },
-    );
+    const skill = join(root, `agent-skills/${SKILL_NAME}`);
+    await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
     service = await startServer(join(root, '.paneon'));
     const run = (name, params) =>
       service.runtime.run(join(skill, `assets/panels/${name}/panel.tsx`), root, params, false);

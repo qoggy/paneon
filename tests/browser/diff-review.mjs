@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,11 +11,7 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-built-in-diff-review-'));
 let service, browser, page;
 try {
   const skill = join(root, 'skill');
-  await cp(
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-    skill,
-    { recursive: true },
-  );
+  await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   await Promise.all([
     writeFile(join(root, 'original.ts'), 'export const value = 1;\n'),
     writeFile(join(root, 'proposed.ts'), 'export const value = 2;\n'),

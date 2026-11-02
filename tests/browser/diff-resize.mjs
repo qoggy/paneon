@@ -1,3 +1,4 @@
+import { SKILL_NAME } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -121,7 +122,7 @@ try {
   await writeFile(join(fixture.root, 'original.ts'), original);
   await writeFile(join(fixture.root, 'proposed.ts'), proposed);
   const diffReview = await fixture.service.runtime.run(
-    join(fixture.root, 'agent-skills/paneon/assets/panels/diff-review/panel.tsx'),
+    join(fixture.root, `agent-skills/${SKILL_NAME}/assets/panels/diff-review/panel.tsx`),
     fixture.root,
     { files: [{ displayPath: 'sample.ts', oldPath: 'original.ts', newPath: 'proposed.ts' }] },
     false,

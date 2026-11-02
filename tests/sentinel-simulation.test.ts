@@ -7,7 +7,7 @@ import {
   PRESETS,
   snapshotAt,
   validate,
-} from '../skills/paneon/assets/examples/sentinel-leap-array/simulation.ts';
+} from '#test-skill/assets/examples/sentinel-leap-array/simulation.ts';
 
 void test('each arrival in a burst is checked separately; blocks never increase PASS', () => {
   const trace = compile(DEFAULT_CONFIG, PRESETS.burst);

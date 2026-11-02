@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -12,15 +13,15 @@ try {
   const { metadata, packageRoot } = await createPackageFixture(root);
   const files = new Set(metadata.files.map((entry) => entry.path));
   for (const name of ['panel.tsx', 'actions.ts', 'schema.ts', 'feedback.ts', 'model.ts'])
-    assert.ok(files.has(`skills/paneon/assets/panels/file-review/${name}`));
+    assert.ok(files.has(`${SKILL_PACKAGE_PATH}/assets/panels/file-review/${name}`));
   for (const name of [
     'references/file-review.md',
     'assets/shared/read-text-file.js',
     'assets/shared/read-text-file.d.ts',
   ])
-    assert.ok(files.has(`skills/paneon/${name}`));
-  assert.equal(files.has('skills/paneon/assets/panels/review/panel.tsx'), false);
-  assert.equal(files.has('skills/paneon/references/review.md'), false);
+    assert.ok(files.has(`${SKILL_PACKAGE_PATH}/${name}`));
+  assert.equal(files.has(`${SKILL_PACKAGE_PATH}/assets/panels/review/panel.tsx`), false);
+  assert.equal(files.has(`${SKILL_PACKAGE_PATH}/references/review.md`), false);
   for (const name of ['file-review', 'markdown-review']) {
     const result = await promisify(execFile)(
       process.execPath,
@@ -31,7 +32,7 @@ try {
           ...process.env,
           PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js'))
             .href,
-          PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+          PANEON_TEST_SKILL_SOURCE: join(packageRoot, SKILL_PACKAGE_PATH),
           PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
         },
         timeout: 180_000,

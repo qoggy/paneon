@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -27,7 +28,7 @@ try {
     'assets/shared/diff-schema.ts',
     'assets/shared/markdown-annotation.tsx',
   ])
-    assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
+    assert.ok(files.has(`${SKILL_PACKAGE_PATH}/${file}`), `Missing packaged resource: ${file}`);
   assert.equal((await lstat(packageRoot)).isSymbolicLink(), false);
   const digest = createHash('sha256')
     .update(await readFile(join(root, metadata.filename)))
@@ -36,7 +37,7 @@ try {
   const env = {
     ...process.env,
     PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js')).href,
-    PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+    PANEON_TEST_SKILL_SOURCE: join(packageRoot, SKILL_PACKAGE_PATH),
     PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
   };
   let failure;

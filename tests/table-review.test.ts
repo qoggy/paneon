@@ -7,8 +7,8 @@ import {
   tableTargetError,
   tableSubmittedSchema,
   visibleRows,
-} from '../skills/paneon/assets/panels/table/schema.ts';
-import { publicTableFeedback } from '../skills/paneon/assets/panels/table/feedback.ts';
+} from '#test-skill/assets/panels/table/schema.ts';
+import { publicTableFeedback } from '#test-skill/assets/panels/table/feedback.ts';
 import { markdownOffsets } from '../src/ui/markdown-annotation-mapper.ts';
 const table = () =>
   tableParamsSchema.parse({

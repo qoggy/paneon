@@ -10,14 +10,14 @@ import {
   fileFeedbackSchema,
   fileReviewSubmittedSchema,
   validateRanges,
-} from '../skills/paneon/assets/panels/file-review/schema.ts';
-import type { FileFeedback, Snapshot } from '../skills/paneon/assets/panels/file-review/schema.ts';
+} from '#test-skill/assets/panels/file-review/schema.ts';
+import type { FileFeedback, Snapshot } from '#test-skill/assets/panels/file-review/schema.ts';
 import {
   readManifestFile,
   snapshotId,
   validateFeedback,
-} from '../skills/paneon/assets/panels/file-review/actions.ts';
-import { publicFileFeedback } from '../skills/paneon/assets/panels/file-review/feedback.ts';
+} from '#test-skill/assets/panels/file-review/actions.ts';
+import { publicFileFeedback } from '#test-skill/assets/panels/file-review/feedback.ts';
 import {
   ancestorKeys,
   directoryKeys,
@@ -25,8 +25,8 @@ import {
   fileLanguage,
   isMarkdown,
   visibleFileCount,
-} from '../skills/paneon/assets/panels/file-review/model.ts';
-import { TEXT_FILE_MAX_BYTES } from '../skills/paneon/assets/shared/read-text-file.js';
+} from '#test-skill/assets/panels/file-review/model.ts';
+import { TEXT_FILE_MAX_BYTES } from '#test-skill/assets/shared/read-text-file.js';
 
 const ctx = { signal: new AbortController().signal };
 const snapshot = (
@@ -303,7 +303,7 @@ void test('submission checks path and digest from explicit evidence without rere
       Object.assign(changed.evidence.files[0], patch);
       assert.throws(() => validateFeedback.handler(ctx, changed), /inconsistent/);
     }
-    const script = `import {validateFeedback} from ${JSON.stringify(new URL('../skills/paneon/assets/panels/file-review/actions.ts', import.meta.url).href)}; const request = JSON.parse(process.argv[1]); validateFeedback.handler({signal:new AbortController().signal}, request);`;
+    const script = `import {validateFeedback} from ${JSON.stringify(import.meta.resolve('#test-skill/assets/panels/file-review/actions.ts'))}; const request = JSON.parse(process.argv[1]); validateFeedback.handler({signal:new AbortController().signal}, request);`;
     const worker = spawnSync(
       process.execPath,
       ['--input-type=module', '-e', script, JSON.stringify(request)],

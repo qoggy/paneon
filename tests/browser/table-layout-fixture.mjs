@@ -1,3 +1,4 @@
+import { SKILL_NAME } from '../skill-paths.ts';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { startTableReviewFixture } from './table-review-fixture.mjs';
@@ -34,7 +35,7 @@ export async function startTableLayoutFixture() {
     await writeFile(params, JSON.stringify(input));
     return fixture.cli(
       'run',
-      join(fixture.root, 'agent-skills/paneon/assets/panels/table/panel.tsx'),
+      join(fixture.root, `agent-skills/${SKILL_NAME}/assets/panels/table/panel.tsx`),
       '--cwd',
       fixture.root,
       '--params-file',

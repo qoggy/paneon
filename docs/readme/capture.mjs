@@ -22,7 +22,7 @@ const output = fileURLToPath(new URL('./', import.meta.url));
 const skill = join(root, 'skill');
 let service, browser;
 try {
-  await cp(new URL('../../skills/paneon/', import.meta.url), skill, { recursive: true });
+  await cp(new URL('../../skills/paneon-visualize/', import.meta.url), skill, { recursive: true });
   const home = join(root, 'runtime');
   await mkdir(home, { recursive: true });
   await writeFile(

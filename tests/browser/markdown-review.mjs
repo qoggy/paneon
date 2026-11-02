@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { cp, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
@@ -18,11 +19,7 @@ const fileText = 'const timeout = 5000;\n';
 let service, browser;
 try {
   const skill = join(root, 'skill');
-  await cp(
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-    skill,
-    { recursive: true },
-  );
+  await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   await writeFile(join(root, 'review.md'), markdown);
   await writeFile(join(root, 'request.ts'), fileText);
   service = await startServer(join(root, 'runtime'));

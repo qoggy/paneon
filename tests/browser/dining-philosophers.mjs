@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { startExplanationsFixture } from './explanations-fixture.mjs';
-import { simulationTrace } from '../../skills/paneon/assets/examples/dining-philosophers/model.ts';
+import { simulationTrace } from '#test-skill/assets/examples/dining-philosophers/model.ts';
 
 export async function verifyDiningPhilosophers(page, fixture) {
   await page.goto(fixture.url('dining-philosophers'));

@@ -6,10 +6,10 @@ import {
   diffReviewSubmittedSchema,
   validateRanges,
   validateSources,
-} from '../skills/paneon/assets/panels/diff-review/schema.ts';
-import { reviewTree, visibleFileCount } from '../skills/paneon/assets/panels/diff-review/model.ts';
-import type { DiffFeedbackResult } from '../skills/paneon/assets/panels/diff-review/schema.ts';
-import { publicDiffFeedback } from '../skills/paneon/assets/panels/diff-review/feedback.ts';
+} from '#test-skill/assets/panels/diff-review/schema.ts';
+import { reviewTree, visibleFileCount } from '#test-skill/assets/panels/diff-review/model.ts';
+import type { DiffFeedbackResult } from '#test-skill/assets/panels/diff-review/schema.ts';
+import { publicDiffFeedback } from '#test-skill/assets/panels/diff-review/feedback.ts';
 
 void test('path-only manifest rejects ambiguous absence and unsolicited identity fields', () => {
   assert.equal(

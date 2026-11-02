@@ -26,6 +26,8 @@ export type InstallPlan = {
   sourcePath: string;
   recordPath: string;
   targets: InstallTarget[];
+  obsoleteTargets: string[];
+  preservedInstallations: InstallationRecord[];
 };
 export type InstallResult = {
   scope: InstallScope;
@@ -33,6 +35,7 @@ export type InstallResult = {
   method: InstallMethod;
   paneonVersion: string;
   recordPath: string;
+  removedTargets: string[];
   targets: {
     path: string;
     kind: 'directory' | 'symlink';

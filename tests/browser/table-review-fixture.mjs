@@ -1,3 +1,4 @@
+import { SKILL_NAME, SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,12 +27,8 @@ export async function startTableReviewFixture() {
   const root = await mkdtemp(join(tmpdir(), 'paneon-table-review-'));
   let service;
   try {
-    const skill = join(root, 'agent-skills/paneon');
-    await cp(
-      process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon', import.meta.url),
-      skill,
-      { recursive: true },
-    );
+    const skill = join(root, `agent-skills/${SKILL_NAME}`);
+    await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
     service = await startServer(join(root, '.paneon'));
     await service.app.inject({
       method: 'POST',

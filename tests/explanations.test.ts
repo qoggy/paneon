@@ -15,7 +15,7 @@ import {
   simulationText,
   simulationTrace,
   waitingFor,
-} from '../skills/paneon/assets/examples/dining-philosophers/model.ts';
+} from '#test-skill/assets/examples/dining-philosophers/model.ts';
 import {
   access,
   deprecated,
@@ -23,7 +23,7 @@ import {
   mapping,
   values,
   windowValue,
-} from '../skills/paneon/assets/examples/sentinel-leap-array/model.ts';
+} from '#test-skill/assets/examples/sentinel-leap-array/model.ts';
 
 void test('each successful turn executes exactly one of the six displayed lines', () => {
   for (const strategy of STRATEGIES) {

@@ -6,6 +6,7 @@ import {
   mkdtemp,
   open,
   readFile,
+  readdir,
   readlink,
   realpath,
   rename,
@@ -32,6 +33,8 @@ import type {
 const invalid = (message: string) => new PaneonError('SKILL_INSTALL_INVALID_REQUEST', message);
 const unsafe = (message: string) => new PaneonError('SKILL_INSTALL_UNSAFE_PATH', message);
 const missing = (e: unknown) => (e as NodeJS.ErrnoException).code === 'ENOENT';
+const missingRecordedPath = (e: unknown) =>
+  missing(e) || (e as NodeJS.ErrnoException).code === 'ENOTDIR';
 async function entry(path: string) {
   try {
     return await lstat(path);
@@ -67,6 +70,8 @@ function overlap(a: string, b: string) {
 }
 const nonempty = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && !v.includes('\0');
+const recordedPath = (v: unknown): v is string =>
+  nonempty(v) && !isAbsolute(v) && !['.', '..'].includes(basename(v));
 function recordError() {
   return new PaneonError(
     'SKILL_INSTALL_INVALID_RECORD',
@@ -100,23 +105,15 @@ function validateRecord(value: unknown): InstallationRecords {
         : i.projectPath !== undefined
     )
       throw recordError();
-    const key = `${i.scope}:${i.projectPath ?? ''}`;
-    if (identities.has(key)) throw recordError();
-    identities.add(key);
+    for (const agent of i.agents) {
+      const key = `${i.scope}:${i.projectPath ?? ''}:${agent}`;
+      if (identities.has(key)) throw recordError();
+      identities.add(key);
+    }
     for (const t of i.targets) {
-      if (
-        !t ||
-        !nonempty(t.path) ||
-        isAbsolute(t.path) ||
-        basename(t.path) !== 'paneon' ||
-        !['directory', 'symlink'].includes(t.kind)
-      )
+      if (!t || !recordedPath(t.path) || !['directory', 'symlink'].includes(t.kind))
         throw recordError();
-      if (
-        t.kind === 'symlink'
-          ? !nonempty(t.target) || isAbsolute(t.target) || basename(t.target) !== 'paneon'
-          : t.target !== undefined
-      )
+      if (t.kind === 'symlink' ? !recordedPath(t.target) : t.target !== undefined)
         throw recordError();
     }
   }
@@ -143,14 +140,114 @@ async function readRecords(path: string): Promise<InstallationRecords> {
     throw recordError();
   }
 }
-async function sourcePath(e: InstallEnvironment): Promise<string> {
-  const source = await realpath(join(e.packageRoot, 'skills/paneon'));
-  if (!(await stat(source)).isDirectory() || !(await stat(join(source, 'SKILL.md'))).isFile())
-    throw invalid(
-      'The installed Paneon package does not contain a complete skill. Reinstall Paneon.',
+async function bundledSkills(e: InstallEnvironment) {
+  const source = await realpath(join(e.packageRoot, 'skills'));
+  const names = (await readdir(source, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (!names.length)
+    throw invalid('The installed Paneon package does not contain any skills. Reinstall Paneon.');
+  for (const name of names) {
+    const path = join(source, name, 'SKILL.md');
+    if (!(await stat(path)).isFile())
+      throw invalid(`The bundled skill ${name} is incomplete. Reinstall Paneon.`);
+    await readFile(path, 'utf8');
+  }
+  return { source, names };
+}
+function withLinkSources<T extends { path: string; target?: string }>(all: T[], owned: T[]): T[] {
+  const paths = new Set(owned.flatMap((t) => [t.path, ...(t.target ? [t.target] : [])]));
+  return all.filter((t) => paths.has(t.path));
+}
+async function recordedTargetPath(base: string, path: string): Promise<string> {
+  const absolute = resolve(base, path);
+  // A missing target needs no deletion, including a target beneath a dangling parent link.
+  try {
+    return (await entry(absolute)) ? await physicalParent(absolute) : absolute;
+  } catch (error) {
+    if (!missingRecordedPath(error))
+      console.warn(
+        `Could not inspect recorded skill path ${absolute}; preserving the recorded path. ${String(error)}`,
+      );
+    return absolute;
+  }
+}
+async function preserveInstallations(
+  records: InstallationRecords,
+  scope: InstallRequest['scope'],
+  projectPath: string | undefined,
+  agents: string[],
+  e: InstallEnvironment,
+): Promise<InstallationRecord[]> {
+  const preserved: InstallationRecord[] = [];
+  const registry = agentRegistry(e);
+  for (const record of records.installations) {
+    if (record.scope !== scope || record.projectPath !== projectPath) {
+      continue;
+    }
+    const remaining = record.agents.filter((agent) => !agents.includes(agent));
+    if (remaining.length === record.agents.length) {
+      preserved.push(record);
+      continue;
+    }
+    if (!remaining.length) continue;
+    // Older records grouped agents together. Attribute their targets by agent directories;
+    // new records are stored per agent so their paths, method and version stay independent.
+    const base = record.projectPath ?? (await realpath(e.homeDir));
+    const roots = new Map(
+      await Promise.all(
+        record.agents.map(async (id) => {
+          const agent = registry.find((a) => a.id === id);
+          const directory =
+            agent && (scope === 'global' ? agent.globalDir : join(base, agent.projectDir));
+          let root = directory && resolve(directory);
+          if (directory) {
+            try {
+              root = await realpath(directory);
+            } catch (error) {
+              if (!missingRecordedPath(error))
+                console.warn(
+                  `Could not inspect recorded agent directory ${directory}; preserving its recorded paths. ${String(error)}`,
+                );
+            }
+          }
+          return [id, root] as const;
+        }),
+      ),
     );
-  await readFile(join(source, 'SKILL.md'), 'utf8');
-  return source;
+    const located = await Promise.all(
+      record.targets.map(async (target) => ({
+        target,
+        directory: dirname(await recordedTargetPath(base, target.path)),
+      })),
+    );
+    const directories = new Set(located.map((t) => t.directory));
+    const unmatched = record.agents.filter((id) => {
+      const root = roots.get(id);
+      return !root || !directories.has(root);
+    });
+    const sources = new Set(record.targets.flatMap((t) => (t.target ? [t.target] : [])));
+    for (const id of remaining) {
+      const root = roots.get(id);
+      const owned = located
+        .filter(({ target, directory }) => {
+          if (root && directory === root) return true;
+          if (sources.has(target.path)) return false;
+          const known = [...roots.values()].some((r) => r === directory);
+          // A legacy configurable directory may have moved. If ownership is ambiguous,
+          // retain it for the unselected agents rather than guessing a deletion owner.
+          return !known && unmatched.includes(id);
+        })
+        .map(({ target }) => target);
+      preserved.push({
+        ...record,
+        agents: [id],
+        targets: withLinkSources(record.targets, owned.length ? owned : record.targets),
+      });
+    }
+  }
+  return preserved;
 }
 export async function createInstallPlan(
   request: InstallRequest,
@@ -176,59 +273,114 @@ export async function createInstallPlan(
   if (!(await stat(base)).isDirectory())
     throw invalid('The installation root must be a directory.');
   let source: string;
+  let names: string[];
   try {
-    source = await sourcePath(e);
+    ({ source, names } = await bundledSkills(e));
   } catch (error) {
     if (error instanceof PaneonError) throw error;
     throw invalid('The installed Paneon package skill could not be read. Reinstall Paneon.');
   }
   const recordPath = join(await physicalPath(e.paneonHome), 'skill-installations.json');
-  await readRecords(recordPath);
+  const records = await readRecords(recordPath);
   if (contains(source, dirname(recordPath)))
     throw unsafe('Paneon installation metadata must be outside the bundled skill source.');
   const selected = registry.filter((a) => agents.includes(a.id));
   const paths = await Promise.all(
     selected.map(async (a) => ({
       agent: a.id,
-      path: await physicalParent(
-        join(request.scope === 'global' ? a.globalDir : join(base, a.projectDir), 'paneon'),
-      ),
+      path: await physicalPath(request.scope === 'global' ? a.globalDir : join(base, a.projectDir)),
     })),
   );
   const unique = new Map<string, string[]>();
   for (const p of paths) unique.set(p.path, [...(unique.get(p.path) ?? []), p.agent]);
   const method = unique.size === 1 ? 'copy' : (request.method ?? 'symlink');
-  const central = await physicalParent(join(base, '.agents/skills/paneon'));
+  const central = await physicalPath(join(base, '.agents/skills'));
   const targets: InstallTarget[] = [];
   if (method === 'symlink' && !unique.has(central)) unique.set(central, []);
-  // Copy the central source before creating links to it.
-  for (const [path, owners] of [...unique].sort(([a], [b]) =>
+  // Copy each central skill before creating links to it.
+  for (const [directory, owners] of [...unique].sort(([a], [b]) =>
     a === central ? -1 : b === central ? 1 : a.localeCompare(b),
   )) {
-    const kind = method === 'symlink' && path !== central ? 'symlink' : 'directory';
-    if (overlap(source, path))
-      throw unsafe('The installation target overlaps the bundled skill source.');
-    const info = await entry(path);
-    if (info?.isSymbolicLink()) {
-      const link = resolve(dirname(path), await readlink(path));
-      const resolved = await physicalPath(link);
-      if (overlap(source, resolved))
-        throw unsafe('An installation target links to the bundled skill source.');
+    for (const name of names) {
+      const path = join(directory, name);
+      const kind = method === 'symlink' && directory !== central ? 'symlink' : 'directory';
+      if (overlap(source, path))
+        throw unsafe('The installation target overlaps the bundled skill source.');
+      const info = await entry(path);
+      if (info?.isSymbolicLink()) {
+        const link = resolve(dirname(path), await readlink(path));
+        const resolved = await physicalPath(link);
+        if (overlap(source, resolved))
+          throw unsafe('An installation target links to the bundled skill source.');
+      }
+      if (contains(path, recordPath) || contains(path, await physicalPath(e.paneonHome)))
+        throw unsafe('The installation target overlaps Paneon installation metadata.');
+      targets.push({
+        path,
+        kind,
+        ...(kind === 'symlink' ? { target: join(central, name) } : {}),
+        agents: owners.sort(),
+        exists: !!info,
+      });
     }
-    if (contains(path, recordPath) || contains(path, await physicalPath(e.paneonHome)))
-      throw unsafe('The installation target overlaps Paneon installation metadata.');
-    targets.push({
-      path,
-      kind,
-      ...(kind === 'symlink' ? { target: central } : {}),
-      agents: owners.sort(),
-      exists: !!info,
-    });
   }
   for (let i = 0; i < targets.length; i++)
     for (let j = i + 1; j < targets.length; j++)
       if (overlap(targets[i].path, targets[j].path))
         throw unsafe('Installation target directories overlap.');
+  const projectPath = request.scope === 'project' ? base : undefined;
+  const previous = records.installations.filter(
+    (i) => i.scope === request.scope && i.projectPath === projectPath,
+  );
+  const preservedInstallations = await preserveInstallations(
+    records,
+    request.scope,
+    projectPath,
+    agents,
+    e,
+  );
+  // A path still owned or referenced by another installation must remain available.
+  const retained = new Set(targets.map((t) => t.path));
+  for (const installation of [
+    ...records.installations.filter((i) => !previous.includes(i)),
+    ...preservedInstallations,
+  ]) {
+    const root = installation.projectPath ?? (await realpath(e.homeDir));
+    for (const target of installation.targets) {
+      retained.add(await recordedTargetPath(root, target.path));
+      if (target.target) retained.add(await recordedTargetPath(root, target.target));
+    }
+  }
+  const obsoleteTargets: string[] = [];
+  for (const target of previous
+    .flatMap((record) => record.targets)
+    .sort((a, b) =>
+      a.kind === b.kind ? a.path.localeCompare(b.path) : a.kind === 'symlink' ? -1 : 1,
+    )) {
+    const recorded = resolve(base, target.path);
+    if (retained.has(recorded)) continue;
+    try {
+      if (!(await entry(recorded))) continue;
+    } catch (error) {
+      if (missingRecordedPath(error)) continue;
+      throw error;
+    }
+    const path = await physicalParent(recorded);
+    if (retained.has(path) || obsoleteTargets.includes(path)) continue;
+    if (
+      overlap(source, path) ||
+      contains(path, recordPath) ||
+      contains(path, await physicalPath(e.paneonHome)) ||
+      contains(path, base) ||
+      [...retained].some((other) => overlap(path, other))
+    )
+      throw new PaneonError(
+        'SKILL_INSTALL_UNSAFE_PATH',
+        'A previous installation target overlaps protected paths.',
+        { path },
+      );
+    obsoleteTargets.push(path);
+  }
   return {
     scope: request.scope,
     ...(request.scope === 'project' ? { projectPath: base } : {}),
@@ -238,6 +390,8 @@ export async function createInstallPlan(
     sourcePath: source,
     recordPath,
     targets,
+    obsoleteTargets,
+    preservedInstallations,
   };
 }
 async function lockRecords(home: string): Promise<() => Promise<void>> {
@@ -272,15 +426,22 @@ async function lockRecords(home: string): Promise<() => Promise<void>> {
     { lockPath: path },
   );
 }
-async function storedRecord(plan: InstallPlan, e: InstallEnvironment): Promise<InstallationRecord> {
+async function storedRecord(
+  plan: InstallPlan,
+  agent: string,
+  e: InstallEnvironment,
+): Promise<InstallationRecord> {
   const base = plan.projectPath ?? (await realpath(e.homeDir));
   return {
     scope: plan.scope,
     ...(plan.projectPath ? { projectPath: plan.projectPath } : {}),
     paneonVersion: plan.paneonVersion,
-    agents: plan.agents,
+    agents: [agent],
     method: plan.method,
-    targets: plan.targets.map((t) => ({
+    targets: withLinkSources(
+      plan.targets,
+      plan.targets.filter((t) => t.agents.includes(agent)),
+    ).map((t) => ({
       path: relative(base, t.path),
       kind: t.kind,
       ...(t.target ? { target: relative(base, t.target) } : {}),
@@ -295,6 +456,7 @@ export async function executeInstallPlan(
   let staging: string | undefined;
   let pending: string | undefined;
   const completed: string[] = [];
+  const removed: string[] = [];
   try {
     // Plans are review artifacts, not arbitrary filesystem write capabilities.
     const verified = await createInstallPlan(
@@ -311,15 +473,17 @@ export async function executeInstallPlan(
     if (!isDeepStrictEqual(plan, fresh))
       throw unsafe('The installation plan changed. Review a new plan before proceeding.');
     const records = await readRecords(fresh.recordPath);
-    const installed = await storedRecord(fresh, e);
-    records.installations = records.installations.filter(
-      (i) => i.scope !== installed.scope || i.projectPath !== installed.projectPath,
-    );
-    records.installations.push(installed);
+    records.installations = [
+      ...records.installations.filter(
+        (i) => i.scope !== fresh.scope || i.projectPath !== fresh.projectPath,
+      ),
+      ...fresh.preservedInstallations,
+      ...(await Promise.all(fresh.agents.map((agent) => storedRecord(fresh, agent, e)))),
+    ];
     validateRecord(records);
     // Prepare source and metadata before removing any existing skill directory.
     staging = await mkdtemp(join(dirname(fresh.recordPath), '.skill-install-'));
-    const stagedSource = join(staging, 'paneon');
+    const stagedSource = join(staging, 'skills');
     await cp(fresh.sourcePath, stagedSource, {
       recursive: true,
       dereference: false,
@@ -350,13 +514,20 @@ export async function executeInstallPlan(
           if (!target.target) throw unsafe('The symbolic link target is missing.');
           await symlink(relative(dirname(target.path), target.target), target.path, 'dir');
         } else
-          await cp(stagedSource, target.path, {
+          await cp(join(stagedSource, basename(target.path)), target.path, {
             recursive: true,
             dereference: false,
             verbatimSymlinks: true,
           });
       }
       completed.push(target.path);
+    }
+    // Keep the old installation until every new skill has been installed successfully.
+    for (const path of fresh.obsoleteTargets) {
+      if ((await physicalParent(path)) !== path)
+        throw unsafe(`A previous installation target parent changed during installation: ${path}`);
+      await rm(path, { recursive: true, force: true });
+      removed.push(path);
     }
     await rename(pending, fresh.recordPath);
     pending = undefined;
@@ -366,6 +537,7 @@ export async function executeInstallPlan(
       method: fresh.method,
       paneonVersion: fresh.paneonVersion,
       recordPath: fresh.recordPath,
+      removedTargets: removed,
       targets: fresh.targets.map((t) => ({
         path: t.path,
         kind: t.kind,
@@ -381,6 +553,7 @@ export async function executeInstallPlan(
       {
         reason: error instanceof Error ? error.message : String(error),
         completedTargets: completed,
+        removedTargets: removed,
       },
     );
   } finally {

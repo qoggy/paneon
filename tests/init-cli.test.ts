@@ -1,3 +1,4 @@
+import { SKILL_NAME } from './skill-paths.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
@@ -148,8 +149,8 @@ for (const entry of entries) {
       assert.equal(result.stdout.trim().split('\n').length, 1);
       assert.match(result.stderr, /\[debug\] command.start/);
       assert.match(result.stderr, /\[debug\] command.complete/);
-      const central = join(f.cwd, '.agents/skills/paneon');
-      const claude = join(f.cwd, '.claude/skills/paneon');
+      const central = join(f.cwd, `.agents/skills/${SKILL_NAME}`);
+      const claude = join(f.cwd, `.claude/skills/${SKILL_NAME}`);
       assert.ok(lstatSync(claude).isSymbolicLink());
       assert.equal(
         readFileSync(join(claude, 'SKILL.md'), 'utf8'),
@@ -162,7 +163,10 @@ for (const entry of entries) {
       const recordPath = join(f.home, '.paneon/skill-installations.json');
       const records = recordsAt(recordPath);
       assert.equal(records.schemaVersion, 1);
-      assert.deepEqual([...records.installations[0].agents].sort(), ['claude-code', 'codex']);
+      assert.deepEqual(records.installations.flatMap((record) => record.agents).sort(), [
+        'claude-code',
+        'codex',
+      ]);
       assert.equal(realpathSync(data.recordPath), realpathSync(recordPath));
       assert.ok(!existsSync(join(f.home, '.paneon/runtime.json')));
     } finally {
@@ -176,10 +180,10 @@ for (const entry of entries) {
       const args = ['init', '--agent', 'claude-code', '--global', '--copy', '--yes', '--json'];
       const first = f.run(entry, ...args);
       assert.equal(first.status, 0, first.stderr);
-      const target = join(f.home, '.claude/skills/paneon');
+      const target = join(f.home, `.claude/skills/${SKILL_NAME}`);
       assert.equal(envelope(first.stdout).data.method, 'copy');
       assert.ok(!lstatSync(target).isSymbolicLink());
-      assert.ok(!existsSync(join(f.home, '.agents/skills/paneon')));
+      assert.ok(!existsSync(join(f.home, `.agents/skills/${SKILL_NAME}`)));
       writeFileSync(join(target, 'references/old-file.md'), 'old');
       writeFileSync(join(target, 'SKILL.md'), 'local edits');
       const second = f.run(entry, ...args);
@@ -205,7 +209,7 @@ for (const entry of entries) {
       assert.equal(data.scope, 'project');
       assert.equal(data.method, 'copy');
       assert.equal(data.targets.length, 1);
-      assert.ok(existsSync(join(f.cwd, '.agents/skills/paneon/SKILL.md')));
+      assert.ok(existsSync(join(f.cwd, `.agents/skills/${SKILL_NAME}/SKILL.md`)));
       assert.ok(!existsSync(join(f.cwd, '.claude')));
       assert.ok(!existsSync(join(f.cwd, '.windsurf')));
     } finally {

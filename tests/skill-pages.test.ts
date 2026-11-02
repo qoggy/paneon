@@ -4,14 +4,14 @@ import { z } from '@qoggy/paneon/sdk';
 import {
   chooseParamsSchema,
   completeAnswersSchema,
-} from '../skills/paneon/assets/panels/choose/schema.ts';
+} from '#test-skill/assets/panels/choose/schema.ts';
 import {
   collectForm,
   completeFormSchema,
   formParamsSchema,
   formSubmittedSchema,
   initialDraft,
-} from '../skills/paneon/assets/panels/form/schema.ts';
+} from '#test-skill/assets/panels/form/schema.ts';
 
 const questions = [
   {

@@ -1,4 +1,4 @@
-import { GitHubReview } from '../skills/paneon/assets/examples/github-pr/github.ts';
+import { GitHubReview } from '#test-skill/assets/examples/github-pr/github.ts';
 const repository = process.env.PANEON_LIVE_REPOSITORY ?? 'cli/cli',
   number = Number(process.env.PANEON_LIVE_PR ?? '14768');
 const client = new GitHubReview(),

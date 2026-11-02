@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -53,7 +54,7 @@ try {
           ...process.env,
           PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js'))
             .href,
-          PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+          PANEON_TEST_SKILL_SOURCE: join(packageRoot, SKILL_PACKAGE_PATH),
           PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
         },
         timeout: 180_000,

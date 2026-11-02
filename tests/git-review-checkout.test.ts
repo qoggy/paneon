@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkoutGit } from '../skills/paneon/assets/panels/git-review/checkout.ts';
-import { gitCheckoutCompletedSchema } from '../skills/paneon/assets/panels/git-review/schema.ts';
-import type { GitCheckoutInput } from '../skills/paneon/assets/panels/git-review/schema.ts';
+import { checkoutGit } from '#test-skill/assets/panels/git-review/checkout.ts';
+import { gitCheckoutCompletedSchema } from '#test-skill/assets/panels/git-review/schema.ts';
+import type { GitCheckoutInput } from '#test-skill/assets/panels/git-review/schema.ts';
 import { git } from './git-review-fixture.ts';
 
 async function fixture() {

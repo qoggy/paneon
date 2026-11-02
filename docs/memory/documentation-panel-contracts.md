@@ -6,7 +6,7 @@ type: documentation
 
 # Built-in panel references
 
-Each built-in panel reference in `skills/paneon/references/` is written for an agent deciding on and operating the panel. Cover:
+Each built-in panel reference in `skills/paneon-visualize/references/` is written for an agent deciding on and operating the panel. Cover:
 
 - **When to use it**: the need it fits, in one or two sentences.
 - **What it achieves**: what the human can do on the page and what the agent gets back.

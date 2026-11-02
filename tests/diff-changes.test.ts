@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createDiffModel, diffChanges } from '../skills/paneon/assets/shared/diff-model.ts';
+import { createDiffModel, diffChanges } from '#test-skill/assets/shared/diff-model.ts';
 
 void test('navigation retains separate edits inside a single contextual hunk', () => {
   const old = Array.from({ length: 60 }, (_, i) => `source ${i + 1}\r\n`).join('');

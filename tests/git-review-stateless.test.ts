@@ -4,24 +4,24 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readGit, readGitFile } from '../skills/paneon/assets/panels/git-review/git.ts';
+import { readGit, readGitFile } from '#test-skill/assets/panels/git-review/git.ts';
 import {
   buildGitFeedback,
   publicGitFeedback,
   validateGitFeedback,
-} from '../skills/paneon/assets/panels/git-review/feedback.ts';
+} from '#test-skill/assets/panels/git-review/feedback.ts';
 import {
   gitFileSchema,
   gitRequestSchema,
   gitReviewSubmittedSchema,
-} from '../skills/paneon/assets/panels/git-review/schema.ts';
-import type { GitRef } from '../skills/paneon/assets/panels/git-review/schema.ts';
+} from '#test-skill/assets/panels/git-review/schema.ts';
+import type { GitRef } from '#test-skill/assets/panels/git-review/schema.ts';
 import { jsonValue } from '../src/shared/types.ts';
 import { fixture, git } from './git-review-fixture.ts';
 const execute = promisify(execFile);
 async function fresh<T>(input: unknown, expression: string): Promise<T> {
-  const script = `import {readGit,readGitFile} from ${JSON.stringify(new URL('../skills/paneon/assets/panels/git-review/git.ts', import.meta.url).href)};
-import {validateGitFeedback} from ${JSON.stringify(new URL('../skills/paneon/assets/panels/git-review/feedback.ts', import.meta.url).href)};
+  const script = `import {readGit,readGitFile} from ${JSON.stringify(import.meta.resolve('#test-skill/assets/panels/git-review/git.ts'))};
+import {validateGitFeedback} from ${JSON.stringify(import.meta.resolve('#test-skill/assets/panels/git-review/feedback.ts'))};
 const input=JSON.parse(process.argv[1]);console.log(JSON.stringify(await (${expression})));`;
   return JSON.parse(
     (await execute(process.execPath, ['--input-type=module', '-e', script, JSON.stringify(input)]))

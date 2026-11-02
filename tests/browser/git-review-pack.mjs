@@ -1,3 +1,4 @@
+import { SKILL_PACKAGE_PATH } from '../skill-paths.ts';
 import { createPackageFixture } from '../package-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -24,7 +25,7 @@ try {
     'assets/shared/diff-schema.ts',
     'assets/shared/submission.ts',
   ])
-    assert.ok(files.has(`skills/paneon/${file}`), `Missing packaged resource: ${file}`);
+    assert.ok(files.has(`${SKILL_PACKAGE_PATH}/${file}`), `Missing packaged resource: ${file}`);
   for (const script of [
     'git-review.mjs',
     'git-review-loading.mjs',
@@ -40,7 +41,7 @@ try {
           ...process.env,
           PANEON_TEST_RUNTIME_ENTRY: pathToFileURL(join(packageRoot, 'dist/runtime/server.js'))
             .href,
-          PANEON_TEST_SKILL_SOURCE: join(packageRoot, 'skills/paneon'),
+          PANEON_TEST_SKILL_SOURCE: join(packageRoot, SKILL_PACKAGE_PATH),
           PANEON_TEST_CLI_ENTRY: join(packageRoot, 'dist/cli/index.js'),
         },
         maxBuffer: 4 * 1024 * 1024,

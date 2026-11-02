@@ -1,3 +1,4 @@
+import { SKILL_NAME } from '../skill-paths.ts';
 import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import { submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines } from './annotation-tools.mjs';
@@ -248,7 +249,7 @@ try {
   // A plain string consumer has no AnnotationRoot and retains document scrolling.
   const plainEntry = join(
     f.root,
-    'agent-skills/paneon/assets/panels/git-review/plain-diff-acceptance.tsx',
+    `agent-skills/${SKILL_NAME}/assets/panels/git-review/plain-diff-acceptance.tsx`,
   );
   await writeFile(
     plainEntry,

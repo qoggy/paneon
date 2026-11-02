@@ -1,3 +1,4 @@
+import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import { selectDiffLines } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
@@ -14,13 +15,8 @@ try {
     process.env.PANEON_TEST_RUNTIME_ENTRY ??
       new URL('../../dist/runtime/server.js', import.meta.url).href
   );
-  const skill =
-    process.env.PANEON_TEST_SKILL_SOURCE ?? new URL('../../skills/paneon/', import.meta.url);
-  await cp(
-    typeof skill === 'string' ? join(skill, 'assets/shared') : new URL('assets/shared/', skill),
-    join(root, 'shared'),
-    { recursive: true },
-  );
+  const skill = process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT;
+  await cp(join(skill, 'assets/shared'), join(root, 'shared'), { recursive: true });
   const entry = join(root, 'panel.tsx');
   await writeFile(
     entry,
