@@ -1,4 +1,4 @@
-import { PACKAGE_VERSION } from '../dist/shared/paths.js';
+import { PACKAGE_ROOT, PACKAGE_VERSION } from '../dist/shared/paths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -15,7 +15,10 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import pino from 'pino';
+import type { ViteDevServer } from 'vite';
 import type { WatchInputs } from '../src/shared/types.js';
 
 const { Runtime } = (await import(
@@ -46,6 +49,66 @@ function sources(runtime: InstanceType<typeof Runtime>) {
   return (runtime as unknown as { sources: InstanceType<typeof SourceWatcher> }).sources;
 }
 
+for (const [mode, backend] of [
+  ['single', 'native'],
+  ['cross-directory', 'native'],
+  ['second', 'native'],
+  ['update', 'native'],
+  ['cross-directory', 'nodefs'],
+  ['second', 'nodefs'],
+  ['update', 'nodefs'],
+  ['missing-parent', 'nodefs'],
+]) {
+  void test(`one save during registration is reconciled: ${mode}, ${backend}`, async () => {
+    await promisify(execFile)(
+      process.execPath,
+      [new URL('./fixtures/source-watcher-startup.mjs', import.meta.url).pathname, mode, backend],
+      { timeout: 10000 },
+    );
+  });
+}
+
+void test('NodeFs recovers a panel after creating a missing import and its parent directories', async () => {
+  await promisify(execFile)(
+    process.execPath,
+    [new URL('./fixtures/source-watcher-recovery.mjs', import.meta.url).pathname],
+    { timeout: 60000 },
+  );
+});
+
+for (const backend of ['nodefs', 'native'])
+  void test(`shared missing paths and retired directories recover without scanning siblings: ${backend}`, async () => {
+    await promisify(execFile)(
+      process.execPath,
+      [new URL('./fixtures/source-watcher-nodefs.mjs', import.meta.url).pathname, backend],
+      { timeout: 20000 },
+    );
+  });
+
+void test('the watcher disables dependency optimization, reports errors and releases its server', async () => {
+  const root = directory(),
+    file = join(root, 'value.ts');
+  writeFileSync(file, 'one');
+  const errors: unknown[] = [];
+  const watcher = new SourceWatcher((error) => errors.push(error));
+  try {
+    const subscription = await watcher.subscribe(inputs(file, 'one'), async () => {});
+    const native = await (watcher as unknown as { server: Promise<ViteDevServer> }).server;
+    assert.equal(native.config.root, PACKAGE_ROOT);
+    assert.equal(native.environments.client.depsOptimizer, undefined);
+    const failure = new Error('Deliberate watcher error');
+    native.watcher.emit('error', failure);
+    assert.deepEqual(errors, [failure]);
+    await subscription.close();
+    assert.deepEqual(native.watcher.getWatched(), {});
+    assert.equal(watcher.size, 0);
+    assert.equal(watcher.servers, 0);
+  } finally {
+    await watcher.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 void test(
   'retiring an ancestor preserves child subscribers and later subscriptions can reopen that subtree',
   { timeout: 20000 },
@@ -71,23 +134,11 @@ void test(
       first++;
       return Promise.resolve();
     });
-    const deadline = Date.now() + 10000;
-    let writes = 0;
-    // Native registration is asynchronous. Verify that subscriptions stay live,
-    // without requiring the first write after subscribe() to be delivered.
-    async function writeUntilNotified(check: () => boolean, message: string) {
-      while (Date.now() < deadline) {
-        writeFileSync(file, `update-${writes++}`);
-        const nextWrite = Math.min(Date.now() + 250, deadline);
-        while (!check() && Date.now() < nextWrite) await delay(20);
-        if (check()) return;
-      }
-      assert.fail(message);
-    }
     try {
       await parent.close();
       const beforeFirst = first;
-      await writeUntilNotified(
+      writeFileSync(file, 'after-parent-close');
+      await until(
         () => first > beforeFirst,
         'Closing the ancestor subscription stopped notifications for its child',
       );
@@ -98,7 +149,8 @@ void test(
       });
       try {
         const beforeLater = later;
-        await writeUntilNotified(
+        writeFileSync(file, 'after-resubscribe');
+        await until(
           () => later > beforeLater,
           'A new subscription could not receive notifications from the retired subtree',
         );

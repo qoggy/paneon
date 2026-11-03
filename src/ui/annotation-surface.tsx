@@ -559,6 +559,7 @@ export function AnnotationMenu() {
   const [position, setPosition] = useState<LauncherPosition | null>(null);
   const [dragging, setDragging] = useState(false);
   const launcher = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const setLauncher = picker.setLauncher;
   const launcherRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -661,6 +662,7 @@ export function AnnotationMenu() {
         <PopoverTrigger
           render={
             <Button
+              ref={menuTrigger}
               type="button"
               variant="outline"
               className={cn(
@@ -799,7 +801,7 @@ export function AnnotationMenu() {
                   onClick={() => {
                     // A hover-opened menu must not refocus the old tab after locating elsewhere.
                     if (!store.getSnapshot().editor)
-                      launcher.current?.querySelector('button')?.focus({ preventScroll: true });
+                      menuTrigger.current?.focus({ preventScroll: true });
                     close();
                     void feedback.locate(entry.targets[0]).catch(() => {});
                   }}
@@ -848,9 +850,7 @@ export function AnnotationMenu() {
                           disabled={blocked}
                           onClick={() => {
                             if (!store.getSnapshot().editor)
-                              launcher.current
-                                ?.querySelector('button')
-                                ?.focus({ preventScroll: true });
+                              menuTrigger.current?.focus({ preventScroll: true });
                             close();
                             void store.locateAndEdit(entry.id, entry.targets[0]).catch(() => {});
                           }}

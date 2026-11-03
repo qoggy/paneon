@@ -873,6 +873,38 @@ void test('multi-project and global installs coexist, reinstall preserves unsele
       assert.equal(projectRecords.find((i) => i.agents.includes(agent))?.paneonVersion, '1.2.3');
     assert.equal(r.installations.find((i) => i.projectPath === second.cwd)?.paneonVersion, '1.2.3');
   }));
+void test('a concurrently created ordinary parent is resolved while dangling parent links remain unsafe', async () =>
+  fixture(async (e, root) => {
+    const original = fs.promises.realpath;
+    let raced = false;
+    fs.promises.realpath = (async (...args: Parameters<typeof original>) => {
+      try {
+        return await original(...args);
+      } catch (error) {
+        if (
+          !raced &&
+          String(args[0]) === e.paneonHome &&
+          (error as NodeJS.ErrnoException).code === 'ENOENT'
+        ) {
+          raced = true;
+          await mkdir(e.paneonHome);
+        }
+        throw error;
+      }
+    }) as typeof original;
+    syncBuiltinESMExports();
+    try {
+      await createInstallPlan({ scope: 'project', agents: ['codex'] }, e);
+      assert.equal(raced, true);
+    } finally {
+      fs.promises.realpath = original;
+      syncBuiltinESMExports();
+    }
+    await rm(e.paneonHome, { recursive: true });
+    await symlink(join(root, 'missing-parent'), e.paneonHome, 'dir');
+    await assert.rejects(createInstallPlan(request, e), code('SKILL_INSTALL_UNSAFE_PATH'));
+  }));
+
 void test('parallel processes merge centralized records atomically without losing projects', async () =>
   fixture(async (e, root) => {
     const moduleUrl = new URL('../dist/cli/skill-install/index.js', import.meta.url).href;

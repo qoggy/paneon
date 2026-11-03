@@ -2,6 +2,13 @@ import { SKILL_PACKAGE_PATH } from './skill-paths.ts';
 import { deduplicateJobs, runJobs } from './release-support.ts';
 import { packageDownloadCache } from './package-fixture.mjs';
 import { readTestTimings, summarizeTestTimings } from './test-timing.ts';
+import {
+  formatReleaseReport,
+  formatReleaseDuration,
+  formatUnitCounts,
+  releasePhaseName,
+  releaseResultFailed,
+} from './release-report.ts';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import {
@@ -142,6 +149,7 @@ try {
 } finally { await rm(root,{recursive:true,force:true}); }
 `;
 const options = new Set(process.argv.slice(2));
+const verbose = options.has('--verbose');
 const phase = [...options].find((arg) => arg.startsWith('--phase='))?.slice(8) ?? 'all';
 const match = [...options].find((arg) => arg.startsWith('--match='))?.slice(8) ?? '';
 const patterns = match.split(',').filter(Boolean);
@@ -156,7 +164,7 @@ const phases = ['checks', 'unit', 'acceptance', 'browser', 'package', 'live'];
 assert.ok(phase === 'all' || phases.includes(phase), `Unknown phase: ${phase}`);
 for (const arg of options)
   assert.ok(
-    ['--list', '--skip-build', '--coverage'].includes(arg) ||
+    ['--list', '--skip-build', '--coverage', '--verbose'].includes(arg) ||
       arg.startsWith('--phase=') ||
       arg.startsWith('--match=') ||
       arg.startsWith('--jobs='),
@@ -256,6 +264,15 @@ if (options.has('--list')) {
   process.exit(0);
 }
 
+// Wall-clock test deadlines keep advancing during macOS idle sleep. Keep the
+// machine awake only for this runner's lifetime; the display may still sleep.
+if (process.platform === 'darwin') {
+  const awake = spawn('/usr/bin/caffeinate', ['-i', '-w', String(process.pid)], {
+    stdio: 'ignore',
+  });
+  awake.unref();
+}
+
 // Preserve generated files that predate this run. Never clean by a broad paneon-* glob.
 const runStarted = Date.now();
 const scratch = await realpath(await mkdtemp(join(tmpdir(), 'paneon-release-')));
@@ -315,6 +332,7 @@ const jobHomes = [];
 const phaseTimings = [];
 let setupMilliseconds = 0;
 let interrupted = false;
+let runnerError;
 function stopActive() {
   for (const child of active) {
     if (!child.pid) continue;
@@ -396,16 +414,26 @@ async function isolatedEnvironment() {
 }
 async function run(test, environment = env, queueMilliseconds = 0) {
   const started = Date.now();
-  console.log(`\n[${test.phase}] ${test.name}`);
+  console.log(`\n[运行 ${releasePhaseName(test.phase)}] ${test.name}`);
   const log = join(
     artifacts,
     `command-${results.length}-${Date.now()}-${test.name.replace(/[^a-zA-Z0-9-]/g, '-')}.log`,
   );
   const output = await open(log, 'w');
+  const unitReport = test.phase === 'unit' ? log.replace(/\.log$/, '-unit.json') : undefined;
+  const args = unitReport
+    ? [
+        '--test-reporter=spec',
+        '--test-reporter-destination=stdout',
+        `--test-reporter=${new URL('./release-node-reporter.mjs', import.meta.url).href}`,
+        `--test-reporter-destination=${unitReport}`,
+        ...test.args,
+      ]
+    : test.args;
   let result;
   try {
     result = await new Promise((done) => {
-      const child = spawn(test.command, test.args, {
+      const child = spawn(test.command, args, {
         cwd: repository,
         env: environment,
         stdio: ['ignore', output.fd, output.fd],
@@ -428,12 +456,35 @@ async function run(test, environment = env, queueMilliseconds = 0) {
   const seconds = Math.round(milliseconds / 1000);
   const captured = await readFile(log, 'utf8');
   const steps = summarizeTestTimings(readTestTimings(captured));
+  let unit;
+  if (unitReport) {
+    try {
+      unit = JSON.parse(await readFile(unitReport, 'utf8'));
+      if (!unit.counts) result.error ??= 'Node 未生成用例统计。';
+    } catch (error) {
+      result.error ??= `Node 用例统计不可用：${error.message}`;
+    }
+  }
+  const success =
+    result.code === 0 && !result.error && !unit?.counts?.failed && !unit?.counts?.cancelled;
   console.log(
-    `[${result.code === 0 ? 'PASS' : 'FAIL'} ${test.phase}] ${test.name} (${seconds}s)\n${captured}`,
+    `[${success ? '通过' : '失败'} ${releasePhaseName(test.phase)}] ${test.name}` +
+      `${unit?.counts ? `：${formatUnitCounts(unit.counts)}` : ''} (${formatReleaseDuration(milliseconds)})`,
   );
-  console.log(
-    `Test timing: ${JSON.stringify({ name: test.name, milliseconds, queueMilliseconds, steps })}`,
-  );
+  const showCaptured = verbose || (unitReport && options.has('--coverage'));
+  if (showCaptured || !success) {
+    if (!showCaptured && unit?.failures.length) {
+      for (const failure of unit.failures)
+        console.log(
+          `\n${failure.file ?? test.name}:${failure.line ?? 1} — ${failure.name}\n${failure.details ?? failure.message}`,
+        );
+    } else if (captured.trim()) console.log(captured.trimEnd());
+  }
+  if (verbose)
+    console.log(
+      `Test timing: ${JSON.stringify({ name: test.name, milliseconds, queueMilliseconds, steps })}`,
+    );
+  const failureMessage = [...captured.matchAll(/^(?:\w*Error)(?: \[[^\]]+\])?: .+$/gm)].at(-1)?.[0];
   results.push({
     phase: test.phase,
     name: test.name,
@@ -442,8 +493,10 @@ async function run(test, environment = env, queueMilliseconds = 0) {
     milliseconds,
     queueMilliseconds,
     steps,
+    ...(unit ? { unit } : {}),
+    ...(!success && failureMessage ? { failureMessage } : {}),
   });
-  return result.code === 0;
+  return success;
 }
 
 try {
@@ -559,48 +612,73 @@ try {
         }
       }
   }
+} catch (error) {
+  runnerError = error;
+  console.error('\n测试运行器异常：', error);
 } finally {
   const cleanupStarted = performance.now();
-  // Tests own their service shutdown; also stop an isolated CLI daemon if a test left it running.
-  for (const isolatedHome of [home, ...jobHomes]) {
-    if (await exists(join(isolatedHome, '.paneon/runtime.json')))
-      await run(
-        {
-          phase: 'cleanup',
-          name: 'isolated-server-stop',
-          command: process.execPath,
-          args: ['dist/cli/index.js', 'server', 'stop', '--json'],
-        },
-        { ...env, HOME: isolatedHome },
-      );
-  }
-  for (const snapshot of directorySnapshots) {
-    for (const entry of await readdir(snapshot.path).catch((error) => {
-      if (error.code === 'ENOENT') return [];
-      throw error;
-    })) {
-      if (snapshot.entries.has(entry)) continue;
-      // Only generated entries are removed from tests/, never newly authored test cases.
-      if (snapshot.path === join(repository, 'tests') && !entry.startsWith('.mermaid-test-'))
-        continue;
-      await rm(join(snapshot.path, entry), { recursive: true, force: true });
+  try {
+    // Tests own their service shutdown; also stop an isolated CLI daemon if a test left it running.
+    for (const isolatedHome of [home, ...jobHomes]) {
+      if (await exists(join(isolatedHome, '.paneon/runtime.json')))
+        await run(
+          {
+            phase: 'cleanup',
+            name: 'isolated-server-stop',
+            command: process.execPath,
+            args: ['dist/cli/index.js', 'server', 'stop', '--json'],
+          },
+          { ...env, HOME: isolatedHome },
+        );
     }
-    if (!snapshot.existed) await rm(snapshot.path, { recursive: true, force: true });
+    for (const snapshot of directorySnapshots) {
+      for (const entry of await readdir(snapshot.path).catch((error) => {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+      })) {
+        if (snapshot.entries.has(entry)) continue;
+        // Only generated entries are removed from tests/, never newly authored test cases.
+        if (snapshot.path === join(repository, 'tests') && !entry.startsWith('.mermaid-test-'))
+          continue;
+        await rm(join(snapshot.path, entry), { recursive: true, force: true });
+      }
+      if (!snapshot.existed) await rm(snapshot.path, { recursive: true, force: true });
+    }
+    for (const { path, backup, existed } of backups.reverse()) {
+      await rm(path, { recursive: true, force: true });
+      if (existed) await cp(backup, path, { recursive: true, verbatimSymlinks: true });
+    }
+    await writeFile(join(artifacts, 'results.json'), JSON.stringify(results, null, 2));
+    if (verbose) {
+      console.log(
+        `Release phase timings: ${JSON.stringify({ setupMilliseconds, phases: phaseTimings })}`,
+      );
+      console.log(`\nRelease test results:\n${JSON.stringify(results, null, 2)}`);
+    }
+    await rm(scratch, { recursive: true, force: true });
+    console.log(
+      `清理完成（${formatReleaseDuration(performance.now() - cleanupStarted)}）：已恢复原 dist，移除临时测试数据，保留 npm 下载缓存。`,
+    );
+  } catch (error) {
+    runnerError ??= error;
+    console.error('\n测试清理失败：', error);
   }
-  for (const { path, backup, existed } of backups.reverse()) {
-    await rm(path, { recursive: true, force: true });
-    if (existed) await cp(backup, path, { recursive: true, verbatimSymlinks: true });
-  }
-  await writeFile(join(artifacts, 'results.json'), JSON.stringify(results, null, 2));
   console.log(
-    `Release phase timings: ${JSON.stringify({ setupMilliseconds, phases: phaseTimings })}`,
+    formatReleaseReport({
+      results,
+      commands,
+      phaseTimings,
+      wallMilliseconds: Date.now() - runStarted,
+      skipBuild: options.has('--skip-build'),
+      interrupted,
+      error:
+        runnerError instanceof Error
+          ? runnerError.message
+          : runnerError
+            ? String(runnerError)
+            : undefined,
+      repository,
+    }),
   );
-  console.log(`\nRelease test results:\n${JSON.stringify(results, null, 2)}`);
-  await rm(scratch, { recursive: true, force: true });
-  console.log(`Release cleanup time: ${Math.round(performance.now() - cleanupStarted)}ms.`);
-  console.log(
-    'Temporary HOME, fixtures, screenshots and reports removed; previous dist and fixed screenshot paths restored. Dedicated npm download cache retained.',
-  );
-  console.log(`Release test wall time: ${Math.round((Date.now() - runStarted) / 1000)}s.`);
 }
-if (interrupted || results.some((result) => result.code !== 0)) process.exitCode = 1;
+if (interrupted || runnerError || results.some(releaseResultFailed)) process.exitCode = 1;

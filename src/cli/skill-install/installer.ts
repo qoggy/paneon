@@ -55,7 +55,12 @@ async function physicalPath(path: string): Promise<string> {
   } catch (e) {
     if (!missing(e)) throw e;
     // A broken parent link is unsafe: recreating through it could redirect installation.
-    if (await entry(absolute)) throw unsafe(`A parent path is a broken symbolic link: ${absolute}`);
+    const current = await entry(absolute);
+    if (current?.isSymbolicLink())
+      throw unsafe(`A parent path is a broken symbolic link: ${absolute}`);
+    // Another installer can mkdir between realpath's ENOENT and lstat. Resolve
+    // that ordinary entry rather than misclassifying it as a dangling link.
+    if (current) return realpath(absolute);
     const parent = dirname(absolute);
     if (parent === absolute) throw e;
     return join(await physicalPath(parent), basename(absolute));

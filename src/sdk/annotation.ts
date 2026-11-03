@@ -3,11 +3,12 @@ import type { JsonValue } from '../shared/types.js';
 
 export type { JsonValue } from '../shared/types.js';
 export type AnnotationTextRange = { start: number; end: number; quote: string };
-export const elementAnnotationRefSchema = z
-  .object({
-    element: z.object({ path: z.string(), tag: z.string(), excerpt: z.string() }).strict(),
-  })
-  .strict();
+export const elementAnnotationRefSchema = /*#__PURE__*/ (() =>
+  z
+    .object({
+      element: z.object({ path: z.string(), tag: z.string(), excerpt: z.string() }).strict(),
+    })
+    .strict())();
 export type ElementAnnotationRef = z.infer<typeof elementAnnotationRefSchema>;
 export function isElementAnnotationRef(ref: unknown): ref is ElementAnnotationRef {
   return elementAnnotationRefSchema.safeParse(ref).success;

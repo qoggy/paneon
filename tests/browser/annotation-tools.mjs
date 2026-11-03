@@ -134,6 +134,8 @@ export async function waitForAnnotationScrollIdle(frame) {
 
 export async function openAnnotationDirectory(frame) {
   const trigger = frame.getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/ });
+  // Keep a hover-opened directory alive before inspecting its expanded state.
+  await trigger.hover();
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
   await frame.getByRole('dialog', { name: /^(批注目录|Annotation directory)$/ }).waitFor();
 }

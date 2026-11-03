@@ -716,6 +716,21 @@ export async function verifyGitLayout(f, page) {
       paging.push(request.postDataJSON().input.request);
   };
   page.on('request', trackPaging);
+  await page.evaluate(() => {
+    window.__pagingHostEvents = [];
+    for (const type of ['pointerdown', 'pointerup', 'click'])
+      document.addEventListener(
+        type,
+        (event) =>
+          window.__pagingHostEvents.push({
+            type,
+            x: event.clientX,
+            y: event.clientY,
+            target: event.target?.tagName,
+          }),
+        { capture: true },
+      );
+  });
   await more.evaluate((el) =>
     el.addEventListener(
       'click',
@@ -754,6 +769,12 @@ export async function verifyGitLayout(f, page) {
   } catch (error) {
     console.error('Paging diagnostic', {
       paging,
+      hostEvents: await page.evaluate(() => window.__pagingHostEvents),
+      hostHit: await page.evaluate(() => {
+        const iframe = document.querySelector('iframe');
+        const rect = iframe?.getBoundingClientRect();
+        return { iframe: rect?.toJSON(), viewport: { width: innerWidth, height: innerHeight } };
+      }),
       pointerEvents: await layoutFrame.evaluate(() => window.__pagingPointerEvents),
       count: await frame.locator('[data-history-count]').getAttribute('data-history-count'),
       clicked: (await more.count()) ? await more.getAttribute('data-clicked') : 'removed',

@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { createServer } from 'vite';
 import type { ViteDevServer } from 'vite';
@@ -17,6 +17,11 @@ type Subscriber = {
   running: boolean;
   onChange: () => Promise<void>;
 };
+type Register = (...args: unknown[]) => Promise<unknown>;
+type NativeWatcher = ViteDevServer['watcher'] & {
+  _fsEventsHandler?: Record<string, Register>;
+  _nodeFsHandler?: Record<string, Register>;
+};
 
 // Missing candidates use the identity of their nearest existing parent, so
 // /tmp aliases and creation/deletion use the same subscription keys.
@@ -32,6 +37,38 @@ function canonical(path: string): string {
       tail.unshift(basename(parent));
       parent = dirname(parent);
     }
+  }
+}
+
+// Vite bundles Chokidar 3: add() returns before native registration, and ready
+// can precede missing-path parent registration. Await the actual backend tasks
+// for every addition, including later subscriptions and changed import graphs.
+async function addAndSettle(watcher: ViteDevServer['watcher'], paths: string[]) {
+  if (!paths.length) return;
+  const native = watcher as NativeWatcher;
+  const handler = native._fsEventsHandler ?? native._nodeFsHandler;
+  const method = native._fsEventsHandler ? '_addToFsEvents' : '_addToNodeFs';
+  const add = handler?.[method];
+  if (!handler || !add) throw new Error('Vite source watcher registration API changed.');
+  const tasks: Promise<unknown>[] = [];
+  handler[method] = (...args) => {
+    const task = add.apply(handler, args);
+    tasks.push(task);
+    return task;
+  };
+  try {
+    watcher.add(paths);
+    let consumed = 0;
+    while (consumed < tasks.length) {
+      const batch = tasks.slice(consumed);
+      consumed = tasks.length;
+      await Promise.all(batch);
+      // NodeFs adds missing paths' parents in add().then(). Yield a turn so
+      // those continuations enqueue their tasks before checking for completion.
+      if (method === '_addToNodeFs') await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  } finally {
+    handler[method] = add;
   }
 }
 
@@ -72,6 +109,7 @@ export class SourceWatcher {
       envDir: false,
       publicDir: false,
       logLevel: 'silent',
+      optimizeDeps: { noDiscovery: true },
       server: {
         middlewareMode: true,
         hmr: false,
@@ -154,31 +192,57 @@ export class SourceWatcher {
     }
     subscriber.paths = paths;
     this.refreshAncestors();
+    const watcher = paths.size ? ((await this.start()).watcher as NativeWatcher) : undefined;
+    const nodeFs = watcher?._nodeFsHandler;
     // Chokidar unwatch(dir) ignores its descendants too. Reactivate any retired
     // ancestor before adding a new child, including historical-manifest files.
+    const missingRetired: string[] = [];
     for (const directory of this.retiredDirectories) {
       if (added.some((path) => path === directory || path.startsWith(directory + sep))) {
-        added.push(directory);
+        if (nodeFs && !existsSync(directory)) missingRetired.push(directory);
+        else added.push(directory);
         this.retiredDirectories.delete(directory);
       }
     }
-    if (paths.size) {
-      (await this.start()).watcher.add(added);
-      for (const path of added) this.registered.add(path);
+    if (watcher) {
+      const wanted = new Set(
+        [...this.owners.keys(), ...added].map((path) => {
+          if (!nodeFs || existsSync(path)) return path;
+          let parent = dirname(path);
+          while (!existsSync(parent)) parent = dirname(parent);
+          // Register the directory without Chokidar's missing-child target.
+          // Otherwise sibling missing targets share a throttled read and can
+          // hide one another's creation. Ownership still filters traversal.
+          this.directories.add(parent);
+          return parent;
+        }),
+      );
+      const pending = [...wanted].filter((path) => !this.registered.has(path));
+      await addAndSettle(watcher, pending);
+      for (const path of pending) this.registered.add(path);
+      // add() must also clear retired directories' ignored prefixes. When the
+      // directory is missing, first establish the untargeted parent listener;
+      // its reads must precede NodeFs's targeted missing-child callbacks.
+      await addAndSettle(
+        watcher,
+        missingRetired.filter((path) => !this.registered.has(path)),
+      );
     }
     const removed = [...this.registered].filter(
       (path) => !this.owners.has(path) && !this.ancestors.has(path),
     );
     if (removed.length && this.server) {
-      (await this.server).watcher.unwatch(removed);
+      const watcher = (await this.server).watcher;
+      // Missing candidates may have become directories without an addDir
+      // event (ignoreInitial). Match the directories Chokidar will ignore.
+      const watched = watcher.getWatched();
+      watcher.unwatch(removed);
       for (const path of removed) {
         this.registered.delete(path);
-        if (this.directories.delete(path)) {
-          if (![...this.retiredDirectories].some((parent) => path.startsWith(parent + sep))) {
-            for (const child of this.retiredDirectories)
-              if (child.startsWith(path + sep)) this.retiredDirectories.delete(child);
-            this.retiredDirectories.add(path);
-          }
+        if (this.directories.delete(path) || Object.hasOwn(watched, path)) {
+          // add(parent) does not remove a separately ignored child prefix.
+          // Keep every retired directory until its own prefix is reactivated.
+          this.retiredDirectories.add(path);
         }
       }
     }
@@ -198,6 +262,10 @@ export class SourceWatcher {
         for (const path of [...Object.keys(next.files), ...Object.keys(next.paths)]) {
           paths.add(resolve(path));
           paths.add(canonical(path));
+          for (let parent = dirname(path); !existsSync(parent); parent = dirname(parent)) {
+            paths.add(resolve(parent));
+            paths.add(canonical(parent));
+          }
           if (next.paths[path] === 'directory') {
             this.directories.add(resolve(path));
             this.directories.add(canonical(path));

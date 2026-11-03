@@ -1,6 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { definePanel, agent, annotationValueSchema, z } from '@qoggy/paneon/sdk';
-import type { AnnotationTarget as Target, AnnotationValue } from '@qoggy/paneon/sdk';
+import type {
+  AnnotationTarget as Target,
+  AnnotationValue,
+  ElementAnnotationRef,
+} from '@qoggy/paneon/sdk';
 import {
   Button,
   Card,
@@ -365,7 +369,7 @@ function Panel() {
     }),
     [adapterMode],
   );
-  async function submit(value: AnnotationValue<Ref>) {
+  async function submit(value: AnnotationValue<Ref | ElementAnnotationRef>) {
     if (!Object.isFrozen(value) || !Object.isFrozen(value.annotations))
       throw new Error('Snapshot must be frozen');
     setAttempts((count) => count + 1);
