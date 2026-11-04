@@ -107,6 +107,7 @@ async function loadAnnotationStore() {
         summary: string;
       }): () => void;
       createAnnotation(targets: AnnotationTarget<string>[], comment: string): string;
+      isTargetRendered(target: AnnotationTarget<string>): boolean;
       locateAndEdit(id: string, target: AnnotationTarget<string>): Promise<void>;
       beginAnnotation(targets: AnnotationTarget<string>[]): void;
       changeEditor(comment: string): void;
@@ -122,6 +123,30 @@ async function loadAnnotationStore() {
   };
   return AnnotationStore;
 }
+
+void test('loading media has a rendered representation until its renderer unmounts', async () => {
+  const AnnotationStore = await loadAnnotationStore();
+  const store = new AnnotationStore({ onSubmit: async () => {} });
+  const image = '![界面](./screen.svg)';
+  const imageStart = source.indexOf(image);
+  const target: AnnotationTarget<string> = {
+    ref: 'document',
+    text: { start: imageStart, end: imageStart + image.length, quote: image },
+  };
+  assert.equal(store.isTargetRendered(target), false);
+  const unregister = store.registerObject({ target, source, summary: image });
+  assert.equal(store.isTargetRendered(target), true);
+  assert.equal(
+    store.isTargetRendered({
+      ...target,
+      text: { start: imageStart + 1, end: imageStart + 2, quote: '[' },
+    }),
+    false,
+    'A source-only selection inside image syntax has no matching object registration',
+  );
+  unregister();
+  assert.equal(store.isTargetRendered(target), false);
+});
 
 void test('object registrations support pure-media drafts and submission without public quotes', async () => {
   const AnnotationStore = await loadAnnotationStore();

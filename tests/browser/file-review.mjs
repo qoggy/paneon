@@ -379,6 +379,221 @@ try {
   assert.equal(await frame.getByRole('separator').count(), 0);
   await page.screenshot({ path: join(artifacts, 'file-review-single.png') });
 
+  await service.app.inject({
+    method: 'POST',
+    url: '/api/preferences',
+    headers: {
+      host: `127.0.0.1:${service.descriptor.port}`,
+      authorization: `Bearer ${service.descriptor.controlToken}`,
+    },
+    payload: { ui: { language: 'zh-CN', theme: 'light' } },
+  });
+  const viewSource = [
+    '# Markdown 视图切换',
+    '',
+    '正文 **保留批注🙂**。',
+    '',
+    '[相同标签](./first.md) 与 [相同标签](./second.md)',
+    '',
+    `<!-- ${'long source line '.repeat(80)} -->`,
+    '',
+    ...Array.from({ length: 45 }, (_, index) => `第 ${index + 1} 段正文，用于验证阅读位置。`),
+  ].join('\r\n');
+  await writeFile(join(root, 'views.md'), viewSource);
+  await writeFile(join(root, 'long.ts'), `export const message = "${'x'.repeat(400)}";\n`);
+  const views = await run(['views.md', 'docs/notes.md', 'long.ts'], 'Markdown 视图切换');
+  await page.goto(url(views));
+  const renderedTab = frame.getByRole('tab', { name: '渲染', exact: true });
+  const sourceTab = frame.getByRole('tab', { name: '源码', exact: true });
+  await frame.locator('strong [data-source-leaf]').waitFor();
+  assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+  await save('strong [data-source-leaf]', 0, '保留批注🙂'.length, '正文批注');
+  await sourceTab.click();
+  await line(3).filter({ hasText: '**保留批注🙂**' }).waitFor();
+  assert.equal(await viewport.locator('[data-markdown-annotation]').count(), 0);
+  assert.equal(await viewport.locator('pre').getAttribute('data-language'), 'markdown');
+  const sourceViewport = viewport.locator(
+    ':scope > [data-slot="code-block"] > [data-slot="code-block-content"]',
+  );
+  const scrollSource = async (left) => {
+    await sourceViewport.evaluate((element, left) => {
+      element.scrollLeft = left;
+      return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, left);
+    assert.equal(await sourceViewport.evaluate((element) => element.scrollLeft), left);
+  };
+  await scrollSource(400);
+  await row(1).click();
+  await viewport.getByRole('heading', { name: 'Notes' }).waitFor();
+  await row(0).click();
+  await line(3).waitFor();
+  assert.equal(await sourceViewport.evaluate((element) => element.scrollLeft), 400);
+  await renderedTab.click();
+  await frame.locator('strong [data-source-leaf]').waitFor();
+  await sourceTab.click();
+  await line(3).waitFor();
+  assert.equal(await sourceViewport.evaluate((element) => element.scrollLeft), 400);
+  await scrollSource(0);
+  await comments.locate(1);
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await viewport.evaluate(() => document.getSelection()?.toString()), '保留批注🙂');
+  await save('[data-code-line="3"]', 3, 3 + '**保留批注🙂**'.length, '格式标记批注');
+  const urlStart = '[相同标签](./first.md) 与 [相同标签]('.length;
+  await save('[data-code-line="5"]', urlStart, urlStart + './second.md'.length, '第二个链接地址');
+
+  await renderedTab.click();
+  await comments.locate(1);
+  assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await viewport.evaluate(() => document.getSelection()?.toString()), '保留批注🙂');
+  await comments.locate(2);
+  await line(3).waitFor();
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+  assert.equal(
+    await viewport.evaluate(() => document.getSelection()?.toString()),
+    '**保留批注🙂**',
+  );
+  await renderedTab.click();
+  await comments.locate(3);
+  await line(5).waitFor();
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await viewport.evaluate(() => document.getSelection()?.toString()), './second.md');
+  await page.screenshot({
+    path: join(artifacts, 'file-review-markdown-source.png'),
+    animations: 'disabled',
+  });
+
+  await row(1).click();
+  await viewport.getByRole('heading', { name: 'Notes' }).waitFor();
+  assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+  await row(0).click();
+  await line(3).waitFor();
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+  await row(2).click();
+  await line(1).filter({ hasText: 'export const message' }).waitFor();
+  assert.equal(await frame.getByRole('tablist').count(), 0);
+  await scrollSource(250);
+  await row(1).click();
+  await viewport.getByRole('heading', { name: 'Notes' }).waitFor();
+  await row(2).click();
+  await line(1).filter({ hasText: 'export const message' }).waitFor();
+  assert.equal(await sourceViewport.evaluate((element) => element.scrollLeft), 250);
+  await comments.locate(1);
+  await line(3).waitFor();
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+
+  // Each view keeps its own scroll position; only the active renderer is mounted.
+  await viewport.evaluate((element) => {
+    element.scrollTop = 300;
+  });
+  // Wait for the scroll event that records the position before changing views.
+  await viewport.evaluate(
+    (element) =>
+      new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await renderedTab.click();
+  await frame.locator('strong [data-source-leaf]').waitFor();
+  assert.equal(await viewport.locator('[data-code-line]').count(), 0);
+  await sourceTab.click();
+  await line(3).waitFor();
+  assert.equal(await viewport.evaluate((element) => element.scrollTop), 300);
+  await renderedTab.click();
+  await frame.locator('strong [data-source-leaf]').waitFor();
+  await viewport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+  await page.screenshot({
+    path: join(artifacts, 'file-review-markdown-rendered.png'),
+    animations: 'disabled',
+  });
+  await renderedTab.focus();
+  await renderedTab.press('ArrowRight');
+  await line(3).waitFor();
+  assert.equal(await sourceTab.getAttribute('aria-selected'), 'true');
+  await sourceTab.press('ArrowLeft');
+  await frame.locator('strong [data-source-leaf]').waitFor();
+  const compactPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  await compactPage.goto(url(views));
+  const compactFrame = compactPage.frameLocator('iframe');
+  await compactFrame.locator('strong [data-source-leaf]').waitFor();
+  await compactPage.screenshot({
+    path: join(artifacts, 'file-review-markdown-compact.png'),
+    animations: 'disabled',
+  });
+  assert.equal(
+    await compactFrame
+      .locator('html')
+      .evaluate((element) => element.scrollWidth > element.clientWidth),
+    false,
+  );
+  await compactPage.close();
+
+  await submitAnnotations(frame);
+  const viewEvents = await service.runtime.events(
+    views.instanceId,
+    'markdown-views-test',
+    100,
+    1000,
+  );
+  assert.equal(viewEvents.events.length, 1);
+  const submitted = viewEvents.events[0].payload.files[0];
+  assert.equal(submitted.annotations.length, 3);
+  assert.deepEqual(submitted.annotations[2].targets[0].text, {
+    start: viewSource.indexOf('./second.md'),
+    end: viewSource.indexOf('./second.md') + './second.md'.length,
+    quote: './second.md',
+  });
+  assert.equal(JSON.stringify(submitted).includes('fileIndex'), false);
+
+  // An image registers its range while loading; locating it must retain Rendered.
+  await cp(new URL('../fixtures/checkout.svg', import.meta.url), join(root, 'screen.svg'));
+  await writeFile(join(root, 'media.md'), '# 图片审阅\n\n![Checkout](./screen.svg)\n');
+  const mediaPanel = await run(['media.md', 'long.ts'], '图片批注定位');
+  await page.goto(url(mediaPanel));
+  const image = viewport.locator('img[alt="Checkout"]');
+  await image.waitFor();
+  await image.hover();
+  await viewport
+    .locator('[data-slot="image"]')
+    .getByRole('button', { name: '批注', exact: true })
+    .click();
+  await comments.write('确认图片批注仍定位到渲染视图');
+  await comments.save();
+  await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
+  await row(1).click();
+  await line(1).filter({ hasText: 'export const message' }).waitFor();
+  let releaseImage;
+  const imageGate = new Promise((resolve) => {
+    releaseImage = resolve;
+  });
+  const imageAction = `**/api/panels/${mediaPanel.instanceId}/actions/**`;
+  const isImageRead = (request) => decodeURIComponent(request.url()).includes('/image#readImage');
+  const holdImageRead = async (route) => {
+    if (isImageRead(route.request())) await imageGate;
+    await route.continue();
+  };
+  await page.route(imageAction, holdImageRead);
+  try {
+    // Gate Image's actual reader, not a timer, to exercise its pending object registration.
+    const readingImage = page.waitForRequest(isImageRead);
+    await comments.locate(1);
+    await readingImage;
+    await viewport.locator('[data-slot="image"]').getByRole('status').waitFor();
+    assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+    releaseImage();
+    await image.waitFor();
+    assert.equal(await renderedTab.getAttribute('aria-selected'), 'true');
+    assert.equal(await viewport.locator('[data-code-line]').count(), 0);
+  } finally {
+    releaseImage();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  assert.equal(
+    (await service.runtime.events(mediaPanel.instanceId, 'media-location-test', 100, 0)).events
+      .length,
+    0,
+  );
+
   // Delay the real first response to verify that navigation cannot attach it to another file.
   const late = await run(['config.json', 'unknown.xyz'], 'Late reads');
   let release, received, finished;

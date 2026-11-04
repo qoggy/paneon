@@ -118,6 +118,7 @@ export class AnnotationStore<TRef> {
       editAnnotation: this.editAnnotation,
       updateAnnotation: this.updateAnnotation,
       removeAnnotation: this.removeAnnotation,
+      isTargetRendered: this.isTargetRendered,
       locate: this.locate,
       registerText: this.registerText,
       submit: this.submit,
@@ -919,10 +920,20 @@ export class AnnotationStore<TRef> {
       throw error;
     }
   };
-  private highlightText(target: AnnotationTarget<TRef>, source: string | undefined) {
+  isTargetRendered: AnnotationController<TRef>['isTargetRendered'] = (target) => {
+    const key = annotationTargetKey(target);
+    // A mounted media renderer owns its range while loading; locateObject waits for readiness.
+    return (
+      [...this.objects.values()].some((item) => annotationTargetKey(item.target) === key) ||
+      this.textRange(target) !== undefined
+    );
+  };
+
+  private textRange(target: AnnotationTarget<TRef>, source?: string) {
     if (!target.text) return;
     const registrations = [...this.texts.values()].filter(
-      (item) => sourceKey(item) === sourceKey(target) && item.source === source,
+      (item) =>
+        sourceKey(item) === sourceKey(target) && (source === undefined || item.source === source),
     );
     const segments = registrations.flatMap((item) => item.segments);
     const start = segments.find(
@@ -943,7 +954,12 @@ export class AnnotationStore<TRef> {
     const range = start.node.ownerDocument.createRange();
     range.setStart(start.node, start.sourceOffsets.indexOf(target.text.start));
     range.setEnd(end.node, end.sourceOffsets.indexOf(target.text.end));
-    const selection = start.node.ownerDocument.getSelection();
+    return range;
+  }
+  private highlightText(target: AnnotationTarget<TRef>, source: string | undefined) {
+    const range = this.textRange(target, source);
+    if (!range) return;
+    const selection = range.startContainer.ownerDocument?.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
   }

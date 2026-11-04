@@ -22,14 +22,21 @@ import {
   Markdown,
   Page,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   Tree,
+  useAnnotations,
   usePageAnnotations,
+  useToastManager,
   useUI,
 } from '@qoggy/paneon/ui';
 import type { TreeHandle } from '@qoggy/paneon/ui';
+import { CodeXml, Eye } from '../../shared/icons';
 import { ChevronsDownUp, ChevronsUpDown, FolderTree, TreeIcon } from '../diff-review/icons';
 import { FileReviewSplit } from '../../shared/file-review-split';
 import { useSubmission } from '../../shared/submission';
@@ -51,6 +58,15 @@ type ReadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; snapshot: Snapshot };
+type MarkdownView = 'rendered' | 'source';
+
+function horizontalViewport(viewport: HTMLElement) {
+  return (
+    viewport.querySelector<HTMLElement>(
+      ':scope > [data-slot="code-block"] > [data-slot="code-block-content"]',
+    ) ?? viewport
+  );
+}
 
 function ToolbarButton({
   label,
@@ -90,13 +106,15 @@ function ToolbarButton({
 /** Child registrations run before this layout effect, including CodeBlock's plain-text registration. */
 function Preview({
   snapshot,
+  view,
   onReady,
 }: {
   snapshot: Snapshot;
-  onReady: (snapshot: Snapshot) => () => void;
+  view: MarkdownView;
+  onReady: (snapshot: Snapshot, view: MarkdownView) => () => void;
 }) {
   const { t } = useLocale();
-  useLayoutEffect(() => onReady(snapshot), [snapshot, onReady]);
+  useLayoutEffect(() => onReady(snapshot, view), [snapshot, view, onReady]);
   const target = { fileIndex: snapshot.fileIndex, snapshotId: snapshot.snapshotId };
   return snapshot.text === '' ? (
     <Empty className="flex-none py-8">
@@ -104,9 +122,9 @@ function Preview({
         <EmptyDescription>{t('The file has no content.')}</EmptyDescription>
       </EmptyHeader>
     </Empty>
-  ) : isMarkdown(snapshot.path) ? (
+  ) : isMarkdown(snapshot.path) && view === 'rendered' ? (
     <div className="min-h-full bg-markdown-background p-4">
-      <Markdown sourcePath={snapshot.path} annotationTarget={target}>
+      <Markdown sourcePath={snapshot.path} annotationTarget={target} outline="auto">
         {snapshot.text}
       </Markdown>
     </div>
@@ -127,6 +145,8 @@ function FileReviewPanel() {
   const value = usePanelInput<FileReviewParams>();
   const { language } = useUI();
   const { t } = useLocale();
+  const annotations = useAnnotations<FileRef>();
+  const toast = useToastManager();
   const copy =
     language === 'zh-CN'
       ? {
@@ -140,6 +160,10 @@ function FileReviewPanel() {
           empty: '没有匹配的文件。',
           preview: '文件预览',
           resize: '调整文件列表与预览宽度',
+          view: 'Markdown 展示方式',
+          rendered: '渲染',
+          source: '源码',
+          locatedSource: '已切换到源码，定位批注内容。',
         }
       : {
           title: 'File review',
@@ -152,6 +176,10 @@ function FileReviewPanel() {
           empty: 'No matching files.',
           preview: 'File preview',
           resize: 'Resize file list and preview',
+          view: 'Markdown view',
+          rendered: 'Rendered',
+          source: 'Source',
+          locatedSource: 'Switched to source to locate the annotation.',
         };
   const directoryRoots = useMemo(() => fileTree(value.files), [value.files]);
   const [grouped, setGrouped] = useState(true);
@@ -163,6 +191,10 @@ function FileReviewPanel() {
   const [expanded, setExpanded] = useState<readonly string[]>(() => directoryKeys(directoryRoots));
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState(0);
+  const [markdownViews, setMarkdownViews] = useState<Record<number, MarkdownView>>({});
+  const view = markdownViews[opened] ?? 'rendered';
+  const viewport = useRef<HTMLDivElement>(null);
+  const scrollPositions = useRef(new Map<string, { top: number; left: number }>());
   const [entries, setEntries] = useState<Map<number, ReadState>>(() => new Map());
   const snapshots = useRef(new Map<string, Snapshot>());
   const tree = useRef<TreeHandle>(null);
@@ -190,8 +222,8 @@ function FileReviewPanel() {
       });
   }, [opened, entries, value.files]);
 
-  const previewReady = useCallback((snapshot: Snapshot) => {
-    const key = snapshotKey(snapshot);
+  const previewReady = useCallback((snapshot: Snapshot, view: MarkdownView) => {
+    const key = `${snapshotKey(snapshot)}:${view}`;
     mounted.current = key;
     if (pendingLocation.current?.key === key) {
       pendingLocation.current.resolve();
@@ -248,14 +280,33 @@ function FileReviewPanel() {
         setExpanded((previous) => [
           ...new Set([...previous, ...(ancestorKeys(directoryRoots, snapshot.fileIndex) ?? [])]),
         ]);
-        if (mounted.current === key) return;
-        // Settle a superseded request; the common session owns cancellation of its selection.
-        pendingLocation.current?.resolve();
-        const ready = new Promise<void>((resolve) => {
-          pendingLocation.current = { key, resolve };
-        });
-        setOpened(snapshot.fileIndex);
-        await ready;
+        const reveal = async (nextView: MarkdownView) => {
+          const viewKey = `${key}:${nextView}`;
+          if (mounted.current === viewKey) return;
+          // Settle a superseded request; the common session owns cancellation of its selection.
+          pendingLocation.current?.resolve();
+          const ready = new Promise<void>((resolve) => {
+            pendingLocation.current = { key: viewKey, resolve };
+          });
+          setMarkdownViews((previous) => ({ ...previous, [snapshot.fileIndex]: nextView }));
+          setOpened(snapshot.fileIndex);
+          await ready;
+        };
+        const nextView =
+          target.type === 'mermaid'
+            ? 'rendered'
+            : (markdownViews[snapshot.fileIndex] ?? 'rendered');
+        await reveal(nextView);
+        if (
+          isMarkdown(snapshot.path) &&
+          nextView === 'rendered' &&
+          target.ref.part !== 'path' &&
+          target.type !== 'mermaid' &&
+          !annotations.isTargetRendered(target)
+        ) {
+          await reveal('source');
+          toast.add({ title: copy.locatedSource });
+        }
       },
     },
   });
@@ -268,30 +319,65 @@ function FileReviewPanel() {
     );
   };
   const state = entries.get(opened);
+  // Parent refs are attached after Preview's layout effect; restore before locate resumes.
+  useLayoutEffect(() => {
+    if (state?.status === 'ready' && viewport.current) {
+      const position = scrollPositions.current.get(`${snapshotKey(state.snapshot)}:${view}`);
+      viewport.current.scrollTop = position?.top ?? 0;
+      horizontalViewport(viewport.current).scrollLeft = position?.left ?? 0;
+    }
+  }, [state, view]);
   const count = (node: Parameters<typeof visibleFileCount>[0]) =>
     visibleFileCount(node, (index) => matches(index, search));
   const hasBranches = roots.some((node) => node.nodes !== undefined);
   const content = (
-    <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border"
+    <Tabs
+      value={view}
+      onValueChange={(nextView) =>
+        setMarkdownViews((previous) => ({ ...previous, [opened]: nextView as MarkdownView }))
+      }
+      className="min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-md border"
       aria-label={copy.preview}
     >
-      <div
-        className="shrink-0 truncate border-b px-4 py-2 text-sm font-medium"
-        title={value.files[opened]}
-        data-file-review-path=""
-      >
-        {state?.status === 'ready' ? (
-          <AnnotationText
-            target={{ fileIndex: opened, snapshotId: state.snapshot.snapshotId, part: 'path' }}
-          >
-            {value.files[opened]}
-          </AnnotationText>
-        ) : (
-          value.files[opened]
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2 text-sm font-medium">
+        <div className="min-w-0 truncate" title={value.files[opened]} data-file-review-path="">
+          {state?.status === 'ready' ? (
+            <AnnotationText
+              target={{ fileIndex: opened, snapshotId: state.snapshot.snapshotId, part: 'path' }}
+            >
+              {value.files[opened]}
+            </AnnotationText>
+          ) : (
+            value.files[opened]
+          )}
+        </div>
+        {state?.status === 'ready' && isMarkdown(state.snapshot.path) && (
+          <TabsList aria-label={copy.view} className="h-8 shrink-0">
+            <TabsTrigger value="rendered" className="px-3 text-xs">
+              <Eye className="size-3.5" strokeWidth={1.6} />
+              {copy.rendered}
+            </TabsTrigger>
+            <TabsTrigger value="source" className="px-3 text-xs">
+              <CodeXml className="size-3.5" strokeWidth={1.6} />
+              {copy.source}
+            </TabsTrigger>
+          </TabsList>
         )}
       </div>
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto" data-file-review-viewport="">
+      <TabsContent
+        key={view}
+        value={view}
+        ref={viewport}
+        className="min-h-0 min-w-0 flex-1 overflow-auto"
+        data-file-review-viewport=""
+        onScrollCapture={(event) => {
+          if (state?.status === 'ready')
+            scrollPositions.current.set(`${snapshotKey(state.snapshot)}:${view}`, {
+              top: event.currentTarget.scrollTop,
+              left: horizontalViewport(event.currentTarget).scrollLeft,
+            });
+        }}
+      >
         {!state || state.status === 'loading' ? (
           <p role="status" className="flex items-center gap-2 p-4">
             <Spinner aria-hidden="true" />
@@ -306,11 +392,12 @@ function FileReviewPanel() {
           <Preview
             key={snapshotKey(state.snapshot)}
             snapshot={state.snapshot}
+            view={view}
             onReady={previewReady}
           />
         )}
-      </div>
-    </section>
+      </TabsContent>
+    </Tabs>
   );
   const sidebar = (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

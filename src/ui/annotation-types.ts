@@ -58,6 +58,8 @@ export type AnnotationController<TRef = JsonValue> = {
   editAnnotation(id: string | null): void;
   updateAnnotation(id: string, value: Omit<Annotation<TRef>, 'id'>): void;
   removeAnnotation(id: string): void;
+  /** Whether mounted renderers represent the target, including media still loading. */
+  isTargetRendered(target: AnnotationTarget<TRef>): boolean;
   locate(target: AnnotationTarget<TRef>): Promise<void>;
   registerText: (registration: AnnotationTextRegistration<TRef>) => () => void;
   submit(): Promise<void>;
