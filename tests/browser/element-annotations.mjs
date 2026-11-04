@@ -197,6 +197,13 @@ try {
   assert.equal(await frame.locator('[data-annotation-outline]').count(), 2);
   assert.equal(await marker(3).count(), 0);
 
+  // Dismiss the deletion notification before testing the independent launcher drag.
+  const deletionToast = frame
+    .locator('[data-slot="toast"]')
+    .filter({ hasText: /Annotation deleted|批注已删除/ });
+  await deletionToast.locator('[data-slot="toast-close"]').click();
+  await deletionToast.waitFor({ state: 'detached' });
+
   const launcher = frame.locator('[data-annotation-launcher]');
   const directory = launcher.getByRole('button', { name: /^(Annotations|批注) \(2\)$/ });
   const original = await launcher.boundingBox();
