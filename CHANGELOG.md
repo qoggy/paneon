@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- Select rendered page elements for annotation, including cards, controls and SVG content, without configuring each target. Adjust the selected range with the keyboard and retain visible outlines for saved annotations.
+- Undo up to three deleted annotations independently, restoring their original order and source references.
+- Navigate choice questions through a persistent directory showing answer status, and jump between questions and the answer summary.
+- Switch Markdown files between rendered and source views in file review, with per-file view and scroll positions preserved. Opening an annotation switches to source when its range has no rendered representation.
+
+### Changed
+
+- **Breaking:** Choose input no longer accepts top-level `title` or `description`. Keep titles and optional descriptions on individual entries in `questions`.
+- Rename the bundled agent skill from `paneon` to `paneon-visualize`. Run `paneon init` to update selected agents; obsolete skill targets recorded by previous installations are removed after the new installation succeeds.
+- **Breaking:** Custom annotation consumers must handle generated element references alongside their own targets. The `usePageAnnotations` submission callback and `annotationValueSchema` now include `ElementAnnotationRef`; built-in panel feedback preserves these element annotations.
+- Default the `Markdown` heading outline to a popover. Use `outline="auto"` for a responsive sidebar or `outline="off"` to disable it; outlines appear only when there is more than one heading.
+- Add return links to panel management when a page is closed, unavailable or fails to start.
+
+### Fixed
+
+- Locate annotations below common fixed or sticky top bars, keeping the target, marker and editor visible.
+- Keep notifications clear of the floating annotation controls and directory, and restore focus after annotation editing.
+- Register source watches before startup completes and recover watches when dependency directories are deleted and recreated, preserving automatic page reloads.
+- Avoid skill installation failures when concurrent installers create the same parent directory.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added
@@ -78,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.2.0...0.2.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.3.0...0.3.x
+[0.3.0]: https://github.com/qoggy/paneon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/qoggy/paneon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/qoggy/paneon/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/qoggy/paneon/releases/tag/v0.0.1
