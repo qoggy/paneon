@@ -220,6 +220,8 @@ export type MarkdownProps<TRef = JsonValue> = {
   sourcePath?: string;
   /** Recognize a leading YAML block; disable for intentionally ambiguous Markdown. */
   frontmatter?: 'auto' | 'off';
+  /** Heading outline: popover at every width (default), responsive sidebar, or disabled. */
+  outline?: 'auto' | 'popover' | 'off';
   /** Opt into the session enabled by usePageAnnotations; the value is delivered unchanged as target.ref. */
   annotationTarget?: TRef;
   className?: string;
@@ -240,6 +242,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
   annotated,
   annotationReference,
   frontmatter = 'auto',
+  outline = 'popover',
   sourcePath,
 }: RenderProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -325,6 +328,7 @@ const MarkdownContent = /*#__PURE__*/ memo(function MarkdownContent({
       <FileLinkContext.Provider value={linkContext}>
         <MarkdownOutline
           contentRef={root}
+          mode={outline}
           className={className}
           annotated={annotated}
           {...preview.events}

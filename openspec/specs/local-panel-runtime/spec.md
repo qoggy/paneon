@@ -40,6 +40,12 @@ CLI 的命令返回 SHALL 适度精简，主要避免重复回显入参，MUST N
 
 inspect MUST NOT 创建新实例、编译/reload 面板定义、调用业务函数或改变面板的关闭状态；instanceId、参数、事件及消费位置 SHALL 保持不变。closed/unavailable 面板的链接 SHALL 展示其状态，不自动重新打开或修复面板。
 
+#### Scenario: Recover from a non-running panel link
+
+- **WHEN** a person opens a closed, unavailable or no-longer-existing panel
+- **THEN** the browser uses the shared Empty components to show its state and a Return to Panels link
+- **AND** returning to the panel list does not reopen, reload or delete the original panel, and available framework diagnostics remain visible
+
 #### Scenario: Reopen the same link
 
 - **WHEN** 用户关闭浏览器标签页后再次打开已有面板链接，且服务地址和实例仍可用

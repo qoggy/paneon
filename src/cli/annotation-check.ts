@@ -511,7 +511,7 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
   const next =
     [
       missing.length &&
-        'Add targets only where original-source annotations are needed; whole-element picking needs no per-element registration.',
+        'Add a target to each listed component whose content the human may question word by word, such as code, data, command output and results; whole-element picking only annotates a component as a whole. For content that changes with page state, put the state in the ref.',
       plain.length &&
         'Use AnnotationText or a targeted component only where precise text-range selection is needed; ordinary content already supports whole-element picking when page annotations are enabled; leave interface text such as labels and status messages as is.',
       unchecked.length && 'Inspect the unchecked items in source.',

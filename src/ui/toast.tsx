@@ -5,7 +5,11 @@ import { Toast as ToastPrimitive } from '@base-ui/react/toast';
 import { cn } from './utils';
 import { useUI } from './use-ui';
 import { toast } from './toast-manager';
-import { AnnotationEnabledContext } from './annotation-environment';
+import {
+  AnnotationEnabledContext,
+  AnnotationEnvironmentContext,
+  AnnotationFloatingContext,
+} from './annotation-environment';
 
 import { Button } from './button';
 import {
@@ -27,11 +31,26 @@ function ToastPortal({ ...props }: ToastPrimitive.Portal.Props) {
 
 function ToastViewport({ className, style, ...props }: ToastPrimitive.Viewport.Props) {
   const annotationsEnabled = React.useContext(AnnotationEnabledContext);
+  const setFloatingElements = React.useContext(AnnotationFloatingContext)?.setElements;
+  const viewport = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setFloatingElements?.((current) => ({ ...current, viewport: node }));
+    },
+    [setFloatingElements],
+  );
+  const { toasts } = ToastPrimitive.useToastManager();
+  const geometry = toasts.map(({ id, height, limited }) => `${id}:${height}:${limited}`).join(',');
+  React.useLayoutEffect(() => {
+    setFloatingElements?.((current) =>
+      current.toastGeometry === geometry ? current : { ...current, toastGeometry: geometry },
+    );
+  }, [geometry, setFloatingElements]);
   return (
     <ToastPrimitive.Viewport
+      ref={viewport}
       data-slot="toast-viewport"
       className={cn(
-        'pointer-events-none fixed inset-x-4 bottom-4 z-[100] mx-auto w-auto max-w-sm outline-none sm:right-4 sm:left-auto sm:mx-0 sm:w-full',
+        'pointer-events-none fixed inset-x-4 bottom-4 z-[100] mx-auto w-auto max-w-sm gap-3 outline-none sm:right-4 sm:left-auto sm:mx-0 sm:w-full',
         className,
       )}
       style={{ bottom: annotationsEnabled ? '4rem' : undefined, ...style }}
@@ -41,29 +60,36 @@ function ToastViewport({ className, style, ...props }: ToastPrimitive.Viewport.P
 }
 
 function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
+  const positioner = React.useRef<HTMLDivElement>(null);
+  const environment = React.useContext(AnnotationEnvironmentContext);
+  React.useLayoutEffect(() => {
+    const element = positioner.current;
+    if (!element || props.toast.transitionStatus !== 'ending') return;
+    return environment?.toastExit.current?.(element);
+  }, [environment, props.toast.transitionStatus]);
   return (
-    <ToastPrimitive.Root
-      data-slot="toast"
-      className={cn(
-        'group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-2xl border bg-popover text-popover-foreground shadow-lg will-change-transform outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        '[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]',
-        'h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_500ms_cubic-bezier(0.22,1,0.36,1),opacity_500ms,height_150ms]',
-        "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
-        'data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))]',
-        'data-limited:opacity-0 data-starting-style:[transform:translateY(150%)]',
-        '[&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(150%)]',
-        'data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]',
-        'data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]',
-        'data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]',
-        'data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]',
-        'data-expanded:data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]',
-        'data-expanded:data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]',
-        'data-expanded:data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]',
-        'data-expanded:data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]',
-        className,
-      )}
-      {...props}
-    />
+    <div ref={positioner} className="contents">
+      <ToastPrimitive.Root
+        data-slot="toast"
+        className={cn(
+          'group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-2xl border bg-popover text-popover-foreground shadow-lg will-change-transform outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          '[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]',
+          'h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_500ms_cubic-bezier(0.22,1,0.36,1),opacity_500ms,height_150ms]',
+          "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
+          'data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))]',
+          'data-limited:opacity-0 data-starting-style:[transform:translateY(150%)]',
+          'data-ending-style:opacity-0 [&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:var(--toast-exit-transform,translateY(150%))]',
+          'data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]',
+          'data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]',
+          'data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]',
+          'data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]',
+          'data-expanded:data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]',
+          'data-expanded:data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]',
+          className,
+        )}
+        {...props}
+      />
+    </div>
   );
 }
 
@@ -177,11 +203,10 @@ function ToastIcon({ type }: { type: string | undefined }) {
 
 function ToastList() {
   const { toasts } = ToastPrimitive.useToastManager();
-
-  return toasts.map((toastItem) => (
-    <Toast key={toastItem.id} toast={toastItem}>
+  return toasts.map((item) => (
+    <Toast key={item.id} toast={item}>
       <ToastContent>
-        <ToastIcon type={toastItem.type} />
+        <ToastIcon type={item.type} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <ToastTitle />
           <ToastDescription />

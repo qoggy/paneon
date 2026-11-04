@@ -44,7 +44,7 @@ function Panel() {
     <Button onClick={() => setWithChild(true)}>新增子章节</Button>
     <Button onClick={() => setWidth(width === 1088 ? 1087 : 1088)}>切换目录宽度</Button>
     <div data-testid="wide" style={{width}}>
-      <Markdown>{wideMarkdown}</Markdown>
+      <Markdown outline="auto">{wideMarkdown}</Markdown>
     </div>
     <div data-testid="no-headings"><Markdown>{'Plain content.\n\n```markdown\n# Code only\n```'}</Markdown></div>
     <div data-testid="author-id">

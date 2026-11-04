@@ -56,6 +56,8 @@ const browserScripts = [
   'annotation-positioning',
   'media-annotations',
   'annotation-editor',
+  'annotation-undo',
+  'toast-avoidance',
   'annotation-popover',
   'annotation-drag',
   'annotation-submission-toast',

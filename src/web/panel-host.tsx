@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Card, CardContent } from '../ui/card';
+import { buttonVariants } from '../ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '../ui/empty';
 import { Spinner } from '../ui/spinner';
 import { useUI } from '../ui/use-ui';
 import { BuildDiagnostic } from './build-diagnostic';
@@ -111,32 +112,43 @@ export function PanelHost({ instanceId }: { instanceId: string }) {
           previousAvailable={panel.status === 'running'}
         />
       )}
-      {missing && (
-        <Card>
-          <CardContent className="pt-6">
-            <p>{t('This panel no longer exists.')}</p>
-          </CardContent>
-        </Card>
-      )}
+      {missing && <PanelEmptyState title={t('This panel no longer exists.')} />}
       {!panel && !error && !missing && <Spinner />}
       {panel &&
         (panel.status === 'running' ? (
           <Frame key={`${panel.instanceId}:${panel.revision}`} panel={panel} />
         ) : (
-          <Card>
-            <CardContent className="pt-6">
-              <h2 className="font-semibold">{t('Panel {status}', { status: t(panel.status) })}</h2>
-              <p className="text-sm text-muted-foreground">
-                {panel.status === 'closed'
-                  ? t('This panel has been closed. Interaction history is retained.')
-                  : t(
-                      'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.',
-                    )}
-              </p>
-            </CardContent>
-          </Card>
+          <PanelEmptyState
+            title={t('Panel {status}', { status: t(panel.status) })}
+            description={
+              panel.status === 'closed'
+                ? t('This panel has been closed. Interaction history is retained.')
+                : t(
+                    'This panel is unavailable. Ask your agent to inspect the diagnostic and correct the source.',
+                  )
+            }
+          />
         ))}
     </div>
+  );
+}
+
+function PanelEmptyState({ title, description }: { title: string; description?: string }) {
+  const { t } = useUI();
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>
+          <h2>{title}</h2>
+        </EmptyTitle>
+        {description && <EmptyDescription>{description}</EmptyDescription>}
+      </EmptyHeader>
+      <EmptyContent>
+        <a href="/" className={buttonVariants()}>
+          {t('Return to Panels')}
+        </a>
+      </EmptyContent>
+    </Empty>
   );
 }
 

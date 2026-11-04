@@ -108,6 +108,9 @@ const en = {
   'This permanently deletes the panel and its interaction history. This cannot be undone.':
     'This permanently deletes the panel and its interaction history. This cannot be undone.',
   'This panel no longer exists.': 'This panel no longer exists.',
+  'Return to Panels': 'Return to Panels',
+  'Annotation deleted': 'Annotation deleted',
+  Undo: 'Undo',
   'Panel pagination': 'Panel pagination',
   'Page {page} of {totalPages} · {total} panels': 'Page {page} of {totalPages} · {total} panels',
   running: 'running',

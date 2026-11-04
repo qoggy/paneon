@@ -1,0 +1,58 @@
+import { useState } from 'react';
+import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import {
+  AnnotationText,
+  Button,
+  toast,
+  useAnnotations,
+  usePageAnnotations,
+} from '@qoggy/paneon/ui';
+
+function Configuration() {
+  usePageAnnotations<string>({ onSubmit: (value) => agent.emit('feedback', value).then(() => {}) });
+  return null;
+}
+
+function Panel() {
+  const [enabled, setEnabled] = useState(true);
+  const { value } = useAnnotations<string>();
+  return (
+    <main className="space-y-4 p-4">
+      {enabled && <Configuration />}
+      <h1>Toast avoidance acceptance</h1>
+      <div className="flex gap-2" data-annotation-controls="">
+        <Button
+          onClick={() => {
+            toast.add({ title: 'Background task finished', type: 'success', timeout: 0 });
+            toast.add({
+              title: 'Another notification',
+              description:
+                'This notification is independent of annotation deletion and remains actionable while the directory is open.',
+              timeout: 0,
+            });
+          }}
+        >
+          Add notifications
+        </Button>
+        <Button onClick={() => toast.close()}>Dismiss notifications</Button>
+        <Button onClick={() => setEnabled(!enabled)}>Annotations {enabled ? 'on' : 'off'}</Button>
+      </div>
+      <p>
+        <AnnotationText target="shared">
+          Shared annotation target for notification positioning.
+        </AnnotationText>
+      </p>
+      <output data-draft hidden>
+        {JSON.stringify(value)}
+      </output>
+    </main>
+  );
+}
+
+export default definePanel({
+  id: 'toast-avoidance-acceptance',
+  requires: { paneon: '__PANEON_TEST_VERSION__' },
+  input: z.object({}),
+  events: { feedback: annotationValueSchema(z.string()) },
+  render: Panel,
+});

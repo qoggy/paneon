@@ -72,6 +72,14 @@ export type AnnotationEditor<TRef> = {
   anchor?: { marker: string } | DOMRect | 'bottom-right';
 };
 export type AnnotationUI<TRef> = {
+  /** Bounded UI recoveries; each toast owns its own lifetime and action. */
+  deletions: {
+    id: string;
+    number: number;
+    description: string;
+    undo(): boolean;
+    discard(): void;
+  }[];
   hoveredAnnotationId: string | null;
   focusedAnnotationId: string | null;
   pending: AnnotationTarget<TRef>[];

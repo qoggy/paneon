@@ -91,6 +91,7 @@ export class AnnotationStore<TRef> {
   private state: AnnotationController<TRef> & AnnotationUI<TRef>;
   private surfaceCount = 0;
   private numbers = new Map<string, number>();
+  private deletionOrder = new Map<string, number>();
   private stagedSources = new Map<string, string>();
   private editorSources = new Map<string, string>();
   private summaries = new Map<string, string>();
@@ -100,6 +101,7 @@ export class AnnotationStore<TRef> {
   constructor(options?: PageAnnotationOptions<TRef>) {
     this.options = options;
     this.state = {
+      deletions: [],
       hoveredAnnotationId: null,
       focusedAnnotationId: null,
       pending: [],
@@ -291,6 +293,7 @@ export class AnnotationStore<TRef> {
       annotations: [...this.state.value.annotations, { id, targets, comment }],
     };
     this.save(value, id);
+    if (this.state.deletions.length) this.deletionOrder.set(id, this.deletionOrder.size);
     this.remember(targets);
     return id;
   };
@@ -320,7 +323,75 @@ export class AnnotationStore<TRef> {
     }
     this.removeSavedAnnotation(id);
   };
-  private removeSavedAnnotation(id: string) {
+  /** Shared controls offer undo; programmatic removals keep their existing behavior. */
+  removeAnnotationWithUndo = (id: string) => {
+    this.assertEditable();
+    if (this.state.editor) {
+      this.requestEditorAttention();
+      return;
+    }
+    this.removeSavedAnnotation(id, true);
+  };
+  private removeSavedAnnotation(id: string, undoable = false) {
+    const original = this.state.value.annotations;
+    const index = original.findIndex((entry) => entry.id === id);
+    if (index < 0) return;
+    const annotation = original[index];
+    let deletion: AnnotationUI<TRef>['deletions'][number] | undefined;
+    if (undoable) {
+      if (!this.state.deletions.length)
+        this.deletionOrder = new Map(original.map((entry, position) => [entry.id, position]));
+      // save() prunes deleted targets, so retain their exact evidence, not just the comment.
+      const sources = new Map<string, string>();
+      const files = new Map<string, FileSnapshot<TRef>>();
+      for (const target of annotation.targets) {
+        const key = annotationTargetKey(target);
+        const source = this.sources.get(key);
+        if (source !== undefined) sources.set(key, source);
+        const file = this.fileSnapshots.get(sourceKey(target));
+        if (file) files.set(sourceKey(target), file);
+      }
+      const summary = this.presentation(annotation.targets)?.summary;
+      const recovery = {
+        id: crypto.randomUUID(),
+        number: this.numberFor(annotation.id),
+        description: (
+          annotation.comment.trim() ||
+          summary ||
+          annotation.targets[0]?.text?.quote ||
+          ''
+        )
+          .replace(/\s+/g, ' ')
+          .slice(0, 120),
+        undo: () => {
+          if (!this.state.deletions.includes(recovery) || this.disabled) return false;
+          if (this.state.editor) {
+            this.requestEditorAttention();
+            return false;
+          }
+          const annotations = [...this.state.value.annotations];
+          const rank = this.deletionOrder.get(annotation.id);
+          const position = annotations.findIndex((entry) => {
+            const current = this.deletionOrder.get(entry.id);
+            return rank !== undefined && current !== undefined && current > rank;
+          });
+          annotations.splice(position < 0 ? annotations.length : position, 0, annotation);
+          for (const [key, source] of sources) this.sources.set(key, source);
+          for (const [key, file] of files) this.fileSnapshots.set(key, file);
+          if (summary !== undefined) this.summaries.set(targetsKey(annotation.targets), summary);
+          this.save({ annotations }, annotation.id);
+          recovery.discard();
+          return true;
+        },
+        discard: () => {
+          if (!this.state.deletions.includes(recovery)) return;
+          const deletions = this.state.deletions.filter((entry) => entry !== recovery);
+          if (!deletions.length) this.deletionOrder.clear();
+          this.publish({ deletions });
+        },
+      };
+      deletion = recovery;
+    }
     this.save(
       {
         ...this.state.value,
@@ -328,6 +399,7 @@ export class AnnotationStore<TRef> {
       },
       this.state.activeAnnotationId === id ? null : this.state.activeAnnotationId,
     );
+    if (deletion) this.publish({ deletions: [...this.state.deletions, deletion].slice(-3) });
   }
   registerText: AnnotationController<TRef>['registerText'] = (registration) => {
     sourceKey(registration);
@@ -611,7 +683,7 @@ export class AnnotationStore<TRef> {
   deleteEditor = () => {
     this.assertEditable();
     const editor = this.state.editor;
-    if (editor?.id) this.removeSavedAnnotation(editor.id);
+    if (editor?.id) this.removeSavedAnnotation(editor.id, true);
     this.cancelEditor();
   };
   /** Actual registered DOM geometry, never an indexOf/quote search or inserted text node. */

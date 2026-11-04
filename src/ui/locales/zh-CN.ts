@@ -106,6 +106,9 @@ const zh: Record<keyof typeof en, string> = {
   'This permanently deletes the panel and its interaction history. This cannot be undone.':
     '将永久删除此面板及其交互历史。此操作无法撤销。',
   'This panel no longer exists.': '此面板已不存在。',
+  'Return to Panels': '返回面板列表',
+  'Annotation deleted': '批注已删除',
+  Undo: '撤销',
   'Panel pagination': '面板分页',
   'Page {page} of {totalPages} · {total} panels': '第 {page} / {totalPages} 页 · 共 {total} 个面板',
   running: '运行中',

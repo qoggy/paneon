@@ -14,7 +14,7 @@ import {
 
 const root = await realpath(await mkdtemp(join(tmpdir(), 'paneon-markdown-review-')));
 const markdown =
-  '---\nname: 发布方案🙂\n---\n\n# 全文标题\n\n正文 **词句**。`inline()`\n\n```ts\nconst timeout = 5000;\n```\n\n| 字段 | 值 |\n| --- | --- |\n| 表格文字 | 1 |\n\n- 列表文字\n\n> 引用文字\n\n[关联文件](./request.ts)\n';
+  '---\nname: 发布方案🙂\n---\n\n# 全文标题\n\n[无关链接](https://example.com/unrelated)\n\n正文 **词句**。`inline()`\n\n```ts\nconst timeout = 5000;\n```\n\n| 字段 | 值 |\n| --- | --- |\n| 表格文字 | 1 |\n\n- 列表文字\n\n> 引用文字\n\n[关联文件](./request.ts)\n';
 const fileText = 'const timeout = 5000;\n';
 let service, browser;
 try {
@@ -48,6 +48,18 @@ try {
     await input.fill(`调整${quote}`);
     await input.press('Enter');
     await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
+    assert.equal(
+      await frame
+        .getByRole('link', { name: '无关链接', exact: true })
+        .evaluate((element) => element === document.activeElement),
+      false,
+      'Saving an annotation must not focus an unrelated Markdown link',
+    );
+    assert.equal(
+      await frame.locator('[data-slot="tooltip-content"][data-open]').count(),
+      0,
+      'Saving an annotation must not open an unrelated tooltip',
+    );
   };
   const cases = [
     ['[data-markdown-frontmatter] dd [data-source-leaf]', '发布方案🙂'],
@@ -61,6 +73,31 @@ try {
   ];
   // Each case selects within one rendered text source, without cross-paragraph selection.
   for (const [selector, quote] of cases) await save(selector, quote);
+  await selectAnnotationText(frame, 'th:last-child [data-source-leaf]', 0, 1);
+  await frame.locator('[data-annotation-action]').click();
+  await frame.locator('[data-annotation-editor] textarea').press('Escape');
+  await frame.locator('[data-annotation-editor]').waitFor({ state: 'hidden' });
+  assert.equal(
+    await frame
+      .getByRole('link', { name: '无关链接', exact: true })
+      .evaluate((element) => element === document.activeElement),
+    false,
+    'Cancelling a table-header annotation must not focus an unrelated Markdown link',
+  );
+  await page.screenshot({ path: '/tmp/paneon-markdown-tooltip-fixed.png', fullPage: true });
+  // The same link must still expose its address through ordinary pointer and keyboard use.
+  const unrelated = frame.getByRole('link', { name: '无关链接', exact: true });
+  const address = frame.locator('[data-slot="tooltip-content"][data-open]').filter({
+    hasText: 'https://example.com/unrelated',
+  });
+  await unrelated.hover();
+  await address.waitFor();
+  await page.mouse.move(0, 0);
+  await address.waitFor({ state: 'hidden' });
+  await unrelated.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await address.waitFor();
   await frame.getByRole('link', { name: '关联文件', exact: true }).click();
   const fileSelector = '[data-slot="file-preview-source"] [data-code-line="1"]';
   await frame.locator(fileSelector).waitFor();

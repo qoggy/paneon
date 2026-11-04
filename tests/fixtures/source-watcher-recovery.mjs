@@ -24,10 +24,22 @@ const panelSource = (value) => `import{definePanel,serverAction,z}from'@qoggy/pa
 export const read=serverAction({kind:'query',input:z.object({}),handler:()=>({value})});
 export default definePanel({id:'nested-recovery',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:()=> <div>{value}</div>});`;
 writeFileSync(entry, panelSource("const value='initial';"));
-const runtime = new Runtime(join(root, 'data'), pino({ level: 'silent' }));
+const errors = [];
+const runtime = new Runtime(
+  join(root, 'data'),
+  pino({ level: 'error' }, { write: (line) => errors.push(JSON.parse(line)) }),
+);
 async function until(check, message) {
   const deadline = Date.now() + 20000;
   while (!check() && Date.now() < deadline) await delay(20);
+  if (!check()) {
+    console.error('NodeFs recovery diagnostics:', {
+      message,
+      errors,
+      watched: await runtime.sources.getWatched(),
+      panels: runtime.store.list(),
+    });
+  }
   assert.ok(check(), message);
 }
 try {

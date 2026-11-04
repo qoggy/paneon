@@ -55,6 +55,7 @@
     "@base-ui/react": "1.9.0",
     "@clack/prompts": "1.8.1",
     "@fastify/websocket": "^11.3.4",
+    "@floating-ui/dom": "^1.8.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

@@ -1,7 +1,9 @@
 import { useUI } from './use-ui';
 import {
   useCallback,
+  useContext,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -36,6 +38,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './tooltip';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './empty';
 import { Spinner } from './spinner';
 import { useElementAnnotationPicker } from './element-annotation-context';
+import { toast } from './toast-manager';
+import { AnnotationFloatingContext } from './annotation-environment';
+import { freezeToastExit, useToastAvoidance } from './toast-positioning';
 
 type Marker = { id: string; number: number; target: string; rect: DOMRect };
 type Outline = { id: string; target: string; rect: DOMRect; borderRadius: string };
@@ -57,12 +62,48 @@ export function AnnotationSurface() {
   const { t, message } = useUI();
   const { store, disabled } = useAnnotationContext();
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const deletionToasts = useRef(new Set<string>());
   const [geometry, setGeometry] = useState<Geometry>({ markers: [], highlights: [], outlines: [] });
   const input = useRef<HTMLTextAreaElement>(null);
   const editor = useRef<HTMLDivElement>(null);
   const shake = useRef<Animation | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const blocked = disabled || state.submitting;
+  const undoBlocked = blocked || state.editor !== null;
+  useEffect(() => {
+    const current = new Set(state.deletions.map((deletion) => deletion.id));
+    for (const id of deletionToasts.current) {
+      if (!current.has(id)) toast.close(id);
+    }
+    for (const deletion of state.deletions) {
+      const options = {
+        title: t('Annotation deleted'),
+        description: (
+          <span className="line-clamp-2 break-words">
+            {t('Annotation {number}', { number: deletion.number })}
+            {deletion.description ? `: ${deletion.description}` : ''}
+          </span>
+        ),
+        actionProps: {
+          children: t('Undo'),
+          disabled: undoBlocked,
+          onClick: () => {
+            if (deletion.undo()) toast.close(deletion.id);
+          },
+        },
+        onClose: () => deletion.discard(),
+      };
+      if (deletionToasts.current.has(deletion.id)) toast.update(deletion.id, options);
+      else toast.add({ id: deletion.id, ...options });
+    }
+    deletionToasts.current = current;
+  }, [state.deletions, undoBlocked, t]);
+  useEffect(
+    () => () => {
+      for (const id of deletionToasts.current) toast.close(id);
+    },
+    [],
+  );
   const emphasizedId =
     state.editor?.draftId ?? state.hoveredAnnotationId ?? state.focusedAnnotationId;
   const requestAttention = useCallback(() => {
@@ -373,7 +414,13 @@ export function AnnotationSurface() {
               textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
               return false;
             }}
-            finalFocus={returnFocus}
+            finalFocus={() => {
+              // Base UI resolves a non-tabbable target (including body) to its first
+              // tabbable child. Restore the exact element instead of an unrelated link.
+              const target = returnFocus.current;
+              if (target?.isConnected) target.focus({ preventScroll: true });
+              return false;
+            }}
           >
             <div
               className={
@@ -548,10 +595,13 @@ function clampLauncherPosition(element: HTMLElement, position: LauncherPosition)
 
 /** Internal: the page's single floating annotation directory. */
 export function AnnotationMenu() {
+  useToastAvoidance();
   const { t } = useUI();
-  const { store, disabled } = useAnnotationContext();
+  const { store, environment, disabled } = useAnnotationContext();
+  useImperativeHandle(environment.toastExit, () => freezeToastExit, []);
   const feedback = useAnnotations();
   const picker = useElementAnnotationPicker();
+  const setFloatingElements = useContext(AnnotationFloatingContext)?.setElements;
   const { allowEmptySubmit = false, onRequestEdit } = store.configuration ?? {};
   const empty = feedback.value.annotations.length === 0;
   const blocked = disabled || feedback.submitting;
@@ -565,8 +615,9 @@ export function AnnotationMenu() {
     (node: HTMLDivElement | null) => {
       launcher.current = node;
       setLauncher(node);
+      setFloatingElements?.((current) => ({ ...current, launcher: node }));
     },
-    [setLauncher],
+    [setLauncher, setFloatingElements],
   );
   const drag = useRef<{
     pointerId: number;
@@ -580,6 +631,14 @@ export function AnnotationMenu() {
   const pinned = useRef(false);
   const hoverOpened = useRef(false);
   const content = useRef<HTMLDivElement>(null);
+  const contentRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      content.current = node;
+      // Base UI retains this element through the closing animation.
+      setFloatingElements?.((current) => ({ ...current, directory: node }));
+    },
+    [setFloatingElements],
+  );
   const cancelClose = () => clearTimeout(closeTimer.current);
   const close = () => {
     cancelClose();
@@ -748,7 +807,7 @@ export function AnnotationMenu() {
         />
         <PopoverContent
           container={store.overlayContainer ?? undefined}
-          ref={content}
+          ref={contentRef}
           align="end"
           side="top"
           positionMethod="fixed"
@@ -873,7 +932,7 @@ export function AnnotationMenu() {
                           disabled={blocked}
                           onClick={() => {
                             if (store.getSnapshot().editor) close();
-                            feedback.removeAnnotation(entry.id);
+                            store.removeAnnotationWithUndo(entry.id);
                           }}
                         >
                           <Trash2 aria-hidden="true" />

@@ -92,6 +92,13 @@ Common feedback SHALL use one annotations list for selected objects and their op
 - **WHEN** a person selects registered content and submits without writing an annotation
 - **THEN** the result contains an annotations entry with those targets and an empty annotation, using the same structure as an entry with a written opinion
 
+#### Scenario: Undo deleting a saved annotation
+
+- **WHEN** a person deletes a saved annotation from the directory or its editor
+- **THEN** the common controls offer Undo in the existing toast, restoring the most recent deletion with its original identifier, targets, saved comment, list position and source evidence
+- **AND** undo respects open editors, submission locks and page read-only policies, and does not submit feedback
+- **AND** the undo opportunity ends when its toast is dismissed or expires, or a later deletion replaces it; an unsaved new editor is cancelled without a deletion toast
+
 #### Scenario: Add or clear an opinion
 
 - **WHEN** a person adds text to or clears an existing entry's annotation

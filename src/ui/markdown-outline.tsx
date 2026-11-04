@@ -39,12 +39,14 @@ function outlineOf(content: HTMLElement, prefix: string): Outline {
 export function MarkdownOutline({
   children,
   contentRef,
+  mode,
   className,
   annotated,
   ...events
 }: Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   children: ReactNode;
   contentRef: RefObject<HTMLDivElement | null>;
+  mode: 'auto' | 'popover' | 'off';
   annotated?: boolean;
 }) {
   const { t } = useUI();
@@ -115,7 +117,7 @@ export function MarkdownOutline({
       viewportTop.current = readingTop;
       const visibleTop = Math.max(body.top, top);
       const visibleBottom = Math.min(body.bottom, bottom);
-      const isWide = rect.width >= 1088;
+      const isWide = mode === 'auto' && rect.width >= 1088;
       setWide(isWide);
       const visible = visibleBottom > visibleTop && rect.right > left && rect.left < right;
       const sidebar = lane.current?.getBoundingClientRect();
@@ -132,7 +134,7 @@ export function MarkdownOutline({
             }
           : null,
       );
-      if (!visible || isWide) setOpen(false);
+      if (!visible || isWide || mode === 'off') setOpen(false);
       let current = outline.flat[0];
       for (const heading of outline.flat) {
         // Scroll offsets round to pixels while heading boxes retain subpixel coordinates.
@@ -157,7 +159,7 @@ export function MarkdownOutline({
       window.removeEventListener('resize', schedule);
       window.removeEventListener('animationend', schedule, true);
     };
-  }, [outline, wide, contentRef]);
+  }, [outline, wide, contentRef, mode]);
 
   function jump(id: string | null) {
     const heading = outline.flat.find((item) => item.id === id);
@@ -180,7 +182,7 @@ export function MarkdownOutline({
     setOpen(false);
   }
 
-  const showOutline = outline.flat.length > 1;
+  const showOutline = mode !== 'off' && outline.flat.length > 1;
   const sidebar = wide && showOutline;
   const tree = (
     <Tree

@@ -75,11 +75,13 @@ try {
   assert.equal(editedDraft.annotations[0].id, savedDraft.annotations[0].id);
   assert.deepEqual(editedDraft.annotations[0].targets, savedDraft.annotations[0].targets);
   assert.equal((await read()).length, 1, 'Editing remains local until explicit submission');
-  const resubmitted = page.waitForResponse(
-    (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
-  );
-  await submitAnnotations(frame);
-  assert.equal((await resubmitted).status(), 200);
+  const [resubmitted] = await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
+    ),
+    submitAnnotations(frame),
+  ]);
+  assert.equal(resubmitted.status(), 200);
   const revisedEvents = await read();
   assert.equal(revisedEvents.length, 2);
   assert.deepEqual(revisedEvents[1].payload, {
@@ -131,11 +133,13 @@ try {
     'Description opinion',
   );
   await frame.locator('[data-annotation-editor] textarea').press('Escape');
-  const pageSubmitted = page.waitForResponse(
-    (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
-  );
-  await submitAnnotations(frame);
-  assert.equal((await pageSubmitted).status(), 200);
+  const [pageSubmitted] = await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
+    ),
+    submitAnnotations(frame),
+  ]);
+  assert.equal(pageSubmitted.status(), 200);
   assert.deepEqual((await read())[2].payload, { annotations: expected });
   assert.deepEqual(errors, []);
   console.log(

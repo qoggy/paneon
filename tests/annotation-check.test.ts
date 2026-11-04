@@ -74,8 +74,8 @@ void test('reports content components and headings without targets, with locatio
     report.summary,
     /^7 component\(s\) or heading\(s\) have no original-source annotation/,
   );
-  assert.match(report.next, /only where original-source annotations are needed/);
-  assert.match(report.next, /whole-element picking needs no per-element registration/);
+  assert.match(report.next, /may question word by word/);
+  assert.match(report.next, /put the state in the ref/);
 });
 
 void test('a fully covered page reports nothing, including falsy targets and spreads', async () => {

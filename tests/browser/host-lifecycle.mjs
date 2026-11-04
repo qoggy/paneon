@@ -1,6 +1,6 @@
 import { PACKAGE_VERSION } from '../../dist/shared/paths.js';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -33,7 +33,11 @@ try {
     if (webRoot)
       await page.route('**/*', async (route) => {
         const pathname = new URL(route.request().url()).pathname;
-        if (pathname === `/panels/${panel.instanceId}` || pathname.startsWith('/assets/')) {
+        if (
+          pathname === '/' ||
+          /^\/panels\/[^/]+\/?$/.test(pathname) ||
+          pathname.startsWith('/assets/')
+        ) {
           const file = pathname.startsWith('/assets/')
             ? join(webRoot, pathname.slice(1))
             : join(webRoot, 'index.html');
@@ -139,6 +143,41 @@ try {
       assert.deepEqual(errors, []);
     }
     await page.close();
+  }
+  {
+    const page = await newPage();
+    await service.runtime.closePanel(panel.instanceId);
+    await page.goto(url);
+    await page.getByRole('heading', { name: 'Panel closed', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-slot="empty"]').count(), 1);
+    await page.getByText('This panel has been closed. Interaction history is retained.').waitFor();
+    if (process.env.PANEON_TEST_SCREENSHOTS) {
+      await mkdir(process.env.PANEON_TEST_SCREENSHOTS, { recursive: true });
+      await page.screenshot({
+        path: join(process.env.PANEON_TEST_SCREENSHOTS, 'panel-closed-empty.png'),
+      });
+    }
+    const back = page.getByRole('link', { name: 'Return to Panels', exact: true });
+    assert.equal(await back.getAttribute('href'), '/');
+    await back.click();
+    await page.getByRole('heading', { name: 'Panels', exact: true }).waitFor();
+    assert.equal(service.runtime.inspect(panel.instanceId).status, 'closed');
+    await page.goto(`http://127.0.0.1:${service.descriptor.port}/panels/no-longer-exists`);
+    await page
+      .getByRole('heading', { name: 'This panel no longer exists.', exact: true })
+      .waitFor();
+    assert.equal(await page.locator('[data-slot="empty"]').count(), 1);
+    if (process.env.PANEON_TEST_SCREENSHOTS)
+      await page.screenshot({
+        path: join(process.env.PANEON_TEST_SCREENSHOTS, 'panel-missing-empty.png'),
+      });
+    await page.getByRole('link', { name: 'Return to Panels', exact: true }).click();
+    await page.getByRole('heading', { name: 'Panels', exact: true }).waitFor();
+    await page.close();
+    evidence.push({
+      check: 'Closed and missing panels use Empty and can return to Panels.',
+      ok: true,
+    });
   }
   console.log(JSON.stringify({ ok: true, evidence }, null, 2));
 } finally {

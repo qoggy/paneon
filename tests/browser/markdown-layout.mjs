@@ -15,19 +15,23 @@ try {
     `
 import { useState } from 'react';
 import { definePanel, z } from '@qoggy/paneon/sdk';
-import { Button, Markdown, Page, Tabs, TabsContent, TabsList, TabsTrigger } from '@qoggy/paneon/ui';
+import { Button, Markdown, Page, Tabs, TabsContent, TabsList, TabsTrigger, usePageAnnotations } from '@qoggy/paneon/ui';
+import type { MarkdownProps } from '@qoggy/paneon/ui';
 
 function Panel() {
   const [count, setCount] = useState(1);
+  const [outline, setOutline] = useState<MarkdownProps['outline']>();
+  usePageAnnotations({ onSubmit: () => Promise.resolve() });
   const source = count === 0 ? 'Introduction.' : '# Introduction\\n\\nIntroduction.' + (count === 2 ? '\\n\\n## Details\\n\\nDetails.' : '');
   return <Page>
-    <Markdown className="layout-introduction">{source}</Markdown>
+    <Markdown className="layout-introduction" outline={outline} annotationTarget="introduction">{source}</Markdown>
     <Tabs defaultValue="first">
       <TabsList><TabsTrigger value="first">First</TabsTrigger><TabsTrigger value="second">Second</TabsTrigger></TabsList>
       <TabsContent value="first">First content</TabsContent>
       <TabsContent value="second">Second content</TabsContent>
     </Tabs>
     {[0, 1, 2].map(value => <Button key={value} onClick={() => setCount(value)}>{value} headings</Button>)}
+    {([undefined, 'auto', 'popover', 'off'] as const).map(value => <Button key={value ?? 'default'} onClick={() => setOutline(value)}>Outline {value ?? 'default'}</Button>)}
   </Page>;
 }
 export default definePanel({ id: 'markdown-layout', requires: { paneon: '${PACKAGE_VERSION}' }, input: z.object({}), render: Panel });
@@ -39,9 +43,9 @@ export default definePanel({ id: 'markdown-layout', requires: { paneon: '${PACKA
     headless: true,
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
   });
-  for (const { theme, width, outlineMode } of [
-    { theme: 'light', width: 1176, outlineMode: 'sidebar' },
-    { theme: 'dark', width: 1000, outlineMode: 'popup' },
+  for (const { theme, width, autoMode } of [
+    { theme: 'light', width: 1176, autoMode: 'sidebar' },
+    { theme: 'dark', width: 1000, autoMode: 'popup' },
   ]) {
     const response = await service.app.inject({
       method: 'POST',
@@ -71,45 +75,67 @@ export default definePanel({ id: 'markdown-layout', requires: { paneon: '${PACKA
         root.getBoundingClientRect().bottom,
     );
     assert.equal(gap, 32, `${theme}: Markdown must preserve Page's 32px spacing.`);
-    for (const count of [1, 0, 2, 1]) {
-      await frame.getByRole('button', { name: `${count} headings`, exact: true }).click();
-      await inner.waitForFunction(
-        ({ count, mode }) => {
-          const root = document.querySelector('.layout-introduction');
-          return root.querySelectorAll('h1,h2').length === count && root.dataset.tocMode === mode;
-        },
-        { count, mode: count === 2 ? outlineMode : 'none' },
-      );
-      const dimensions = await markdown.evaluate((root) => ({
-        root: root.getBoundingClientRect().width,
-        content: root.querySelector('[data-markdown-content]').getBoundingClientRect().width,
-        firstMargin: getComputedStyle(
-          root.querySelector('[data-markdown-content]').firstElementChild,
-        ).marginTop,
-      }));
-      assert.equal(
-        dimensions.firstMargin,
-        '0px',
-        'The first content block keeps its internal reset.',
-      );
-      if (count < 2) {
-        assert.equal(
-          dimensions.content,
-          dimensions.root,
-          'No outline must reserve no sidebar width.',
+    // Switch modes on the same annotated Markdown, including restoring the omitted default.
+    for (const outline of ['default', 'auto', 'popover', 'off', 'default']) {
+      await frame.getByRole('button', { name: `Outline ${outline}`, exact: true }).click();
+      const outlineMode = outline === 'off' ? 'none' : outline === 'auto' ? autoMode : 'popup';
+      for (const count of [1, 0, 2, 1, 2]) {
+        await frame.getByRole('button', { name: `${count} headings`, exact: true }).click();
+        const mode = count === 2 ? outlineMode : 'none';
+        await inner.waitForFunction(
+          ({ count, mode }) => {
+            const root = document.querySelector('.layout-introduction');
+            return root.querySelectorAll('h1,h2').length === count && root.dataset.tocMode === mode;
+          },
+          { count, mode },
         );
-        assert.equal(await markdown.locator('[data-toc-sidebar], [data-toc-trigger]').count(), 0);
-      } else {
-        await markdown
-          .locator(outlineMode === 'sidebar' ? '[data-toc-sidebar]' : '[data-toc-trigger]')
-          .waitFor();
+        const dimensions = await markdown.evaluate((root) => ({
+          root: root.getBoundingClientRect().width,
+          content: root.querySelector('[data-markdown-content]').getBoundingClientRect().width,
+          firstMargin: getComputedStyle(
+            root.querySelector('[data-markdown-content]').firstElementChild,
+          ).marginTop,
+        }));
+        assert.equal(
+          dimensions.firstMargin,
+          '0px',
+          'The first content block keeps its internal reset.',
+        );
+        assert.equal(
+          dimensions.root - dimensions.content,
+          mode === 'sidebar' ? 244 : 0,
+          `${outline}: only the automatic sidebar may reserve content width.`,
+        );
+        if (mode === 'none') {
+          assert.equal(await markdown.locator('[data-toc-sidebar], [data-toc-trigger]').count(), 0);
+          assert.equal(await frame.locator('[data-toc-popup]').count(), 0);
+        } else {
+          await markdown
+            .locator(mode === 'sidebar' ? '[data-toc-sidebar]' : '[data-toc-trigger]')
+            .waitFor();
+        }
+      }
+      if (outlineMode === 'popup') {
+        await markdown.locator('[data-toc-trigger]').press('Enter');
+        const popup = frame.locator('[data-toc-popup]');
+        await popup.waitFor();
+        // A wide popover must stay open when scroll/resize updates its placement.
+        await inner.evaluate(async () => {
+          window.dispatchEvent(new Event('resize'));
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+        });
+        assert.equal(await popup.isVisible(), true);
+        await popup.press('Escape');
+        await popup.waitFor({ state: 'hidden' });
       }
     }
     assert.deepEqual(errors, []);
     await page.close();
   }
   console.log(
-    'Markdown layout passed: light/dark Page spacing, zero/single/multiple headings, sidebar/popup, full content width, and outline removal after a source update.',
+    'Markdown layout passed: default/auto/popover/off on annotated Markdown, wide/narrow light/dark layout, Page spacing, heading updates, mode changes, sidebar width, and popover keyboard/resize behavior.',
   );
 } finally {
   await browser?.close();

@@ -1,5 +1,52 @@
 import assert from 'node:assert/strict';
 
+/** Verify the painted exit path while Undo closes the directory and changes its size. */
+export async function assertToastUndoExitsUp(frame, toast, undo) {
+  await undo.click({ trial: true });
+  const before = await toast.boundingBox();
+  const root = frame.locator('html');
+  await toast.evaluate((element) => {
+    const root = element.ownerDocument.documentElement;
+    const observation = (root.__paneonToastExit = { samples: [], frame: 0 });
+    const sample = () => {
+      if (!element.isConnected) return;
+      const rect = element.getBoundingClientRect();
+      observation.samples.push({
+        ending: element.hasAttribute('data-ending-style'),
+        x: rect.x,
+        y: rect.y,
+        opacity: Number(getComputedStyle(element).opacity),
+      });
+      observation.frame = requestAnimationFrame(sample);
+    };
+    sample();
+  });
+  try {
+    await undo.click();
+    await toast.waitFor({ state: 'detached' });
+    const samples = await root.evaluate((element) => element.__paneonToastExit.samples);
+    const ending = samples.filter((sample) => sample.ending);
+    assert.ok(ending.length > 0, 'Observe the actual exit animation');
+    assert.ok(
+      ending.every((sample) => sample.y <= before.y + 1),
+      'Undo toast cannot travel down through the directory',
+    );
+    assert.ok(
+      ending.every((sample) => Math.abs(sample.x - before.x) <= 1),
+      'Closing the directory cannot teleport its exiting toast',
+    );
+    assert.ok(
+      ending.some((sample) => sample.opacity < 0.5),
+      'The toast fades away before unmounting',
+    );
+  } finally {
+    await root.evaluate((element) => {
+      cancelAnimationFrame(element.__paneonToastExit.frame);
+      delete element.__paneonToastExit;
+    });
+  }
+}
+
 /** Observe painted source positions, including scrolling and the file Sheet's slide-in. */
 export async function assertAnnotationEditorOpensAfterLocate(frame, selector, openEditor) {
   const root = frame.locator('html');
@@ -227,12 +274,20 @@ export async function assertEditorBlocksAnnotationNavigation(frame, number, veri
 }
 
 export async function submitAnnotations(frame) {
+  const trigger = frame.getByRole('button', { name: /^(批注|Annotations) \(\d+\)$/ });
+  const directory = frame.getByRole('dialog', { name: /^(批注目录|Annotation directory)$/ });
   const submit = frame.getByRole('button', { name: /^(提交批注|Submit annotations)$/ });
-  await openAnnotationDirectory(frame);
+  // Submission tests need a pinned directory while the pointer waits for its
+  // opening animation. Hover and pointer navigation are covered separately.
+  await trigger.focus();
+  if ((await trigger.getAttribute('aria-expanded')) === 'true') {
+    await trigger.press('Escape');
+    await directory.waitFor({ state: 'hidden' });
+  }
+  await trigger.press('Enter');
+  await directory.waitFor();
   await submit.click();
-  await frame
-    .getByRole('dialog', { name: /^(批注目录|Annotation directory)$/ })
-    .waitFor({ state: 'hidden' });
+  await directory.waitFor({ state: 'hidden' });
 }
 
 /** Drive the real contextual UI; no store injection or synthetic annotation state. */
