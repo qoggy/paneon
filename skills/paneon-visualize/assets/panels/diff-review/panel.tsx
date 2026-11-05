@@ -31,6 +31,7 @@ import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  FileIcon,
   Input,
   Page,
   Spinner,
@@ -528,9 +529,11 @@ function DiffReviewPanel() {
                   const parent = path.slice(0, Math.max(0, path.lastIndexOf('/')));
                   return (
                     <>
-                      <TreeIcon
-                        kind={state.isBranch ? (state.expanded ? 'open' : 'folder') : 'file'}
-                      />
+                      {state.isBranch ? (
+                        <TreeIcon kind={state.expanded ? 'open' : 'folder'} />
+                      ) : (
+                        <FileIcon path={path} className="size-3.5" />
+                      )}
                       <span className="min-w-0 truncate">{node.name}</span>
                       {!grouped && parent && (
                         <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">

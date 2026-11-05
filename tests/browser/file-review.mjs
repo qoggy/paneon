@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
+import { assertFileIcons } from './file-icon-tools.mjs';
 import {
   annotationTools,
   openAnnotationDirectory,
@@ -84,6 +85,7 @@ try {
   const search = frame.getByRole('textbox', { name: '搜索文件', exact: true });
   const line = (number) => viewport.locator(`[data-code-line="${number}"]`);
   await frame.locator('strong [data-source-leaf]').waitFor();
+  await assertFileIcons(frame.locator('[data-tree-item^="file:"]'), files.length);
   const save = async (selector, start, end, comment) => {
     await selectAnnotationText(frame, selector, start, end);
     await comments.write(comment);

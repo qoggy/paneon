@@ -34,6 +34,8 @@ export { Markdown } from './markdown';
 export type { MarkdownProps } from './markdown';
 export { Image } from './image';
 export type { ImageProps } from './image';
+export { FileIcon } from './file-icon';
+export type { FileIconProps } from './file-icon';
 export * from './mermaid';
 export * from './toast';
 export * from './toast-manager';

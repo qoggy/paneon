@@ -20,6 +20,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  FileIcon,
   Input,
   Markdown,
   Page,
@@ -484,7 +485,11 @@ function FileReviewPanel() {
           })}
           renderItemContent={(node, state) => (
             <>
-              <TreeIcon kind={state.isBranch ? (state.expanded ? 'open' : 'folder') : 'file'} />
+              {node.fileIndex === undefined ? (
+                <TreeIcon kind={state.expanded ? 'open' : 'folder'} />
+              ) : (
+                <FileIcon path={value.files[node.fileIndex]} className="size-3.5" />
+              )}
               <span className="min-w-0 truncate">{node.name}</span>
               {!grouped &&
                 node.fileIndex !== undefined &&

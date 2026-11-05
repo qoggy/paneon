@@ -63,6 +63,7 @@ const browserScripts = [
   'annotation-submission-toast',
   'promoted-ui',
   'ui',
+  'file-icons',
   'imported-tailwind',
   'preferences',
   'preferences-transition',

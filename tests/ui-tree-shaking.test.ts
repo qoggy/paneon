@@ -79,6 +79,12 @@ void test('public basic UI consumers exclude unused rich content and annotation 
   assert.equal(chunks.length, initial.length, 'Basic UI must not emit unreachable lazy chunks.');
   const bytes = chunks.reduce((sum, chunk) => sum + Buffer.byteLength(chunk.code), 0);
   assert.ok(bytes < 1_000_000, `Unminified basic panel JavaScript is ${bytes} bytes.`);
+  const iconModules = chunks.flatMap((chunk) =>
+    Object.entries(chunk.modules)
+      .filter(([id, module]) => id.includes('/material-icon-theme/') && module.renderedLength > 0)
+      .map(([id]) => id),
+  );
+  assert.deepEqual(iconModules, [], 'Unused FileIcon must not retain its manifest or SVGs.');
   assert.deepEqual(
     initial.flatMap((chunk) => chunk.dynamicImports),
     [],

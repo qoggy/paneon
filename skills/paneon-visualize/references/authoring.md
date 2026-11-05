@@ -176,6 +176,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `CodeBlock` | Read-only highlighted code with optional annotations |
 | `Markdown` | GFM Markdown, including Mermaid fences |
 | `Image` | Remote or local image |
+| `FileIcon` | File type icon selected from a file name or path |
 | `Mermaid` | Diagram |
 | `DiffView` | Text diff |
 | `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` | Resizable split layout |

@@ -1,4 +1,5 @@
 import { selectDiffLines } from './annotation-tools.mjs';
+import { assertFileIcons } from './file-icon-tools.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -106,6 +107,7 @@ try {
   await frame.getByRole('button', { name: '仓库', exact: true }).waitFor();
   await button(`已暂存 · M ${modified}`).waitFor();
   assert.equal(await files.count(), 9, 'Each index/worktree snapshot keeps its own leaf');
+  await assertFileIcons(files, 9);
   assert.equal(await group('staged').locator('[data-file-id]').count(), 7);
   assert.equal(await group('unstaged').locator('[data-file-id]').count(), 1);
   assert.equal(await group('untracked').locator('[data-file-id]').count(), 1);

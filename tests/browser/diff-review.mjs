@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
+import { assertFileIcons } from './file-icon-tools.mjs';
 import { annotationTools, selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-built-in-diff-review-'));
@@ -62,6 +63,7 @@ try {
       .locator(`[data-tree-item="file:${index}"][data-comparison-status="${status}"]`)
       .waitFor();
   const rows = frame.locator('[data-tree-item]');
+  await assertFileIcons(frame.locator('[data-tree-item^="file:"]'), files.length);
   assert.deepEqual(await rows.evaluateAll((rows) => rows.map((row) => row.dataset.treeItem)), [
     'directory:docs',
     'file:2',

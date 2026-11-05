@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { FileDiff, FolderTree, ChevronsUpDown, ChevronsDownUp, TreeIcon } from './file-icons.tsx';
 import {
   Button,
+  FileIcon,
   Tree,
   TreeRevealError,
   Collapsible,
@@ -254,7 +255,7 @@ export function ChangedFileTree({
           const directory = path.slice(0, Math.max(0, path.lastIndexOf('/')));
           return (
             <>
-              <TreeIcon kind="file" />
+              <FileIcon path={path} className="size-3.5" />
               <span className="min-w-0 truncate">{node.name}</span>
               {!byDirectory && directory && (
                 <span

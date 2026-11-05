@@ -98,6 +98,19 @@ await tree.current!.revealItem(id, { signal: controller.signal });
 
 The [built-in Diff Review panel](../../skills/paneon-visualize/assets/panels/diff-review/panel.tsx) demonstrates non-Git adaptation and composes a page-owned file-read query, DiffView and explicit annotation submission; Git Review keeps its path construction, sections, status rendering and toolbar in the skill's adapter.
 
+### FileIcon
+
+`FileIcon` and `FileIconProps` are exported from `@qoggy/paneon/ui`. The component uses Material Icon Theme 5.40.0 and reads only the supplied `path` string, never the file. File-name matches take priority over extensions; compound extensions and immediate-parent associations are supported, case-insensitively, for POSIX and Windows paths. Unknown types use the upstream default file icon. Theme-specific SVG variants follow `useUI()`.
+
+```tsx
+<FileIcon path="Dockerfile" />
+<FileIcon path="src/main.ts" className="size-3.5" />
+```
+
+The only props are required `path: string` and optional `className: string`. The default classes are `size-4 shrink-0`; the image has empty alt text and `aria-hidden="true"` because its adjacent file name supplies the accessible label. SVG assets ship with the UI build, work offline, and add no file-read endpoint. Preserve the Material Icon Theme notice in `UPSTREAM-LICENSE.md` when redistributing the embedded assets.
+
+Pages using FileIcon currently embed the complete file SVG catalog and association manifest for synchronous, offline rendering, even when displaying only one file. This fixed bundle cost should be measured with the full component rather than a selection of sample SVGs. Pages that do not use FileIcon can tree-shake out both the catalog and manifest.
+
 ### Resizable
 
 `ResizablePanelGroup`, `ResizablePanel` and `ResizableHandle` follow [shadcn Resizable](https://ui.shadcn.com/docs/components/base/resizable), backed by `react-resizable-panels` v4. Use `orientation="horizontal"` or `"vertical"`; sizes accept explicit strings such as `"20%"`, `"9rem"` and `"320px"`. Numeric sizes mean pixels. A handle is a narrow separator by default; `withHandle` adds a visible grip. The library owns pointer resizing, size constraints and separator accessibility. `groupRef` accepts the exported `ResizablePanelGroupHandle` for imperative layout operations.
