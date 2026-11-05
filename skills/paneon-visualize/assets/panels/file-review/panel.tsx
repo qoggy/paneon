@@ -347,10 +347,10 @@ function FileReviewPanel() {
       onValueChange={(nextView) =>
         setMarkdownViews((previous) => ({ ...previous, [opened]: nextView as MarkdownView }))
       }
-      className="min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-md border"
+      className="min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-md border-x border-b"
       aria-label={copy.preview}
     >
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2 text-sm font-medium">
+      <div className="flex h-[33px] shrink-0 items-center justify-between gap-4 border-y px-4 text-sm font-medium">
         <div className="min-w-0 truncate" title={value.files[opened]} data-file-review-path="">
           {state?.status === 'ready' ? (
             <AnnotationText
@@ -363,12 +363,15 @@ function FileReviewPanel() {
           )}
         </div>
         {state?.status === 'ready' && isMarkdown(state.snapshot.path) && (
-          <TabsList aria-label={copy.view} className="h-8 shrink-0">
-            <TabsTrigger value="rendered" className="px-3 text-xs">
+          <TabsList
+            aria-label={copy.view}
+            className="shrink-0 p-0.5 group-data-[orientation=horizontal]/tabs:h-7"
+          >
+            <TabsTrigger value="rendered" className="px-3 py-0.5 text-xs">
               <Eye className="size-3.5" strokeWidth={1.6} />
               {copy.rendered}
             </TabsTrigger>
-            <TabsTrigger value="source" className="px-3 text-xs">
+            <TabsTrigger value="source" className="px-3 py-0.5 text-xs">
               <CodeXml className="size-3.5" strokeWidth={1.6} />
               {copy.source}
             </TabsTrigger>
@@ -429,12 +432,18 @@ function FileReviewPanel() {
       <div
         role="toolbar"
         aria-label={copy.actions}
-        className="flex shrink-0 items-center gap-0.5 border-b px-1 py-0.5 text-muted-foreground"
+        className="flex h-[33px] shrink-0 items-center gap-0.5 border-y border-t-transparent px-1 text-muted-foreground"
       >
+        <Input
+          aria-label={copy.search}
+          placeholder={copy.search}
+          className="h-7 min-w-0 flex-1"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
         <ToolbarButton label={copy.group} pressed={grouped} onClick={() => setGrouped(!grouped)}>
           <FolderTree className="size-4" aria-hidden="true" />
         </ToolbarButton>
-        <div className="flex-1" />
         <ToolbarButton
           label={copy.expand}
           disabled={!hasBranches}
@@ -450,13 +459,6 @@ function FileReviewPanel() {
           <ChevronsDownUp className="size-4" aria-hidden="true" />
         </ToolbarButton>
       </div>
-      <Input
-        className="h-8 shrink-0 rounded-none border-0 border-b px-2 shadow-none focus-visible:ring-inset"
-        aria-label={copy.search}
-        placeholder={copy.search}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
       <div className="min-h-0 flex-1 overflow-auto">
         <Tree
           ref={tree}

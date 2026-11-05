@@ -498,7 +498,14 @@ try {
     await unlink(fixture.markdownFilePath);
     const missingReview = await fixture.runReview(fixture.markdownFilePath);
     await page.goto(fixture.url(missingReview));
-    await frame.getByRole('alert').filter({ hasText: '读取文件失败。' }).waitFor();
+    const missingState = frame.locator('main [data-slot="empty"][role="status"]');
+    await missingState.getByText('文件不存在', { exact: true }).waitFor();
+    await missingState
+      .getByText('此路径下没有文件。请检查路径是否正确，以及文件是否已被移动或删除。', {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(await frame.getByRole('alert').count(), 0);
     assert.equal(await frame.locator('[data-markdown-annotation]').count(), 0);
     assert.equal((await fixture.events(missingReview)).length, 0);
     console.log(

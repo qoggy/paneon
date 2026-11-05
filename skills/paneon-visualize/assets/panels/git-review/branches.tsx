@@ -52,7 +52,10 @@ function RefIcon({
       {mainline && !current ? (
         <path d="m8 1.5 2 4.2 4.6.6-3.3 3.2.8 4.5L8 11.8l-4.1 2.2.8-4.5L1.4 6.3l4.6-.6Z" />
       ) : tag || current ? (
-        <path d="m2 8 6-6h6v6l-6 6-6-6ZM11 5h.01" />
+        <>
+          <path d="m2 8 6-6h6v6l-6 6-6-6Z" />
+          <circle cx="11" cy="5" r="1" strokeWidth="1" fill="var(--background)" />
+        </>
       ) : (
         <>
           <circle cx="4" cy="3" r="1.5" />
@@ -181,8 +184,9 @@ export function Branches({
       aria-label={t('历史分支')}
       className="flex max-h-64 min-h-0 min-w-0 flex-col md:max-h-none"
     >
-      <div className="shrink-0 border-b p-1">
+      <div className="flex h-[33px] shrink-0 items-center px-1">
         <Input
+          className="h-7"
           aria-label={t('搜索分支或标签')}
           placeholder={t('搜索分支或标签')}
           value={filter}

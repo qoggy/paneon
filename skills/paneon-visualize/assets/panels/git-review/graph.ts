@@ -1,11 +1,17 @@
 /** Child-before-parent input is supplied by git log --date-order. */
-type Commit = { oid: string; parents: readonly string[] };
-type Lane = { oid: string; color: number };
+type Commit = {
+  oid: string;
+  parents: readonly string[];
+  graphParents?: readonly string[];
+  indirectParents?: readonly string[];
+};
+type Lane = { oid: string; color: number; dashed?: boolean };
 export type GraphStroke = {
   kind: 'incoming' | 'outgoing' | 'through';
   from: number;
   to: number;
   color: number;
+  dashed?: boolean;
 };
 export type GraphRow = {
   oid: string;
@@ -32,19 +38,22 @@ export function layoutGitGraph(commits: readonly Commit[]) {
     const strokes: GraphStroke[] = [];
     active.forEach((entry, at) => {
       if (!entry) return;
-      if (at !== lane) strokes.push({ kind: 'through', from: at, to: at, color: entry.color });
-      else if (connected) strokes.push({ kind: 'incoming', from: lane, to: lane, color });
+      const dash = entry.dashed ? { dashed: true } : {};
+      if (at !== lane)
+        strokes.push({ kind: 'through', from: at, to: at, color: entry.color, ...dash });
+      else if (connected) strokes.push({ kind: 'incoming', from: lane, to: lane, color, ...dash });
     });
     active[lane] = undefined;
-    [...new Set(commit.parents)].forEach((oid, parentIndex) => {
+    [...new Set(commit.graphParents ?? commit.parents)].forEach((oid, parentIndex) => {
+      const dash = commit.indirectParents?.includes(oid) ? { dashed: true } : {};
       let target = active.findIndex((entry) => entry?.oid === oid);
       const parentColor = active[target]?.color ?? (parentIndex === 0 ? color : colors++);
       if (target === -1) {
         target = parentIndex === 0 ? lane : active.findIndex((entry) => !entry);
         if (target === -1) target = active.length;
-        active[target] = { oid, color: parentColor };
+        active[target] = { oid, color: parentColor, ...dash };
       }
-      strokes.push({ kind: 'outgoing', from: lane, to: target, color: parentColor });
+      strokes.push({ kind: 'outgoing', from: lane, to: target, color: parentColor, ...dash });
     });
     lanes = Math.max(lanes, lane + 1, active.length);
     rows.push({ oid: commit.oid, lane, color, strokes });

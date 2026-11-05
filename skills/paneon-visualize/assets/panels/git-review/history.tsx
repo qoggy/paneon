@@ -5,8 +5,9 @@ import type { GitCommit, GitCommitDetails } from './git.ts';
 import { layoutGitGraph } from './graph.ts';
 import type { GraphRow } from './graph.ts';
 import { RevisionContextMenu } from './revision-context-menu.tsx';
+import { CommitRefDetails, CommitRefSummary } from './commit-refs.tsx';
 
-// Colors identify graph lanes only; the surrounding UI keeps its default theme.
+// Graph colors identify lanes; reference icons identify reference kinds.
 const colors = Array.from({ length: 6 }, (_, i) => `var(--git-lane-${i})`);
 const x = (lane: number) => 10 + lane * 16;
 const rowHeight = 28;
@@ -29,6 +30,7 @@ function Graph({ row, width, head }: { row: GraphRow; width: number; head: boole
             fill="none"
             stroke={colors[stroke.color % colors.length]}
             strokeWidth={1.5}
+            strokeDasharray={stroke.dashed ? '3 3' : undefined}
           />
         );
       })}
@@ -56,6 +58,8 @@ export function HistoryRows({
   onViewChanges,
   onCompare,
   scrollPosition,
+  currentBranch,
+  mainlines,
 }: {
   commits: GitCommit[];
   selected?: string;
@@ -63,6 +67,8 @@ export function HistoryRows({
   onViewChanges?: (commit: GitCommit) => void;
   onCompare?: (revision: string) => void;
   scrollPosition?: { top: number; left: number };
+  currentBranch?: string;
+  mainlines?: string[];
 }) {
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
   const graphWidth = Math.max(42, graph.lanes * 16 + 10);
@@ -168,8 +174,8 @@ export function HistoryRows({
               tabIndex={index === tabIndex ? 0 : -1}
               data-commit-id={commit.oid}
               aria-pressed={selected === commit.oid}
-              title={`${commit.oid} ${commit.subject} · ${commit.refs.map((ref) => ref.name).join(', ')} · ${commit.author} · ${commit.date}`}
-              className="grid h-7 w-full items-center gap-3 px-2 text-left text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent"
+              title={`${commit.oid} ${commit.matchedMessage ?? commit.subject} · ${commit.refs.map((ref) => ref.name).join(', ')} · ${commit.author} · ${commit.date}`}
+              className={`grid h-7 w-full items-center gap-3 px-2 text-left text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent ${commit.parents.length > 1 ? 'text-muted-foreground' : ''}`}
               style={{
                 gridTemplateColumns: `${graphWidth}px minmax(0,1fr) 7rem 7rem`,
                 minWidth: graphWidth + 520,
@@ -183,55 +189,18 @@ export function HistoryRows({
               />
               <span className="flex min-w-0 items-center gap-2" title={commit.subject}>
                 <span
-                  className={`min-w-0 truncate ${commit.parents.length > 1 ? 'text-muted-foreground' : ''}`}
+                  className={`min-w-0 flex-1 truncate ${commit.parents.length > 1 ? 'text-muted-foreground' : ''}`}
                   data-commit-subject=""
                 >
                   {commit.subject}
                 </span>
                 {!!commit.refs.length && (
-                  <span
-                    className="flex max-w-[60%] shrink-0 gap-1 overflow-hidden"
-                    title={commit.refs.map((ref) => ref.name).join(', ')}
-                  >
-                    {commit.refs.map((ref) => (
-                      <RevisionContextMenu
-                        key={`${ref.kind}:${ref.name}`}
-                        revision={
-                          ref.kind === 'head'
-                            ? 'HEAD'
-                            : `refs/${{ branch: 'heads', remote: 'remotes', tag: 'tags' }[ref.kind]}/${ref.name}`
-                        }
-                        onCompare={onCompare}
-                      >
-                        <span
-                          data-commit-ref={ref.kind}
-                          className="inline-flex h-5 min-w-0 items-center gap-1 rounded border bg-background px-1.5 text-[11px] font-normal text-muted-foreground first:shrink-0"
-                        >
-                          <svg
-                            aria-hidden="true"
-                            width="12"
-                            height="12"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                          >
-                            {ref.kind === 'tag' ? (
-                              <path d="M2 2h5l7 7-5 5-7-7V2Zm3 3h.01" />
-                            ) : (
-                              <>
-                                <path d="M4 5v6M12 5v1c0 3-8 1-8 5" />
-                                <circle cx="4" cy="3" r="2" />
-                                <circle cx="4" cy="13" r="2" />
-                                <circle cx="12" cy="3" r="2" />
-                              </>
-                            )}
-                          </svg>
-                          <span className="max-w-36 truncate">{ref.name}</span>
-                        </span>
-                      </RevisionContextMenu>
-                    ))}
-                  </span>
+                  <CommitRefSummary
+                    refs={commit.refs}
+                    currentBranch={currentBranch}
+                    mainlines={mainlines}
+                    onCompare={onCompare}
+                  />
                 )}
               </span>
               <span className="truncate text-xs text-muted-foreground" title={commit.author}>
@@ -255,7 +224,17 @@ export function HistoryRows({
   );
 }
 
-export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
+export function CommitDetails({
+  commit,
+  onCompare,
+  currentBranch,
+  mainlines,
+}: {
+  commit?: GitCommitDetails;
+  onCompare?: (revision: string) => void;
+  currentBranch?: string;
+  mainlines?: string[];
+}) {
   const { t } = useLocale();
   return (
     <section
@@ -280,6 +259,14 @@ export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
             >
               {commit.message}
             </p>
+            {!!commit.refs.length && (
+              <CommitRefDetails
+                refs={commit.refs}
+                currentBranch={currentBranch}
+                mainlines={mainlines}
+                onCompare={onCompare}
+              />
+            )}
           </>
         ) : (
           <p className="text-sm text-muted-foreground">{t('选择提交查看说明。')}</p>

@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { markMainlines } from '#test-skill/assets/panels/git-review/branch-model.ts';
-import { readGit } from '#test-skill/assets/panels/git-review/git.ts';
+import {
+  readGit,
+  readGitBranches,
+  readGitRevisions,
+} from '#test-skill/assets/panels/git-review/git.ts';
 import type { HistoryRef } from '#test-skill/assets/panels/git-review/git.ts';
 import { fixture, git } from './git-review-fixture.ts';
 const branch = (name: string): HistoryRef => ({ kind: 'branch', name, ref: `refs/heads/${name}` });
@@ -89,6 +94,94 @@ void test('real Git symbolic refs mark mainlines without changing cached history
       'Commit selection retains the existing reference catalog.',
     );
     assert.equal(await git(f.repo, 'symbolic-ref', '--short', 'HEAD'), 'main');
+  } finally {
+    await f.close();
+  }
+});
+
+void test('live remote HEAD overrides stale local records in every branch catalog without writing refs', async () => {
+  const f = await fixture();
+  try {
+    const upstream = join(f.root, 'upstream.git');
+    await git(f.root, 'clone', '--bare', f.repo, upstream);
+    await git(f.repo, 'remote', 'add', 'origin', upstream);
+    await git(f.repo, 'branch', 'dev/20260528-0402fc');
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/main', f.feature);
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/dev/20260528-0402fc', f.feature);
+    await git(
+      f.repo,
+      'symbolic-ref',
+      'refs/remotes/origin/HEAD',
+      'refs/remotes/origin/dev/20260528-0402fc',
+    );
+    const params = { repositories: [{ id: 'repo', path: f.repo }] };
+    const before = await git(f.repo, 'for-each-ref', '--format=%(refname) %(objectname) %(symref)');
+    const expected = ['refs/heads/main', 'refs/remotes/origin/main'];
+    const mainlines = (refs: HistoryRef[]) =>
+      refs
+        .filter((ref) => ref.mainline)
+        .map((ref) => ref.ref)
+        .sort();
+    assert.deepEqual(mainlines((await readGitBranches(f.repo)).refs), expected);
+    assert.deepEqual(
+      mainlines(
+        (await readGit(params, { repositoryId: 'repo', type: 'history' })).historyRefs ?? [],
+      ),
+      expected,
+    );
+    assert.deepEqual(
+      (await readGitRevisions(params, 'repo'))
+        .filter((ref) => ref.isDefault)
+        .map((ref) => ref.ref)
+        .sort(),
+      expected,
+    );
+    // A real remote may use a custom default even while main still exists.
+    await git(upstream, 'branch', 'integration/next');
+    await git(upstream, 'symbolic-ref', 'HEAD', 'refs/heads/integration/next');
+    await git(f.repo, 'branch', 'integration/next');
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/integration/next', f.feature);
+    assert.deepEqual(mainlines((await readGitBranches(f.repo)).refs), [
+      'refs/heads/integration/next',
+      'refs/remotes/origin/integration/next',
+    ]);
+    await git(f.repo, 'branch', '-D', 'integration/next');
+    await git(f.repo, 'update-ref', '-d', 'refs/remotes/origin/integration/next');
+    assert.equal(
+      await git(f.repo, 'for-each-ref', '--format=%(refname) %(objectname) %(symref)'),
+      before,
+      'Queries must not repair or rewrite local refs.',
+    );
+    assert.equal(await git(f.repo, 'symbolic-ref', '--short', 'HEAD'), 'main');
+  } finally {
+    await f.close();
+  }
+});
+
+void test('unavailable remotes keep offline branch browsing and report the query failure', async (t) => {
+  const f = await fixture();
+  try {
+    await git(f.repo, 'remote', 'add', 'origin', join(f.root, 'missing.git'));
+    await git(f.repo, 'branch', 'integration');
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/integration', f.feature);
+    await git(
+      f.repo,
+      'symbolic-ref',
+      'refs/remotes/origin/HEAD',
+      'refs/remotes/origin/integration',
+    );
+    const warnings = t.mock.method(console, 'warn', () => {});
+    const catalog = await readGitBranches(f.repo);
+    assert.deepEqual(
+      catalog.refs
+        .filter((ref) => ref.mainline)
+        .map((ref) => ref.ref)
+        .sort(),
+      ['refs/heads/integration', 'refs/remotes/origin/integration'],
+    );
+    assert.equal(warnings.mock.callCount(), 1);
+    assert.match(String(warnings.mock.calls[0].arguments[0]), /origin/);
+    assert.ok(warnings.mock.calls[0].arguments[1] instanceof Error);
   } finally {
     await f.close();
   }

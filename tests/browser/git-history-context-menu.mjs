@@ -133,15 +133,15 @@ try {
   await history();
   await compare(row(graph.merge).locator('[data-commit-subject]'), graph.merge);
   await history();
+  await row(graph.merge).click();
+  await frame.locator('[data-commit-ref-details]').waitFor();
   await compare(
-    row(graph.merge).locator('[data-commit-ref="tag"]').filter({ hasText: 'reviewed' }),
+    frame.locator('[data-commit-detail-ref="tag"][data-ref-name="reviewed"]'),
     'refs/tags/reviewed',
   );
   await history();
   await compare(
-    row(graph.merge)
-      .locator('[data-commit-ref="branch"]')
-      .filter({ hasText: /^main$/ }),
+    frame.locator('[data-commit-detail-ref="branch"][data-ref-name="main"]'),
     'refs/heads/main',
   );
   await history();

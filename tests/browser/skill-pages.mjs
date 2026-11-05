@@ -459,15 +459,19 @@ try {
   await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
   await requested;
   assert.equal(
-    await frame.getByRole('button', { name: 'Saving…', exact: true }).isDisabled(),
+    await frame.getByRole('button', { name: 'Submit all answers', exact: true }).isDisabled(),
     true,
   );
   await frame
-    .getByRole('button', { name: 'Saving…', exact: true })
+    .getByRole('button', { name: 'Submit all answers', exact: true })
     .evaluate((button) => button.click());
-  assert.equal(await frame.getByRole('status').count(), 0, 'No success before persistence.');
+  assert.equal(
+    await frame.locator('[data-slot="toast"]').count(),
+    0,
+    'No success before persistence.',
+  );
   release();
-  await frame.getByRole('status').waitFor();
+  await frame.locator('[data-slot="toast"]').getByText('Submitted.', { exact: true }).waitFor();
   assert.equal(requests, 1);
   await page.unroute(eventUrl);
   const initial = (await fixture.events(fixture.choose))[0];
@@ -522,7 +526,15 @@ try {
   assert.equal((await fixture.events(fixture.choose)).length, 1);
   await page.unroute(eventUrl);
   await frame.getByRole('button', { name: 'Submit corrected answers', exact: true }).click();
-  await frame.getByRole('status').waitFor();
+  await until(
+    async () => (await fixture.events(fixture.choose)).length === 2,
+    'Correction is saved.',
+  );
+  await frame
+    .locator('[data-slot="toast"]')
+    .getByText('Submitted.', { exact: true })
+    .last()
+    .waitFor();
   const revisions = await fixture.events(fixture.choose);
   assert.equal(revisions.length, 2);
   assert.deepEqual(revisions[1].payload, {
@@ -544,7 +556,10 @@ try {
   await secondFrame.getByRole('radio', { name: 'SQLite', exact: true }).check();
   await secondFrame.getByRole('button', { name: 'Next', exact: true }).click();
   await secondFrame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
-  await secondFrame.getByRole('status').waitFor();
+  await secondFrame
+    .locator('[data-slot="toast"]')
+    .getByText('Submitted.', { exact: true })
+    .waitFor();
   assert.equal((await fixture.events(fixture.choose)).length, 2);
   assert.deepEqual((await fixture.events(secondRound))[0].payload, {
     answers: [
@@ -559,7 +574,10 @@ try {
   await secondFrame.getByLabel('My answer', { exact: true }).fill('Custom only');
   await secondFrame.getByRole('button', { name: 'Next', exact: true }).click();
   await secondFrame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
-  await secondFrame.getByRole('status').waitFor();
+  await secondFrame
+    .locator('[data-slot="toast"]')
+    .getByText('Submitted.', { exact: true })
+    .waitFor();
   assert.deepEqual((await fixture.events(customRound))[0].payload, {
     answers: [{ questionId: 'features', selections: [{ kind: 'custom', text: 'Custom only' }] }],
   });

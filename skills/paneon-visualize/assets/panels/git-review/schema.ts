@@ -248,8 +248,19 @@ export const gitFileSchema = z
     )
       ctx.addIssue({ code: 'custom', message: 'File descriptor does not match its source.' });
   });
+export const historyFilterSchema = z.object({
+  text: z.string().optional(),
+  regex: z.boolean().optional(),
+  matchCase: z.boolean().optional(),
+  author: z.union([z.literal('me'), z.object({ name: z.string(), email: z.string() })]).optional(),
+});
 export const gitHistoryContextSchema = z
-  .object({ repositoryId: nonempty, tip: oid.optional(), branch: nonempty })
+  .object({
+    repositoryId: nonempty,
+    tip: oid.optional(),
+    branch: nonempty,
+    filter: historyFilterSchema.optional(),
+  })
   .strict();
 export const gitRequestSchema = z
   .object({
@@ -266,6 +277,7 @@ export const gitRequestSchema = z
     file: relativeFile.optional(),
     area: z.enum(['staged', 'unstaged', 'untracked']).optional(),
     historyContext: gitHistoryContextSchema.optional(),
+    historyFilter: historyFilterSchema.optional(),
     pageOnly: z.boolean().optional(),
   })
   .strict()

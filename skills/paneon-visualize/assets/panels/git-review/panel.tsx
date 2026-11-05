@@ -57,6 +57,9 @@ import { ChangedFileTree } from './file-tree.tsx';
 import { Branches } from './branches.tsx';
 import { HistoryWorkspace } from './history-workspace';
 import type { HistoryLayout } from './history-workspace';
+import { HistoryFilters } from './history-filters.tsx';
+import { hasHistoryFilter, historyFilterKey } from './history-filter.ts';
+import type { HistoryFilter } from './history-filter.ts';
 import { FileReviewSplit } from '../../shared/file-review-split';
 import type { FileReviewLayout } from '../../shared/file-review-split';
 import type {
@@ -184,7 +187,9 @@ function Review() {
       const sameGraph =
         request.type === 'history' &&
         request.historyContext &&
-        request.historyContext.tip === previous?.listing?.historyContext?.tip;
+        request.historyContext.tip === previous?.listing?.historyContext?.tip &&
+        historyFilterKey(request.historyFilter) ===
+          historyFilterKey(previous?.request.historyFilter);
       // Selection responds immediately. Old files/details must never masquerade as the requested commit.
       // Branch navigation keeps the repository's ref tree while the new graph loads.
       save({
@@ -230,14 +235,20 @@ function Review() {
       });
       if (
         listing.history &&
-        previous?.listing?.history &&
+        previous?.listing &&
         !!request.historyContext &&
         listing.historyContext?.tip === previous.listing.historyContext?.tip
       ) {
-        listing.history.commits = more
-          ? [...previous.listing.history.commits, ...listing.history.commits]
-          : previous.listing.history.commits;
-        if (!more) listing.history.hasMore = previous.listing.history.hasMore;
+        if (
+          previous.listing.history &&
+          historyFilterKey(request.historyFilter) ===
+            historyFilterKey(previous.request.historyFilter)
+        ) {
+          listing.history.commits = more
+            ? [...previous.listing.history.commits, ...listing.history.commits]
+            : previous.listing.history.commits;
+          if (!more) listing.history.hasMore = previous.listing.history.hasMore;
+        }
         listing.historyRefs = previous.listing.historyRefs;
         listing.historyDecorations = previous.listing.historyDecorations;
         listing.currentBranch = previous.listing.currentBranch;
@@ -536,6 +547,9 @@ function Review() {
   const fileLayout = useRef<FileReviewLayout | undefined>(undefined);
   const listing = view.listing,
     request = view.request;
+  const historyMainlines = listing?.historyRefs
+    ?.filter((ref) => ref.mainline)
+    .map((ref) => ref.name);
   const fileList = (
     <aside
       className="flex max-h-64 min-h-0 min-w-0 flex-col md:max-h-none"
@@ -552,7 +566,13 @@ function Review() {
           viewType={request.type}
           pending={pending}
           emptyState={
-            error ? null : !listing ? (
+            error ? null : request.type === 'history' && !listing?.history?.selectedCommit ? (
+              <Empty className="flex-none py-10">
+                <EmptyHeader>
+                  <EmptyDescription>{t('Select a commit to view changed files.')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : !listing ? (
               request.type === 'compare' ? (
                 <Empty className="flex-none py-20">
                   <EmptyHeader>
@@ -604,37 +624,67 @@ function Review() {
           historyContext: _historyContext,
           tip: _tip,
           commit: _commit,
+          parent: _parent,
           offset: _offset,
           file: _file,
           branch: _branch,
           ...next
         } = request;
-        void load({ ...next, ...(branch === 'HEAD' ? {} : { branch }) });
+        void load({
+          ...next,
+          ...(branch === 'HEAD' ? {} : { branch }),
+          pageOnly: hasHistoryFilter(next.historyFilter),
+        });
       }}
     />
   );
-  const historyScrollKey = `${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`;
+  const historyScrollKey = `${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}:${historyFilterKey(request.historyFilter)}`;
   const historyScrollPosition = historyScrollPositions.current.get(historyScrollKey) ?? {
     top: 0,
     left: 0,
   };
   historyScrollPositions.current.set(historyScrollKey, historyScrollPosition);
+  function applyHistoryFilter(filter: HistoryFilter) {
+    if (historyFilterKey(filter) === historyFilterKey(request.historyFilter) && !error) return;
+    const { commit: _commit, parent: _parent, offset: _offset, file: _file, ...next } = request;
+    void load({ ...next, offset: 0, historyFilter: filter, pageOnly: true });
+  }
   const historyCommits = (
     <section
       aria-label={t('提交历史')}
       className="flex max-h-72 min-h-0 min-w-0 flex-col md:max-h-none"
     >
-      <div className="min-h-0 overflow-auto" data-commit-scroll="">
+      <HistoryFilters
+        key={request.repositoryId}
+        repositories={repositories}
+        repositoryId={request.repositoryId}
+        tip={listing?.history?.tip ?? request.tip}
+        filter={request.historyFilter ?? {}}
+        onChange={applyHistoryFilter}
+        error={error}
+      />
+      <div className="min-h-0 overflow-auto pt-1" data-commit-scroll="">
         {listing?.history?.commits.length === 0 && (
           <Empty className="flex-none px-3 py-10">
             <EmptyHeader>
-              <EmptyDescription>{t('没有提交记录。')}</EmptyDescription>
+              <EmptyDescription>
+                {hasHistoryFilter(request.historyFilter)
+                  ? t('No matching commits.')
+                  : t('没有提交记录。')}
+              </EmptyDescription>
+              {hasHistoryFilter(request.historyFilter) && (
+                <Button variant="outline" onClick={() => applyHistoryFilter({})}>
+                  {t('Clear filters')}
+                </Button>
+              )}
             </EmptyHeader>
           </Empty>
         )}
         <HistoryRows
-          key={`${request.repositoryId}:${request.branch ?? 'HEAD'}:${listing?.history?.tip ?? ''}`}
+          key={historyScrollKey}
           commits={listing?.history?.commits ?? []}
+          currentBranch={listing?.currentBranch}
+          mainlines={historyMainlines}
           selected={request.commit ?? listing?.history?.selectedCommit?.oid}
           scrollPosition={historyScrollPosition}
           onViewChanges={viewCommitChanges}
@@ -646,6 +696,7 @@ function Review() {
               file: undefined,
               area: undefined,
               commit: commit.oid,
+              pageOnly: undefined,
             })
           }
         />
@@ -970,7 +1021,7 @@ function Review() {
                 </div>
               )}
 
-              {error && (
+              {error && request.type !== 'history' && (
                 <Alert variant="destructive">
                   <AlertTitle>{t('读取失败')}</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -1021,7 +1072,14 @@ function Review() {
                     branches={historyBranches}
                     commits={historyCommits}
                     files={fileList}
-                    details={<CommitDetails commit={listing?.history?.selectedCommit} />}
+                    details={
+                      <CommitDetails
+                        commit={listing?.history?.selectedCommit}
+                        currentBranch={listing?.currentBranch}
+                        mainlines={historyMainlines}
+                        onCompare={compareWithCurrentBranch}
+                      />
+                    }
                     diff={diffPane}
                     showDiff={historyDiff}
                     layoutRef={historyLayout}

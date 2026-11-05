@@ -7,6 +7,9 @@ import { promisify } from 'node:util';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
 import { markMainlines } from './branch-model.ts';
+import { hasHistoryFilter, historyFilterKey } from './history-filter.ts';
+import type { HistoryFilter } from './history-filter.ts';
+import { filteredHistory, historyAuthors } from './history-query.ts';
 import { gitConfigurationSchema, relativeFile, gitFileSchema, gitRequestSchema } from './schema.ts';
 import type { GitConfiguration, GitSnapshotSource, GitSourceView } from './schema.ts';
 
@@ -176,6 +179,9 @@ export type GitCommit = {
   author: string;
   date: string;
   refs: CommitDecoration[];
+  graphParents?: string[];
+  indirectParents?: string[];
+  matchedMessage?: string;
 };
 export type GitCommitDetails = GitCommit & { message: string };
 export type HistoryRef = {
@@ -190,6 +196,58 @@ export type GitHistory = {
   commits: GitCommit[];
   hasMore: boolean;
 };
+/** Query server defaults without updating the repository's possibly stale remote HEAD refs. */
+async function resolveRemoteDefaults(
+  root: string,
+  recorded: ReadonlyMap<string, string>,
+  signal?: AbortSignal,
+) {
+  const defaults = new Map(recorded);
+  const remotes = (await text(root, ['remote'], signal)).split('\n').filter(Boolean);
+  const resolved = await Promise.all(
+    remotes.map(async (remote) => {
+      try {
+        const { stdout } = await exec(
+          'git',
+          [
+            '-C',
+            root,
+            '-c',
+            'credential.interactive=false',
+            'ls-remote',
+            '--symref',
+            '--',
+            remote,
+            'HEAD',
+          ],
+          {
+            encoding: 'utf8',
+            maxBuffer: 1024 * 1024,
+            timeout: 5000,
+            signal,
+            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+          },
+        );
+        const branch = /^ref: refs\/heads\/(.+)\tHEAD$/m.exec(stdout)?.[1];
+        return { remote, branch };
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        // Keep offline browsing available, but make use of unverified local hints observable.
+        console.warn(
+          `Could not verify default branch for remote ${remote}; using local hints.`,
+          error,
+        );
+      }
+    }),
+  );
+  for (const result of resolved) {
+    if (!result) continue;
+    if (result.branch)
+      defaults.set(result.remote, `refs/remotes/${result.remote}/${result.branch}`);
+    else defaults.delete(result.remote); // A detached/empty server HEAD does not validate an old hint.
+  }
+  return defaults;
+}
 async function commitDecorations(root: string, signal?: AbortSignal) {
   const result = new Map<string, CommitDecoration[]>();
   const refs: HistoryRef[] = [];
@@ -233,7 +291,10 @@ async function commitDecorations(root: string, signal?: AbortSignal) {
     add(oid, { kind, name });
     refs.push({ kind, name, ref });
   }
-  return { decorations: result, refs: markMainlines(refs, defaults) };
+  return {
+    decorations: result,
+    refs: markMainlines(refs, await resolveRemoteDefaults(root, defaults, signal)),
+  };
 }
 
 export type GitListing = {
@@ -254,6 +315,7 @@ export type GitHistoryContext = {
   repositoryId: string;
   tip?: string;
   branch: string;
+  filter?: HistoryFilter;
 };
 function capture(
   repositoryId: string,
@@ -341,6 +403,7 @@ export type GitRequest = {
   offset?: number;
   file?: string;
   historyContext?: GitHistoryContext;
+  historyFilter?: HistoryFilter;
   area?: 'staged' | 'unstaged' | 'untracked';
   pageOnly?: boolean;
 };
@@ -495,48 +558,67 @@ export async function readGit(
       ? { decorations: new Map<string, CommitDecoration[]>(), refs: [] as HistoryRef[] }
       : await commitDecorations(root, signal);
     const { decorations, refs } = catalog;
-    historyContext = pinnedHistory ?? {
+    const sameFilter =
+      historyFilterKey(pinnedHistory?.filter) === historyFilterKey(request.historyFilter);
+    historyContext = {
       repositoryId: request.repositoryId,
-      branch: request.branch ?? 'HEAD',
+      branch: pinnedHistory?.branch ?? request.branch ?? 'HEAD',
       ...(tip ? { tip } : {}),
+      ...(request.historyFilter ? { filter: request.historyFilter } : {}),
     };
     if (!pinnedHistory) {
       historyRefs = refs;
       historyDecorations = Object.fromEntries(decorations);
     }
-    if (tip && (!pinnedHistory || (request.offset !== undefined && request.offset > 0))) {
-      const log = (
-        await git(
-          root,
-          [
-            'log',
-            '--date-order',
-            '--format=%H%x00%P%x00%s%x00%an%x00%aI%x00',
-            '--max-count=51',
-            `--skip=${offset}`,
-            tip,
-            '--',
-          ],
-          signal,
-        )
-      ).toString('utf8');
-      const fields = log.split('\0');
-      for (let i = 0; i + 4 < fields.length; i += 5)
-        commits.push({
-          oid: fields[i].trim(),
-          parents: fields[i + 1].split(' ').filter(Boolean),
-          subject: fields[i + 2],
-          author: fields[i + 3],
-          date: fields[i + 4],
-          refs: decorations.get(fields[i].trim()) ?? [],
-        });
+    if (
+      tip &&
+      (!pinnedHistory || !sameFilter || (request.offset !== undefined && request.offset > 0))
+    ) {
+      if (hasHistoryFilter(request.historyFilter)) {
+        const page = await filteredHistory(
+          (args, input) => git(root, args, signal, input),
+          tip,
+          request.historyFilter,
+          offset,
+        );
+        commits.push(...page.commits);
+        for (const commit of commits) commit.refs = decorations.get(commit.oid) ?? [];
+        history = { tip, ...page };
+      } else {
+        const log = (
+          await git(
+            root,
+            [
+              'log',
+              '--date-order',
+              '--format=%H%x00%P%x00%s%x00%an%x00%aI%x00',
+              '--max-count=51',
+              `--skip=${offset}`,
+              tip,
+              '--',
+            ],
+            signal,
+          )
+        ).toString('utf8');
+        const fields = log.split('\0');
+        for (let i = 0; i + 4 < fields.length; i += 5)
+          commits.push({
+            oid: fields[i].trim(),
+            parents: fields[i + 1].split(' ').filter(Boolean),
+            subject: fields[i + 2],
+            author: fields[i + 3],
+            date: fields[i + 4],
+            refs: decorations.get(fields[i].trim()) ?? [],
+          });
+      }
     }
-    history = {
+    history ??= {
       ...(tip ? { tip } : {}),
       commits: commits.slice(0, 50),
       hasMore: commits.length > 50,
     };
-    const selectedRef = request.commit ?? tip;
+    const selectedRef =
+      request.commit ?? (hasHistoryFilter(request.historyFilter) ? undefined : tip);
     if (selectedRef && !request.pageOnly) {
       const commit = await commitOID(root, selectedRef, signal);
       const detail = (
@@ -695,6 +777,17 @@ export async function readGit(
       : {}),
   };
 }
+export async function readGitAuthors(
+  params: GitConfiguration,
+  repositoryId: string,
+  tip?: string,
+  signal?: AbortSignal,
+) {
+  const root = await repository(params, repositoryId, signal);
+  const fixedTip = tip ? await commitOID(root, tip, signal) : await headOID(root, signal);
+  return historyAuthors((args, input) => git(root, args, signal, input), fixedTip);
+}
+
 /** Capture exactly the selected entry. Directory queries never read blobs or build diff models. */
 export async function readGitFile(
   paramsValue: GitConfiguration,
@@ -776,11 +869,12 @@ export async function readGitRevisions(
     .split('\n')
     .filter(Boolean)
     .map((line) => line.split('\0'));
-  const defaults = new Map<string, string>();
+  const recorded = new Map<string, string>();
   for (const [ref, , , symbolic] of records) {
     const remoteHead = /^refs\/remotes\/([^/]+)\/HEAD$/.exec(ref);
-    if (remoteHead && symbolic) defaults.set(remoteHead[1], symbolic);
+    if (remoteHead && symbolic) recorded.set(remoteHead[1], symbolic);
   }
+  const defaults = await resolveRemoteDefaults(root, recorded, signal);
   // Prefer origin for the corresponding local default, as in the branch sidebar.
   const preferred = defaults.get('origin') ?? defaults.values().next().value;
   const localDefault = preferred?.replace(/^refs\/remotes\/[^/]+\//, 'refs/heads/');

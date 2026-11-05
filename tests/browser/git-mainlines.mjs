@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
 import { git } from '../git-review-fixture.ts';
@@ -10,7 +11,18 @@ try {
   await git(f.repo, 'checkout', '-qb', 'feat/current');
   await git(f.repo, 'update-ref', 'refs/remotes/origin/main', f.feature);
   await git(f.repo, 'update-ref', 'refs/remotes/origin/aaa', f.feature);
-  await git(f.repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+  await git(f.repo, 'branch', 'dev/20260528-0402fc');
+  await git(f.repo, 'update-ref', 'refs/remotes/origin/dev/20260528-0402fc', f.feature);
+  await git(
+    f.repo,
+    'symbolic-ref',
+    'refs/remotes/origin/HEAD',
+    'refs/remotes/origin/dev/20260528-0402fc',
+  );
+  const upstream = join(f.root, 'upstream.git');
+  await git(f.root, 'clone', '--bare', f.repo, upstream);
+  await git(upstream, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+  await git(f.repo, 'remote', 'add', 'origin', upstream);
   const panel = await f.run({
     ...f.params,
     initialView: { repositoryPath: f.repo, type: 'history' },

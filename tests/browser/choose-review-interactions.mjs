@@ -332,7 +332,7 @@ try {
   await summary.getByText('3 / 3 answered', { exact: true }).waitFor();
   assert.equal(await summary.locator('[data-answer-incomplete="true"]').count(), 0);
   await button('Submit all answers').click();
-  await frame.getByRole('status').waitFor();
+  await frame.locator('[data-slot="toast"]').getByText('Submitted.', { exact: true }).waitFor();
   const events = await fixture.events(round);
   assert.equal(events.length, 1);
   assert.deepEqual(events[0].payload, {

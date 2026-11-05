@@ -190,7 +190,7 @@ try {
     true,
   );
 
-  // Choice and form keep their existing inline success feedback.
+  // Choice uses success toast; form keeps its existing inline success feedback.
   const page = await browser.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(standard.url(standard.choose));
@@ -201,12 +201,93 @@ try {
       .check();
     await frame.getByRole('button', { name: 'Next', exact: true }).click();
   }
-  await frame.getByRole('button', { name: 'Submit all answers', exact: true }).click();
+  const choiceEventURL = `**/api/panels/${standard.choose.instanceId}/events`;
+  const choiceToast = frame.locator('[data-slot="toast"]').filter({ hasText: 'Submitted.' });
+  async function submitChoice(name) {
+    const button = frame.getByRole('button', { name, exact: true });
+    await button.hover();
+    await button.evaluate(async (element) => {
+      await document.fonts.ready;
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const layout = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        opacity: style.opacity,
+        background: style.backgroundColor,
+        padding: style.paddingLeft,
+      };
+    };
+    const before = await button.evaluate(layout);
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    await page.route(choiceEventURL, async (route) => {
+      if (route.request().method() === 'POST') await gate;
+      await route.continue();
+    });
+    const request = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().endsWith('/events'),
+    );
+    try {
+      await button.click();
+      await request;
+      assert.equal(await button.isDisabled(), true);
+      assert.equal(await button.getAttribute('aria-busy'), 'true');
+      assert.equal(await frame.locator('[data-slot="toast"]').count(), 0);
+      // Sample throughout the disabled transition, including hover and SVG padding.
+      for (let i = 0; i < 12; i++) {
+        await button.evaluate(() => new Promise(requestAnimationFrame));
+        assert.deepEqual(await button.evaluate(layout), before, 'Loading keeps button stable');
+      }
+      await button.evaluate((element) => element.click());
+    } finally {
+      release();
+    }
+    await choiceToast.waitFor();
+    const corrected = frame.getByRole('button', { name: 'Submit corrected answers', exact: true });
+    assert.equal(await corrected.isEnabled(), true);
+    assert.deepEqual(await corrected.evaluate(layout), before, 'Receipt keeps button stable');
+    await page.unroute(choiceEventURL);
+  }
+  await submitChoice('Submit all answers');
+  assert.equal(await frame.locator('[data-slot="alert"]').count(), 0);
+  assert.equal(await frame.locator('[data-slot="toast"]').count(), 1);
+  const [choiceEvent] = await standard.events(standard.choose);
+  assert.equal(choiceEvent.type, 'answers-submitted');
+  await choiceToast.locator('[data-slot="toast-close"]').click();
+  await choiceToast.waitFor({ state: 'detached' });
+  await page.route(choiceEventURL, (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: false,
+            error: { code: 'TEST_FAILURE', message: 'Intentional choice submission failure' },
+          }),
+        })
+      : route.continue(),
+  );
+  await frame.getByRole('button', { name: 'Submit corrected answers', exact: true }).click();
   await frame
-    .getByRole('status')
-    .getByText('Submitted. Submit again if you make changes.', { exact: true })
+    .getByRole('alert')
+    .filter({ hasText: 'Intentional choice submission failure' })
     .waitFor();
   assert.equal(await frame.locator('[data-slot="toast"]').count(), 0);
+  assert.equal((await standard.events(standard.choose)).length, 1);
+  await page.unroute(choiceEventURL);
+  await submitChoice('Submit corrected answers');
+  assert.equal(await frame.locator('[data-slot="alert"]').count(), 0);
+  const choiceEvents = await standard.events(standard.choose);
+  assert.equal(choiceEvents.length, 2);
+  assert.equal(choiceEvents[1].payload.replacesEventId, choiceEvent.id);
   assert.equal(
     await frame.locator('[data-annotation-launcher]').count(),
     0,
@@ -228,7 +309,7 @@ try {
     'Unconfigured pages have no annotation entry',
   );
   await page.close();
-  console.log('PASS choose/form: inline success unchanged');
+  console.log('PASS choose: success toast, inline failure and correction; form: inline success');
 
   const git = await startGitReviewFixture();
   fixtures.push(git);

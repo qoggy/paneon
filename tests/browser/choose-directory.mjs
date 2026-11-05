@@ -168,7 +168,7 @@ try {
   await page.screenshot({ path: join(artifacts, 'directory-desktop-zh.png') });
   await chineseNav.getByRole('button', { name: '答案汇总', exact: true }).click();
   await frame.getByRole('button', { name: '提交全部答案', exact: true }).click();
-  await frame.getByRole('status').waitFor();
+  await frame.locator('[data-slot="toast"]').getByText('已提交。', { exact: true }).waitFor();
   const events = await fixture.events(fixture.choose);
   assert.equal(events.length, 1);
   assert.deepEqual(events[0].payload, {

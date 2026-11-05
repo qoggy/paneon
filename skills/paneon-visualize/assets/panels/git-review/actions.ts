@@ -1,5 +1,5 @@
 import { serverAction, z } from '@qoggy/paneon/sdk';
-import { readGit, readGitFile, readGitBranches, readGitRevisions } from './git.ts';
+import { readGit, readGitFile, readGitBranches, readGitRevisions, readGitAuthors } from './git.ts';
 import { validateGitFeedback } from './feedback.ts';
 import { checkoutGit } from './checkout.ts';
 import {
@@ -70,6 +70,15 @@ export const queryGit = serverAction({
       };
     }
   },
+});
+export const queryGitAuthors = serverAction({
+  kind: 'query',
+  input: z.object({
+    params: gitConfigurationSchema,
+    repositoryId: z.string(),
+    tip: z.string().optional(),
+  }),
+  handler: (ctx, input) => readGitAuthors(input.params, input.repositoryId, input.tip, ctx.signal),
 });
 export const queryGitFile = serverAction({
   kind: 'query',

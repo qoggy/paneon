@@ -1149,10 +1149,10 @@ export async function verifyGitLayout(f, page) {
     'Messages are plain text.',
   );
   assert.equal(await frame.locator(`[data-commit-id="${graphRepo.unrelated}"]`).count(), 0);
-  await tipRow.getByText('HEAD', { exact: true }).waitFor();
-  await tipRow.getByText('feature/history', { exact: true }).waitFor();
-  for (const name of ['main', 'origin/main', 'v0.1.0', 'reviewed'])
-    assert.equal(await mergeRow.getByText(name, { exact: true }).count(), 1);
+  await tipRow.locator('[data-commit-ref="head"]').waitFor();
+  assert.equal(await tipRow.locator('[data-commit-ref-summary]').textContent(), 'feature/history');
+  assert.equal(await mergeRow.locator('[data-commit-ref-summary]').textContent(), 'origin & main');
+  assert.equal(await mergeRow.locator('[data-commit-ref]').count(), 3);
   const graphNodes = await frame
     .locator('[data-commit-graph] circle')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('cx')));

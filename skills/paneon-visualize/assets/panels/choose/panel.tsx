@@ -152,8 +152,9 @@ function ChoosePanel() {
   const multiple = question.mode === 'multiple';
   const ChoiceGroup = multiple ? MultipleChoiceGroup : RadioGroup;
   const draft = drafts[index];
-  const submission = useSubmission<{ answers: ChoiceAnswer[] }>((value) =>
-    agent.emit('answers-submitted', completeAnswersSchema(params).parse(value)),
+  const submission = useSubmission<{ answers: ChoiceAnswer[] }>(
+    (value) => agent.emit('answers-submitted', completeAnswersSchema(params).parse(value)),
+    { successToast: 'Submitted.' },
   );
   function update(patch: Partial<Draft>) {
     setDrafts((previous) =>
@@ -618,13 +619,46 @@ function ChoosePanel() {
                 {t('Previous')}
               </Button>
               {reviewing ? (
-                <Button disabled={submission.pending} onClick={submit}>
-                  {submission.pending && <Spinner aria-hidden="true" />}
-                  {submission.pending
-                    ? t('Saving…')
-                    : submission.hasReceipt
-                      ? t('Submit corrected answers')
-                      : t('Submit all answers')}
+                <Button
+                  disabled={submission.pending}
+                  aria-busy={submission.pending || undefined}
+                  aria-label={t(
+                    submission.hasReceipt ? 'Submit corrected answers' : 'Submit all answers',
+                  )}
+                  className="relative transition-colors disabled:pointer-events-auto disabled:opacity-100"
+                  onClick={submit}
+                >
+                  <span className={submission.pending ? 'invisible grid' : 'grid'}>
+                    <span
+                      aria-hidden={submission.hasReceipt}
+                      className={
+                        submission.hasReceipt
+                          ? 'invisible col-start-1 row-start-1'
+                          : 'col-start-1 row-start-1'
+                      }
+                    >
+                      {t('Submit all answers')}
+                    </span>
+                    <span
+                      aria-hidden={!submission.hasReceipt}
+                      className={
+                        submission.hasReceipt
+                          ? 'col-start-1 row-start-1'
+                          : 'invisible col-start-1 row-start-1'
+                      }
+                    >
+                      {t('Submit corrected answers')}
+                    </span>
+                  </span>
+                  {submission.pending && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center gap-2"
+                    >
+                      <Spinner aria-hidden="true" />
+                      {t('Saving…')}
+                    </span>
+                  )}
                 </Button>
               ) : (
                 <Button onClick={next}>{t('Next')}</Button>

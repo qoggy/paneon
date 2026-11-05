@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
+import { assertFileIcons } from './file-icon-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-tree-contract-'));
 let service, browser, page, unblockRead;
@@ -198,7 +199,7 @@ try {
   assert.match(await button('analyze-session-worker.md').getAttribute('class'), /text-blue-600/);
   assert.match(await button('deleted.ts').getAttribute('class'), /text-muted-foreground/);
   assert.equal(await button('added.ts').getAttribute('title'), 'Added · prompts/added.ts');
-  assert.equal(await button('added.ts').locator('svg').count(), 1);
+  await assertFileIcons(button('added.ts'), 1);
   assert.equal(await toolbar.getByRole('button').count(), 4);
   const grouping = toolbar.getByRole('button', { name: 'Group by directory', exact: true });
   const originalLine = await frame.locator('[data-code-side="old"][data-line="1"]').elementHandle();

@@ -215,6 +215,7 @@ const en = {
   'Submit form': 'Submit form',
   提交表单: 'Submit form',
   'Annotations submitted.': 'Annotations submitted.',
+  'Submitted.': 'Submitted.',
   'Saved as event {id}. Edit and explicitly submit again to save a correction.':
     'Submitted. Submit again if you make changes.',
   '已保存为事件 {id}。修改后请再次明确提交以保存更正。':
@@ -705,5 +706,22 @@ const en = {
   'File preview is limited to 1 MiB.': 'File preview is limited to 1 MiB.',
   'Only UTF-8 text files can be previewed.': 'Only UTF-8 text files can be previewed.',
   'The file has no content.': 'The file has no content.',
+  'Text or hash': 'Text or hash',
+  'Select a commit to view changed files.': 'Select a commit to view changed files.',
+  'Clear commit search': 'Clear commit search',
+  'Regular expression': 'Regular expression',
+  'Match case': 'Match case',
+  'Git extended regular expression (ERE)': 'Git extended regular expression (ERE)',
+  'Filter by author': 'Filter by author',
+  'All authors': 'All authors',
+  'Search authors': 'Search authors',
+  'Name or email': 'Name or email',
+  'Loading authors…': 'Loading authors…',
+  Authors: 'Authors',
+  'Configure user.email to use me.': 'Configure user.email to use me.',
+  'No matching authors.': 'No matching authors.',
+  'Clear author filter': 'Clear author filter',
+  'No matching commits.': 'No matching commits.',
+  'Clear filters': 'Clear filters',
 } as const;
 export default en;
