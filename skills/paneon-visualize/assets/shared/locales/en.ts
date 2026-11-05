@@ -696,6 +696,14 @@ const en = {
     'Checkout succeeded, but the agent notification failed.',
   'Reading file…': 'Reading file…',
   'Could not read file.': 'Could not read file.',
+  'File not found': 'File not found',
+  'No file exists at this path. Check that the path is correct and the file has not been moved or deleted.':
+    'No file exists at this path. Check that the path is correct and the file has not been moved or deleted.',
+  'The referenced file could not be read.': 'The referenced file could not be read.',
+  'The reference does not point to a regular file.':
+    'The reference does not point to a regular file.',
+  'File preview is limited to 1 MiB.': 'File preview is limited to 1 MiB.',
+  'Only UTF-8 text files can be previewed.': 'Only UTF-8 text files can be previewed.',
   'The file has no content.': 'The file has no content.',
 } as const;
 export default en;

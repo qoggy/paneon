@@ -14,6 +14,7 @@ import {
 import type { FileFeedback, Snapshot } from '#test-skill/assets/panels/file-review/schema.ts';
 import {
   readManifestFile,
+  readFile,
   snapshotId,
   validateFeedback,
 } from '#test-skill/assets/panels/file-review/actions.ts';
@@ -120,6 +121,10 @@ void test('literal bounded reads preserve Unicode, BOM and line endings, with va
     assert.equal(file.text, text);
     assert.equal(file.fileIndex, 1);
     assert.equal(file.snapshotId, snapshotId(file.path, text));
+    assert.deepEqual(await readFile.handler(ctx, { files: [file.path], fileIndex: 0 }), {
+      ok: true,
+      snapshot: { ...file, fileIndex: 0 },
+    });
     await writeFile(join(root, 'empty'), '');
     assert.equal((await readManifestFile(root, ['empty'], 0)).text, '');
     await writeFile(join(root, 'limit'), Buffer.alloc(TEXT_FILE_MAX_BYTES, 97));
@@ -140,9 +145,17 @@ void test('literal bounded reads preserve Unicode, BOM and line endings, with va
       ['nul', 'FILE_NOT_TEXT'],
       ['invalid', 'FILE_NOT_TEXT'],
       ['directory', 'FILE_NOT_REGULAR'],
-    ])
+    ]) {
       await assert.rejects(readManifestFile(root, [path], 0), { code });
+      const result = await readFile.handler(ctx, { files: [join(root, path)], fileIndex: 0 });
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.code, code);
+    }
     await assert.rejects(readManifestFile(root, [name], 1), /index/);
+    await assert.rejects(
+      async () => readFile.handler(ctx, { files: [name], fileIndex: 1 }),
+      /index/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

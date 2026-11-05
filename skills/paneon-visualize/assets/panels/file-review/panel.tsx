@@ -18,6 +18,8 @@ import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   Input,
   Markdown,
   Page,
@@ -56,7 +58,7 @@ import type { FileRef, FileReviewParams, Snapshot } from './schema';
 
 type ReadState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; code?: string; message: string }
   | { status: 'ready'; snapshot: Snapshot };
 type MarkdownView = 'rendered' | 'source';
 
@@ -144,7 +146,7 @@ function Preview({
 function FileReviewPanel() {
   const value = usePanelInput<FileReviewParams>();
   const { language } = useUI();
-  const { t } = useLocale();
+  const { t, message } = useLocale();
   const annotations = useAnnotations<FileRef>();
   const toast = useToastManager();
   const copy =
@@ -207,7 +209,14 @@ function FileReviewPanel() {
     const fileIndex = opened;
     setEntries((previous) => new Map(previous).set(fileIndex, { status: 'loading' }));
     void readFile({ files: value.files, fileIndex })
-      .then((snapshot) => {
+      .then((result) => {
+        if (!result.ok) {
+          setEntries((previous) =>
+            new Map(previous).set(fileIndex, { status: 'error', ...result.error }),
+          );
+          return;
+        }
+        const { snapshot } = result;
         snapshots.current.set(snapshotKey(snapshot), snapshot);
         setEntries((previous) => new Map(previous).set(fileIndex, { status: 'ready', snapshot }));
       })
@@ -383,10 +392,24 @@ function FileReviewPanel() {
             <Spinner aria-hidden="true" />
             {t('Reading file…')}
           </p>
+        ) : state.status === 'error' && state.code === 'FILE_NOT_FOUND' ? (
+          <Empty role="status" className="min-h-full rounded-none">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <TreeIcon kind="file" />
+              </EmptyMedia>
+              <EmptyTitle>{t('File not found')}</EmptyTitle>
+              <EmptyDescription>
+                {t(
+                  'No file exists at this path. Check that the path is correct and the file has not been moved or deleted.',
+                )}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : state.status === 'error' ? (
           <Alert variant="destructive" className="m-4 w-auto">
             <AlertTitle>{t('Could not read file.')}</AlertTitle>
-            <AlertDescription>{state.message}</AlertDescription>
+            <AlertDescription>{message(state.message)}</AlertDescription>
           </Alert>
         ) : (
           <Preview

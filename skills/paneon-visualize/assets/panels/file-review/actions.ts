@@ -30,7 +30,26 @@ export const readFile = serverAction({
       fileIndex: z.number().int().nonnegative(),
     })
     .strict(),
-  handler: (_ctx, { files, fileIndex }) => readManifestFile(process.cwd(), files, fileIndex),
+  handler: async (_ctx, { files, fileIndex }) => {
+    try {
+      const snapshot = await readManifestFile(process.cwd(), files, fileIndex);
+      return { ok: true as const, snapshot };
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      // Expected read failures are panel data; ordinary thrown errors are redacted by the runtime.
+      if (error instanceof Error) {
+        switch (code) {
+          case 'FILE_NOT_FOUND':
+          case 'FILE_ACCESS_DENIED':
+          case 'FILE_NOT_REGULAR':
+          case 'FILE_TOO_LARGE':
+          case 'FILE_NOT_TEXT':
+            return { ok: false as const, error: { code, message: error.message } };
+        }
+      }
+      throw error;
+    }
+  },
 });
 
 export const resolvePaths = serverAction({

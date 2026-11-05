@@ -672,6 +672,13 @@ const zh: Record<keyof typeof en, string> = {
   'Save at least one annotation before submitting.': '请先保存至少一条批注后再提交。',
   'Reading file…': '正在读取文件…',
   'Could not read file.': '读取文件失败。',
+  'File not found': '文件不存在',
+  'No file exists at this path. Check that the path is correct and the file has not been moved or deleted.':
+    '此路径下没有文件。请检查路径是否正确，以及文件是否已被移动或删除。',
+  'The referenced file could not be read.': '无法读取此文件，请检查文件的访问权限。',
+  'The reference does not point to a regular file.': '此路径指向的不是普通文件。',
+  'File preview is limited to 1 MiB.': '文件预览大小上限为 1 MiB。',
+  'Only UTF-8 text files can be previewed.': '仅支持预览 UTF-8 文本文件。',
   'The file has no content.': '文件没有内容。',
 };
 export default zh;

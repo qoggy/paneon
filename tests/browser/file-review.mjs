@@ -345,7 +345,14 @@ try {
   await row(4).click();
   await viewport.getByText('文件没有内容。', { exact: true }).waitFor();
   await row(5).click();
-  await viewport.getByRole('alert').filter({ hasText: '读取文件失败。' }).waitFor();
+  await viewport.getByRole('status').filter({ hasText: '文件不存在' }).waitFor();
+  assert.equal(await path.textContent(), files[5]);
+  await viewport
+    .getByText('此路径下没有文件。请检查路径是否正确，以及文件是否已被移动或删除。')
+    .waitFor();
+  assert.equal(await viewport.getByRole('alert').count(), 0);
+  assert.equal(await viewport.getByText('The action failed.', { exact: true }).count(), 0);
+  await page.screenshot({ path: join(artifacts, 'file-review-missing-light.png') });
   const started = Date.now();
   await row(6).click();
   await line(2000).waitFor();
@@ -371,6 +378,15 @@ try {
   await line(1).filter({ hasText: 'ttl' }).waitFor();
   await frame.locator('html.dark').waitFor();
   await page.screenshot({ path: join(artifacts, 'file-review-code-dark.png') });
+  await row(5).click();
+  await viewport.getByRole('status').filter({ hasText: 'File not found' }).waitFor();
+  await viewport
+    .getByText(
+      'No file exists at this path. Check that the path is correct and the file has not been moved or deleted.',
+    )
+    .waitFor();
+  assert.equal(await viewport.getByRole('alert').count(), 0);
+  await page.screenshot({ path: join(artifacts, 'file-review-missing-dark.png') });
 
   const single = await run(['docs/plan.MARKDOWN'], 'Single document');
   await page.goto(url(single));
