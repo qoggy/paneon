@@ -63,7 +63,19 @@ try {
     }
   }
   const next = () => frame.getByRole('button', { name: 'Next', exact: true }).click();
-  const previous = () => frame.getByRole('button', { name: 'Previous', exact: true }).click();
+  async function previous() {
+    await frame.getByRole('button', { name: 'Previous', exact: true }).click();
+    // Previous focuses the heading on the next animation frame. Wait before
+    // fill('') focuses the textarea and sends its clearing keystroke.
+    await until(
+      () =>
+        frame
+          .getByRole('heading', { level: 1 })
+          .first()
+          .evaluate((element) => element === document.activeElement),
+      'Previous finishes moving focus before the next interaction.',
+    );
+  }
   async function screenshot(name) {
     if (!process.env.PANEON_TEST_ARTIFACTS) return;
     await mkdir(process.env.PANEON_TEST_ARTIFACTS, { recursive: true });

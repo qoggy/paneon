@@ -42,7 +42,6 @@ compatibility: Requires Node.js 24, npm logged in with publish rights to @qoggy,
 - 没有未归档的 OpenSpec change：`openspec/changes/` 下除 `archive/` 外不能有其他目录（任务全部完成但未归档的也算）。
   不满足时列出这些 change，提醒用户先归档。
 - 工作区干净。
-- 当前分支有 upstream 时，与 upstream 指向同一提交。
 - `origin/line` 存在时：本地 `line`（若有）与 `origin/line` 指向同一提交，且 `origin/line` 是 `HEAD` 的祖先（能快进）。
 - `origin/line` 不存在时：只允许版本为 `X.Y.0` 或 `X.Y.0-beta.N`（开新版本线），且本地也没有 `line`。
 - 需要更新 `main` 时，`origin/main` 是 `HEAD` 的祖先（能快进）。

@@ -1,4 +1,6 @@
 import { useLocale } from '../../shared/i18n';
+import { panelBrowserAction } from '@qoggy/paneon/sdk/client';
+import { toast } from '@qoggy/paneon/ui';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { GitCommit, GitCommitDetails } from './git.ts';
@@ -60,6 +62,8 @@ export function HistoryRows({
   scrollPosition,
   currentBranch,
   mainlines,
+  onLoadMore,
+  loading = false,
 }: {
   commits: GitCommit[];
   selected?: string;
@@ -69,7 +73,10 @@ export function HistoryRows({
   scrollPosition?: { top: number; left: number };
   currentBranch?: string;
   mainlines?: string[];
+  onLoadMore?: () => void;
+  loading?: boolean;
 }) {
+  const { t } = useLocale();
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
   const graphWidth = Math.max(42, graph.lanes * 16 + 10);
   const list = useRef<HTMLDivElement>(null);
@@ -77,6 +84,11 @@ export function HistoryRows({
   const [viewport, setViewport] = useState({ top: 0, height: 400 });
   const [defaultPosition] = useState(() => ({ top: 0, left: 0 }));
   const position = scrollPosition ?? defaultPosition;
+  const loadMore = useRef(onLoadMore);
+  const scrollDemand = useRef(false);
+  useLayoutEffect(() => {
+    loadMore.current = onLoadMore;
+  }, [onLoadMore]);
   useLayoutEffect(() => {
     const scroll = list.current?.parentElement;
     if (scroll) {
@@ -98,12 +110,26 @@ export function HistoryRows({
     };
     const observer = new ResizeObserver(update);
     observer.observe(scroll);
-    scroll.addEventListener('scroll', update, { passive: true });
+    const requestMore = () => {
+      if (loading || !scrollDemand.current) return;
+      scrollDemand.current = false;
+      if (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= scroll.clientHeight)
+        loadMore.current?.();
+    };
+    // Prefetch follows downward scrolling, never mounting, resizing, or appending rows.
+    const onScroll = () => {
+      scrollDemand.current = scroll.scrollTop > position.top;
+      update();
+      requestMore();
+    };
+    // Honor a scroll made during a foreground read, only if the viewport is still near the end.
+    requestMore();
+    scroll.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       observer.disconnect();
-      scroll.removeEventListener('scroll', update);
+      scroll.removeEventListener('scroll', onScroll);
     };
-  }, [position]);
+  }, [position, loading]);
   useLayoutEffect(() => {
     if (!focusTarget.current) return;
     const row = list.current?.querySelector<HTMLButtonElement>(
@@ -157,6 +183,14 @@ export function HistoryRows({
     }
     if (next !== current) onSelect(commit);
   }
+  async function copyRevision(revision: string) {
+    try {
+      await panelBrowserAction({ kind: 'copy-text', text: revision });
+    } catch (error) {
+      console.error('Copy revision number failed.', error);
+      toast.add({ title: t('Unable to copy revision number.'), type: 'error' });
+    }
+  }
   return (
     <div ref={list} onKeyDown={navigate} data-history-count={commits.length}>
       {start > 0 && <div aria-hidden="true" style={{ height: start * rowHeight }} />}
@@ -166,6 +200,7 @@ export function HistoryRows({
           <RevisionContextMenu
             key={commit.oid}
             revision={commit.oid}
+            onCopyRevision={() => void copyRevision(commit.oid)}
             onViewChanges={onViewChanges && (() => onViewChanges(commit))}
             onCompare={onCompare}
           >

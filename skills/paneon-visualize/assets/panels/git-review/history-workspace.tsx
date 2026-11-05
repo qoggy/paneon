@@ -177,14 +177,14 @@ function HistoryFiles({
         if (meta.isUserInteraction) layoutRef.current.fileDetails = meta.requestedLayout;
       }}
     >
-      <ResizablePanel id="file-list" defaultSize="50%" minSize="8rem" className={paneClass}>
+      <ResizablePanel id="file-list" defaultSize="50%" minSize={0} className={paneClass}>
         {files}
       </ResizablePanel>
       <ResizableHandle
         aria-label={t('调整文件列表与提交说明高度')}
         className="z-10 after:h-3 focus-visible:ring-2"
       />
-      <ResizablePanel id="commit-details" minSize="4rem" className={paneClass}>
+      <ResizablePanel id="commit-details" minSize={0} className={paneClass}>
         {details}
       </ResizablePanel>
     </ResizablePanelGroup>
@@ -245,7 +245,7 @@ export function HistoryWorkspace({
     >
       <ResizablePanel
         id="overview"
-        minSize="12.75rem"
+        minSize={0}
         defaultSize={`${(0.8 / 2.8) * 100}%`}
         className={paneClass}
       >
@@ -272,11 +272,11 @@ export function HistoryWorkspace({
           const current = (group.current.getLayout().overview / 100) * available;
           const requested =
             event.key === 'Home'
-              ? 12.75 * rem
+              ? 0
               : event.key === 'End'
                 ? available - 15 * rem
                 : current + (event.key === 'ArrowUp' ? -16 : 16);
-          const value = (clamp(requested, 12.75 * rem, available - 15 * rem) / available) * 100;
+          const value = (clamp(requested, 0, available - 15 * rem) / available) * 100;
           layoutRef.current.rows = group.current.setLayout({ overview: value, diff: 100 - value });
         }}
       />

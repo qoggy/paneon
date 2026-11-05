@@ -100,6 +100,7 @@ const browserScripts = [
   'git-review-chrome',
   'git-review-navigation',
   'git-review-loading',
+  'git-review-pagination',
   'git-review-annotation-navigation',
   'git-review-empty',
   'git-review-layout',

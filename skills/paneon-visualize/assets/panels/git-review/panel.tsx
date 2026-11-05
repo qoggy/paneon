@@ -123,6 +123,9 @@ function Review() {
   const serial = useRef(0);
   const [pending, setPending] = useState(false),
     [error, setError] = useState('');
+  const historyPagePending = useRef(false);
+  const [pagePending, setPagePending] = useState(false);
+  const [pageError, setPageError] = useState('');
   useEffect(() => {
     if (!ready || view.request.type !== 'compare') return;
     let active = true;
@@ -173,46 +176,44 @@ function Review() {
     views.current.set(keyOf(next.request), next);
     setView(next);
   }
-  async function load(request: GitRequest, more = false, openFirst = false) {
+  async function load(request: GitRequest, openFirst = false) {
     const id = ++serial.current,
       key = keyOf(request),
       location = locating.current;
     activeKey.current = key;
     setPending(true);
     setError('');
+    setPageError('');
     const previous = views.current.get(key);
-    if (!more) {
-      setOldSnapshot(undefined);
-      setCollapsed(true);
-      const sameGraph =
-        request.type === 'history' &&
-        request.historyContext &&
-        request.historyContext.tip === previous?.listing?.historyContext?.tip &&
-        historyFilterKey(request.historyFilter) ===
-          historyFilterKey(previous?.request.historyFilter);
-      // Selection responds immediately. Old files/details must never masquerade as the requested commit.
-      // Branch navigation keeps the repository's ref tree while the new graph loads.
-      save({
-        request,
-        ...(request.type === 'history' && previous?.listing
-          ? {
-              listing: {
-                ...previous.listing,
-                files: [],
-                snapshots: [],
-                description: '',
-                descriptionUI: { key: '' },
-                history:
-                  sameGraph && previous.listing.history
-                    ? { ...previous.listing.history, selectedCommit: undefined }
-                    : undefined,
-              },
-            }
-          : {}),
-      });
-    }
+    setOldSnapshot(undefined);
+    setCollapsed(true);
+    const sameGraph =
+      request.type === 'history' &&
+      request.historyContext &&
+      request.historyContext.tip === previous?.listing?.historyContext?.tip &&
+      historyFilterKey(request.historyFilter) === historyFilterKey(previous?.request.historyFilter);
+    // Selection responds immediately. Old files/details must never masquerade as the requested commit.
+    // Branch navigation keeps the repository's ref tree while the new graph loads.
+    save({
+      request,
+      ...(request.type === 'history' && previous?.listing
+        ? {
+            listing: {
+              ...previous.listing,
+              files: [],
+              snapshots: [],
+              description: '',
+              descriptionUI: { key: '' },
+              history:
+                sameGraph && previous.listing.history
+                  ? { ...previous.listing.history, selectedCommit: undefined }
+                  : undefined,
+            },
+          }
+        : {}),
+    });
     try {
-      const result = await reader.read({ ...request, ...(more ? { pageOnly: true } : {}) });
+      const result = await reader.read(request);
       if (!result.ok) throw new Error(result.message);
       if (id !== serial.current || activeKey.current !== key) return;
       const listing = result.data;
@@ -244,10 +245,8 @@ function Review() {
           historyFilterKey(request.historyFilter) ===
             historyFilterKey(previous.request.historyFilter)
         ) {
-          listing.history.commits = more
-            ? [...previous.listing.history.commits, ...listing.history.commits]
-            : previous.listing.history.commits;
-          if (!more) listing.history.hasMore = previous.listing.history.hasMore;
+          listing.history.commits = previous.listing.history.commits;
+          listing.history.hasMore = previous.listing.history.hasMore;
         }
         listing.historyRefs = previous.listing.historyRefs;
         listing.historyDecorations = previous.listing.historyDecorations;
@@ -259,19 +258,10 @@ function Review() {
           listing.history.selectedCommit.refs =
             listing.historyDecorations?.[listing.history.selectedCommit.oid] ?? [];
       }
-      if (more && previous?.listing) {
-        listing.files = previous.listing.files;
-        listing.listingId = previous.listing.listingId;
-        listing.snapshots = previous.listing.snapshots;
-        listing.description = previous.listing.description;
-        listing.descriptionUI = previous.listing.descriptionUI;
-        if (listing.history)
-          listing.history.selectedCommit = previous.listing.history?.selectedCommit;
-      }
-      const selected = more ? previous?.selected : listing.snapshots[0]?.id;
-      const selectedFile = more ? previous?.selectedFile : listing.snapshots[0]?.fileId;
+      const selected = listing.snapshots[0]?.id;
+      const selectedFile = listing.snapshots[0]?.fileId;
       // A later annotation location owns visibility while this listing finishes loading.
-      if (!more && location === locating.current) setCollapsed(!selected);
+      if (location === locating.current) setCollapsed(!selected);
       save({
         request: {
           ...request,
@@ -287,6 +277,52 @@ function Review() {
         setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
       if (id === serial.current) setPending(false);
+    }
+  }
+  async function loadHistoryPage(automatic = false) {
+    const listing = view.listing;
+    if (
+      pending ||
+      historyPagePending.current ||
+      !listing?.history?.hasMore ||
+      (automatic && pageError)
+    )
+      return;
+    const history = listing.history;
+    const id = serial.current;
+    const key = keyOf(view.request);
+    historyPagePending.current = true;
+    setPagePending(true);
+    setPageError('');
+    try {
+      const result = await reader.read({
+        ...view.request,
+        offset: history.commits.length,
+        pageOnly: true,
+      });
+      if (!result.ok) throw new Error(result.message);
+      // Navigation owns selection and details; a background page never supersedes it.
+      if (id !== serial.current || activeKey.current !== key) return;
+      const next = result.data.history as NonNullable<GitListing['history']>;
+      for (const commit of next.commits)
+        commit.refs = listing.historyDecorations?.[commit.oid] ?? [];
+      save({
+        ...view,
+        listing: {
+          ...listing,
+          history: {
+            ...history,
+            commits: [...history.commits, ...next.commits],
+            hasMore: next.hasMore,
+          },
+        },
+      });
+    } catch (failure) {
+      if (id === serial.current && activeKey.current === key)
+        setPageError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      historyPagePending.current = false;
+      setPagePending(false);
     }
   }
   function selectFile(file: GitFile) {
@@ -406,6 +442,7 @@ function Review() {
     serial.current++;
     setPending(false);
     setError('');
+    setPageError('');
     setOldSnapshot(undefined);
     setCollapsed(true);
     activeKey.current = key;
@@ -436,7 +473,6 @@ function Review() {
         mode: 'commits',
         commit: commit.oid,
       },
-      false,
       true,
     );
   }
@@ -689,6 +725,8 @@ function Review() {
           scrollPosition={historyScrollPosition}
           onViewChanges={viewCommitChanges}
           onCompare={compareWithCurrentBranch}
+          onLoadMore={() => void loadHistoryPage(true)}
+          loading={pending || pagePending}
           onSelect={(commit) =>
             void load({
               ...request,
@@ -700,17 +738,41 @@ function Review() {
             })
           }
         />
-        {listing?.history?.hasMore && (
-          <Button
-            disabled={pending}
-            variant="ghost"
-            className="w-full"
-            onClick={() =>
-              void load({ ...request, offset: listing.history?.commits.length ?? 0 }, true)
-            }
+        {!!listing?.history?.commits.length && (
+          <div
+            className="flex min-h-9 items-center justify-center gap-2 px-2 text-xs text-muted-foreground"
+            data-history-pagination=""
+            aria-busy={pagePending}
           >
-            {t('加载更多（每批 50）')}
-          </Button>
+            {listing.history.hasMore ? (
+              <>
+                {pageError && (
+                  <span role="alert" title={pageError}>
+                    {t('Could not load earlier commits.')}
+                  </span>
+                )}
+                <Button
+                  disabled={pending}
+                  aria-disabled={pagePending}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => void loadHistoryPage()}
+                >
+                  {pagePending ? (
+                    <span role="status" className="flex items-center gap-2">
+                      <Spinner className="size-3" />
+                      {t('Loading earlier commits…')}
+                    </span>
+                  ) : (
+                    t(pageError ? 'Retry' : 'Load earlier commits')
+                  )}
+                </Button>
+              </>
+            ) : (
+              <span>{t('All commits loaded')}</span>
+            )}
+          </div>
         )}
       </div>
     </section>
@@ -880,21 +942,49 @@ function Review() {
     },
     allowEmptySubmit: submission.hasReceipt,
   });
+  const listingDescription =
+    listing &&
+    message(
+      listing.descriptionUI.key,
+      Object.fromEntries(
+        Object.entries(listing.descriptionUI.params ?? {}).map(([key, value]) => [
+          key,
+          key === 'merge' ? message(value) : value,
+        ]),
+      ),
+    );
+  const listingStatus = ((request.type === 'compare' && listing) || pending) && (
+    <div
+      className={`flex h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground ${request.type === 'history' ? 'flex-1' : 'shrink-0'}`}
+    >
+      {request.type === 'compare' && (
+        <p className="min-w-0 flex-1 truncate" title={listingDescription}>
+          {listingDescription}
+        </p>
+      )}
+      {pending && (
+        <span role="status" className="flex shrink-0 items-center gap-2">
+          <Spinner aria-hidden="true" />
+          {t('读取 Git…')}
+        </span>
+      )}
+    </div>
+  );
   return (
     <>
       <Tabs
-        className="gap-3"
+        className={request.type === 'history' ? 'gap-1' : 'gap-3'}
         value={request.type}
         onValueChange={(type) => navigate(request.repositoryId, type as GitRequest['type'])}
         render={
           <Page
             inert={checkingOut || undefined}
             aria-busy={checkingOut || undefined}
-            className="mx-0 flex min-h-[34rem] max-w-none flex-col space-y-0 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4"
+            className={`mx-0 flex min-h-[34rem] max-w-none flex-col space-y-0 p-3 md:h-[100dvh] md:min-h-[36rem] md:p-4 ${request.type === 'history' ? 'md:pt-2' : ''}`}
             data-git-workbench=""
           >
             <header
-              className="flex min-h-12 flex-wrap items-center gap-4 border-b pb-3"
+              className={`flex flex-wrap items-center gap-2 border-b ${request.type === 'history' ? 'min-h-9' : 'min-h-10 pb-1'}`}
               aria-label={t('Git 与批注操作')}
             >
               <RepositoryPicker
@@ -908,7 +998,11 @@ function Review() {
                 onAdd={addRepository}
                 onRemove={removeRepository}
               />
-              <TabsList variant="line" aria-label={t('Git 审阅')}>
+              <TabsList
+                variant="line"
+                className="gap-2 group-data-[orientation=horizontal]/tabs:h-8"
+                aria-label={t('Git 审阅')}
+              >
                 {(['changes', 'history', 'compare'] as const).map((type) => (
                   <TabsTrigger key={type} value={type} disabled={!ready}>
                     {
@@ -921,7 +1015,8 @@ function Review() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <div className="ml-auto flex items-center gap-3">
+              {request.type === 'history' && listingStatus}
+              <div className="ml-auto flex items-center gap-2">
                 {(checkingOut || catalogPending) && (
                   <span
                     role="status"
@@ -936,7 +1031,7 @@ function Review() {
                     render={
                       <Button
                         variant="outline"
-                        size="icon"
+                        size="icon-sm"
                         aria-label={t('刷新')}
                         disabled={pending || catalogPending}
                         onClick={() => {
@@ -1027,45 +1122,10 @@ function Review() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              {((request.type !== 'changes' && listing) || pending) && (
-                <div className="flex h-5 min-w-0 shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                  {request.type !== 'changes' && (
-                    <p
-                      className="min-w-0 flex-1 truncate"
-                      title={
-                        listing &&
-                        message(
-                          listing.descriptionUI.key,
-                          Object.fromEntries(
-                            Object.entries(listing.descriptionUI.params ?? {}).map(
-                              ([key, value]) => [key, key === 'merge' ? message(value) : value],
-                            ),
-                          ),
-                        )
-                      }
-                    >
-                      {listing &&
-                        message(
-                          listing.descriptionUI.key,
-                          Object.fromEntries(
-                            Object.entries(listing.descriptionUI.params ?? {}).map(
-                              ([key, value]) => [key, key === 'merge' ? message(value) : value],
-                            ),
-                          ),
-                        )}
-                    </p>
-                  )}
-                  {pending && (
-                    <span role="status" className="flex shrink-0 items-center gap-2">
-                      <Spinner aria-hidden="true" />
-                      {t('读取 Git…')}
-                    </span>
-                  )}
-                </div>
-              )}
+              {request.type !== 'history' && listingStatus}
               <div
                 data-git-workspace=""
-                className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(27.75rem+1px)] md:grid-rows-1 md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-1 md:gap-x-0' : 'md:grid-cols-1'}`}
+                className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(15rem+1px)] md:grid-rows-1 md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-1 md:gap-x-0' : 'md:grid-cols-1'}`}
               >
                 {request.type === 'history' ? (
                   <HistoryWorkspace

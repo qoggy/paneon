@@ -20,7 +20,10 @@ try {
     headless: true,
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
   });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 900 },
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   const errors = [];
   const comparisons = [];
   const repositoryIds = new Map();
@@ -45,6 +48,22 @@ try {
   await row(graph.tip).waitFor();
   const before = await selected().getAttribute('data-commit-id');
   const beforeHistoryRequests = historyRequests.length;
+  assert.equal(await frame.locator('header p[title]').count(), 0);
+  await row(graph.merge).locator('[data-commit-subject]').click({ button: 'right' });
+  const copy = frame.getByRole('menuitem', { name: '复制版本号', exact: true });
+  await copy.waitFor();
+  await copy.hover();
+  await page.screenshot({ path: `${artifacts}/commit-copy-menu.png`, animations: 'disabled' });
+  await copy.click();
+  await page.waitForFunction(
+    (revision) => navigator.clipboard.readText().then((text) => text === revision),
+    graph.merge,
+  );
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), graph.merge);
+  assert.equal(await selected().getAttribute('data-commit-id'), before);
+  assert.equal(historyRequests.length, beforeHistoryRequests);
+  assert.equal(comparisons.length, 0);
+  await copy.waitFor({ state: 'hidden' });
   await button('本地分支 main').click({ button: 'right' });
   await item().waitFor();
   assert.equal(await button('本地分支 main').getAttribute('aria-pressed'), 'true');
@@ -157,6 +176,35 @@ try {
   await button('M a.ts').dblclick();
   await frame.locator('[data-diff-source]').waitFor();
   assert.match((await frame.locator('[data-code-side="new"]').allTextContents()).join(''), /n = 2/);
+  await history();
+  await row(fixture.feature).waitFor();
+  const selectedBeforeCopy = await selected().getAttribute('data-commit-id');
+  await fixture.service.app.inject({
+    method: 'POST',
+    url: '/api/preferences',
+    headers: {
+      host: `127.0.0.1:${fixture.service.descriptor.port}`,
+      authorization: `Bearer ${fixture.service.descriptor.controlToken}`,
+    },
+    payload: { ui: { language: 'en', theme: 'dark' } },
+  });
+  await frame.locator('html.dark[data-language="en"]:not([data-theme-changing])').waitFor();
+  await row(fixture.rootCommit).locator('[data-commit-subject]').click({ button: 'right' });
+  const englishCopy = frame.getByRole('menuitem', { name: 'Copy Revision Number', exact: true });
+  await englishCopy.waitFor();
+  await englishCopy.hover();
+  await page.screenshot({
+    path: `${artifacts}/commit-copy-menu-en-dark.png`,
+    animations: 'disabled',
+  });
+  await englishCopy.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (revision) => navigator.clipboard.readText().then((text) => text === revision),
+    fixture.rootCommit,
+  );
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), fixture.rootCommit);
+  assert.equal(await selected().getAttribute('data-commit-id'), selectedBeforeCopy);
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

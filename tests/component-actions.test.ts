@@ -142,6 +142,9 @@ export function Probe(){return {label:${JSON.stringify(label)},read:()=>read({})
     configFile: false,
     root,
     logLevel: 'silent',
+    // This test exercises component transforms, not dependency pre-bundling.
+    // Vite can return from close() before its optimizer finishes writing files.
+    optimizeDeps: { noDiscovery: true },
     resolve: {
       alias: {
         '@qoggy/paneon/sdk/client': fileURLToPath(

@@ -119,7 +119,7 @@ try {
   await button('HEAD（当前分支）').dblclick();
   await frame.locator(`[data-commit-id=${JSON.stringify(many)}][aria-pressed=true]`).waitFor();
   await page.screenshot({ path: join(artifacts, 'branches.png'), fullPage: true });
-  // A one-file commit still reserves a small reading area above the message.
+  // The default split keeps a one-file commit readable at both viewport heights.
   const single = await f.run({
     ...params,
     initialView: {
@@ -137,8 +137,9 @@ try {
     assert.ok(panelFrame);
     await panelFrame.waitForFunction(
       (element) => {
-        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-        return element.getBoundingClientRect().height >= 8 * rem - 1;
+        const row = element.querySelector('[data-file-id]').getBoundingClientRect();
+        const scroll = element.querySelector('[data-file-scroll]').getBoundingClientRect();
+        return row.top >= scroll.top && row.bottom <= scroll.bottom + 1;
       },
       await files.elementHandle(),
       { timeout: 10000 },
@@ -163,13 +164,12 @@ try {
         row: rect(row),
         toolbar: rect(toolbar),
         scroll: rect(scroll),
-        rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
       };
     });
     console.log(JSON.stringify({ height, geometry }));
     assert.ok(
-      geometry.list.height >= 8 * geometry.rem - 1,
-      'The file list retains an 8rem minimum height',
+      geometry.list.height >= geometry.toolbar.height + geometry.row.height - 1,
+      'The default file list has room for its toolbar and a complete file row',
     );
     assert.ok(
       geometry.row.top >= geometry.scroll.top && geometry.row.bottom <= geometry.scroll.bottom + 1,
@@ -178,6 +178,10 @@ try {
     assert.ok(
       geometry.details && geometry.details.height > 0,
       'Commit details retain visible space',
+    );
+    assert.ok(
+      Math.abs(geometry.list.height - geometry.details.height) < 2,
+      'The file list and commit details initially share the available height',
     );
     assert.ok(
       geometry.details.top >= geometry.list.bottom - 1,

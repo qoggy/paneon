@@ -54,6 +54,7 @@ try {
     await row(commit).locator('[data-commit-subject]').click({ button: 'right' });
     await action().waitFor();
     assert.deepEqual(await frame.getByRole('menuitem').allTextContents(), [
+      '复制版本号',
       '查看改动',
       '与当前分支比较',
     ]);

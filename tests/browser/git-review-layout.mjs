@@ -317,7 +317,7 @@ export async function verifyHistorySplit(frame, page, content, until) {
   const initial = await sizes();
   const initialTop = initial.upper;
   const available = initial.upper + initial.diff;
-  const expectedTop = Math.min(available - 240, Math.max(204, (available * 0.8) / 2.8));
+  const expectedTop = Math.min(available - 240, Math.max(0, (available * 0.8) / 2.8));
   assert.ok(
     Math.abs(initialTop - expectedTop) < 1,
     'Initial split retains the original 0.8fr:2fr ratio within pane limits.',
@@ -352,15 +352,20 @@ export async function verifyHistorySplit(frame, page, content, until) {
     await page.mouse.move(point.x, edge, { steps: 8 });
     await page.mouse.up();
     const bounded = await sizes();
-    const limit = direction < 0 ? 204 : available - 240;
+    const limit = direction < 0 ? 0 : available - 240;
     assert.ok(
       Math.abs(bounded.upper - limit) <= 1,
       `History split boundary: ${JSON.stringify({ direction, available, bounded, limit })}`,
     );
     assert.ok(
-      bounded.upper >= 200 && bounded.diff >= 239,
-      'Both panes retain usable minimum heights.',
+      bounded.upper >= 0 && bounded.diff >= 239,
+      'Both panes stop at their configured minimum heights.',
     );
+    if (direction < 0)
+      assert.ok(
+        (await divider.boundingBox()).y <= 75,
+        'The collapsed divider stays within 75px of the page top, including the header.',
+      );
     assert.ok(await history.evaluate((el) => el.scrollHeight > el.clientHeight));
   }
   await divider.focus();
@@ -436,7 +441,7 @@ export async function verifyHistorySplit(frame, page, content, until) {
   await page.setViewportSize({ width: 1440, height: 700 });
   await divider.waitFor({ state: 'visible' });
   await until(async () => (await sizes()).diff >= 239, 'Resize did not re-constrain pane heights.');
-  assert.ok((await sizes()).upper >= 200);
+  assert.ok((await sizes()).upper >= 0);
   assert.ok(
     Number(await divider.getAttribute('aria-valuenow')) <=
       Number(await divider.getAttribute('aria-valuemax')),
@@ -445,7 +450,7 @@ export async function verifyHistorySplit(frame, page, content, until) {
   for (const height of [600, 576]) {
     await page.setViewportSize({ width: 1440, height });
     await until(
-      async () => (await sizes()).upper >= 203 && (await sizes()).diff >= 239,
+      async () => (await sizes()).upper >= 0 && (await sizes()).diff >= 239,
       'Short viewport shrank panes below actual child minima.',
     );
     const bounds = await content.evaluate(() => {
@@ -702,11 +707,6 @@ export async function verifyGitLayout(f, page) {
     max: el.scrollHeight - el.clientHeight,
   }));
   assert.ok(commitBefore.max > 0);
-  await commitScroll.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-  assert.ok(await commitScroll.evaluate((el) => el.scrollTop > 0));
-  const more = button('加载更多（每批 50）');
   const paging = [];
   const trackPaging = (request) => {
     if (
@@ -716,81 +716,16 @@ export async function verifyGitLayout(f, page) {
       paging.push(request.postDataJSON().input.request);
   };
   page.on('request', trackPaging);
-  await page.evaluate(() => {
-    window.__pagingHostEvents = [];
-    for (const type of ['pointerdown', 'pointerup', 'click'])
-      document.addEventListener(
-        type,
-        (event) =>
-          window.__pagingHostEvents.push({
-            type,
-            x: event.clientX,
-            y: event.clientY,
-            target: event.target?.tagName,
-          }),
-        { capture: true },
-      );
+  await commitScroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
   });
-  await more.evaluate((el) =>
-    el.addEventListener(
-      'click',
-      () => {
-        el.dataset.clicked = 'yes';
-      },
-      { once: true },
-    ),
+  await until(
+    async () => (await frame.locator('[data-commit-id]').count()) === 55,
+    'Scrolling near the end did not extend history.',
   );
-  await more.evaluate((el) => {
-    window.__pagingPointerEvents = [];
-    for (const type of ['pointerdown', 'pointerup', 'click'])
-      document.addEventListener(
-        type,
-        (event) => {
-          const rect = el.getBoundingClientRect();
-          window.__pagingPointerEvents.push({
-            type,
-            target: event.target?.textContent?.slice(0, 60),
-            x: event.clientX,
-            y: event.clientY,
-            top: rect.top,
-            bottom: rect.bottom,
-            disabled: el.disabled,
-          });
-        },
-        { capture: true },
-      );
-  });
-  await more.click();
-  try {
-    await until(
-      async () => (await frame.locator('[data-commit-id]').count()) === 55,
-      'history did not extend',
-    );
-  } catch (error) {
-    console.error('Paging diagnostic', {
-      paging,
-      hostEvents: await page.evaluate(() => window.__pagingHostEvents),
-      hostHit: await page.evaluate(() => {
-        const iframe = document.querySelector('iframe');
-        const rect = iframe?.getBoundingClientRect();
-        return { iframe: rect?.toJSON(), viewport: { width: innerWidth, height: innerHeight } };
-      }),
-      pointerEvents: await layoutFrame.evaluate(() => window.__pagingPointerEvents),
-      count: await frame.locator('[data-history-count]').getAttribute('data-history-count'),
-      clicked: (await more.count()) ? await more.getAttribute('data-clicked') : 'removed',
-      box: (await more.count()) ? await more.boundingBox() : null,
-      active: await frame
-        .locator('[data-separator="active"]')
-        .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label'))),
-      alerts: await frame.getByRole('alert').allTextContents(),
-    });
-    await page.screenshot({
-      path: '/private/tmp/paneon-history-resizable-evidence/full-failure.png',
-    });
-    throw error;
-  } finally {
-    page.off('request', trackPaging);
-  }
+  page.off('request', trackPaging);
+  assert.equal(paging.length, 1, 'Scrolling requests exactly one next page.');
+  await frame.getByText('已显示全部提交', { exact: true }).waitFor();
   assert.equal(await frame.locator('[data-commit-graph]').count(), 55);
   assert.equal(
     await frame.locator('[data-commit-graph]').first().innerHTML(),
@@ -1119,8 +1054,9 @@ export async function verifyGitLayout(f, page) {
     'Native separator keyboard controls resize the panes.',
   );
   await fileDetailsDivider.press('End');
+  assert.ok((await graphFrameForGeometry()).details.height < 2);
+  await fileDetailsDivider.press('ArrowUp');
   const smallDetails = await graphFrameForGeometry();
-  assert.ok(Math.abs(smallDetails.details.height - 64) < 2);
   const detailsScroll = frame.locator('[data-commit-details]');
   await detailsScroll.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
@@ -1290,7 +1226,8 @@ export async function verifyGitLayout(f, page) {
   await page.goto(f.url(longPanel));
   await frame.locator('[data-history-count="50"]').waitFor();
   for (const size of [100, 150, 200, 250]) {
-    await button('加载更多（每批 50）').click();
+    await button('加载更早的提交').evaluate((el) => el.focus({ preventScroll: true }));
+    await page.keyboard.press('Enter');
     await frame.locator(`[data-history-count="${size}"]`).waitFor();
   }
   const longScroll = frame.locator('[data-commit-scroll]');

@@ -145,7 +145,7 @@ export function HistoryFilters({
             ))}
           </div>
         </div>
-        <div className="flex max-w-[40%] min-w-0 items-center">
+        <div className="relative flex max-w-[40%] min-w-0 items-center">
           <Popover
             open={open}
             onOpenChange={(next) => {
@@ -158,11 +158,19 @@ export function HistoryFilters({
                 <Button
                   variant="ghost"
                   aria-label={t('Filter by author')}
-                  className="h-7 min-w-0 shrink justify-start px-2 font-normal"
+                  className={`h-7 min-w-0 shrink justify-start px-2 font-normal ${filter.author ? 'pr-7' : ''}`}
                   title={`User: ${authorLabel}`}
                 >
-                  <span className="truncate">User{filter.author ? `: ${authorLabel}` : ''}</span>
-                  <ChevronDown />
+                  <span className="truncate">
+                    {filter.author ? (
+                      <>
+                        <span className="text-muted-foreground">User:</span> {authorLabel}
+                      </>
+                    ) : (
+                      'User'
+                    )}
+                  </span>
+                  {!filter.author && <ChevronDown />}
                 </Button>
               }
             />
@@ -248,9 +256,10 @@ export function HistoryFilters({
               variant="ghost"
               size="icon-xs"
               aria-label={t('Clear author filter')}
+              className="absolute right-0 h-7 text-muted-foreground hover:text-foreground"
               onClick={() => onChange({ ...filter, author: undefined })}
             >
-              <X />
+              <X className="size-4" />
             </Button>
           )}
         </div>

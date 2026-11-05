@@ -150,6 +150,7 @@ export function RepositoryPicker({
           render={
             <Button
               variant="secondary"
+              size="sm"
               disabled={selectionDisabled}
               aria-label={t('仓库')}
               aria-description={current && `${repositoryLabel(current)} · ${current.path}`}
