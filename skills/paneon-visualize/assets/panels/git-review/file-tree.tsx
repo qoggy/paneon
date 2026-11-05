@@ -1,4 +1,5 @@
 import { useLocale } from '../../shared/i18n';
+import { testFilePresentation } from '../../shared/test-file-presentation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileDiff, FolderTree, ChevronsUpDown, ChevronsDownUp, TreeIcon } from './file-icons.tsx';
@@ -219,15 +220,18 @@ export function ChangedFileTree({
         }
         getItemPresentation={(node, state) => {
           const depth = state.level - 1 + (area ? 1 : 0);
-          if (node.kind === 'file')
+          if (node.kind === 'file') {
+            const presentation = testFilePresentation(snapshotPath(node.snapshot), state.selected);
             return {
+              ...presentation,
               'data-file-id': node.snapshot.id,
               'data-file-status': node.snapshot.status,
               title: snapshotTitle(node.snapshot, message),
               'aria-description': snapshotTitle(node.snapshot, message),
-              className: `h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(node.snapshot.status)}`,
+              className: `h-7 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-xs ${statusClass(node.snapshot.status)} ${presentation.className}`,
               style: { paddingLeft: 8 + depth * 12 },
             };
+          }
           return {
             'data-file-directory': node.path,
             title: t('{path} · {count} files', {

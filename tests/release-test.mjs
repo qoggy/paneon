@@ -64,6 +64,7 @@ const browserScripts = [
   'promoted-ui',
   'ui',
   'file-icons',
+  'test-file-highlights',
   'imported-tailwind',
   'preferences',
   'preferences-transition',

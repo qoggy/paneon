@@ -20,8 +20,10 @@ let service, browser;
 const unusedColor = randomBytes(3).toString('hex');
 const serverColor = randomBytes(3).toString('hex');
 const serverClass = `bg-[#${serverColor}]`;
+const lightColor = randomBytes(3).toString('hex');
+const darkColor = randomBytes(3).toString('hex');
 const legacy = (width) =>
-  `export function LegacyRows(){return <table data-legacy className="border-[${width}px]"><tbody><tr><td className="bg-green-50">added</td><td className="bg-red-50">removed</td></tr></tbody></table>}`;
+  `export function LegacyRows(){return <table data-legacy className="border-[${width}px]"><tbody><tr><td className="bg-green-50">added</td><td className="bg-red-50">removed</td><td data-theme-probe className="bg-[#${lightColor}] dark:bg-[#${darkColor}]">theme</td></tr></tbody></table>}`;
 async function until(check, description) {
   const end = Date.now() + 60000;
   while (Date.now() < end) {
@@ -95,6 +97,14 @@ export default definePanel({id:'imported-tailwind',requires:{paneon:'${PACKAGE_V
       theme,
     );
     await frame.locator(`html[data-theme="${theme}"]`).waitFor();
+    const expectedColor = theme === 'dark' ? darkColor : lightColor;
+    assert.equal(
+      await frame
+        .locator('[data-theme-probe]')
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+      `rgb(${[0, 2, 4].map((index) => parseInt(expectedColor.slice(index, index + 2), 16)).join(', ')})`,
+      'Imported dark utilities must follow the panel theme rather than the system theme.',
+    );
     for (const mode of ['split', 'unified']) {
       if (mode === 'unified')
         await frame.getByRole('button', { name: 'Unified', exact: true }).click();

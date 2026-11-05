@@ -42,6 +42,7 @@ import type { TreeHandle } from '@qoggy/paneon/ui';
 import { CodeXml, Eye } from '../../shared/icons';
 import { ChevronsDownUp, ChevronsUpDown, FolderTree, TreeIcon } from '../diff-review/icons';
 import { FileReviewSplit } from '../../shared/file-review-split';
+import { testFilePresentation } from '../../shared/test-file-presentation';
 import { useSubmission } from '../../shared/submission';
 import { useLocale } from '../../shared/i18n';
 import { readFile, resolvePaths, validateFeedback } from './actions';
@@ -476,13 +477,17 @@ function FileReviewPanel() {
           isItemMatchingSearch={(node, term) =>
             node.fileIndex !== undefined && matches(node.fileIndex, term)
           }
-          getItemPresentation={(node) => ({
-            className: 'gap-1.5',
-            title:
-              node.fileIndex === undefined
-                ? `${node.name} · ${count(node)}`
-                : value.files[node.fileIndex],
-          })}
+          getItemPresentation={(node, state) => {
+            if (node.fileIndex === undefined)
+              return { className: 'gap-1.5', title: `${node.name} · ${count(node)}` };
+            const path = value.files[node.fileIndex];
+            const presentation = testFilePresentation(path, state.selected);
+            return {
+              ...presentation,
+              className: `gap-1.5 ${presentation.className}`,
+              title: path,
+            };
+          }}
           renderItemContent={(node, state) => (
             <>
               {node.fileIndex === undefined ? (

@@ -15,6 +15,7 @@ import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
 import type { DiffViewHandle } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import { FileReviewSplit } from '../../shared/file-review-split';
+import { testFilePresentation } from '../../shared/test-file-presentation';
 import {
   comparisonSchema,
   diffReviewParamsSchema,
@@ -491,13 +492,18 @@ function DiffReviewPanel() {
                 getItemId={(node) => node.key}
                 getItemLabel={(node) => node.name}
                 getItemChildren={(node) => node.nodes}
-                getItemPresentation={(node) => {
+                getItemPresentation={(node, state) => {
                   if (!node.comparison)
                     return {
                       className: 'gap-1.5',
                       title: `${node.name} · ${visibleFileCount(node, search)}`,
                     };
                   const { status, error } = comparisonStates[node.key];
+                  const { displayPath, oldPath, newPath } = node.comparison;
+                  const presentation = testFilePresentation(
+                    displayPath ?? oldPath ?? newPath ?? '',
+                    state.selected,
+                  );
                   const description = [
                     copy.statuses[status],
                     comparisonPath(node.comparison),
@@ -506,7 +512,8 @@ function DiffReviewPanel() {
                     .filter(Boolean)
                     .join(' · ');
                   return {
-                    className: `gap-1.5 ${comparisonStatusClass(status)}`,
+                    ...presentation,
+                    className: `gap-1.5 ${comparisonStatusClass(status)} ${presentation.className}`,
                     title: description,
                     'aria-description': description,
                     'data-comparison-status': status,

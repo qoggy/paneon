@@ -43,10 +43,11 @@ function Graph({ row, width, head }: { row: GraphRow; width: number; head: boole
     </svg>
   );
 }
-function shortDate(value: string, language: string) {
-  return new Intl.DateTimeFormat(language, { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(value),
-  );
+function shortDate(value: string) {
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  const year = String(date.getFullYear()).padStart(4, '0');
+  return `${year}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 export function HistoryRows({
   commits,
@@ -63,7 +64,6 @@ export function HistoryRows({
   onCompare?: (revision: string) => void;
   scrollPosition?: { top: number; left: number };
 }) {
-  const { language } = useLocale();
   const graph = useMemo(() => layoutGitGraph(commits), [commits]);
   const graphWidth = Math.max(42, graph.lanes * 16 + 10);
   const list = useRef<HTMLDivElement>(null);
@@ -242,7 +242,7 @@ export function HistoryRows({
                 dateTime={commit.date}
                 title={commit.date}
               >
-                {shortDate(commit.date, language)}
+                {shortDate(commit.date)}
               </time>
             </button>
           </RevisionContextMenu>
@@ -256,7 +256,7 @@ export function HistoryRows({
 }
 
 export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
-  const { t, language } = useLocale();
+  const { t } = useLocale();
   return (
     <section
       aria-label={t('提交说明')}
@@ -271,7 +271,7 @@ export function CommitDetails({ commit }: { commit?: GitCommitDetails }) {
               </span>{' '}
               · {commit.author} ·{' '}
               <time dateTime={commit.date} title={commit.date}>
-                {shortDate(commit.date, language)}
+                {shortDate(commit.date)}
               </time>
             </p>
             <p

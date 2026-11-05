@@ -303,7 +303,7 @@ async function compileSnapshot(
     writeFileSync(authorSource, [...client.sources.values()].join('\n'));
     writeFileSync(
       authorCss,
-      `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))} source(none);\n@source ${JSON.stringify(authorSource)};`,
+      `@import ${JSON.stringify(require.resolve('tailwindcss/index.css'))} source(none);\n@source ${JSON.stringify(authorSource)};\n@custom-variant dark (&:is(.dark *));`,
     );
     const theme = join(PACKAGE_ROOT, 'dist/ui/theme.css');
     writeFileSync(
