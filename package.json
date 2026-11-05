@@ -1,6 +1,6 @@
 {
   "name": "@qoggy/paneon",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Let agents build interactive local pages and bring your feedback back.",
   "license": "MIT",

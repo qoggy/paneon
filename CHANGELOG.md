@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+### Added
+
+- Filter Git history by commit message or hash prefix and by author, including your configured Git identity. Text search supports case-sensitive matching and regular expressions, and the filtered graph shows connections through hidden commits.
+- Copy a commit's full revision number from its Git history context menu.
+- Use the new `FileIcon` component from `@qoggy/paneon/ui` for file-type icons that follow the light or dark theme and work offline. File review, diff review and Git review now use these icons in their file trees.
+- Highlight files with common test filename conventions in file review, diff review and Git review trees.
+
 ### Changed
 
 - **Breaking:** Replace `paneon panel check-annotations` with `paneon panel check <entry.tsx>`. It also reports native `<select>`, `<textarea>` and text-like `<input>` elements that `@qoggy/paneon/ui` components replace, and exits with 1 when it finds any. Annotation coverage is checked only when the rendered page calls `usePageAnnotations`; a page without it is no longer reported as missing annotations. The annotation findings move under `annotations`, together with a `status` of `enabled`, `disabled` or `undetermined`.
+- Load earlier Git commits as you scroll toward the end of history, preserving the selected commit and scroll position. A manual load control remains available.
+- Group Git commit references by local branch, remote branch, tag and HEAD, with compact summaries in history and full reference lists in commit details. History and detail dates now consistently use `YYYY/MM/DD HH:mm` in local time.
+- Compact review toolbars and allow the Git history overview, file list and commit details to be fully collapsed with their resize handles.
+- Show a success notification after submitting choice answers and keep the submit button's width stable while saving or submitting corrections.
+
+### Fixed
+
+- Show a localized "File not found" state when a file review path no longer exists, while retaining error details for other read failures.
+- Verify remote default branches when identifying Git mainlines, avoiding incorrect markers caused by stale local remote HEAD references.
 
 ## [0.3.0] - 2026-11-05
 
@@ -106,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.3.0...0.3.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.4.0...0.4.x
+[0.4.0]: https://github.com/qoggy/paneon/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/qoggy/paneon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/qoggy/paneon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/qoggy/paneon/compare/v0.0.1...v0.1.0

@@ -548,7 +548,7 @@ function FileReviewPanel() {
 
 export default definePanel({
   id: 'file-review',
-  requires: { paneon: '>=0.3.0 <0.4.0' },
+  requires: { paneon: '>=0.4.0 <0.5.0' },
   input: fileReviewParamsSchema,
   events: { 'file-review-submitted': fileReviewSubmittedSchema },
   render: FileReviewPanel,

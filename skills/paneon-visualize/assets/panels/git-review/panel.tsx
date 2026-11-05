@@ -1169,7 +1169,7 @@ function Review() {
 }
 export default definePanel({
   id: 'git-review',
-  requires: { paneon: '>=0.3.0 <0.4.0' },
+  requires: { paneon: '>=0.4.0 <0.5.0' },
   input: gitReviewParamsSchema,
   events: {
     'git-review-submitted': gitReviewSubmittedSchema,

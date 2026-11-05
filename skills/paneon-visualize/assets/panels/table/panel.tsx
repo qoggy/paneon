@@ -461,7 +461,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table',
-  requires: { paneon: '>=0.3.0 <0.4.0' },
+  requires: { paneon: '>=0.4.0 <0.5.0' },
   input: tableParamsSchema,
   events: { 'table-submitted': tableSubmittedSchema },
   render: TablePanel,
