@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Replace `paneon panel check-annotations` with `paneon panel check <entry.tsx>`. It also reports native `<select>`, `<textarea>` and text-like `<input>` elements that `@qoggy/paneon/ui` components replace, and exits with 1 when it finds any. Annotation coverage is checked only when the rendered page calls `usePageAnnotations`; a page without it is no longer reported as missing annotations. The annotation findings move under `annotations`, together with a `status` of `enabled`, `disabled` or `undetermined`.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

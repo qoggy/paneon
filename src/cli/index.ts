@@ -251,21 +251,29 @@ execute(ack, async () => {
     },
   });
 });
-const checkAnnotationsCommand = panel
-  .command('check-annotations <entry.tsx>')
-  .description('Statically check original-source and precise-text annotation coverage');
-execute(checkAnnotationsCommand, async () => {
-  const entryPath = resolve(checkAnnotationsCommand.args[0]);
+const checkCommand = panel
+  .command('check <entry.tsx>')
+  .description(
+    'Statically check a custom page: native controls with Paneon equivalents, and annotation coverage when the page enables annotations',
+  )
+  .addHelpText(
+    'after',
+    '\nExits with 1 when native controls are found; the result is still printed. Annotation findings are advisory and do not change the exit code.',
+  );
+execute(checkCommand, async () => {
+  const entryPath = resolve(checkCommand.args[0]);
   try {
     if (!statSync(entryPath).isFile()) invalid('The entry must be a file.');
   } catch {
     invalid('The entry must exist and be accessible.');
   }
   const path = import.meta.url.endsWith('.ts')
-    ? new URL('../../dist/cli/annotation-check.js', import.meta.url).href
-    : './annotation-check.js';
-  const { checkAnnotations } = (await import(path)) as typeof import('./annotation-check.js');
-  return checkAnnotations(entryPath);
+    ? new URL('../../dist/cli/panel-check.js', import.meta.url).href
+    : './panel-check.js';
+  const { checkPanel } = (await import(path)) as typeof import('./panel-check.js');
+  const result = checkPanel(entryPath);
+  if (result.nativeControls.length) process.exitCode = 1;
+  return result;
 });
 const config = program.command('config').description('Read and update user interface preferences');
 const configGet = config.command('get').description('Read effective UI preferences');

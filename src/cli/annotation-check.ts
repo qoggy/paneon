@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { findingAt, type Finding } from './check-finding.js';
 
 /** Static, best-effort check of original-source and precise-text annotation coverage. */
 
@@ -9,13 +9,16 @@ type Env = Map<ts.Symbol | undefined, unknown>;
 type Fn = ts.FunctionLikeDeclaration & { body: ts.Node };
 type Children = { childrenNodes: readonly ts.Node[]; env: Env };
 type Group = 'missing' | 'text' | 'unchecked';
-export type AnnotationFinding = { location: string; message: string; excerpt: string };
+/**
+ * `enabled`: the rendered page calls usePageAnnotations. `disabled`: it certainly does not.
+ * `undetermined`: it does not as far as the check can see, but an opaque component might.
+ */
+export type AnnotationStatus = 'enabled' | 'disabled' | 'undetermined';
 export type AnnotationCheck = {
-  summary: string;
-  next: string;
-  missingTargets: AnnotationFinding[];
-  unannotatedText: AnnotationFinding[];
-  unchecked: AnnotationFinding[];
+  status: AnnotationStatus;
+  missingTargets: Finding[];
+  unannotatedText: Finding[];
+  unchecked: Finding[];
 };
 
 // Interactive controls and interface chrome never carry plan content.
@@ -85,41 +88,104 @@ const keyName = (name: ts.PropertyName | ts.BindingName) =>
     : UNKNOWN;
 const moduleName = (node: ts.Node) =>
   ts.isStringLiteral(node) ? node.text : node.getText().replace(/^['"]|['"]$/g, '');
+const uiModule = (name: string) =>
+  name === '@qoggy/paneon/ui' || name.startsWith('@qoggy/paneon/ui/');
+const hookName = (name: string) => /^use[A-Z0-9]/.test(name);
+/** A package outside the page whose hooks this check cannot read, unlike React's and Paneon's. */
+const foreignPackage = (name: string) =>
+  !/^(\.|\/|node:)/.test(name) &&
+  !['react', 'react-dom'].includes(name.replace(/\/.*$/, '')) &&
+  !name.startsWith('@qoggy/paneon');
 
-export function checkAnnotations(entryPath: string): AnnotationCheck {
-  const entry = resolve(entryPath);
-  const program = ts.createProgram([entry], {
-    jsx: ts.JsxEmit.ReactJSX,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    module: ts.ModuleKind.ESNext,
-    target: ts.ScriptTarget.ESNext,
-    allowJs: true,
-    noEmit: true,
-    skipLibCheck: true,
-  });
+/** The import declaration that brings a namespace or default binding from a foreign package. */
+function foreignImport(declaration: ts.Declaration) {
+  const clause = ts.isNamespaceImport(declaration)
+    ? declaration.parent
+    : ts.isImportClause(declaration)
+      ? declaration
+      : undefined;
+  return !!clause && foreignPackage(moduleName(clause.parent.moduleSpecifier));
+}
+
+/**
+ * Whether the page's own sources could reach usePageAnnotations at all: they name it anywhere,
+ * load @qoggy/paneon/ui other than through named imports, which hides the names they use, or
+ * take a hook from another package, whose implementation this check does not read.
+ */
+function mayReachHook(program: ts.Program) {
   const checker = program.getTypeChecker();
-  const root = program.getSourceFile(entry);
-  if (!root)
-    throw Object.assign(new Error('The entry is not readable.'), { code: 'INVALID_ARGUMENT' });
-  const found: Record<Group, AnnotationFinding[]> = { missing: [], text: [], unchecked: [] };
+  for (const file of program.getSourceFiles()) {
+    if (file.isDeclarationFile || file.fileName.replaceAll('\\', '/').includes('/node_modules/'))
+      continue;
+    const found = (node: ts.Node): boolean => {
+      if (
+        (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) &&
+        node.text === 'usePageAnnotations'
+      )
+        return true;
+      // `import {useFeedback} from 'kit'`, `export {useFeedback} from 'kit'` and `export * from 'kit'`.
+      if (
+        (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+        node.moduleSpecifier &&
+        foreignPackage(moduleName(node.moduleSpecifier))
+      ) {
+        const names = ts.isImportDeclaration(node)
+          ? [
+              node.importClause?.name,
+              ...(node.importClause?.namedBindings &&
+              ts.isNamedImports(node.importClause.namedBindings)
+                ? node.importClause.namedBindings.elements.map(
+                    (item) => item.propertyName ?? item.name,
+                  )
+                : []),
+            ]
+          : node.exportClause && ts.isNamedExports(node.exportClause)
+            ? node.exportClause.elements.map((item) => item.propertyName ?? item.name)
+            : undefined;
+        if (!names || names.some((name) => name && hookName(name.text))) return true;
+      }
+      // `kit.useFeedback()` through `import * as kit from 'kit'` or `import kit from 'kit'`.
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        hookName(node.name.text) &&
+        ts.isIdentifier(node.expression) &&
+        checker.getSymbolAtLocation(node.expression)?.declarations?.some(foreignImport)
+      )
+        return true;
+      if (ts.isStringLiteralLike(node) && uiModule(node.text)) {
+        const parent = node.parent;
+        const named =
+          ts.isImportDeclaration(parent) &&
+          !parent.importClause?.name &&
+          (!parent.importClause?.namedBindings ||
+            ts.isNamedImports(parent.importClause.namedBindings));
+        const reexport =
+          ts.isExportDeclaration(parent) &&
+          !!parent.exportClause &&
+          ts.isNamedExports(parent.exportClause);
+        if (!named && !reexport) return true;
+      }
+      return ts.forEachChild(node, found) ?? false;
+    };
+    if (found(file)) return true;
+  }
+  return false;
+}
+
+export function checkAnnotations(program: ts.Program, root: ts.SourceFile): AnnotationCheck {
+  const checker = program.getTypeChecker();
+  const found: Record<Group, Finding[]> = { missing: [], text: [], unchecked: [] };
   const emitted = new Set<string>();
   const active = new Set<ts.Node>();
   let session = false;
   let opaque = false;
 
   function report(node: ts.Node, group: Group, message: string) {
-    const file = node.getSourceFile();
-    const { line, character } = file.getLineAndCharacterOfPosition(node.getStart(file));
-    const path = relative(process.cwd(), file.fileName);
-    const location = `${path.startsWith('..') || isAbsolute(path) ? file.fileName : path}:${line + 1}:${character + 1}`;
-    const key = `${location}:${message}`;
+    const finding = findingAt(node, message);
+    const key = `${finding.location}:${message}`;
     if (emitted.has(key)) return;
     emitted.add(key);
-    found[group].push({
-      location,
-      message,
-      excerpt: node.getText(file).replace(/\s+/g, ' ').slice(0, 120),
-    });
+    found[group].push(finding);
   }
 
   function symbol(node: ts.Node) {
@@ -491,32 +557,20 @@ export function checkAnnotations(entryPath: string): AnnotationCheck {
     report(root, 'unchecked', 'Cannot find the panel render function; the whole file was scanned.');
     walk(root, env);
   }
+  // `disabled` must be certain: the walk only recognizes direct hook calls, so any other way the
+  // page's own sources could reach usePageAnnotations, such as an alias, keeps it undetermined.
+  if (!session && !opaque && !mayReachHook(program))
+    return { status: 'disabled', missingTargets: [], unannotatedText: [], unchecked: [] };
   if (!session)
     report(
       root,
-      opaque ? 'unchecked' : 'missing',
-      'The rendered page never calls usePageAnnotations, so nothing on it can be annotated.',
+      'unchecked',
+      'Cannot determine whether the rendered page calls usePageAnnotations; the findings assume it does.',
     );
-
-  const { missing, text: plain, unchecked } = found;
-  const summary =
-    [
-      missing.length &&
-        `${missing.length} component(s) or heading(s) have no original-source annotation target.`,
-      plain.length && `${plain.length} piece(s) of text have no precise text-range mapping.`,
-      unchecked.length && `${unchecked.length} item(s) could not be checked statically.`,
-    ]
-      .filter(Boolean)
-      .join(' ') || 'Every checked component and heading has an annotation target.';
-  const next =
-    [
-      missing.length &&
-        'Add a target to each listed component whose content the human may question word by word, such as code, data, command output and results; whole-element picking only annotates a component as a whole. For content that changes with page state, put the state in the ref.',
-      plain.length &&
-        'Use AnnotationText or a targeted component only where precise text-range selection is needed; ordinary content already supports whole-element picking when page annotations are enabled; leave interface text such as labels and status messages as is.',
-      unchecked.length && 'Inspect the unchecked items in source.',
-    ]
-      .filter(Boolean)
-      .join(' ') || 'Nothing to fix.';
-  return { summary, next, missingTargets: missing, unannotatedText: plain, unchecked };
+  return {
+    status: session ? 'enabled' : 'undetermined',
+    missingTargets: found.missing,
+    unannotatedText: found.text,
+    unchecked: found.unchecked,
+  };
 }

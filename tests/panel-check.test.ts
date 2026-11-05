@@ -8,32 +8,43 @@ import { test } from 'node:test';
 // Run the built CLI from a directory without node_modules, as an installed skill does.
 const cli = resolve('dist/cli/index.js');
 type Finding = { location: string; message: string; excerpt: string };
-type Report = {
+type Data = {
   summary: string;
   next: string;
-  missingTargets: Finding[];
-  unannotatedText: Finding[];
-  unchecked: Finding[];
+  nativeControls: Finding[];
+  annotations: {
+    status: 'enabled' | 'disabled' | 'undetermined';
+    missingTargets: Finding[];
+    unannotatedText: Finding[];
+    unchecked: Finding[];
+  };
 };
+type Report = Omit<Data, 'annotations'> & Data['annotations'];
 
-async function check(source: string, modules: Record<string, string> = {}) {
-  const directory = await mkdtemp(join(tmpdir(), 'paneon-annotation-check-'));
+async function run(source: string, modules: Record<string, string> = {}) {
+  const directory = await mkdtemp(join(tmpdir(), 'paneon-panel-check-'));
   try {
     for (const [name, content] of Object.entries({ 'panel.tsx': source, ...modules }))
       await writeFile(join(directory, name), content);
-    const result = spawnSync(
-      process.execPath,
-      [cli, 'panel', 'check-annotations', 'panel.tsx', '--json'],
-      { cwd: directory, encoding: 'utf8' },
-    );
+    const result = spawnSync(process.execPath, [cli, 'panel', 'check', 'panel.tsx', '--json'], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
     assert.equal(result.stderr, '');
-    assert.equal(result.status, 0);
-    const envelope = JSON.parse(result.stdout) as { ok: boolean; data: Report };
+    const envelope = JSON.parse(result.stdout) as { ok: boolean; data: Data };
     assert.equal(envelope.ok, true);
-    return envelope.data;
+    const { annotations, ...rest } = envelope.data;
+    return { status: result.status, report: { ...rest, ...annotations } as Report };
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+}
+/** Annotation-focused pages contain no native controls, so the command succeeds. */
+async function check(source: string, modules: Record<string, string> = {}) {
+  const { status, report } = await run(source, modules);
+  assert.equal(status, 0);
+  assert.deepEqual(report.nativeControls, []);
+  return report;
 }
 const messages = (items: Finding[]) => items.map((item) => item.message);
 
@@ -72,8 +83,9 @@ void test('reports content components and headings without targets, with locatio
   assert.deepEqual(report.unannotatedText, []);
   assert.match(
     report.summary,
-    /^7 component\(s\) or heading\(s\) have no original-source annotation/,
+    /7 component\(s\) or heading\(s\) have no original-source annotation/,
   );
+  assert.equal(report.status, 'enabled');
   assert.match(report.next, /may question word by word/);
   assert.match(report.next, /put the state in the ref/);
 });
@@ -100,7 +112,10 @@ const risks = ['Stale prices'];`,
   assert.deepEqual(report.missingTargets, []);
   assert.deepEqual(report.unannotatedText, []);
   assert.deepEqual(report.unchecked, []);
-  assert.equal(report.summary, 'Every checked component and heading has an annotation target.');
+  assert.equal(
+    report.summary,
+    'No native control with a Paneon component equivalent was found. Every checked component and heading has an annotation target.',
+  );
   assert.equal(report.next, 'Nothing to fix.');
 });
 
@@ -198,18 +213,96 @@ void test('respects spread order and explicit undefined targets', async () => {
   assert.deepEqual(report.unchecked, []);
 });
 
-void test('a page without usePageAnnotations is reported, and unused code does not count', async () => {
+void test('a page that never reaches usePageAnnotations skips the annotation check', async () => {
   const report = await check(
-    panel(
-      '<Markdown annotationTarget="plan">Plan</Markdown>',
-      'function Unused(){usePageAnnotations({}); return <p>Not rendered</p>;}',
-      '',
+    `import {Markdown} from '@qoggy/paneon/ui';
+import {definePanel} from '@qoggy/paneon/sdk';
+function Panel(){return (<><Markdown>Plan</Markdown><p>Plain text</p></>);}
+export default definePanel({render: Panel});`,
+  );
+  assert.equal(report.status, 'disabled');
+  assert.deepEqual(report.missingTargets, []);
+  assert.deepEqual(report.unannotatedText, []);
+  assert.deepEqual(report.unchecked, []);
+  assert.match(
+    report.summary,
+    /never calls usePageAnnotations, so the annotation check was skipped/,
+  );
+  assert.equal(report.next, 'Nothing to fix.');
+});
+
+void test('a hook the walk cannot follow keeps the annotation check undetermined', async () => {
+  const cases: [string, string, string][] = [
+    ['alias', 'const useFeedback = usePageAnnotations;', 'useFeedback({});'],
+    ['unused function', 'function Unused(){usePageAnnotations({}); return null;}', ''],
+  ];
+  for (const [label, declarations, hook] of cases) {
+    const report = await check(panel('<Markdown>Plan</Markdown>', declarations, hook));
+    assert.equal(report.status, 'undetermined', label);
+    assert.deepEqual(
+      messages(report.missingTargets),
+      ['Markdown has no annotation target.'],
+      label,
+    );
+    assert.ok(
+      messages(report.unchecked).some((message) => message.includes('usePageAnnotations')),
+      label,
+    );
+  }
+  // The hook name never appears; a namespace import hides which exports the page uses.
+  const hidden = await check(`import * as UI from '@qoggy/paneon/ui';
+import {definePanel} from '@qoggy/paneon/sdk';
+const name = 'usePage' + 'Annotations';
+function Panel(){(UI as any)[name]({}); return <UI.Markdown>Plan</UI.Markdown>;}
+export default definePanel({render: Panel});`);
+  assert.equal(hidden.status, 'undetermined');
+  assert.deepEqual(messages(hidden.missingTargets), ['Markdown has no annotation target.']);
+});
+
+void test('a hook from another package keeps the annotation check undetermined', async () => {
+  const page = (imports: string, call: string) => `import {Markdown} from '@qoggy/paneon/ui';
+import {definePanel} from '@qoggy/paneon/sdk';
+${imports}
+function Panel(){${call} return <Markdown>Plan</Markdown>;}
+export default definePanel({render: Panel});`;
+  const cases: [string, string, string, Record<string, string>?][] = [
+    ['named import', `import {useFeedback} from 'feedback-kit';`, 'useFeedback();'],
+    ['namespace import', `import * as kit from '@team/feedback-kit';`, 'kit.useFeedback();'],
+    ['default import', `import kit from 'feedback-kit';`, 'kit.useFeedback();'],
+    [
+      'local re-export',
+      `import {useFeedback} from './kit';`,
+      'useFeedback();',
+      { 'kit.ts': `export {useFeedback} from 'feedback-kit';` },
+    ],
+    [
+      'local star re-export',
+      `import {useFeedback} from './kit';`,
+      'useFeedback();',
+      { 'kit.ts': `export * from 'feedback-kit';` },
+    ],
+  ];
+  for (const [label, imports, call, modules] of cases) {
+    const report = await check(page(imports, call), modules);
+    assert.equal(report.status, 'undetermined', label);
+    assert.deepEqual(
+      messages(report.missingTargets),
+      ['Markdown has no annotation target.'],
+      label,
+    );
+  }
+  // React's and Paneon's own hooks, and non-hook package exports, do not open annotations.
+  const plain = await check(
+    page(
+      `import {useState} from 'react';
+import * as React from 'react';
+import {useQuery} from '@qoggy/paneon/sdk';
+import {Check} from 'lucide-react';
+import yaml from 'yaml';`,
+      `useState(0); React.useMemo(() => 0, []); void useQuery; void Check; yaml.parse('a: 1');`,
     ),
   );
-  assert.deepEqual(messages(report.missingTargets), [
-    'The rendered page never calls usePageAnnotations, so nothing on it can be annotated.',
-  ]);
-  assert.deepEqual(report.unannotatedText, []);
+  assert.equal(plain.status, 'disabled');
 });
 
 void test('a session opened through a local hook counts', async () => {
@@ -255,13 +348,14 @@ declare const External: unknown;`,
 void test('a missing session is unchecked rather than certain when a component is opaque', async () => {
   const report = await check(panel('<External />', 'declare const External: unknown;', ''));
   assert.deepEqual(report.missingTargets, []);
+  assert.equal(report.status, 'undetermined');
   assert.ok(messages(report.unchecked).some((message) => message.includes('usePageAnnotations')));
 });
 
 void test('a missing entry fails with a structured error', () => {
   const result = spawnSync(
     process.execPath,
-    [cli, 'panel', 'check-annotations', join(tmpdir(), 'paneon-missing-panel.tsx'), '--json'],
+    [cli, 'panel', 'check', join(tmpdir(), 'paneon-missing-panel.tsx'), '--json'],
     { encoding: 'utf8' },
   );
   assert.equal(result.status, 1);
@@ -340,4 +434,71 @@ function Note({'annotationTarget': target, children}) { return <Doc annotationTa
   );
   assert.deepEqual(report.missingTargets, []);
   assert.deepEqual(report.unchecked, []);
+});
+
+void test('reports native controls with a Paneon equivalent and exits with 1, even without annotations', async () => {
+  const { status, report } = await run(
+    `import {definePanel} from '@qoggy/paneon/sdk';
+import {Filter} from './filter';
+function Panel(){return (<form>
+  <select aria-label="Report" value="a" onChange={() => {}}><option value="a">A</option></select>
+  <textarea defaultValue="Notes" />
+  <input placeholder="Name" />
+  <input type={'number'} />
+  <Filter />
+</form>);}
+export default definePanel({render: Panel});`,
+    { 'filter.tsx': `export const Filter = () => <input type="search" />;` },
+  );
+  assert.equal(status, 1);
+  assert.deepEqual(
+    report.nativeControls.map((item) => [item.location, item.message]),
+    [
+      [
+        'filter.tsx:1:29',
+        'Native <input type="search"> has a Paneon equivalent: use Input from @qoggy/paneon/ui.',
+      ],
+      [
+        'panel.tsx:4:3',
+        'Native <select> has a Paneon equivalent: use Select from @qoggy/paneon/ui and pass items so it shows labels for values.',
+      ],
+      [
+        'panel.tsx:5:3',
+        'Native <textarea> has a Paneon equivalent: use Textarea from @qoggy/paneon/ui.',
+      ],
+      [
+        'panel.tsx:6:3',
+        'Native <input type="text"> has a Paneon equivalent: use Input from @qoggy/paneon/ui.',
+      ],
+      [
+        'panel.tsx:7:3',
+        'Native <input type="number"> has a Paneon equivalent: use Input from @qoggy/paneon/ui.',
+      ],
+    ],
+  );
+  assert.equal(report.status, 'disabled');
+  assert.match(report.summary, /^5 native control\(s\) have a Paneon component equivalent\./);
+  assert.match(report.next, /^Replace each listed native control with the named component\./);
+});
+
+void test('never reports native elements without a certain one-to-one replacement', async () => {
+  const report = await check(
+    `import {definePanel} from '@qoggy/paneon/sdk';
+import {Select, Input, Textarea, Button} from '@qoggy/paneon/ui';
+const props = {type: 'text'};
+const kind = Math.random() > 0.5 ? 'text' : 'checkbox';
+function Panel(){return (<>
+  <select multiple><option>A</option></select>
+  <select size={4}><option>A</option></select>
+  <select {...props}><option>A</option></select>
+  <input type="checkbox" /><input type="radio" /><input type="range" /><input type="file" />
+  <input type="hidden" /><input type="color" /><input type="date" />
+  <input type={kind} /><input {...props} /><input hidden /><input aria-hidden="true" />
+  <textarea {...props} />
+  <button type="button">Row</button><table><tbody><tr><td>Cell</td></tr></tbody></table>
+  <Select items={[]} /><Input /><Textarea /><Button>Save</Button>
+</>);}
+export default definePanel({render: Panel});`,
+  );
+  assert.deepEqual(report.nativeControls, []);
 });
