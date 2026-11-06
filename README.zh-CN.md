@@ -65,6 +65,38 @@ npm run build
 npm install -g .
 ```
 
+### 卸载
+
+```sh
+paneon server stop &&
+npm uninstall -g @qoggy/paneon
+```
+
+**可选：** 删除 `paneon init` 记录的 skill。请在删除本地数据前执行。
+
+```sh
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const home = fs.realpathSync(os.homedir());
+const record = path.join(home, '.paneon/skill-installations.json');
+if (fs.existsSync(record)) {
+  for (const install of JSON.parse(fs.readFileSync(record, 'utf8')).installations) {
+    for (const target of install.targets) {
+      fs.rmSync(path.resolve(install.projectPath ?? home, target.path), { recursive: true, force: true });
+    }
+  }
+}
+JS
+```
+
+**可选：** 删除全部本地数据，包括保存的页面和历史记录。
+
+```sh
+rm -rf ~/.paneon
+```
+
 ## 反馈
 
 问题和建议请提交到 [Issues](https://github.com/qoggy/paneon/issues)，版本变更见 [CHANGELOG](CHANGELOG.md)。

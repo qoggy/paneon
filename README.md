@@ -65,6 +65,38 @@ npm run build
 npm install -g .
 ```
 
+### Uninstall
+
+```sh
+paneon server stop &&
+npm uninstall -g @qoggy/paneon
+```
+
+**Optional:** Remove skills recorded by `paneon init`. Run this before deleting local data.
+
+```sh
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const home = fs.realpathSync(os.homedir());
+const record = path.join(home, '.paneon/skill-installations.json');
+if (fs.existsSync(record)) {
+  for (const install of JSON.parse(fs.readFileSync(record, 'utf8')).installations) {
+    for (const target of install.targets) {
+      fs.rmSync(path.resolve(install.projectPath ?? home, target.path), { recursive: true, force: true });
+    }
+  }
+}
+JS
+```
+
+**Optional:** Delete all local data, including saved pages and history.
+
+```sh
+rm -rf ~/.paneon
+```
+
 ## Feedback
 
 Report bugs and ideas in [Issues](https://github.com/qoggy/paneon/issues). Release notes are in the [changelog](CHANGELOG.md).
