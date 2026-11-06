@@ -7,7 +7,7 @@ import type { AnnotationTarget, AnnotationValue } from '../src/sdk/annotation.ts
 import { publicFileFeedback } from '#test-skill/assets/panels/file-review/feedback.ts';
 import {
   fileReviewSubmittedSchema,
-  validateRanges,
+  validateSources,
 } from '#test-skill/assets/panels/file-review/schema.ts';
 
 const source =
@@ -70,7 +70,7 @@ void test('file-review submits Mermaid type and range under its file without cha
     },
   ];
   const evidence = { files: [{ ...ref, path: '/workspace/plan.md', text: source }] };
-  const feedback = validateRanges({ annotations }, evidence, ['/workspace/plan.md']);
+  const feedback = validateSources({ annotations }, evidence);
   const event = fileReviewSubmittedSchema.parse(publicFileFeedback(feedback, evidence));
   assert.equal(event.files.length, 1);
   assert.deepEqual(event.files[0].annotations[0].targets, [

@@ -974,17 +974,6 @@ export class AnnotationStore<TRef> {
     const value = frozen(copy(this.state.value));
     try {
       getSchema().parse(value);
-      for (const [annotationIndex, annotation] of value.annotations.entries())
-        for (const [targetIndex, target] of annotation.targets.entries()) {
-          try {
-            this.checkResolution(target, await this.resolve(target));
-          } catch (error) {
-            throw new Error(
-              `Annotation ${annotationIndex + 1}, target ${targetIndex + 1}: ${error instanceof Error ? error.message : String(error)}`,
-              { cause: error },
-            );
-          }
-        }
       await options.onSubmit(value);
     } catch (error) {
       this.publish({ error: error instanceof Error ? error.message : String(error) });

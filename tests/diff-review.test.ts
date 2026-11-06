@@ -4,7 +4,6 @@ import {
   diffReviewParamsSchema,
   diffFeedbackResultSchema,
   diffReviewSubmittedSchema,
-  validateRanges,
   validateSources,
 } from '#test-skill/assets/panels/diff-review/schema.ts';
 import { reviewTree, visibleFileCount } from '#test-skill/assets/panels/diff-review/model.ts';
@@ -47,11 +46,9 @@ void test('compressed paths keep original leaf identity and filtered counts', ()
   assert.equal(visibleFileCount(roots[0], '/NEW/B'), 1);
 });
 
-void test('annotation validation uses preserved text and rejects wrong source, side and split graphemes', () => {
+void test('diff submission preserves saved ranges and quotes without requiring original text', () => {
   const id = `sha256:${'a'.repeat(64)}`;
   const file = { oldPath: null, newPath: '/proposed' };
-  const snapshot = { id, oldText: '', newText: 'first é🙂 last' };
-  const snapshots = { [`0:${id}`]: snapshot };
   const feedback: DiffFeedbackResult = {
     annotations: [
       {
@@ -67,19 +64,22 @@ void test('annotation validation uses preserved text and rejects wrong source, s
     ],
     sources: [{ ...file, fileIndex: 0, snapshotId: id }],
   };
-  assert.equal(validateRanges({ files: [file] }, feedback, snapshots), feedback);
+  assert.equal(validateSources({ files: [file] }, feedback), feedback);
   const change = () => structuredClone(feedback);
   const stale = change();
   stale.annotations[0].targets[0].text = { start: 6, end: 10, quote: 'wrong' };
-  assert.throws(() => validateRanges({ files: [file] }, stale, snapshots), /Text range/);
+  assert.equal(validateSources({ files: [file] }, stale), stale);
+  assert.deepEqual(publicDiffFeedback({ files: [file] }, stale).files[0].annotations[0], {
+    targets: [{ side: 'new', text: stale.annotations[0].targets[0].text }],
+    comment: 'review',
+  });
   const split = change();
   split.annotations[0].targets[0].text = { start: 6, end: 7, quote: 'e' };
-  assert.throws(() => validateRanges({ files: [file] }, split, snapshots), /Text range/);
+  assert.equal(validateSources({ files: [file] }, split), split);
   const absent = change();
   assert.ok('side' in absent.annotations[0].targets[0].ref);
   absent.annotations[0].targets[0].ref.side = 'old';
-  assert.throws(() => validateRanges({ files: [file] }, absent, snapshots), /Missing original/);
-  assert.throws(() => validateRanges({ files: [file] }, feedback, {}), /inconsistent/);
+  assert.equal(validateSources({ files: [file] }, absent), absent);
 });
 
 void test('comparison feedback preserves page-defined file targets without adding comparison sources', () => {
@@ -107,9 +107,7 @@ void test('comparison feedback preserves page-defined file targets without addin
     sources: [source],
   });
   const sources = structuredClone(feedback.sources);
-  validateRanges({ files: [{ oldPath: null, newPath: '/proposed' }] }, feedback, {
-    [`0:${snapshotId}`]: { id: snapshotId, oldText: '', newText: 'diff' },
-  });
+  validateSources({ files: [{ oldPath: null, newPath: '/proposed' }] }, feedback);
   assert.deepEqual(feedback.annotations[0].targets[1], common);
   assert.deepEqual(feedback.sources, sources);
   assert.deepEqual(
@@ -225,10 +223,10 @@ void test('source validation accepts feedback without full files and rejects inc
   const absent = structuredClone(feedback);
   assert.ok('side' in absent.annotations[0].targets[0].ref);
   absent.annotations[0].targets[0].ref.side = 'old';
-  assert.throws(() => validateSources({ files: [file] }, absent), /Missing original/);
+  assert.equal(validateSources({ files: [file] }, absent), absent);
   const withoutText = structuredClone(feedback);
   delete withoutText.annotations[0].targets[0].text;
-  assert.throws(() => validateSources({ files: [file] }, withoutText), /Text range/);
+  assert.equal(validateSources({ files: [file] }, withoutText), withoutText);
   assert.throws(
     () => validateSources({ files: [file] }, { annotations: [], sources: [] }),
     /at least one/,

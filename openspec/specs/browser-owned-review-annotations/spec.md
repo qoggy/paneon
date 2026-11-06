@@ -17,7 +17,7 @@ Review pages SHALL retain the exact displayed source and coordinates while refer
 
 ### Requirement: Validate submissions without previous execution memory
 
-Git and PR reads SHALL take explicit scope, version and path/page arguments. Their review adapters SHALL generate sufficient original source/evidence for pure task-local validation. A request worker SHALL not require prior session/listing/history/snapshot Maps. This lifecycle change SHALL NOT introduce additional Git content checks or treat removal of the existing separate checkFeedback action as approved.
+Git and PR reads SHALL take explicit scope, version and path/page arguments. Their review adapters SHALL retain source metadata and saved selected content for delivery, with source resolution and range checks confined to location. A request worker SHALL not require prior session/listing/history/snapshot Maps. Feedback delivery SHALL NOT require checking original source text, coordinates or content hashes; PR feedback SHALL be built from browser-owned metadata without a separate source-integrity preflight.
 
 #### Scenario: Previous execution thread no longer exists
 
@@ -26,11 +26,11 @@ Git and PR reads SHALL take explicit scope, version and path/page arguments. The
 
 ### Requirement: Keep full schema validation and explicit persistence
 
-Existing declared Zod refine/transform and existing scene validation SHALL retain their semantics inside bounded execution tasks; no new content-authenticity verification SHALL be inferred. The main server SHALL recheck revision and closed state in the append transaction, preserve existing payload limits, and return a durable receipt only after successful append. Drafts SHALL remain browser-local.
+Declared schemas SHALL retain structural and transport validation. Feedback submission SHALL NOT compare saved quotes or ranges to source text or recheck source content hashes; source checks remain independent location behavior. The main server SHALL recheck revision and closed state in the append transaction, preserve existing payload limits, and return a durable receipt only after successful append. Drafts SHALL remain browser-local.
 
 #### Scenario: Validation or append fails
 
-- **WHEN** source/range validation, limits, revision checks or persistence fail
+- **WHEN** structural validation, limits, revision checks or persistence fail
 - **THEN** the browser SHALL preserve its draft and the framework SHALL not truncate, split, replay or replace evidence with latest content
 
 ### Requirement: Preserve review interaction and delivery semantics

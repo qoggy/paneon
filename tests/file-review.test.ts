@@ -9,7 +9,7 @@ import {
   fileReviewParamsSchema,
   fileFeedbackSchema,
   fileReviewSubmittedSchema,
-  validateRanges,
+  validateSources,
 } from '#test-skill/assets/panels/file-review/schema.ts';
 import type { FileFeedback, Snapshot } from '#test-skill/assets/panels/file-review/schema.ts';
 import {
@@ -161,7 +161,7 @@ void test('literal bounded reads preserve Unicode, BOM and line endings, with va
   }
 });
 
-void test('main source ranges validate against explicit original evidence, preserving separate duplicate entries', () => {
+void test('file feedback preserves saved quotes and ranges without comparing original text', () => {
   const a = snapshot(0, '\uFEFF# 中文🙂\r\né repeat repeat');
   const b = { ...a, fileIndex: 1 };
   const evidence = { files: [a, b] };
@@ -176,7 +176,7 @@ void test('main source ranges validate against explicit original evidence, prese
     ],
   };
   const original = structuredClone(draft);
-  assert.equal(validateRanges(fileFeedbackSchema.parse(draft), evidence, []).annotations.length, 2);
+  assert.equal(validateSources(fileFeedbackSchema.parse(draft), evidence).annotations.length, 2);
   const result = publicFileFeedback(draft, evidence);
   assert.deepEqual(fileReviewSubmittedSchema.parse(result), result);
   assert.equal(result.files.length, 2);
@@ -186,24 +186,24 @@ void test('main source ranges validate against explicit original evidence, prese
   assert.deepEqual(draft, original);
   const wrong = structuredClone(draft);
   wrong.annotations[0].targets[0].text!.quote = 'wrong';
-  assert.throws(() => validateRanges(wrong, evidence, []), /range/);
+  assert.equal(validateSources(wrong, evidence), wrong);
+  assert.deepEqual(publicFileFeedback(wrong, evidence).files[0].annotations[0].targets[0], {
+    text: wrong.annotations[0].targets[0].text,
+  });
   const split = structuredClone(draft);
   split.annotations[1].targets[0].text = {
     start: b.text.indexOf('é'),
     end: b.text.indexOf('é') + 1,
     quote: 'e',
   };
-  assert.throws(() => validateRanges(split, evidence, []), /range/);
-  assert.throws(() => validateRanges(draft, { files: [a, a] }, []), /Duplicate/);
-  assert.throws(() => validateRanges(draft, { files: [a] }, []), /Missing/);
-  assert.throws(() => validateRanges({ annotations: [] }, { files: [] }, []), /at least one/);
+  assert.equal(validateSources(split, evidence), split);
+  assert.throws(() => validateSources(draft, { files: [a, a] }), /Duplicate/);
+  assert.throws(() => validateSources(draft, { files: [a] }), /Missing/);
+  assert.throws(() => validateSources({ annotations: [] }, { files: [] }), /at least one/);
   assert.deepEqual(
-    publicFileFeedback(
-      validateRanges({ annotations: [], replacesEventId: 17 }, { files: [] }, []),
-      {
-        files: [],
-      },
-    ),
+    publicFileFeedback(validateSources({ annotations: [], replacesEventId: 17 }, { files: [] }), {
+      files: [],
+    }),
     { files: [], replacesEventId: 17 },
   );
 });
@@ -225,7 +225,7 @@ void test('linked opinions publish under their own file without unannotated owne
     })),
   });
   const evidence = { files: [owner] };
-  validateRanges(draft, evidence, []);
+  validateSources(draft, evidence);
   const result = publicFileFeedback(draft, evidence);
   assert.equal(result.files.length, 1);
   assert.deepEqual(result.files[0], {
@@ -237,7 +237,7 @@ void test('linked opinions publish under their own file without unannotated owne
   });
 });
 
-void test('path selections validate against the supplied path and publish only path.quote alongside body targets', () => {
+void test('path selections publish their saved quote without comparing the supplied path', () => {
   const paths = ['docs/缓存🙂/缓存🙂.md'];
   const file = snapshot(0, '# 缓存方案', '/workspace/docs/缓存🙂/缓存🙂.md');
   const evidence = { files: [file] };
@@ -257,7 +257,7 @@ void test('path selections validate against the supplied path and publish only p
       { id: 'body', targets: [target(file, '缓存方案')], comment: '' },
     ],
   });
-  validateRanges(draft, evidence, paths);
+  validateSources(draft, evidence);
   const result = publicFileFeedback(draft, evidence);
   assert.deepEqual(fileReviewSubmittedSchema.parse(result), {
     files: [
@@ -273,11 +273,11 @@ void test('path selections validate against the supplied path and publish only p
   });
   const wrong = structuredClone(draft);
   wrong.annotations[0].targets[0].text!.quote = '缓存方案';
-  assert.throws(() => validateRanges(wrong, evidence, paths), /range/);
+  assert.equal(validateSources(wrong, evidence), wrong);
   const bodyAsPath = structuredClone(draft);
   assert.ok('fileIndex' in bodyAsPath.annotations[1].targets[0].ref);
   bodyAsPath.annotations[1].targets[0].ref.part = 'path';
-  assert.throws(() => validateRanges(bodyAsPath, evidence, paths), /range/);
+  assert.equal(validateSources(bodyAsPath, evidence), bodyAsPath);
   const absoluteDraft = structuredClone(draft);
   const absoluteStart = file.path.lastIndexOf('缓存🙂');
   absoluteDraft.annotations[0].targets[0].text = {
@@ -295,7 +295,7 @@ void test('path selections validate against the supplied path and publish only p
   );
 });
 
-void test('submission checks path and digest from explicit evidence without rereading removed files or prior worker memory', async () => {
+void test('submission uses file metadata without checking the original text or digest', async () => {
   const root = await mkdtemp(join(tmpdir(), 'paneon-file-evidence-'));
   try {
     const path = join(root, 'a.ts');
@@ -308,15 +308,14 @@ void test('submission checks path and digest from explicit evidence without rere
     };
     await unlink(path);
     assert.equal(validateFeedback.handler(ctx, request), request.feedback);
-    for (const patch of [
-      { path: path + '.other' },
-      { snapshotId: `sha256:${'a'.repeat(64)}` },
-      { fileIndex: 9 },
-    ]) {
+    for (const patch of [{ path: path + '.other' }, { fileIndex: 9 }]) {
       const changed = structuredClone(request);
       Object.assign(changed.evidence.files[0], patch);
       assert.throws(() => validateFeedback.handler(ctx, changed), /inconsistent/);
     }
+    const changedText = structuredClone(request);
+    changedText.evidence.files[0].text = 'different text with the same saved metadata';
+    assert.equal(validateFeedback.handler(ctx, changedText), changedText.feedback);
     const script = `import {validateFeedback} from ${JSON.stringify(import.meta.resolve('#test-skill/assets/panels/file-review/actions.ts'))}; const request = JSON.parse(process.argv[1]); validateFeedback.handler({signal:new AbortController().signal}, request);`;
     const worker = spawnSync(
       process.execPath,

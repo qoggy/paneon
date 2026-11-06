@@ -15,14 +15,7 @@ import {
   X,
 } from './icons';
 import { useEffect, useRef, useState } from 'react';
-import {
-  agent,
-  definePanel,
-  isElementAnnotationRef,
-  serverAction,
-  usePanelInput,
-  z,
-} from '@qoggy/paneon/sdk';
+import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
 import type { AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Alert,
@@ -53,20 +46,23 @@ import {
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
-import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
+import {
+  diffAnnotationTargets,
+  diffTargetCoordinates,
+  diffTargetLocation,
+} from '../../shared/diff-schema.ts';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   GitHubReview,
   reviewFromEvidence,
   prDetailInputSchema,
   prComparisonInputSchema,
-  prSnapshotInputSchema,
 } from './github.ts';
 import type { PRChecks, PRComparison, PRDetail, PRList, PRSnapshot } from './github.ts';
 import { resolvePRTarget, safeLink } from './model.ts';
+import { buildPRFeedback } from './feedback.ts';
 import {
   githubPRParamsSchema,
-  prFeedbackSchema,
   prFeedbackSubmittedSchema,
   prReviewRequestedSchema,
   repositorySchema,
@@ -147,19 +143,6 @@ export const readFile = serverAction({
         comparison: input.comparison,
         detail: input.detail,
       }).diff(input.repository, input.sessionId, input.comparisonId, input.filename, ctx.signal),
-    ),
-});
-export const checkFeedback = serverAction({
-  kind: 'query',
-  input: sessionInput.extend({
-    feedback: prFeedbackSchema,
-    snapshots: z.array(prSnapshotInputSchema),
-  }),
-  handler: (_ctx, input) =>
-    readResult(() =>
-      reviewFromEvidence(input.repository, input.sessionId, {
-        snapshots: input.snapshots,
-      }).feedback(input.repository, input.sessionId, input.feedback),
     ),
 });
 export const checkReviewRequest = serverAction({
@@ -457,41 +440,8 @@ function GithubPR() {
   }
   usePageAnnotations<PRRef>({
     onSubmit: async (feedback) => {
-      const ids = new Set(
-        feedback.annotations.flatMap((annotation) =>
-          annotation.targets.flatMap((target) =>
-            target.sourceRef !== undefined || isElementAnnotationRef(target.ref)
-              ? []
-              : [target.ref.sourceId],
-          ),
-        ),
-      );
-      const evidence = [...ids].map((id) => {
-        const snapshot = snapshots.current.get(id);
-        if (!snapshot) throw new Error('Original PR source is missing. Draft retained.');
-        return {
-          id: snapshot.id,
-          source: snapshot.source,
-          detailId: snapshot.detailId,
-          ...(snapshot.identity ? { identity: snapshot.identity } : {}),
-          ...(snapshot.body === undefined ? {} : { body: snapshot.body }),
-          ...(snapshot.model
-            ? {
-                model: {
-                  ...(snapshot.model.oldText === undefined
-                    ? {}
-                    : { oldText: snapshot.model.oldText }),
-                  ...(snapshot.model.newText === undefined
-                    ? {}
-                    : { newText: snapshot.model.newText }),
-                },
-              }
-            : {}),
-        };
-      });
-      const result = await checkFeedback({ ...session, feedback, snapshots: evidence });
-      if (!result.ok) throw new Error(result.message);
-      await agent.emit('pr-feedback-submitted', result.data);
+      const result = buildPRFeedback(session.repository, feedback, snapshots.current);
+      await agent.emit('pr-feedback-submitted', result);
       toast.add({ title: t('Annotations submitted.'), type: 'success' });
     },
     adapter: {
@@ -516,11 +466,8 @@ function GithubPR() {
           (target.ref.kind !== 'file' && target.ref.kind !== 'hunk' && target.ref.kind !== 'lines')
         )
           return [];
-        return (
-          diffView.current?.getRanges(
-            diffTargetLocation(snapshot.model, { ...target, ref: target.ref }),
-          ) ?? []
-        );
+        const location = diffTargetCoordinates(snapshot.model, { ...target, ref: target.ref });
+        return location ? (diffView.current?.getRanges(location) ?? []) : [];
       },
       async locate(target) {
         const serial = ++locating.current,

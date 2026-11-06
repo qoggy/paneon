@@ -49,11 +49,23 @@ void test('feedback schema rejects invalid structures, duplicates and UTF-16 ran
     { start: -1, end: 1, quote: 'a' },
     { start: 1, end: 1, quote: '' },
     { start: 0.5, end: 1.5, quote: 'a' },
-    { start: 0, end: 2, quote: 'a' },
     { start: 0, end: Infinity, quote: 'a' },
   ])
     invalid.push({ annotations: [{ ...selected.annotations[0], targets: [{ ...target, text }] }] });
   invalid.forEach((value) => assert.equal(schema.safeParse(value).success, false));
+  const saved = {
+    annotations: [
+      {
+        ...selected.annotations[0],
+        targets: [{ ...target, text: { start: 0, end: 2, quote: 'Earlier selected content' } }],
+      },
+    ],
+  };
+  assert.deepEqual(
+    schema.parse(saved),
+    saved,
+    'Saved text does not have to match coordinate length',
+  );
   assert.equal(
     schema.safeParse({
       annotations: [

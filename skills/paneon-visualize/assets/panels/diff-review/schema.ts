@@ -1,6 +1,5 @@
 import { annotationValueSchema, isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
 import { publishedElementAnnotationsSchema } from '../../shared/element-annotations.ts';
-import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
 
 const path = z.string().min(1);
 export const comparisonSchema = z
@@ -93,40 +92,14 @@ export function validateSources(params: DiffReviewParams, feedback: DiffFeedback
   for (const annotation of feedback.annotations) {
     for (const target of annotation.targets) {
       if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
-      const { fileIndex, snapshotId, side } = target.ref;
+      const { fileIndex, snapshotId } = target.ref;
       const key = `${fileIndex}:${snapshotId}`;
       const file = params.files[fileIndex];
-      if (!seen.has(key) || !file || file[`${side}Path`] === null)
+      if (!seen.has(key) || !file)
         throw new Error('Missing original comparison snapshot. Draft retained.');
-      if (!target.text)
-        throw new Error('Text range does not match its original comparison snapshot.');
     }
   }
   if (feedback.replacesEventId === undefined && !feedback.annotations.length)
     throw new Error('Save at least one annotation before submitting.');
-  return feedback;
-}
-
-/** Validate retained browser text, never reread current files to reinterpret an old annotation. */
-export function validateRanges(
-  params: DiffReviewParams,
-  feedback: DiffFeedbackResult,
-  snapshots: Record<string, Snapshot>,
-) {
-  validateSources(params, feedback);
-  for (const source of feedback.sources) {
-    const snapshot = snapshots[`${source.fileIndex}:${source.snapshotId}`];
-    if (!snapshot || snapshot.id !== source.snapshotId)
-      throw new Error('Unknown or inconsistent comparison source.');
-  }
-  for (const annotation of feedback.annotations) {
-    for (const target of annotation.targets) {
-      if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
-      const { fileIndex, snapshotId, side } = target.ref;
-      const snapshot = snapshots[`${fileIndex}:${snapshotId}`];
-      if (!target.text || !validSourceRange(snapshot[`${side}Text`], target))
-        throw new Error('Text range does not match its original comparison snapshot.');
-    }
-  }
   return feedback;
 }

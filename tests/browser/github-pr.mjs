@@ -392,9 +392,10 @@ async function completeAcceptance() {
     });
     assert.equal((await f.events()).length, 1);
     const originalAnnotation = await comments.text(1);
+    // The event character limit applies before the HTTP byte limit, even for large UTF-8 input.
     for (const [length, limit] of [
       [66000, '65536'],
-      [100000, '262144'],
+      [100000, '65536'],
     ]) {
       await comments.edit(1);
       await comments.write('中'.repeat(length));
@@ -591,9 +592,10 @@ await test('independent PR delivery, old sources, transport limits and failures'
       headCommit: ids.second,
     });
     const originalAnnotation = await comments.text(1);
+    // The event character limit applies before the HTTP byte limit, even for large UTF-8 input.
     for (const [length, limit] of [
       [66000, '65536'],
-      [100000, '262144'],
+      [100000, '65536'],
     ]) {
       await comments.edit(1);
       await comments.write('中'.repeat(length));

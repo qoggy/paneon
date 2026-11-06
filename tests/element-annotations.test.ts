@@ -4,9 +4,9 @@ import { build } from 'esbuild';
 import { z } from 'zod';
 import { annotationValueSchema, isElementAnnotationRef } from '../src/sdk/annotation.ts';
 import { publicFileFeedback } from '#test-skill/assets/panels/file-review/feedback.ts';
-import { validateRanges as validateFile } from '#test-skill/assets/panels/file-review/schema.ts';
+import { validateSources as validateFile } from '#test-skill/assets/panels/file-review/schema.ts';
 import { publicDiffFeedback } from '#test-skill/assets/panels/diff-review/feedback.ts';
-import { validateRanges as validateDiff } from '#test-skill/assets/panels/diff-review/schema.ts';
+import { validateSources as validateDiff } from '#test-skill/assets/panels/diff-review/schema.ts';
 import {
   buildGitFeedback,
   publicGitFeedback,
@@ -53,11 +53,11 @@ void test('common schemas accept generated refs and preserve existing author ref
 });
 
 void test('file, diff, Git and PR submissions keep element opinions without demanding source evidence', () => {
-  validateFile(draft, { files: [] }, []);
+  validateFile(draft, { files: [] });
   assert.deepEqual(publicFileFeedback(draft, { files: [] }), { files: [], annotations: published });
   const params = { files: [{ oldPath: '/tmp/a', newPath: '/tmp/b' }] };
   const diff = { ...draft, sources: [] };
-  validateDiff(params, diff, {});
+  validateDiff(params, diff);
   assert.deepEqual(publicDiffFeedback(params, diff), { files: [], annotations: published });
   const git = buildGitFeedback(draft, new Map());
   assert.deepEqual(publicGitFeedback(git), { files: [], annotations: published });

@@ -112,7 +112,7 @@ Public events SHALL contain a `files` array of objects with annotations nested u
 
 The supplied file-path text SHALL support selection annotations through the existing AnnotationText and page session once its file snapshot is available. Internal path targets SHALL distinguish their source from body text and retain exact UTF-16 ranges against the supplied path string. Path annotation editing, navigation, submission and correction SHALL reuse the existing annotation flow. Public path targets SHALL contain only `{path: {quote}}`, alongside the unchanged ordinary body `{text: {start, end, quote}}` format and Mermaid `{type: 'mermaid', text: {start, end}}` targets. The existing file metadata, grouping and correction format SHALL remain unchanged; path coordinates, internal source discriminators, pathText, displayPath and additional source fields SHALL NOT be published.
 
-Linked-local-file annotations SHALL retain internal `sourceRef: {path, snapshotId}` semantics: their ref identifies the owning manifest Markdown, while text offsets address the linked source. Public feedback SHALL group these annotations under the linked file's own path/snapshotId, omitting an unannotated owning Markdown. Existing linked-snapshot resolution, reopening and range validation SHALL remain in the common page session. Validation of manifest targets SHALL check identity and ranges against explicitly supplied original browser evidence, without rereading disk or requiring prior worker memory. Existing request/event limits SHALL remain in force; failures SHALL preserve drafts without truncation or automatic splitting.
+Linked-local-file annotations SHALL retain internal `sourceRef: {path, snapshotId}` semantics: their ref identifies the owning manifest Markdown, while text offsets address the linked source. Public feedback SHALL group these annotations under the linked file's own path/snapshotId, omitting an unannotated owning Markdown. Existing linked-snapshot resolution, reopening and range checks SHALL remain available for location in the common page session. Submission SHALL preserve selected content and comments without checking original text, ranges or content hashes; source metadata SHALL be used for grouping without rereading disk or requiring prior worker memory. Existing request/event limits SHALL remain in force; failures SHALL preserve drafts without truncation or automatic splitting.
 
 #### Scenario: Submit Markdown and code annotations together
 
@@ -142,7 +142,7 @@ Linked-local-file annotations SHALL retain internal `sourceRef: {path, snapshotI
 #### Scenario: Include feedback on a linked local file
 
 - **WHEN** a person annotates text in a local file opened from a manifest Markdown link and submits with main-preview annotations
-- **THEN** linked targets retain their sourceRef and owning Markdown ref internally, use linked-source offsets for validation, and publish under the linked file's own path/snapshotId with no internal references or redundant unannotated Markdown entry
+- **THEN** linked targets retain their sourceRef and owning Markdown ref internally, retain linked-source offsets for location, and publish under the linked file's own path/snapshotId with no internal references or redundant unannotated Markdown entry
 
 #### Scenario: Locate linked feedback while its Markdown is unmounted
 
@@ -151,8 +151,8 @@ Linked-local-file annotations SHALL retain internal `sourceRef: {path, snapshotI
 
 #### Scenario: Validate after read worker termination
 
-- **WHEN** the file-reading worker no longer exists and complete original validation evidence is supplied
-- **THEN** submission validation uses the explicit request and instance manifest rather than prior worker state or current disk content
+- **WHEN** the file-reading worker no longer exists and the saved file metadata is supplied
+- **THEN** submission uses the explicit metadata and instance manifest without checking source text, ranges or content hashes
 
 #### Scenario: Submit an entire Markdown Mermaid
 

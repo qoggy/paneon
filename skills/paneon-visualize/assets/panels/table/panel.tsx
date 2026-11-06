@@ -52,8 +52,8 @@ import {
 import type { TableParams, TableRef, TableView } from './schema';
 import { publicTableFeedback } from './feedback';
 export const validateTable = serverAction({
-  input: z.object({ snapshot: tableParamsSchema, feedback: tableFeedbackSchema }).strict(),
-  handler: (_ctx, input) => completeTableSchema(input.snapshot).parse(input.feedback),
+  input: z.object({ feedback: tableFeedbackSchema }).strict(),
+  handler: (_ctx, input) => completeTableSchema().parse(input.feedback),
 });
 const initialView: TableView = { search: '', filters: {}, sort: null };
 function DataTable({
@@ -333,7 +333,7 @@ function TablePanel() {
   const description = useRef<HTMLDivElement>(null);
   const submission = useSubmission<AnnotationValue<TableRef | ElementAnnotationRef>>(
     async (feedback) => {
-      const validated = await validateTable({ snapshot: params, feedback });
+      const validated = await validateTable({ feedback });
       const receipt = await agent.emit('table-submitted', publicTableFeedback(validated));
       setLocked(true);
       return receipt;

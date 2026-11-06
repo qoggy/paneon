@@ -48,20 +48,34 @@ export function diffTargetLocation(
   target: AnnotationTarget<GitRef>,
 ): DiffLocation {
   diffTargetText(model, target);
+  const location = diffTargetCoordinates(model, target);
+  if (!location) throw new Error('Missing diff text location.');
+  return location;
+}
+
+/** Geometry queries may have no matching highlight; explicit location validates separately. */
+export function diffTargetCoordinates(
+  model: DiffModel,
+  target: AnnotationTarget<GitRef>,
+): DiffLocation | undefined {
   const ref = target.ref;
   if (ref.kind === 'file') return { kind: 'file' };
-  if (ref.kind === 'hunk')
-    return { kind: 'hunk', index: model.hunks.findIndex((hunk) => hunk.patch === ref.patch) };
+  if (ref.kind === 'hunk') {
+    const index = model.hunks.findIndex((hunk) => hunk.patch === ref.patch);
+    return index < 0 ? undefined : { kind: 'hunk', index };
+  }
   const source = ref.side === 'old' ? model.oldText : model.newText;
   const range = target.text;
-  if (source === undefined || !range) throw new Error('Missing diff text location.');
-  const offset = sourceLines(source)[ref.startLine - 1].start;
+  if (source === undefined || !range) return;
+  const line = sourceLines(source)[ref.startLine - 1];
+  if (!line) return;
+  const offset = line.start;
   return {
     kind: 'text',
     side: ref.side,
     start: offset + range.start,
     end: offset + range.end,
-    quote: range.quote!, // diffTargetText above has verified the original quote.
+    quote: range.quote!,
   };
 }
 export function diffTargetText(
@@ -110,28 +124,45 @@ export function diffTargetText(
     throw new Error('Text splits a grapheme.');
   return selected;
 }
-/** Whole-side registrations become the actual selected line range on delivery. */
+/** Read optional display context without validating the saved selection. */
+export function diffLineText(model: DiffModel, ref: Extract<GitRef, { kind: 'lines' }>): string {
+  const source = (ref.side === 'old' ? model.oldText : model.newText) ?? '';
+  return sourceLines(source)
+    .slice(ref.startLine - 1, ref.endLine)
+    .map((line) => line.text)
+    .join('');
+}
+
+/** Convert delivery coordinates without comparing quotes or requiring locatable text. */
 export function normalizeDiffTarget(
   model: DiffModel,
   target: AnnotationTarget<GitRef>,
 ): AnnotationTarget<GitRef> {
-  const registered = diffTargetText(model, target);
-  if (target.ref.kind !== 'lines' || !target.text || registered === undefined) return target;
+  if (
+    target.ref.kind !== 'lines' ||
+    !target.text ||
+    target.sourceRef !== undefined ||
+    target.type === 'mermaid'
+  )
+    return target;
+  const registered = diffLineText(model, target.ref);
   const lines = sourceLines(registered),
     startOffset = target.text.start,
     endOffset = target.text.end;
-  const start = lines.findIndex((line) => line.end > startOffset),
-    end = lines.findIndex((line) => line.end >= endOffset);
+  if (!lines.length) return target;
+  const start = lines.findLastIndex((line) => line.start <= startOffset),
+    end = lines.findLastIndex((line) => line.start < endOffset);
   return {
+    ...target,
     ref: {
       ...target.ref,
       startLine: target.ref.startLine + start,
       endLine: target.ref.startLine + end,
     },
     text: {
+      ...target.text,
       start: startOffset - lines[start].start,
       end: endOffset - lines[start].start,
-      quote: target.text.quote!, // diffTargetText above has verified this text-only target.
     },
   };
 }

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { createDiffModel } from '#test-skill/assets/shared/diff-model.ts';
 import {
   diffAnnotationTargets,
+  diffTargetCoordinates,
   diffTargetLocation,
   normalizeDiffTarget,
 } from '#test-skill/assets/shared/diff-schema.ts';
@@ -37,6 +38,40 @@ void test('normalized line references reveal the same full-source UTF-16 range o
     assert.deepEqual(diffTargetLocation(model, target), expected);
     assert.deepEqual(diffTargetLocation(model, normalized), expected);
   }
+});
+
+void test('delivery normalization preserves saved quotes without location checks', () => {
+  const model = createDiffModel(undefined, 'first\na🙂b\n');
+  const ref = diffAnnotationTargets(model, 'snapshot').new!;
+  for (const text of [
+    { start: 6, end: 7, quote: 'Earlier text' },
+    { start: 7, end: 8, quote: '\ud83d' },
+    { start: 100, end: 110, quote: 'Outside current source' },
+  ]) {
+    const target = { ref, text };
+    const before = structuredClone(target);
+    const normalized = normalizeDiffTarget(model, target);
+    assert.equal(normalized.text?.quote, text.quote);
+    assert.deepEqual(target, before);
+    assert.throws(() => diffTargetLocation(model, target));
+    assert.ok(diffTargetCoordinates(model, target));
+    assert.equal(diffTargetCoordinates(createDiffModel(), target), undefined);
+    assert.deepEqual(normalizeDiffTarget(createDiffModel(), target), target);
+  }
+  const hunk = {
+    ref: {
+      sourceId: 'snapshot',
+      kind: 'hunk' as const,
+      oldStart: 1,
+      oldLines: 1,
+      newStart: 1,
+      newLines: 1,
+      patch: 'Earlier patch',
+    },
+  };
+  assert.deepEqual(normalizeDiffTarget(model, hunk), hunk);
+  assert.throws(() => diffTargetLocation(model, hunk));
+  assert.equal(diffTargetCoordinates(model, hunk), undefined);
 });
 
 void test('file and hunk targets become component-local coordinates without source IDs', () => {

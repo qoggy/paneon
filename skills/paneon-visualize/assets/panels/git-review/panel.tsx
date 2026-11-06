@@ -35,6 +35,7 @@ import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
 import {
   diffAnnotationTargets,
+  diffTargetCoordinates,
   diffTargetLocation,
   diffTargetText,
 } from '../../shared/diff-schema.ts';
@@ -919,9 +920,9 @@ function Review() {
       },
       targetRanges(target) {
         const snapshot = snapshots.current.get(target.ref.sourceId);
-        return snapshot && mountedDiff.current === snapshot.id
-          ? (diffView.current?.getRanges(diffTargetLocation(snapshot.model, target)) ?? [])
-          : [];
+        if (!snapshot || mountedDiff.current !== snapshot.id) return [];
+        const location = diffTargetCoordinates(snapshot.model, target);
+        return location ? (diffView.current?.getRanges(location) ?? []) : [];
       },
       async locate(target) {
         const snapshot = snapshots.current.get(target.ref.sourceId);

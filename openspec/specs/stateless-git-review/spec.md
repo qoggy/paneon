@@ -42,7 +42,7 @@ Git branch, history and changed-file components SHALL expose semantic repository
 
 ### Requirement: Bind annotations to browser-retained displayed content
 
-Git annotations SHALL retain source/version/raw evidence and exact target coordinates from the displayed content. Complete explicit submissions SHALL include enough source/evidence for stateless validation without re-reading current files. Later queries SHALL NOT reassign old annotations. Existing event/request size limits, comment fields and complete replacesEventId corrections SHALL remain; no raw snapshot/draft persistence or automatic replay SHALL be introduced.
+Git annotations SHALL retain source/version/raw evidence and exact target coordinates from the displayed content. Complete explicit submissions SHALL carry saved selections, comments and source metadata without validating original text, character ranges or hunk contents, or re-reading current files. Later queries SHALL NOT reassign old annotations. Existing event/request size limits, comment fields and complete replacesEventId corrections SHALL remain; no raw snapshot/draft persistence or automatic replay SHALL be introduced.
 
 #### Scenario: Worktree content changes before annotation submission
 

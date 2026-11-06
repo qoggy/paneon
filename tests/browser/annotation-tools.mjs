@@ -286,7 +286,9 @@ export async function submitAnnotations(frame) {
   }
   await trigger.press('Enter');
   await directory.waitFor();
-  await submit.click();
+  // Keyboard activation leaves the pointer outside the launcher, so the closing
+  // directory cannot move the launcher under it and reopen through hover.
+  await submit.press('Enter');
   await directory.waitFor({ state: 'hidden' });
 }
 
@@ -304,8 +306,7 @@ export function annotationTools(frame, page) {
     await catalog.waitFor({ state: 'hidden' });
   }
   async function openCatalog() {
-    if ((await catalogButton.getAttribute('aria-expanded')) !== 'true') await catalogButton.click();
-    await catalog.waitFor({ state: 'visible' });
+    await openAnnotationDirectory(frame);
   }
   return {
     async count() {

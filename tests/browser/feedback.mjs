@@ -370,7 +370,8 @@ try {
   await markerFor(mappedId).waitFor();
   await button('Change source').click();
   await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: 'stale' }).waitFor();
+  await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
+  assert.equal(await frame.getByTestId('attempts').textContent(), '1');
   assert.deepEqual(await draft(), beforeMissing);
   await frame.locator(plain).scrollIntoViewIfNeeded();
   await familyMarker.waitFor({ state: 'hidden' });
@@ -403,8 +404,8 @@ try {
     .waitFor();
   await button('Adapter ready').click();
   await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: 'Snapshot unavailable' }).waitFor();
-  assert.equal(await frame.getByTestId('attempts').textContent(), '0');
+  await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
+  assert.equal(await frame.getByTestId('attempts').textContent(), '2');
   await button('Adapter missing').click();
 
   // Nested-scroller, narrow iframe viewport, and marker editing use current mounted geometry.
@@ -465,7 +466,7 @@ try {
   await bridgeMarker.click();
   await clickFloating(button('删除批注'));
 
-  // Invalid programmatic ranges still fail, without destroying already saved comments.
+  // Programmatic ranges do not block delivery; callback failures preserve every comment.
   const beforeInvalid = (await draft()).annotations.length;
   await clickFixtureButton('Add invalid grapheme');
   await content.waitForFunction(
@@ -477,14 +478,15 @@ try {
   const invalid = (await draft()).annotations.at(-1);
   assert.deepEqual(invalid.targets[0].text, { start: 5, end: 6, quote: '\udc68' });
   await submitAnnotations(frame);
-  await frame.getByRole('alert').filter({ hasText: 'stale' }).waitFor();
+  await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
+  assert.equal(await frame.getByTestId('attempts').textContent(), '3');
   // Programmatic controller-created invalid entry has no DOM marker; delete through low-level fixture.
   await clickFixtureButton('Remove last');
   const beforeFailure = await draft();
   await clickFixtureButton('Submit twice and mutate');
   assert.equal(await frame.getByRole('button', { name: /^批注 \(\d+\)$/ }).isDisabled(), true);
   await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
-  assert.equal(await frame.getByTestId('attempts').textContent(), '1');
+  assert.equal(await frame.getByTestId('attempts').textContent(), '4');
   assert.deepEqual(await draft(), beforeFailure);
   assert.match(await frame.getByTestId('hook-error').textContent(), /cannot be edited/);
   assert.equal((await read()).events.length, 0);

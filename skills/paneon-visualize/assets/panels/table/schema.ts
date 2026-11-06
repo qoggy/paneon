@@ -147,16 +147,8 @@ export function tableTargetError(
   }
   return null;
 }
-export function completeTableSchema(params: TableParams) {
+export function completeTableSchema() {
   return tableFeedbackSchema.superRefine((value, ctx) => {
-    value.annotations.forEach((entry, index) =>
-      entry.targets.forEach((target, at) => {
-        if (target.sourceRef !== undefined) return;
-        const message = tableTargetError(params, target);
-        if (message)
-          ctx.addIssue({ code: 'custom', path: ['annotations', index, 'targets', at], message });
-      }),
-    );
     if (value.replacesEventId === undefined && !value.annotations.length)
       ctx.addIssue({
         code: 'custom',

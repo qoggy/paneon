@@ -113,12 +113,6 @@ export function annotationValueSchema<TRef>(refSchema: z.ZodType<TRef>) {
           message: 'Text range end must exceed start.',
           path: ['end'],
         });
-      if (range.quote !== undefined && range.quote.length !== range.end - range.start)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Quote must match the UTF-16 range length.',
-          path: ['quote'],
-        });
     });
   const targetSchema = z
     .object({

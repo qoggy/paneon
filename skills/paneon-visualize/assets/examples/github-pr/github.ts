@@ -1,18 +1,14 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
+import { z } from '@qoggy/paneon/sdk';
 import { createDiffModel } from '../../shared/diff-model.ts';
 import type { DiffModel } from '../../shared/diff-model.ts';
-import { normalizeDiffTarget } from '../../shared/diff-schema.ts';
-import { resolvePRTarget } from './model.ts';
-import { publicPRFeedback } from './feedback.ts';
+import { buildPRFeedback } from './feedback.ts';
 import {
   oidSchema,
   repositorySchema,
   prFeedbackSchema,
-  prFeedbackSubmittedSchema,
-  prResolvedFeedbackSchema,
   prReviewRequestedSchema,
   prSourceSchema,
 } from './schema.ts';
@@ -734,44 +730,11 @@ export class GitHubReview {
     return this.session(repository, sessionId).snapshots.get(sourceId);
   }
   feedback(repository: string, sessionId: string, value: unknown): PRFeedbackSubmitted {
-    const session = this.session(repository, sessionId),
-      feedback = prFeedbackSchema.parse(value),
-      sources: Record<string, PRSource> = {};
-    if (!feedback.annotations.length)
-      throw new Error('Save at least one annotation before submitting.');
-    const annotations = feedback.annotations.map((entry) => {
-      const targets = entry.targets.map((target) => {
-        if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) return target;
-        const snapshot = session.snapshots.get(target.ref.sourceId);
-        if (!snapshot)
-          throw new Error(
-            'Original PR snapshot is missing. The draft is retained and cannot be reassigned.',
-          );
-        resolvePRTarget(snapshot, { ...target, ref: target.ref });
-        sources[snapshot.id] = snapshot.source;
-        if (
-          snapshot.source.kind === 'diff' &&
-          snapshot.model &&
-          (target.ref.kind === 'file' || target.ref.kind === 'hunk' || target.ref.kind === 'lines')
-        )
-          return normalizeDiffTarget(snapshot.model, { ...target, ref: target.ref });
-        return target;
-      });
-      return {
-        ...entry,
-        targets: [...new Map(targets.map((target) => [JSON.stringify(target), target])).values()],
-      };
-    });
-    const resolved = prResolvedFeedbackSchema.parse({
+    return buildPRFeedback(
       repository,
-      ...feedback,
-      annotations,
-      sources,
-    });
-    const result = prFeedbackSubmittedSchema.parse(publicPRFeedback(resolved));
-    if (JSON.stringify(result).length > 65536)
-      throw new Error('Annotations exceed the 65536-character event limit. Draft retained.');
-    return result;
+      prFeedbackSchema.parse(value),
+      this.session(repository, sessionId).snapshots,
+    );
   }
   reviewRequest(repository: string, sessionId: string, detailId: string) {
     const detail = this.detailFrom(this.session(repository, sessionId), detailId);

@@ -13,7 +13,10 @@ const compiled = await build({
 const { AnnotationStore } = (await import(
   'data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].contents).toString('base64')
 )) as {
-  AnnotationStore: new <TRef>(options: { onSubmit(): Promise<unknown>; disabled?: boolean }) => {
+  AnnotationStore: new <TRef>(options: {
+    onSubmit(value: AnnotationValue<TRef>): Promise<unknown>;
+    disabled?: boolean;
+  }) => {
     createAnnotation(targets: AnnotationTarget<TRef>[], comment?: string): string;
     updateAnnotation(
       id: string,
@@ -200,9 +203,13 @@ void test('undo respects open editors, submission locks and page read-only polic
   assert.equal(delivered, 1, 'Undo never submits feedback');
 });
 
-void test('undo preserves the original text snapshot so a changed source still rejects submission', async () => {
+void test('undo preserves the original text snapshot for location without blocking submission', async () => {
+  const delivered: AnnotationValue<string>[] = [];
   const store = new AnnotationStore<string>({
-    onSubmit: () => Promise.reject(new Error('Unexpected submission')),
+    onSubmit: (value: AnnotationValue<string>) => {
+      delivered.push(value);
+      return Promise.resolve();
+    },
   });
   const register = (source: string) =>
     store.registerText({
@@ -221,7 +228,11 @@ void test('undo preserves the original text snapshot so a changed source still r
   unregister();
   register('same changed');
   assert.equal(recovery(store).undo(), true);
-  await assert.rejects(store.submit(), /stale/);
+  const before = store.getSnapshot().value;
+  await assert.rejects(store.locate(before.annotations[0].targets[0]), /stale/);
+  await store.submit();
+  assert.deepEqual(delivered, [before]);
+  assert.deepEqual(store.getSnapshot().value, before);
 });
 
 void test('undo restores a closed original file snapshot and its location', async () => {

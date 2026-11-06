@@ -250,8 +250,8 @@ export default definePanel({
 ### Result data
 
 - `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading or on the [picked element](#element-annotations). A target is `{ref, src?, sourceRef?, type?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
-- `text` is `{start, end, quote}`: UTF-16 offsets into the original string, end excluded, on grapheme boundaries, with `quote === source.slice(start, end)`. A target with `type: 'mermaid'` is a diagram; its `text`, when present, is `{start, end}` without `quote`.
-- `ref` is any finite JSON value. For ordinary content use a stable string: `target="redis-plan"` is delivered as `ref: "redis-plan"`. For content that changes with page state or source version, put the state in the ref, such as ``annotationTarget={`result-${env}`}``: one ref over changing text makes earlier annotations stale and blocks submission. Locating them after the state changes needs an [adapter](#adapters) that switches back. Functions, DOM elements and screen coordinates are not references.
+- `text` is `{start, end, quote}`: original-source UTF-16 offsets on grapheme boundaries, end excluded, and the selected text in `quote`. Mermaid targets have `type: 'mermaid'` and optional `text: {start, end}`.
+- `ref` is a finite JSON value identifying the annotated content, such as `"redis-plan"`. Include state or version when content changes, such as ``annotationTarget={`result-${env}`}``. Use an [adapter](#adapters) to locate a saved version.
 - `annotationValueSchema(refSchema)` checks structure only. It also accepts [element targets](#element-annotations), so event schemas derived from it, as in the complete example, accept them too. A hand-written target schema needs `elementAnnotationRefSchema` beside its own ref schema. `onSubmit` and `useAnnotations<TRef>()` values include `ElementAnnotationRef`; check `isElementAnnotationRef(target.ref)` before reading a ref as the page's own.
 
 ### Element annotations
@@ -262,7 +262,7 @@ export default definePanel({
 
 ### File annotations
 
-When an annotatable `Markdown` links to a local file, the human can annotate the opened file too. Its targets keep that Markdown's `ref` and add `sourceRef: {path, snapshotId}`, with offsets into the file as displayed rather than into the Markdown. Wherever the page checks or maps offsets against its own content, such as an event schema refinement, skip targets with `target.sourceRef !== undefined`.
+When an annotatable `Markdown` links to a local file, the human can annotate the opened file too. Its targets keep that Markdown's `ref` and add `sourceRef: {path, snapshotId}`; text offsets refer to the file as displayed, not to the Markdown.
 
 `sourceRef` is optional JSON; the SDK does not prescribe its structure. `annotationValueSchema(refSchema)` accepts it without widening `refSchema`. Hand-written strict target schemas need to accept the optional field.
 
@@ -288,7 +288,7 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 ### Adapters
 
-Registered text validates and locates without an adapter while it is displayed. After it unmounts, such as in an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, its annotations still submit, but locating them fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned source content needs an adapter as well. With an adapter, Paneon resolves every target through it except element targets, which Paneon locates itself:
+Without an adapter, registered text can be located only while it is mounted. Content that unmounts, such as an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, still submits, but locating its annotations fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned source content needs an adapter as well. Once supplied, the adapter resolves every target except element targets and linked-file targets (with `sourceRef`), which Paneon handles itself:
 
 ```tsx
 // Each Tabs value is also the annotation ref of the Markdown rendered in that panel.
@@ -326,7 +326,7 @@ type AnnotationAdapter<TRef> = {
 };
 ```
 
-- `resolve` returns the exact original string for a target with `text`, or `missing` / `stale`, which keeps the draft. Retain old snapshots while annotations refer to them; never apply old offsets to newly fetched text.
+- `resolve` returns the original source string for a target with `text`, or `missing` / `stale` with a message. Retain snapshots used by saved annotations.
 - `locate` restores the right page or view before highlighting. Ignore obsolete async responses.
 - `targetRanges` positions highlights for references that do not equal a registration, such as a line range within one diff side. Return `[]` when the source is not mounted; never search for the first matching quote.
 
@@ -335,7 +335,7 @@ type AnnotationAdapter<TRef> = {
 - `<Markdown annotationTarget="plan-a">{source}</Markdown>` registers the document; the target becomes `ref` unchanged. Give each document its own target, even when texts are identical. Offsets address the Markdown source, so a quote can include Markdown syntax, and a selection across separate source fragments becomes several targets.
 - `<CodeBlock code={source} language="ts" annotationTarget="example-v1" />` registers the code with the same page session. Offsets address the exact original `code`, including CRLF/CR line endings. Use different targets for distinct snippets, and include a version for changing content.
 - `<DiffView oldText="before" newText="after" annotationTargets={{ old: refA, new: refB }} />` registers each side; its reference becomes `ref` unchanged. The two sides need different references. Omit a side to disable annotations on it. Offsets address that side's complete original string.
-- With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side. Page validation must accept annotations spanning both sides.
+- With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side.
 - A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
 - For another renderer, pass `registerText` `segments: {node: Text, sourceOffsets: (number | null)[]}[]`. Each array has `node.data.length + 1` UTF-16 boundaries into one `source`; use `null` for an unmappable boundary.
 
@@ -347,7 +347,7 @@ type AnnotationAdapter<TRef> = {
 
 ### Submission
 
-- Paneon checks each target's range against its original text through the adapter or registration before calling `onSubmit`; if either fails, the draft stays.
+- Explicit submission passes the complete saved annotations to `onSubmit`; a failed submission retains the draft for retry.
 - To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the earlier event's ID, as built-in pages do. The draft is not cleared after submission.
 - Drafts live in browser memory, so a reload can lose them. [Event limits](#deliver-events) apply.
 

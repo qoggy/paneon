@@ -6,7 +6,7 @@ import {
   evidenceSchema,
   fileFeedbackSchema,
   fileReviewParamsSchema,
-  validateRanges,
+  validateSources,
 } from './schema.ts';
 
 export const snapshotId = (path: string, text: string) =>
@@ -69,13 +69,9 @@ export const validateFeedback = serverAction({
   handler: (_ctx, { params, feedback, evidence }) => {
     for (const file of evidence.files) {
       const supplied = params.files[file.fileIndex];
-      if (
-        supplied === undefined ||
-        resolve(process.cwd(), supplied) !== file.path ||
-        snapshotId(file.path, file.text) !== file.snapshotId
-      )
+      if (supplied === undefined || resolve(process.cwd(), supplied) !== file.path)
         throw new Error('Unknown or inconsistent file snapshot.');
     }
-    return validateRanges(feedback, evidence, params.files);
+    return validateSources(feedback, evidence);
   },
 });

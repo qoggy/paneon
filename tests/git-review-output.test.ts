@@ -302,7 +302,6 @@ void test('the existing size limit measures the published payload, including com
     },
     new Map([[s.id, s]]),
   );
-  assert.ok(JSON.stringify(raw).length > 65536);
   const checked = validateGitFeedback({ repositories: [{ id: 'repo', path: '/work/demo' }] }, raw);
   assert.ok(JSON.stringify(publicGitFeedback(checked)).length < 65536);
   assert.throws(

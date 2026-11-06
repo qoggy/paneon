@@ -12,7 +12,7 @@ import {
 import {
   diffReviewParamsSchema,
   diffFeedbackResultSchema,
-  validateRanges,
+  validateSources,
 } from '#test-skill/assets/panels/diff-review/schema.ts';
 import { publicDiffFeedback } from '#test-skill/assets/panels/diff-review/feedback.ts';
 
@@ -289,12 +289,7 @@ void test('diff-review draft validation accepts both block sides before publishi
       { fileIndex: 0, snapshotId: id, oldPath: '/before/config.ts', newPath: '/after/config.ts' },
     ],
   });
-  assert.deepEqual(
-    validateRanges(params, payload, {
-      [`0:${id}`]: { id, oldText, newText },
-    }),
-    payload,
-  );
+  assert.deepEqual(validateSources(params, payload), payload);
   assert.deepEqual(publicDiffFeedback(params, payload).files[0].annotations[0], {
     targets: targets.map(({ ref, text }) => ({ side: ref.side, text })),
     comment: 'review this block',

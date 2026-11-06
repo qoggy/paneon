@@ -127,25 +127,18 @@ void test('controller keeps stable identities, validates changes atomically and 
   assert.deepEqual(store.getSnapshot().value.annotations, []);
 });
 
-void test('submission locks before async resolution, deep-freezes one snapshot and retains failed drafts', async () => {
-  let finishResolve: (() => void) | undefined;
-  const resolution = new Promise<void>((resolve) => {
-    finishResolve = resolve;
+void test('submission locks during delivery, deep-freezes one snapshot and retains failed drafts', async () => {
+  let finishSubmit: (() => void) | undefined;
+  const delivery = new Promise<void>((resolve) => {
+    finishSubmit = resolve;
   });
   let count = 0;
   let received: AnnotationValue | undefined;
   const store = new AnnotationStore({
-    adapter: {
-      resolve: async () => {
-        await resolution;
-        return { status: 'ready' };
-      },
-      locate: async () => {},
-    },
     onSubmit: async (value) => {
       count++;
       received = value;
-      await Promise.resolve();
+      await delivery;
       throw new Error('failure');
     },
   });
@@ -159,9 +152,9 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
   assert.throws(() => api.removeAnnotation(id));
   assert.throws(() => api.editAnnotation(null));
   await api.submit();
-  assert.equal(count, 0);
-  assert.ok(finishResolve);
-  finishResolve();
+  assert.equal(count, 1, 'Duplicate submission does not invoke the callback again');
+  assert.ok(finishSubmit);
+  finishSubmit();
   await assert.rejects(submitting, /failure/);
   assert.equal(count, 1);
   assert.deepEqual(received, before);
@@ -177,8 +170,8 @@ void test('submission locks before async resolution, deep-freezes one snapshot a
     },
   });
   api.updateAnnotation(id, { targets: [{ ref: 'one' }], comment: 'corrected' });
-  await assert.rejects(api.submit(), /not registered/);
-  assert.equal(count, 1);
+  await api.submit();
+  assert.equal(count, 2, 'Corrected feedback submits without a registered source');
 });
 
 void test('disabled providers prohibit mutations and duplicate callbacks without imposing revision fields', async () => {
@@ -258,17 +251,18 @@ void test('annotations on content that later unmounts still submit, but cannot b
   );
 });
 
-void test('a source changed before unmounting stays stale after unmounting', async () => {
-  let count = 0;
+void test('a changed source rejects location before and after unmounting without blocking submission', async () => {
+  const submitted: AnnotationValue[] = [];
   const store = new AnnotationStore({
-    onSubmit: () => {
-      count++;
+    onSubmit: (value) => {
+      submitted.push(value);
       return Promise.resolve();
     },
   });
   const api = store.getSnapshot() as unknown as {
     registerText(registration: unknown): () => void;
     createAnnotation(targets: unknown[], comment?: string): string;
+    locate(target: unknown): Promise<void>;
   };
   const register = (source: string) => {
     const node = { nodeType: 3, data: source, isConnected: true };
@@ -285,11 +279,16 @@ void test('a source changed before unmounting stays stale after unmounting', asy
     };
   };
   const unmountOld = register('Use Redis.');
-  api.createAnnotation([{ ref: 'tab:plan', text: { start: 4, end: 9, quote: 'Redis' } }], 'Why?');
+  const target = { ref: 'tab:plan', text: { start: 4, end: 9, quote: 'Redis' } };
+  api.createAnnotation([target], 'Why?');
+  const before = store.getSnapshot().value;
   unmountOld();
   const unmountNew = register('Use MySQL.');
-  await assert.rejects(store.getSnapshot().submit(), /stale/);
+  await assert.rejects(api.locate(target), /stale/);
+  await store.getSnapshot().submit();
   unmountNew();
-  await assert.rejects(store.getSnapshot().submit(), /stale/);
-  assert.equal(count, 0);
+  await assert.rejects(api.locate(target), /stale/);
+  await store.getSnapshot().submit();
+  assert.deepEqual(submitted, [before, before]);
+  assert.deepEqual(store.getSnapshot().value, before);
 });

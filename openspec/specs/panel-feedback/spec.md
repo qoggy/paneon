@@ -130,7 +130,7 @@ Adapters SHALL preserve target identity across presentation changes such as sort
 
 ### Requirement: Submit through existing declared events
 
-The common controls SHALL deliver a feedback snapshot through an explicit page-provided submission callback. Pages SHALL declare an event schema and reuse agent.emit and the existing durable events/ack mechanism, without requiring a new protocol, database, or universal event name. Selection and draft editing SHALL NOT automatically emit events. Success SHALL be shown only after durable event submission completes; failed submission SHALL retain drafts. Existing page-specific answer and revision contracts SHALL remain authoritative.
+The common controls SHALL deliver a feedback snapshot through an explicit page-provided submission callback. The shared session and all supplied file, diff, Git, PR and table pages SHALL validate submission structure without resolving targets, comparing saved ranges and quotes against source text, requiring quote length to match coordinates, or rechecking content hashes. Source checks SHALL be used only for locating and highlighting annotations. Missing, changed, unmounted or unlocatable content SHALL NOT prevent delivery of saved targets and comments; source checks SHALL remain part of location. Pages SHALL declare an event schema and reuse agent.emit and the existing durable events/ack mechanism, without requiring a new protocol, database, or universal event name. Selection and draft editing SHALL NOT automatically emit events. Success SHALL be shown only after durable event submission completes; failed submission SHALL retain drafts. Existing page-specific answer and revision contracts SHALL remain authoritative.
 
 #### Scenario: Submit and read feedback
 
@@ -141,6 +141,12 @@ The common controls SHALL deliver a feedback snapshot through an explicit page-p
 
 - **WHEN** the submission callback fails
 - **THEN** the controls retain editable drafts and do not show a successful submission
+
+#### Scenario: Submit annotations whose source cannot be located
+
+- **WHEN** a person submits saved annotations after their source changes or disappears, or the page adapter cannot resolve their original ranges
+- **THEN** the common submission path and supplied pages deliver the saved selected content and comments without calling the adapter or checking source ranges or content hashes
+- **AND** locating those annotations still checks the source and can report a location failure without deleting their comments or preventing submission
 
 ### Requirement: Preserve custom post-submission policies
 

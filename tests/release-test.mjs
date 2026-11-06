@@ -52,6 +52,7 @@ const browserScripts = [
   'table-header-themes',
   'feedback',
   'annotation-api',
+  'panel-annotation-submission',
   'element-annotations',
   'annotation-positioning',
   'media-annotations',

@@ -8,6 +8,7 @@ import {
 } from '#test-skill/assets/examples/github-pr/schema.ts';
 import { diffAnnotationTargets } from '#test-skill/assets/shared/diff-schema.ts';
 import { resolvePRTarget, safeLink } from '#test-skill/assets/examples/github-pr/model.ts';
+import { buildPRFeedback } from '#test-skill/assets/examples/github-pr/feedback.ts';
 import { body, code, ids, routeGh } from './github-pr-fixture.ts';
 import type { PRFixtureState } from './github-pr-fixture.ts';
 function fixture() {
@@ -28,6 +29,27 @@ function fixture() {
     },
   };
 }
+
+void test('browser PR submission preserves comments when description text and hashes no longer match', async () => {
+  const f = fixture();
+  const detail = await f.client.detail(f.repository, f.session, 101);
+  const description = detail.snapshots.find((snapshot) => snapshot.source.kind === 'description')!;
+  const target = {
+    ref: { sourceId: description.id, kind: 'description' as const },
+    text: { start: 100, end: 110, quote: 'Earlier selected text' },
+  };
+  const draft = { annotations: [{ id: 'kept', targets: [target], comment: 'Keep this feedback' }] };
+  for (const body of [undefined, 'Different body']) {
+    const snapshot = { ...description, body };
+    assert.throws(() => resolvePRTarget(snapshot, target));
+    const calls = f.calls.length;
+    const result = buildPRFeedback(f.repository, draft, new Map([[snapshot.id, snapshot]]));
+    assert.deepEqual(result.sources[0].annotations, [
+      { targets: [{ text: target.text }], comment: 'Keep this feedback' },
+    ]);
+    assert.equal(f.calls.length, calls, 'Feedback does not recheck GitHub or original content');
+  }
+});
 void test('PR input is explicit, scoped and rejects option/URL repository injection', () => {
   for (const input of [
     {},
@@ -121,31 +143,17 @@ void test('description and stable-ID check observations survive same-head change
   );
   assert.equal(resolvePRTarget(oldBody, target), body());
   assert.throws(
-    () =>
-      f.client.feedback(f.repository, f.session, {
-        annotations: [
-          {
-            id: 'wrong-kind',
-            comment: '',
-            targets: [{ ref: { sourceId: oldBody.id, kind: 'check' } }],
-          },
-        ],
-      }),
+    () => resolvePRTarget(oldBody, { ref: { sourceId: oldBody.id, kind: 'check' } }),
     /kind/,
   );
-  assert.throws(
-    () =>
-      f.client.feedback(f.repository, f.session, {
-        annotations: [
-          {
-            id: 'wrong-text',
-            comment: '',
-            targets: [{ ...target, text: { start, end: start + 2, quote: '错误' } }],
-          },
-        ],
-      }),
-    /Markdown/,
-  );
+  const saved = { ...target, text: { start, end: start + 2, quote: 'Earlier selection' } };
+  assert.throws(() => resolvePRTarget(oldBody, saved), /Markdown/);
+  const submitted = f.client.feedback(f.repository, f.session, {
+    annotations: [{ id: 'saved-text', comment: 'Keep this opinion', targets: [saved] }],
+  });
+  assert.deepEqual(submitted.sources[0].annotations, [
+    { comment: 'Keep this opinion', targets: [{ text: saved.text }] },
+  ]);
   assert.throws(
     () =>
       f.client.feedback(f.repository, randomUUID(), {

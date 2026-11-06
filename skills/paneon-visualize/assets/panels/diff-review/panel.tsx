@@ -21,7 +21,6 @@ import {
   diffReviewParamsSchema,
   diffReviewSubmittedSchema,
   diffFeedbackResultSchema,
-  validateRanges,
   validateSources,
 } from './schema';
 import type { DiffRef, Snapshot } from './schema';
@@ -353,27 +352,14 @@ function DiffReviewPanel() {
           newPath: string | null;
         }
       >();
-      const retained: Record<string, Snapshot> = {};
       for (const annotation of feedback.annotations)
         for (const target of annotation.targets) {
           if (target.sourceRef !== undefined || isElementAnnotationRef(target.ref)) continue;
           const { fileIndex, snapshotId } = target.ref;
           const key = `${fileIndex}:${snapshotId}`;
-          const snapshot = snapshots.current.get(key);
-          if (!snapshot) throw new Error('Missing original comparison snapshot. Draft retained.');
           sources.set(key, { ...value.files[fileIndex], fileIndex, snapshotId });
-          retained[key] = snapshot;
         }
       const result = { ...feedback, sources: [...sources.values()] };
-      validateRanges(value, result, retained);
-      for (const source of result.sources) {
-        const snapshot = retained[`${source.fileIndex}:${source.snapshotId}`];
-        if (
-          (await snapshotId(value.files[source.fileIndex], snapshot.oldText, snapshot.newText)) !==
-          snapshot.id
-        )
-          throw new Error('Comparison snapshot identity does not match its content.');
-      }
       const validated = await validateFeedback({ params: value, feedback: result });
       return agent.emit('diff-review-submitted', publicDiffFeedback(value, validated));
     },

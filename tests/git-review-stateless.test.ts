@@ -130,7 +130,7 @@ void test('fresh processes read subsequent file/page and validate retained annot
     await f.close();
   }
 });
-void test('line/character/hunk/file evidence is deduplicated and strictly internally consistent', async () => {
+void test('Git submission preserves saved feedback without checking source text, patches or character positions', async () => {
   const f = await fixture();
   try {
     const params = { repositories: [{ id: 'web', path: f.repo }] };
@@ -179,7 +179,7 @@ void test('line/character/hunk/file evidence is deduplicated and strictly intern
       new Map([[snapshot.id, snapshot]]),
     );
     assert.equal(event.annotations[0].targets.length, 3);
-    assert.equal(event.sources[snapshot.id].evidence.length, 2);
+    assert.equal(event.sources[snapshot.id].evidence.length, 1);
     assert.deepEqual(validateGitFeedback(params, event), event);
     const rejects = (mutate: (next: typeof event) => void) => {
       const next = structuredClone(event);
@@ -198,34 +198,15 @@ void test('line/character/hunk/file evidence is deduplicated and strictly intern
     rejects((next) => {
       next.sources[snapshot.id].new!.contentHash = 'invalid';
     });
-    rejects((next) => {
-      next.sources[snapshot.id].new!.type = 'binary';
-    });
-    rejects((next) => {
-      next.sources[snapshot.id].evidence.push(next.sources[snapshot.id].evidence[0]);
-    });
-    rejects((next) => {
-      const e = next.sources[snapshot.id].evidence.find((item) => item.kind === 'lines')!;
-      e.text = 'not original\n';
-    });
-    rejects((next) => {
-      next.annotations[0].targets[2].text!.quote = 'false';
-    });
-    rejects((next) => {
-      next.annotations[0].targets[1].text = { start: 0, end: 1, quote: 'x' };
-    });
-    rejects((next) => {
-      const e = next.sources[snapshot.id].evidence.find((item) => item.kind === 'hunk')!;
-      if (e.kind === 'hunk') e.oldText = 'false';
-    });
-    rejects((next) => {
-      const e = next.sources[snapshot.id].evidence.find((item) => item.kind === 'hunk')!;
-      if (e.kind === 'hunk') e.patch = e.patch.replace('@@', 'bad');
-    });
-    rejects((next) => {
-      const e = next.sources[snapshot.id].evidence.find((item) => item.kind === 'lines')!;
-      if (e.kind === 'lines') e.endLine++;
-    });
+    const changed = structuredClone(event);
+    const context = changed.sources[snapshot.id].evidence[0];
+    assert.ok(context.kind === 'lines');
+    context.text = 'different context\n';
+    changed.annotations[0].targets[2].text!.quote = 'saved selection';
+    assert.deepEqual(validateGitFeedback(params, changed), changed);
+    const published = publicGitFeedback(changed).files[0].annotations[0].targets[2];
+    assert.ok(published.kind === 'lines');
+    assert.equal(published.selection.quote, 'saved selection');
     assert.throws(
       () =>
         validateGitFeedback(params, {
@@ -263,7 +244,10 @@ void test('line/character/hunk/file evidence is deduplicated and strictly intern
     ];
     assert.doesNotThrow(() => validateGitFeedback(params, unicode));
     unicode.annotations[0].targets[0].text = { start: 1, end: 2, quote: '\ud83d' };
-    assert.throws(() => validateGitFeedback(params, unicode), /grapheme/);
+    assert.doesNotThrow(() => validateGitFeedback(params, unicode));
+    const split = publicGitFeedback(unicode).files[0].annotations[0].targets[0];
+    assert.ok(split.kind === 'lines');
+    assert.equal(split.selection.quote, '\ud83d');
   } finally {
     await f.close();
   }

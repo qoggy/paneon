@@ -70,9 +70,9 @@ void test('table sorting is stable, null-last in both directions; filters preser
   );
   assert.deepEqual(params, initial);
 });
-void test('table complete result validates mixed targets, independent entries, original quotes and revisions', () => {
+void test('table submission preserves mixed targets, independent entries and saved quotes without source checks', () => {
   const params = table(),
-    schema = completeTableSchema(params);
+    schema = completeTableSchema();
   const first = {
     id: 'a',
     targets: [
@@ -112,11 +112,16 @@ void test('table complete result validates mixed targets, independent entries, o
       ref: { kind: 'cell', rowIndex: 0, columnKey: 'name' },
       text: { start: 9, end: 10, quote: source.slice(9, 10) },
     },
-  ])
+  ]) {
     assert.notEqual(
       tableTargetError(params, target as Parameters<typeof tableTargetError>[1]),
       null,
     );
+    const draft = {
+      annotations: [{ id: 'saved', targets: [target], comment: 'Keep this opinion' }],
+    };
+    assert.deepEqual(schema.parse(draft), draft, 'Location failure cannot prevent submission');
+  }
 });
 void test('Table annotates displayed number and boolean text without changing input types', () => {
   const values = [120, 0, -12.5, true, false, '120'];
@@ -135,7 +140,7 @@ void test('Table annotates displayed number and boolean text without changing in
     text: { start: 1, end: 3, quote: '20' },
   });
   const published = publicTableFeedback(
-    completeTableSchema(params).parse({
+    completeTableSchema().parse({
       annotations: [{ id: 'mixed', targets, comment: 'Check these values' }],
     }),
   );
@@ -150,14 +155,6 @@ void test('Table annotates displayed number and boolean text without changing in
 });
 
 void test('Table publishes header, cell and multi-cell opinions without editing ids', () => {
-  const params = tableParamsSchema.parse({
-    title: 'Services',
-    columns: [
-      { key: 'name', label: 'Service' },
-      { key: 'description', label: '说明' },
-    ],
-    rows: [{ name: 'API', description: '同步请求🙂' }],
-  });
   const name = {
     ref: { kind: 'cell' as const, rowIndex: 0, columnKey: 'name' },
     text: { start: 0, end: 3, quote: 'API' },
@@ -170,7 +167,7 @@ void test('Table publishes header, cell and multi-cell opinions without editing 
     ref: { kind: 'header' as const, columnKey: 'description' },
     text: { start: 0, end: 2, quote: '说明' },
   };
-  const draft = completeTableSchema(params).parse({
+  const draft = completeTableSchema().parse({
     annotations: [
       { id: 'header', targets: [header], comment: '列名意见' },
       { id: 'cell', targets: [description], comment: '' },
@@ -196,14 +193,14 @@ void test('Table publishes header, cell and multi-cell opinions without editing 
 });
 
 void test('Table publishes initial results and complete empty corrections', () => {
-  const draft = completeTableSchema(table()).parse({
+  const draft = completeTableSchema().parse({
     annotations: [
       { id: 'header', targets: [{ ref: { kind: 'header', columnKey: 'name' } }], comment: '' },
     ],
   });
   assert.equal('replacesEventId' in publicTableFeedback(draft), false);
   const cleared = publicTableFeedback(
-    completeTableSchema(table()).parse({ annotations: [], replacesEventId: 13 }),
+    completeTableSchema().parse({ annotations: [], replacesEventId: 13 }),
   );
   assert.deepEqual(cleared, { annotations: [], replacesEventId: 13 });
   assert.deepEqual(tableSubmittedSchema.parse(cleared), cleared);
@@ -253,7 +250,7 @@ void test('table header references distinguish labels from full columns and pres
     ],
     rows: [{ left: 'not the label', right: 'different source', number: 123 }],
   });
-  const schema = completeTableSchema(params);
+  const schema = completeTableSchema();
   const header = (columnKey: string, start: number, end: number, quote: string) => ({
     ref: { kind: 'header' as const, columnKey },
     text: { start, end, quote },
@@ -286,9 +283,6 @@ void test('table header references distinguish labels from full columns and pres
   for (const ref of [
     { kind: 'header', columnKey: 'left', rowIndex: 0 },
     { kind: 'header', label: '说明' },
-    { kind: 'header', columnKey: '__proto__' },
-    { kind: 'column', columnKey: 'left' },
-    { kind: 'row', rowIndex: 0 },
   ]) {
     const result = schema.safeParse({
       annotations: [
@@ -302,6 +296,7 @@ void test('table header references distinguish labels from full columns and pres
     assert.equal(result.success, false);
   }
   for (const ref of [
+    { kind: 'header', columnKey: '__proto__' },
     { kind: 'row', rowIndex: 0 },
     { kind: 'column', columnKey: 'left' },
     { kind: 'cell', rowIndex: 0, columnKey: 'number' },
@@ -316,7 +311,7 @@ void test('table header references distinguish labels from full columns and pres
 });
 
 void test('table rejects page-level comments even on corrections', () => {
-  const schemas = [completeTableSchema(table())];
+  const schemas = [completeTableSchema()];
   for (const schema of schemas) {
     assert.equal(schema.safeParse({ annotations: [], comment: 'removed' }).success, false);
     assert.equal(
@@ -333,7 +328,7 @@ void test('table validates page targets alongside page-defined local file target
     sourceRef: { path: '/local.txt', snapshotId: 'local' },
     text: { start: 0, end: 5, quote: 'local' },
   };
-  const result = completeTableSchema(table()).parse({
+  const result = completeTableSchema().parse({
     annotations: [
       {
         id: 'mixed',

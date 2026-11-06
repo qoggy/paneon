@@ -23,7 +23,12 @@ const { AnnotationStore, fileSourceOffsets } = (await import(
   fileSourceOffsets: (source: string) => number[];
   AnnotationStore: new <TRef = string>(options: {
     onSubmit(value: AnnotationValue<TRef>): Promise<void>;
-    adapter?: { resolve(): { status: 'ready' }; locate(): void };
+    adapter?: {
+      resolve(
+        target: AnnotationTarget<TRef>,
+      ): { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string };
+      locate(): void;
+    };
   }) => {
     openFile(reference: { href: string }, ref: TRef): void;
     createFileSnapshot(
@@ -190,7 +195,7 @@ void test('source identity is optional JSON and does not reserve a file structur
   );
 });
 
-void test('a familiar kind has no special meaning without a registered file snapshot', async () => {
+void test('submission delivers arbitrary page refs without resolving their current source', async () => {
   const ref = { kind: 'paneon-file', custom: 'business' };
   let resolved = 0;
   const store = new AnnotationStore<typeof ref>({
@@ -205,7 +210,82 @@ void test('a familiar kind has no special meaning without a registered file snap
   });
   store.getSnapshot().createAnnotation([{ ref }]);
   await store.getSnapshot().submit();
-  assert.equal(resolved, 1);
+  assert.equal(resolved, 0);
+});
+
+void test('submission preserves all targets and comments when the adapter source omits a rendered heading', async () => {
+  const delivered: AnnotationValue<string>[] = [];
+  const body = 'Use shared storage.';
+  const source = '## Cache plan\n\n' + body;
+  const store = new AnnotationStore<string>({
+    onSubmit: (value) => {
+      delivered.push(value);
+      return Promise.resolve();
+    },
+    adapter: {
+      resolve: () => ({ status: 'ready', text: body }),
+      locate() {},
+    },
+  });
+  store.registerText({
+    ref: 'plan',
+    source,
+    segments: [
+      {
+        node: { nodeType: 3, data: source, isConnected: true },
+        sourceOffsets: Array.from({ length: source.length + 1 }, (_, i) => i),
+      },
+    ],
+  });
+  store
+    .getSnapshot()
+    .createAnnotation(
+      [{ ref: 'plan', text: { start: source.indexOf(body), end: source.length, quote: body } }],
+      'Should this use Redis?',
+    );
+  store.getSnapshot().createAnnotation([{ ref: 'other' }], 'Agreed.');
+  const before = store.getSnapshot().value;
+  await store.getSnapshot().submit();
+  assert.deepEqual(delivered, [before]);
+  assert.deepEqual(store.getSnapshot().value, before);
+  await assert.rejects(store.getSnapshot().locate(before.annotations[0].targets[0]), /stale/);
+});
+
+void test('missing, stale and throwing location adapters cannot block submission', async () => {
+  for (const resolution of ['missing', 'stale', 'throw'] as const) {
+    let resolved = 0;
+    const delivered: AnnotationValue<string>[] = [];
+    const store = new AnnotationStore<string>({
+      onSubmit: (value) => {
+        delivered.push(value);
+        return Promise.resolve();
+      },
+      adapter: {
+        resolve() {
+          resolved++;
+          if (resolution === 'throw') throw new Error('Location unavailable');
+          return { status: resolution, message: 'Location unavailable' };
+        },
+        locate() {},
+      },
+    });
+    store
+      .getSnapshot()
+      .createAnnotation(
+        [{ ref: 'hidden', text: { start: 10, end: 14, quote: 'text' } }],
+        'Keep this feedback.',
+      );
+    const before = store.getSnapshot().value;
+    await store.getSnapshot().submit();
+    assert.deepEqual(delivered, [before]);
+    assert.equal(resolved, 0);
+    await assert.rejects(
+      store.getSnapshot().locate(before.annotations[0].targets[0]),
+      /Location unavailable/,
+    );
+    assert.equal(resolved, 1, 'Only locating consults the adapter');
+    assert.deepEqual(store.getSnapshot().value, before);
+  }
 });
 
 void test('normalized code boundaries preserve raw UTF-16 offsets and CRLF quotes', () => {
@@ -256,9 +336,13 @@ void test('file drafts share explicit submission, retain original source and byp
   assert.equal(JSON.stringify(delivered[0]).includes(file.text), false);
 });
 
-void test('existing quote checks apply to the retained file source without rereading', async () => {
+void test('quote mismatch blocks file location but not submission', async () => {
+  const delivered: AnnotationValue<string>[] = [];
   const store = new AnnotationStore({
-    onSubmit: () => Promise.reject(new Error('Invalid quote must not submit')),
+    onSubmit: (value) => {
+      delivered.push(value);
+      return Promise.resolve();
+    },
   });
   store.openFile({ href: file.path }, ref);
   store.retainFile({ ref, sourceRef, file });
@@ -266,8 +350,14 @@ void test('existing quote checks apply to the retained file source without rerea
     .getSnapshot()
     .createAnnotation([{ ref, sourceRef, text: { start: 0, end: 5, quote: 'wrong' } }]);
   store.closeFile();
-  await assert.rejects(store.getSnapshot().submit(), /range no longer matches/);
-  assert.equal(store.getSnapshot().value.annotations.length, 1);
+  const before = store.getSnapshot().value;
+  await assert.rejects(
+    store.getSnapshot().locate(before.annotations[0].targets[0]),
+    /range no longer matches/,
+  );
+  await store.getSnapshot().submit();
+  assert.deepEqual(delivered, [before]);
+  assert.deepEqual(store.getSnapshot().value, before);
 });
 
 void test('locating a page target closes the file preview and delegates to its page adapter', async () => {

@@ -183,13 +183,19 @@ try {
   assert.deepEqual(await draft(), edited);
 
   await button('Refresh source').click();
-  await submitAnnotations(frame);
-  await frame.locator('[data-submit-error]').filter({ hasText: /stale/ }).waitFor();
-  assert.equal(
-    (await service.runtime.events(panel.instanceId, 'diff-annotations', 100, 0)).events.length,
-    2,
+  const sourceChanged = page.waitForResponse(
+    (response) => response.url().endsWith('/events') && response.request().method() === 'POST',
   );
-  assert.equal((await draft()).annotations.length, 3, 'stale submission preserves every draft');
+  await submitAnnotations(frame);
+  assert.equal((await sourceChanged).status(), 200);
+  const changedEvents = (await service.runtime.events(panel.instanceId, 'diff-annotations', 100, 0))
+    .events;
+  assert.equal(changedEvents.length, 3);
+  assert.deepEqual(changedEvents[2].payload, {
+    annotations: edited.annotations.map(({ targets, comment }) => ({ targets, comment })),
+  });
+  assert.deepEqual(await draft(), edited, 'Changed source cannot block or rewrite saved feedback');
+  assert.equal(await frame.locator('[data-submit-error]').textContent(), '');
   await button('Restore source').click();
   await button('Reveal hidden text').click();
   await button('Only new').click();
@@ -266,7 +272,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(
-    'DiffView passed: agent events omit annotation ids, internal ids survive editing/submission, refs and raw ranges stay intact, test-only submission page covers old/new text and replacement/addition/deletion blocks; generic/falsy refs, scoped reveal, unified offsets and stale-source rejection preserved.',
+    'DiffView passed: agent events omit annotation ids, internal ids survive editing/submission, refs and raw ranges stay intact, test-only submission page covers old/new text and replacement/addition/deletion blocks; generic/falsy refs, scoped reveal, unified offsets and submission after source changes preserved.',
   );
 } finally {
   await browser?.close();
