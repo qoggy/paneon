@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
+import type { Diagnostic } from '../src/shared/types.js';
 const { createGraph } = (await import(
   '../dist/' + 'compiler/action-transform.js'
 )) as typeof import('../src/compiler/action-transform.js');
@@ -216,6 +217,74 @@ void test('selected external Node exports are rejected for named, star, and name
       (_root, entry) => assert.throws(() => createGraph(entry, 'client'), { code: 'BUILD_FAILED' }),
     );
   }
+});
+void test('dependency graph reports each selected Node import and re-export once', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {readFileSync,statSync} from 'node:fs';\nimport {basename} from 'node:path';\nimport {host,crypto} from './barrel';\n",
+        '[readFileSync,statSync,basename,host,crypto]',
+      ),
+      'barrel.ts':
+        "export {hostname as host} from 'node:os';\nexport * as crypto from 'node:crypto';",
+    },
+    (root, entry) => {
+      assert.throws(
+        () => createGraph(entry, 'client'),
+        (error: unknown) => {
+          const d = error as Diagnostic;
+          const errors = d.details?.diagnostics as Record<string, string | number>[];
+          assert.equal(d.code, 'BUILD_FAILED');
+          assert.deepEqual(
+            errors.map(({ dependency, file, line }) => ({ dependency, file, line })),
+            [
+              { dependency: 'node:fs', file: entry, line: 1 },
+              { dependency: 'node:path', file: entry, line: 2 },
+              { dependency: 'node:os', file: join(root, 'barrel.ts'), line: 1 },
+              { dependency: 'node:crypto', file: join(root, 'barrel.ts'), line: 2 },
+            ],
+          );
+          for (const issue of errors) {
+            assert.ok(Number(issue.column) > 0);
+            assert.ok(d.message.includes(String(issue.dependency)));
+            assert.ok(d.message.includes(`${issue.file}:${issue.line}:${issue.column}`));
+          }
+          return true;
+        },
+      );
+    },
+  );
+});
+void test('missing local dependencies do not hide errors in other reachable files', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {missing} from './missing';\nimport {value} from './available';\n",
+        '[missing,value]',
+      ),
+      'available.ts':
+        "import {basename} from 'node:path';\nimport {other} from './also-missing';\nexport const value=[basename,other];",
+    },
+    (root, entry) => {
+      assert.throws(
+        () => createGraph(entry, 'client'),
+        (error: unknown) => {
+          const d = error as Diagnostic;
+          const errors = d.details?.diagnostics as Record<string, string | number>[];
+          assert.equal(d.code, 'BUILD_FAILED');
+          assert.deepEqual(
+            errors.map(({ dependency, file }) => ({ dependency, file })),
+            [
+              { dependency: './missing', file: entry },
+              { dependency: 'node:path', file: join(root, 'available.ts') },
+              { dependency: './also-missing', file: join(root, 'available.ts') },
+            ],
+          );
+          return true;
+        },
+      );
+    },
+  );
 });
 void test('nested external stars retain the requested edge and enforce Node isolation', async () => {
   for (const imported of ['{readFileSync as value}', '* as value']) {

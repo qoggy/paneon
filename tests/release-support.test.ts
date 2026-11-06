@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { deduplicateJobs, runJobs } from './release-support.ts';
 
-void test('release CLI keeps package concurrency at two and allows explicit worker overrides', async () => {
+void test('release CLI defaults to four browser and two package workers and allows overrides', async () => {
   const execute = promisify(execFile);
   const list = async (...options: string[]) => {
     const { stdout } = await execute(
@@ -21,13 +21,13 @@ void test('release CLI keeps package concurrency at two and allows explicit work
     };
   };
   const defaults = await list();
-  assert.deepEqual(defaults.concurrency, { browser: 3, package: 2 });
+  assert.deepEqual(defaults.concurrency, { browser: 4, package: 2 });
   assert.deepEqual(
     defaults.commands.map((command) => command.phase),
     ['browser', 'package'],
   );
   const browser = await list('--phase=browser');
-  assert.equal(browser.jobs, 3);
+  assert.equal(browser.jobs, 4);
   const overridden = await list('--jobs=1');
   assert.deepEqual(overridden.concurrency, { browser: 1, package: 1 });
   assert.equal(overridden.jobs, 1);

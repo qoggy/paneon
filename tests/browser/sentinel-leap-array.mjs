@@ -11,7 +11,7 @@ export async function verifySentinel(page, fixture) {
   const f = page.frameLocator('iframe');
   await f.getByRole('heading', { name: '请求来了，LeapArray 怎么处理？' }).waitFor();
   const slider = f.getByRole('slider', { name: '模拟时间轴' });
-  // Native range input events exercise the same seek path as pointer/keyboard movement.
+  // Base UI's range input exercises the same seek path as pointer/keyboard movement.
   const seek = async (value) => {
     await slider.fill(String(value));
     await assert.equal(await slider.inputValue(), String(value));
@@ -37,7 +37,7 @@ export async function verifySentinel(page, fixture) {
   assert.match(await f.locator('[data-slot="0"]').textContent(), /0–250ms.*PASS 5/);
 
   // Real pointer drag and keyboard range navigation, including automatic pause on seek.
-  const bounds = await slider.boundingBox();
+  const bounds = await f.locator('[data-slot="slider"]').boundingBox();
   assert.ok(bounds);
   await page.mouse.move(bounds.x + bounds.width * 0.2, bounds.y + bounds.height / 2);
   await page.mouse.down();

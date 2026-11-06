@@ -73,6 +73,14 @@ export async function verifyDiningPhilosophers(page, fixture) {
   await page.clock.resume();
   await button('重置').click();
   await seek(10);
+  await page.mouse.move(0, 0);
+  assert.equal(
+    await frame
+      .locator('[data-slot="slider-thumb"]')
+      .evaluate((thumb) => getComputedStyle(thumb).boxShadow !== 'none'),
+    true,
+    'keyboard focus must be visible on the slider thumb without pointer hover',
+  );
   await frame.locator('[data-philosopher="4"]').click();
   assert.match(
     await frame.getByTestId('step-description').textContent(),

@@ -160,12 +160,12 @@ const phase = [...options].find((arg) => arg.startsWith('--phase='))?.slice(8) ?
 const match = [...options].find((arg) => arg.startsWith('--match='))?.slice(8) ?? '';
 const patterns = match.split(',').filter(Boolean);
 const jobsOption = [...options].find((arg) => arg.startsWith('--jobs='));
-const jobs = Number(jobsOption?.slice(7) ?? (phase === 'browser' ? 3 : 2));
+const jobs = Number(jobsOption?.slice(7) ?? (phase === 'browser' ? 4 : 2));
 assert.ok(
   Number.isSafeInteger(jobs) && jobs >= 1 && jobs <= 6,
   '--jobs must be an integer from 1 to 6.',
 );
-const concurrency = { browser: jobsOption ? jobs : 3, package: jobsOption ? jobs : 2 };
+const concurrency = { browser: jobsOption ? jobs : 4, package: jobsOption ? jobs : 2 };
 const phases = ['checks', 'unit', 'acceptance', 'browser', 'package', 'live'];
 assert.ok(phase === 'all' || phases.includes(phase), `Unknown phase: ${phase}`);
 for (const arg of options)

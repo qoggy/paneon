@@ -48,7 +48,7 @@ Page、Section、Stack SHALL 仅提供必要的页面宽度、分区和排列等
 
 ### Requirement: Provide styled components without mandatory custom CSS
 
-系统 SHALL 通过 @qoggy/paneon/ui 提供基于 shadcn/ui 的 Button、Input、Label、Field、Card、RadioGroup、Checkbox、Textarea、Select、Badge、Alert、Spinner、Table、Pagination、Tabs、Dialog、AlertDialog、Accordion、Collapsible、Tooltip、DropdownMenu、Popover、Switch、CodeBlock、Markdown，以及 Page、Section、Stack、StatusBadge 轻量组合；组件族 SHALL 包含设计公共导出清单中完成组合所需的配套组件，特别是 TabsList、TabsTrigger 和 TabsContent。普通组合 SHALL 在不编写面板 CSS 的情况下具有统一主题、焦点、加载与错误呈现。Tabs、RadioGroup、Checkbox、Switch、Textarea、Accordion、Collapsible 等交互组件 SHALL 支持选定社区实现的受控/非受控方式，以及其适用的禁用状态及键盘交互；组件状态变化 MUST NOT 隐式执行业务动作、提交 agent 事件或持久化值。
+系统 SHALL 通过 @qoggy/paneon/ui 提供基于 shadcn/ui 的 Button、Input、Slider、Label、Field、Card、RadioGroup、Checkbox、Textarea、Select、Badge、Alert、Spinner、Table、Pagination、Tabs、Dialog、AlertDialog、Accordion、Collapsible、Tooltip、DropdownMenu、Popover、Switch、CodeBlock、Markdown，以及 Page、Section、Stack、StatusBadge 轻量组合；组件族 SHALL 包含设计公共导出清单中完成组合所需的配套组件，特别是 TabsList、TabsTrigger 和 TabsContent。普通组合 SHALL 在不编写面板 CSS 的情况下具有统一主题、焦点、加载与错误呈现。Tabs、RadioGroup、Checkbox、Switch、Slider、Textarea、Accordion、Collapsible 等交互组件 SHALL 支持选定社区实现的受控/非受控方式，以及其适用的禁用状态及键盘交互；组件状态变化 MUST NOT 隐式执行业务动作、提交 agent 事件或持久化值。
 
 #### Scenario: Compose a release interface with defaults
 

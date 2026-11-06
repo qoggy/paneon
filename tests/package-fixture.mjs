@@ -26,11 +26,13 @@ export async function createPackageFixture(root, { build = false } = {}) {
       cp(join(base, metadata.filename), join(root, metadata.filename)),
     );
     await measureTestStep('package.copy-installation', () =>
-      cp(join(base, 'installation'), installation, {
-        recursive: true,
-        verbatimSymlinks: true,
-        mode: constants.COPYFILE_FICLONE,
-      }),
+      process.platform === 'darwin'
+        ? execute('/bin/cp', ['-cRP', join(base, 'installation'), installation])
+        : cp(join(base, 'installation'), installation, {
+            recursive: true,
+            verbatimSymlinks: true,
+            mode: constants.COPYFILE_FICLONE,
+          }),
     );
   } else {
     const env = {

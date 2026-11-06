@@ -5,10 +5,39 @@ import { findingAt, type Finding } from './check-finding.js';
 
 const UNKNOWN = Symbol('unknown');
 const PRESENT = Symbol('present');
+/** Alternatives are kept separate from objects so a branch is never treated as a target itself. */
+class Alternatives {
+  readonly values: unknown[];
+  constructor(values: unknown[]) {
+    this.values = values;
+  }
+}
+class TypedValue {
+  readonly type: ts.Type;
+  readonly node: ts.Node;
+  constructor(type: ts.Type, node: ts.Node) {
+    this.type = type;
+    this.node = node;
+  }
+}
+const alternatives = (...values: unknown[]): unknown => {
+  const distinct = [
+    ...new Set(values.flatMap((value) => (value instanceof Alternatives ? value.values : [value]))),
+  ];
+  return distinct.length === 1 ? distinct[0] : new Alternatives(distinct);
+};
+const truth = (value: unknown): boolean | undefined => {
+  if (value === UNKNOWN || value === PRESENT) return undefined;
+  if (value instanceof Alternatives) {
+    const results = value.values.map(truth);
+    return results.every((result) => result === results[0]) ? results[0] : undefined;
+  }
+  return Boolean(value);
+};
 type Env = Map<ts.Symbol | undefined, unknown>;
 type Fn = ts.FunctionLikeDeclaration & { body: ts.Node };
 type Children = { childrenNodes: readonly ts.Node[]; env: Env };
-type Group = 'missing' | 'text' | 'unchecked';
+type Group = 'missing' | 'text' | 'unchecked' | 'conditional';
 /**
  * `enabled`: the rendered page calls usePageAnnotations. `disabled`: it certainly does not.
  * `undetermined`: it does not as far as the check can see, but an opaque component might.
@@ -19,6 +48,8 @@ export type AnnotationCheck = {
   missingTargets: Finding[];
   unannotatedText: Finding[];
   unchecked: Finding[];
+  /** Known optional DiffView targets: omitting a side intentionally disables its annotations. */
+  conditionalTargets: Finding[];
 };
 
 // Interactive controls and interface chrome never carry plan content.
@@ -31,6 +62,7 @@ const skipped = new Set([
   'label',
   'Button',
   'Input',
+  'Slider',
   'Textarea',
   'Select',
   'SelectTrigger',
@@ -64,6 +96,8 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' &&
   value !== null &&
   !Array.isArray(value) &&
+  !(value instanceof Alternatives) &&
+  !(value instanceof TypedValue) &&
   !('kind' in value && 'pos' in value);
 const isFn = (value: unknown): value is Fn =>
   typeof value === 'object' &&
@@ -73,14 +107,6 @@ const isFn = (value: unknown): value is Fn =>
   (value as ts.FunctionLikeDeclaration).body !== undefined;
 const isChildren = (value: unknown): value is Children =>
   typeof value === 'object' && value !== null && 'childrenNodes' in value;
-const field = (value: unknown, key: unknown) =>
-  value === UNKNOWN || value === PRESENT || key === UNKNOWN
-    ? UNKNOWN
-    : record(value) && typeof key === 'string'
-      ? value[key]
-      : Array.isArray(value) && typeof key === 'number'
-        ? (value as unknown[])[key]
-        : undefined;
 /** Static property name: `a`, `'a'` and `1` are keys; computed names are not. */
 const keyName = (name: ts.PropertyName | ts.BindingName) =>
   ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
@@ -174,11 +200,43 @@ function mayReachHook(program: ts.Program) {
 
 export function checkAnnotations(program: ts.Program, root: ts.SourceFile): AnnotationCheck {
   const checker = program.getTypeChecker();
-  const found: Record<Group, Finding[]> = { missing: [], text: [], unchecked: [] };
+  const found: Record<Group, Finding[]> = { missing: [], text: [], unchecked: [], conditional: [] };
   const emitted = new Set<string>();
   const active = new Set<ts.Node>();
   let session = false;
   let opaque = false;
+
+  /** Use the checker for computed values; never execute page functions or their side effects. */
+  function typedValue(type: ts.Type, node: ts.Node): unknown {
+    if (type.isUnion()) return alternatives(...type.types.map((part) => typedValue(part, node)));
+    if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter))
+      return UNKNOWN;
+    // Void/never do not prove a value: a helper may throw instead of returning a target.
+    if (type.flags & (ts.TypeFlags.Never | ts.TypeFlags.Void)) return UNKNOWN;
+    if (type.flags & ts.TypeFlags.Undefined) return undefined;
+    if (type.flags & ts.TypeFlags.Null) return null;
+    if (type.isStringLiteral() || type.isNumberLiteral()) return type.value;
+    if (type.flags & ts.TypeFlags.BooleanLiteral) return checker.typeToString(type) === 'true';
+    return type.flags & ts.TypeFlags.Object ? new TypedValue(type, node) : PRESENT;
+  }
+
+  function field(value: unknown, key: unknown): unknown {
+    if (value instanceof Alternatives)
+      return alternatives(...value.values.map((part) => field(part, key)));
+    if (value === UNKNOWN || value === PRESENT || key === UNKNOWN) return UNKNOWN;
+    if (value instanceof TypedValue) {
+      if (typeof key !== 'string') return UNKNOWN;
+      const property = checker.getPropertyOfType(value.type, key);
+      if (!property)
+        return checker.getIndexTypeOfType(value.type, ts.IndexKind.String) ? UNKNOWN : undefined;
+      return typedValue(checker.getTypeOfSymbolAtLocation(property, value.node), value.node);
+    }
+    return record(value) && typeof key === 'string'
+      ? value[key]
+      : Array.isArray(value) && typeof key === 'number'
+        ? value[key]
+        : undefined;
+  }
 
   function report(node: ts.Node, group: Group, message: string) {
     const finding = findingAt(node, message);
@@ -254,7 +312,7 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
       const declaration = binding?.valueDeclaration;
       if (node.text === 'undefined' && !declaration) return undefined;
       if (declaration && ts.isVariableDeclaration(declaration))
-        return read(declaration.initializer, env, seen);
+        return declaration.initializer ? read(declaration.initializer, env, seen) : UNKNOWN;
       if (declaration && ts.isFunctionDeclaration(declaration)) return declaration;
       return UNKNOWN;
     }
@@ -299,8 +357,10 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
       );
     }
     if (ts.isConditionalExpression(node)) {
-      const condition = read(node.condition, env, seen);
-      if (condition !== UNKNOWN) return read(condition ? node.whenTrue : node.whenFalse, env, seen);
+      const condition = truth(read(node.condition, env, seen));
+      return condition === undefined
+        ? alternatives(read(node.whenTrue, env, seen), read(node.whenFalse, env, seen))
+        : read(condition ? node.whenTrue : node.whenFalse, env, seen);
     }
     return UNKNOWN;
   }
@@ -309,12 +369,7 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
   function attributeValue(expression: ts.Expression | undefined, env: Env) {
     const value = read(expression, env);
     if (value !== UNKNOWN || !expression) return value;
-    const type = checker.getTypeAtLocation(expression);
-    const optional =
-      ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Any | ts.TypeFlags.Unknown;
-    return (type.isUnion() ? type.types : [type]).some((item) => item.flags & optional)
-      ? UNKNOWN
-      : PRESENT;
+    return typedValue(checker.getTypeAtLocation(expression), expression);
   }
 
   function attributes(opening: ts.JsxOpeningLikeElement, env: Env) {
@@ -361,7 +416,20 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
     };
   }
 
-  function requireTarget(node: ts.Node, value: unknown, label: string) {
+  function requireTarget(node: ts.Node, value: unknown, label: string, allowConditional = false) {
+    if (value instanceof Alternatives) {
+      if (value.values.includes(UNKNOWN))
+        report(node, 'unchecked', `Cannot determine the annotation target of ${label}.`);
+      else if (value.values.includes(undefined))
+        report(
+          node,
+          allowConditional ? 'conditional' : 'unchecked',
+          allowConditional
+            ? `${label} enables annotations conditionally; omitting its target disables annotations on that side.`
+            : `${label} may have no annotation target in some branches.`,
+        );
+      return;
+    }
     if (value === undefined) report(node, 'missing', `${label} has no annotation target.`);
     else if (value === UNKNOWN)
       report(node, 'unchecked', `Cannot determine the annotation target of ${label}.`);
@@ -402,7 +470,7 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
         const value = read(node.expression, env);
         if (isChildren(value)) children(value.childrenNodes, value.env);
         else if (typeof value === 'string') text(node, value);
-        else if (value === UNKNOWN) {
+        else if (value === UNKNOWN || value instanceof Alternatives) {
           if (containsJsx(node.expression)) walk(node.expression, env);
           else {
             // Follow calls such as {render()} into local functions that return JSX.
@@ -430,8 +498,34 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
     return ts.forEachChild(node, containsJsx) ?? false;
   }
 
+  /** Resolve component aliases; an unknown condition makes both choices relevant. */
+  function componentTags(node: ts.Node, env: Env, seen = new Set<ts.Node>()): ts.Node[] {
+    if (seen.has(node) || publicName(node)) return [node];
+    seen = new Set(seen).add(node);
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isNonNullExpression(node)
+    )
+      return componentTags(node.expression, env, seen);
+    if (ts.isIdentifier(node)) {
+      const binding = symbol(node);
+      const declaration = binding?.valueDeclaration;
+      if (!env.has(binding) && declaration && ts.isVariableDeclaration(declaration))
+        return declaration.initializer ? componentTags(declaration.initializer, env, seen) : [node];
+    }
+    if (ts.isConditionalExpression(node)) {
+      const condition = truth(read(node.condition, env));
+      return condition === undefined
+        ? [...componentTags(node.whenTrue, env, seen), ...componentTags(node.whenFalse, env, seen)]
+        : componentTags(condition ? node.whenTrue : node.whenFalse, env, seen);
+    }
+    return [node];
+  }
+
   /** `Fragment` / `React.Fragment` imported from react. */
-  function isReactFragment(tag: ts.JsxTagNameExpression) {
+  function isReactFragment(tag: ts.Node) {
     const name = ts.isPropertyAccessExpression(tag) ? tag.name : tag;
     if (name.getText() !== 'Fragment') return false;
     const declaration = checker.getSymbolAtLocation(
@@ -441,16 +535,26 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
     return !!module && moduleName(module.moduleSpecifier) === 'react';
   }
 
-  function jsx(node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment, env: Env) {
+  function jsx(
+    node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+    env: Env,
+    tag?: ts.Node,
+  ) {
     if (ts.isJsxFragment(node)) return children(node.children, env);
     const opening = ts.isJsxElement(node) ? node.openingElement : node;
     const childNodes = ts.isJsxElement(node) ? node.children : [];
-    if (isReactFragment(opening.tagName)) return children(childNodes, env);
-    const name = publicName(opening.tagName);
+    if (!tag) {
+      for (const choice of componentTags(opening.tagName, env)) jsx(node, env, choice);
+      return;
+    }
+    if (isReactFragment(tag)) return children(childNodes, env);
+    const name = publicName(tag);
     const literal = opening.tagName.getText();
     const intrinsic = ts.isIdentifier(opening.tagName) && /^[a-z]/.test(literal);
     const props = attributes(opening, env);
     const hidden = props.get('aria-hidden');
+    const role = props.get('role');
+    const roles = role instanceof Alternatives ? role.values : [role];
     if (
       skipped.has(name ?? (intrinsic ? literal : '')) ||
       (name && /^(Alert|Empty|NavigationMenu|Pagination|Select)/.test(name)) ||
@@ -458,26 +562,39 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
       (name && /^(Tooltip|DropdownMenu|ContextMenu)./.test(name) && !name.endsWith('Trigger')) ||
       hidden === true ||
       hidden === 'true' ||
-      ['button', 'textbox', 'combobox', 'checkbox', 'switch', 'radio', 'status', 'alert'].includes(
-        props.get('role') as string,
+      roles.every((role) =>
+        [
+          'button',
+          'textbox',
+          'combobox',
+          'checkbox',
+          'switch',
+          'radio',
+          'status',
+          'alert',
+        ].includes(role as string),
       )
     )
       return;
-    const local = !name && !intrinsic && isFn(read(opening.tagName, env));
+    const local = !name && !intrinsic && isFn(read(tag, env));
     if (!local)
       for (const [key, value] of props.values)
         if (key !== 'children' && isChildren(value)) children(value.childrenNodes, value.env);
     if (name === 'AnnotationText') return requireTarget(opening, props.get('target'), name);
     if (name && sources.has(name)) {
       requireTarget(opening, props.get('annotationTarget'), name);
-      if (name === 'Markdown' && props.get('components') !== undefined)
+      if (
+        name === 'Markdown' &&
+        props.values.has('components') &&
+        props.get('components') !== undefined
+      )
         report(opening, 'unchecked', 'Markdown with custom components may not map annotations.');
       return;
     }
     if (name === 'DiffView') {
       const targets = props.get('annotationTargets');
       for (const side of ['old', 'new'])
-        requireTarget(opening, field(targets, side), `DiffView ${side} side`);
+        requireTarget(opening, field(targets, side), `DiffView ${side} side`, true);
       return;
     }
     if (name === 'Page' || name === 'Section') {
@@ -487,7 +604,7 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
           requireTarget(opening, props.get('annotationTarget'), `${name} ${key}`);
       }
     } else if (!name && !intrinsic) {
-      const fn = read(opening.tagName, env);
+      const fn = read(tag, env);
       if (isFn(fn) && !fn.getSourceFile().isDeclarationFile) {
         const values = props.unknownSpread ? UNKNOWN : Object.fromEntries(props.values);
         if (record(values) && !props.values.has('children'))
@@ -560,7 +677,13 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
   // `disabled` must be certain: the walk only recognizes direct hook calls, so any other way the
   // page's own sources could reach usePageAnnotations, such as an alias, keeps it undetermined.
   if (!session && !opaque && !mayReachHook(program))
-    return { status: 'disabled', missingTargets: [], unannotatedText: [], unchecked: [] };
+    return {
+      status: 'disabled',
+      missingTargets: [],
+      unannotatedText: [],
+      unchecked: [],
+      conditionalTargets: [],
+    };
   if (!session)
     report(
       root,
@@ -572,5 +695,6 @@ export function checkAnnotations(program: ts.Program, root: ts.SourceFile): Anno
     missingTargets: found.missing,
     unannotatedText: found.text,
     unchecked: found.unchecked,
+    conditionalTargets: found.conditional,
   };
 }

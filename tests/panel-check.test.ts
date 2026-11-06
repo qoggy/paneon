@@ -12,11 +12,13 @@ type Data = {
   summary: string;
   next: string;
   nativeControls: Finding[];
+  suggestions: Finding[];
   annotations: {
     status: 'enabled' | 'disabled' | 'undetermined';
     missingTargets: Finding[];
     unannotatedText: Finding[];
     unchecked: Finding[];
+    conditionalTargets: Finding[];
   };
 };
 type Report = Omit<Data, 'annotations'> & Data['annotations'];
@@ -213,6 +215,123 @@ void test('respects spread order and explicit undefined targets', async () => {
   assert.deepEqual(report.unchecked, []);
 });
 
+void test('skips dynamic status roles only when every branch is interface chrome', async () => {
+  const report = await check(
+    panel(
+      `<>
+    <p role={failed ? 'alert' : 'status'}>{message}</p>
+    <p role={failed ? 'alert' : 'article'}>{message}</p>
+  </>`,
+      `const failed = Math.random() > 0.5;
+const message = 'Submission failed';`,
+    ),
+  );
+  assert.equal(report.unannotatedText.length, 1);
+  assert.equal(report.unannotatedText[0].excerpt, '{message}');
+});
+
+void test('infers target fields from local and imported helper return types without executing them', async () => {
+  const report = await check(
+    panel(
+      `<>
+    <DiffView oldText="a" newText="b" annotationTargets={local()} />
+    <DiffView oldText="a" newText="b" annotationTargets={imported()} />
+    <DiffView oldText="a" newText="b" annotationTargets={partial()} />
+  </>`,
+      `import {imported} from './targets';
+function local(){throwIfExecuted(); return {old: 'old', new: 'new'};}
+function partial(){return {old: 'old'};}
+function throwIfExecuted(){throw new Error('must not execute');}`,
+    ),
+    {
+      'targets.ts': `export function imported(){return {old: 'old', new: 'new'};}`,
+    },
+  );
+  assert.deepEqual(messages(report.missingTargets), [
+    'DiffView new side has no annotation target.',
+  ]);
+  assert.deepEqual(report.unchecked, []);
+  assert.deepEqual(report.conditionalTargets, []);
+});
+
+void test('distinguishes conditional DiffView targets from targets it cannot infer', async () => {
+  const report = await check(
+    panel(
+      `<>
+    <DiffView oldText="a" newText="b" annotationTargets={{old: ready ? undefined : 'old', new: 'new'}} />
+    <DiffView oldText="a" newText="b" annotationTargets={optional()} />
+    <DiffView oldText="a" newText="b" annotationTargets={unknown()} />
+    <Markdown annotationTarget={ready ? 'plan' : undefined}>Plan</Markdown>
+  </>`,
+      `const ready = Math.random() > 0.5;
+function optional(): {old?: string; new: string} {return ready ? {new: 'new'} : {old: 'old', new: 'new'};}
+declare function unknown(): any;`,
+    ),
+  );
+  assert.deepEqual(report.missingTargets, []);
+  assert.equal(report.conditionalTargets.length, 2);
+  assert.ok(
+    messages(report.conditionalTargets).every((message) =>
+      message.includes('DiffView old side enables annotations conditionally'),
+    ),
+  );
+  assert.deepEqual(messages(report.unchecked), [
+    'Cannot determine the annotation target of DiffView old side.',
+    'Cannot determine the annotation target of DiffView new side.',
+    'Markdown may have no annotation target in some branches.',
+  ]);
+  assert.match(report.summary, /2 DiffView side\(s\) enable annotations conditionally/);
+});
+
+void test('does not treat ambient conditions or a branch with an unknown target as proven coverage', async () => {
+  const report = await check(
+    panel(
+      `<>
+    <Markdown annotationTarget={ready ? unknown : 'known'}>Plan</Markdown>
+    <p role={ready ? 'status' : 'article'}>Content</p>
+  </>`,
+      `declare const ready: boolean;
+declare const unknown: unknown;`,
+    ),
+  );
+  assert.deepEqual(messages(report.unchecked), [
+    'Cannot determine the annotation target of Markdown.',
+  ]);
+  assert.equal(report.unannotatedText.length, 1);
+});
+
+void test('all supplied built-in and example panels have no native controls, missing targets or opaque targets', () => {
+  const panels = ['choose', 'form', 'table', 'file-review', 'diff-review', 'git-review'];
+  const examples = ['dining-philosophers', 'sentinel-leap-array', 'github-pr'];
+  for (const entry of [
+    ...panels.map((name) => `panels/${name}`),
+    ...examples.map((name) => `examples/${name}`),
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        cli,
+        'panel',
+        'check',
+        resolve(`skills/paneon-visualize/assets/${entry}/panel.tsx`),
+        '--json',
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, entry);
+    assert.equal(result.stderr, '', entry);
+    const { data } = JSON.parse(result.stdout) as { data: Data };
+    assert.deepEqual(data.nativeControls, [], entry);
+    assert.deepEqual(data.annotations.missingTargets, [], entry);
+    assert.deepEqual(data.annotations.unchecked, [], entry);
+    assert.equal(
+      data.annotations.conditionalTargets.length,
+      /diff-review|git-review|github-pr/.test(entry) ? 2 : 0,
+      entry,
+    );
+  }
+});
+
 void test('a page that never reaches usePageAnnotations skips the annotation check', async () => {
   const report = await check(
     `import {Markdown} from '@qoggy/paneon/ui';
@@ -229,6 +348,78 @@ export default definePanel({render: Panel});`,
     /never calls usePageAnnotations, so the annotation check was skipped/,
   );
   assert.equal(report.next, 'Nothing to fix.');
+});
+
+void test('conditional component choices without annotation hooks are disabled', async () => {
+  const report = await check(`import {Markdown, RadioGroup as SingleChoice} from '@qoggy/paneon/ui';
+import {definePanel} from '@qoggy/paneon/sdk';
+const multiple = Math.random() > 0.5;
+function MultipleChoice({children}) { return <div>{children}</div>; }
+const ChoiceGroup = multiple ? MultipleChoice : SingleChoice;
+const Group = ChoiceGroup;
+function Panel(){return <Group><Markdown>Question</Markdown></Group>;}
+export default definePanel({render: Panel});`);
+  assert.equal(report.status, 'disabled');
+  assert.deepEqual(report.missingTargets, []);
+  assert.deepEqual(report.unannotatedText, []);
+  assert.deepEqual(report.unchecked, []);
+});
+
+void test('conditional component choices inspect both branches for annotation hooks', async () => {
+  for (const choice of ['Feedback : Plain', 'Plain : Feedback']) {
+    const report = await check(
+      panel(
+        '<Group><Markdown>Question</Markdown></Group>',
+        `const multiple = Math.random() > 0.5;
+function Feedback({children}) { usePageAnnotations({}); return <div>{children}</div>; }
+function Plain({children}) { return <div>{children}</div>; }
+const Group = multiple ? ${choice};`,
+        '',
+      ),
+    );
+    assert.equal(report.status, 'enabled');
+    assert.deepEqual(messages(report.missingTargets), ['Markdown has no annotation target.']);
+    assert.deepEqual(report.unchecked, []);
+  }
+});
+
+void test('conditional component choices apply the checks of public content components', async () => {
+  const report = await check(
+    panel(
+      '<Content>Question</Content>',
+      `const detailed = Math.random() > 0.5;
+const Content = detailed ? Markdown : Section;`,
+    ),
+  );
+  assert.deepEqual(messages(report.missingTargets), ['Markdown has no annotation target.']);
+  assert.deepEqual(report.unchecked, []);
+});
+
+void test('conditional component choices with a known condition skip the inactive branch', async () => {
+  for (const choice of ['true ? Markdown : External', 'false ? External : Markdown']) {
+    const report = await check(
+      panel(
+        '<Content annotationTarget="question">Question</Content>',
+        `declare const External: unknown;
+const Content = ${choice};`,
+      ),
+    );
+    assert.deepEqual(report.missingTargets, []);
+    assert.deepEqual(report.unannotatedText, []);
+    assert.deepEqual(report.unchecked, []);
+  }
+});
+
+void test('conditional component choices keep an unknown branch unchecked', async () => {
+  const report = await check(`import {definePanel} from '@qoggy/paneon/sdk';
+const multiple = Math.random() > 0.5;
+declare const External: unknown;
+function Plain() { return null; }
+const Group = multiple ? Plain : External;
+function Panel(){return <Group />;}
+export default definePanel({render: Panel});`);
+  assert.equal(report.status, 'undetermined');
+  assert.ok(messages(report.unchecked).includes('Cannot inspect component Group.'));
 });
 
 void test('a hook the walk cannot follow keeps the annotation check undetermined', async () => {
@@ -501,4 +692,66 @@ function Panel(){return (<>
 export default definePanel({render: Panel});`,
   );
   assert.deepEqual(report.nativeControls, []);
+});
+
+void test('reports literal native tooltip titles as optional suggestions with exit code zero', async () => {
+  const { status, report } = await run(`import {definePanel} from '@qoggy/paneon/sdk';
+function Panel(){return <>
+  <button title="Save changes">Save</button>
+  <span title={'More details'}>Details</span>
+  <a href="/report" title={\`Open report\`}>Report</a>
+  <div title="Inherited hint"><span>Child</span><span title="">No hint</span></div>
+</>;}
+export default definePanel({render: Panel});`);
+  assert.equal(status, 0);
+  assert.equal(report.status, 'disabled');
+  assert.deepEqual(report.nativeControls, []);
+  assert.deepEqual(
+    report.suggestions.map((item) => item.location),
+    ['panel.tsx:3:3', 'panel.tsx:4:3', 'panel.tsx:5:3', 'panel.tsx:6:3'],
+  );
+  assert.ok(
+    report.suggestions.every((item) =>
+      item.message.includes(
+        'Consider Tooltip, TooltipTrigger and TooltipContent from @qoggy/paneon/ui',
+      ),
+    ),
+  );
+  assert.match(report.summary, /4 optional component suggestion/);
+  assert.match(report.next, /Consider the optional component suggestions/);
+});
+
+void test('optional tooltip suggestions do not hide blocking native controls', async () => {
+  const { status, report } = await run(`import {definePanel} from '@qoggy/paneon/sdk';
+function Panel(){return <><p title="More details">Summary</p><input /></>;}
+export default definePanel({render: Panel});`);
+  assert.equal(status, 1);
+  assert.equal(report.nativeControls.length, 1);
+  assert.equal(report.suggestions.length, 1);
+  assert.match(report.nativeControls[0].message, /use Input/);
+  assert.match(report.suggestions[0].message, /Consider Tooltip/);
+});
+
+void test('does not infer tooltips from component props, special semantics or uncertain titles', async () => {
+  const report = await check(`import {definePanel} from '@qoggy/paneon/sdk';
+import {Page, Section, Button, Tooltip, TooltipTrigger, TooltipContent} from '@qoggy/paneon/ui';
+const props = {title: 'From props'};
+const hint = Math.random() > 0.5 ? 'Hint' : undefined;
+function Panel(){return <>
+  <Page title="Plan"><Section title="Risks" /></Page><Button title="Save">Save</Button>
+  <title>Document title</title><iframe title="Preview" />
+  <abbr title="Hypertext Markup Language">HTML</abbr><dfn title="Definition">Term</dfn>
+  <link rel="alternate stylesheet" title="Alternative" /><style title="Theme">{''}</style>
+  <input type="checkbox" title="Validation hint" />
+  <svg><title>Accessible drawing name</title><a title="SVG metadata" /></svg>
+  <custom-element title="Component metadata" />
+  <span title="" /><span title={'   '} /><span title={undefined} /><span title={null} />
+  <span title={hint} /><span title={\`Hint: \${hint}\`} /><span title />
+  <span {...props} /><span title="Overridden" {...props} /><span {...props} title="Hint" />
+  <span hidden title="Hidden" /><span aria-hidden="true" title="Decoration" />
+  <Tooltip><TooltipTrigger>Help</TooltipTrigger><TooltipContent>Hint</TooltipContent></Tooltip>
+</>;}
+export default definePanel({render: Panel});`);
+  assert.deepEqual(report.nativeControls, []);
+  assert.deepEqual(report.suggestions, []);
 });

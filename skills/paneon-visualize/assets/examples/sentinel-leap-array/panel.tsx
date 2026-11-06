@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button, Input, Label, Page, toast, usePageAnnotations } from '@qoggy/paneon/ui';
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Page,
+  Slider,
+  toast,
+  usePageAnnotations,
+} from '@qoggy/paneon/ui';
 import { useLocale } from '../../shared/i18n';
 import { SOURCE_COMMIT, SOURCE_ROOT } from './model';
 import {
@@ -345,15 +354,13 @@ function SentinelPanel() {
                 {state.processed} / {trace.events.length}
               </span>
             </div>
-            <input
-              className="block w-full accent-primary"
-              type="range"
+            <Slider
               min={-1}
               max={trace.duration}
               step={1}
               value={Math.floor(cursor)}
               aria-label={c.timeline}
-              onChange={(e) => seek(Number(e.target.value))}
+              onValueChange={seek}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>0ms</span>

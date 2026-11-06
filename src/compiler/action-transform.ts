@@ -232,7 +232,8 @@ function localPath(
   from: string,
   specifier: string,
   isFile = (path: string) => existsSync(path) && statSync(path).isFile(),
-): string | undefined {
+): string | null | undefined {
+  // null is a missing local source; undefined is a non-local or non-source import.
   if (!specifier.startsWith('.')) return;
   const raw = resolve(dirname(from), specifier);
   if (isFile(raw) && !/\.[cm]?[jt]sx?$/.test(raw)) return;
@@ -247,11 +248,16 @@ function localPath(
   ])
     if (isFile(path) && !path.endsWith('.css')) return path;
   if (specifier.endsWith('.css')) return;
-  throw new PaneonError('BUILD_FAILED', 'A local dependency could not be resolved.', {
-    entryPath: from,
-    dependency: specifier,
-  });
+  return null;
 }
+type DependencyDiagnostic = {
+  code: string;
+  message: string;
+  file: string;
+  line: number;
+  column: number;
+  dependency: string;
+};
 export type Graph = {
   modules: Map<string, SourceModule>;
   sources: Map<string, string>;
@@ -273,7 +279,25 @@ export function createGraph(
     options.actionId ??
     ((file: string, name: string) =>
       `${relative(dirname(entry), file).replaceAll('\\', '/')}#${name}`);
-  const resolveLocal = (from: string, specifier: string) => localPath(from, specifier, isFile);
+  const diagnostics = new Map<ts.Node, DependencyDiagnostic>();
+  function reportDependency(node: ts.Node, dependency: string, message: string) {
+    const source = node.getSourceFile();
+    const location = source.getLineAndCharacterOfPosition(node.getStart(source));
+    diagnostics.set(node, {
+      code: 'BUILD_FAILED',
+      message,
+      file: source.fileName,
+      line: location.line + 1,
+      column: location.character + 1,
+      dependency,
+    });
+  }
+  function resolveLocal(from: string, specifier: string, node: ts.Node) {
+    const path = localPath(from, specifier, isFile);
+    if (path === null)
+      reportDependency(node, specifier, 'A local dependency could not be resolved.');
+    return path;
+  }
   const modules = new Map<string, SourceModule>();
   const selected = new Map<string, Set<ts.Statement>>();
   const selectedImports = new Map<string, Set<string>>();
@@ -328,16 +352,18 @@ export function createGraph(
     const imported = m.imports.get(name);
     if (imported) {
       selectedImports.get(file)!.add(name);
-      const local = resolveLocal(file, imported.specifier);
+      const local = resolveLocal(file, imported.specifier, imported.statement.moduleSpecifier);
+      if (local === null) return;
       if (local) include(local, imported.imported);
       else if (
         side === 'client' &&
         (imported.specifier.startsWith('node:') || builtinModules.includes(imported.specifier))
       )
-        throw new PaneonError('BUILD_FAILED', 'Browser code cannot import Node modules.', {
-          entryPath: file,
-          dependency: imported.specifier,
-        });
+        reportDependency(
+          imported.statement.moduleSpecifier,
+          imported.specifier,
+          'Browser code cannot import Node modules.',
+        );
       return;
     }
     const declaration = m.names.get(name);
@@ -362,7 +388,7 @@ export function createGraph(
           for (const e of s.exportClause.elements) if (!e.isTypeOnly) names.add(e.name.text);
         } else if (s.exportClause) names.add(s.exportClause.name.text);
         else if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-          const path = resolveLocal(file, s.moduleSpecifier.text);
+          const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
           if (path)
             for (const name of exportedNames(path, branch)) if (name !== 'default') names.add(name);
         }
@@ -382,8 +408,8 @@ export function createGraph(
         !ts.isStringLiteral(s.moduleSpecifier)
       )
         return false;
-      const path = resolveLocal(file, s.moduleSpecifier.text);
-      return !path || hasExternalStar(path, branch);
+      const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
+      return path !== null && (!path || hasExternalStar(path, branch));
     });
   }
   function directExport(m: SourceModule, name: string) {
@@ -412,10 +438,11 @@ export function createGraph(
         side === 'client' &&
         (specifier.startsWith('node:') || builtinModules.includes(specifier))
       )
-        throw new PaneonError('BUILD_FAILED', 'Browser code cannot import Node modules.', {
-          entryPath: file,
-          dependency: specifier,
-        });
+        reportDependency(
+          statement.moduleSpecifier,
+          specifier,
+          'Browser code cannot import Node modules.',
+        );
     }
   }
   function include(file: string, exported: string, forwarding = new Set<string>()) {
@@ -435,7 +462,8 @@ export function createGraph(
           s.moduleSpecifier &&
           ts.isStringLiteral(s.moduleSpecifier)
         ) {
-          const path = resolveLocal(file, s.moduleSpecifier.text);
+          const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
+          if (path === null) continue;
           if (path && !hasExternalStar(path, branch)) continue;
           retainExport(file, s, '*');
           if (path) include(path, '*', branch);
@@ -456,14 +484,14 @@ export function createGraph(
             retainExport(file, s, exported);
             const name = binding.propertyName?.text ?? binding.name.text;
             if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-              const path = resolveLocal(file, s.moduleSpecifier.text);
+              const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
               if (path) include(path, name, branch);
             } else reference(file, name);
           } else if (s.exportClause.name.text === exported) {
             matched = true;
             retainExport(file, s, exported);
             if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-              const path = resolveLocal(file, s.moduleSpecifier.text);
+              const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
               if (path) include(path, '*', branch);
             }
           }
@@ -480,7 +508,8 @@ export function createGraph(
               !ts.isStringLiteral(s.moduleSpecifier)
             )
               continue;
-            const path = resolveLocal(file, s.moduleSpecifier.text);
+            const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
+            if (path === null) continue;
             if (
               path &&
               !exportedNames(path, branch).has(exported) &&
@@ -528,7 +557,7 @@ export function createGraph(
     }
     for (const a of m.actions.values()) if (side === 'server') select(file, a.statement);
     for (const imported of m.imports.values()) {
-      const path = resolveLocal(file, imported.specifier);
+      const path = resolveLocal(file, imported.specifier, imported.statement.moduleSpecifier);
       if (path) discover(path, imported.imported);
     }
     if (directExport(m, exported)) return;
@@ -544,7 +573,7 @@ export function createGraph(
           : [];
       if (names.length) matched = true;
       if (s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)) {
-        const path = resolveLocal(file, s.moduleSpecifier.text);
+        const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
         if (path) for (const name of names) discover(path, name, branch);
       }
     }
@@ -558,7 +587,7 @@ export function createGraph(
         !ts.isStringLiteral(s.moduleSpecifier)
       )
         continue;
-      const path = resolveLocal(file, s.moduleSpecifier.text);
+      const path = resolveLocal(file, s.moduleSpecifier.text, s.moduleSpecifier);
       if (
         path &&
         (exported === '*' ||
@@ -571,6 +600,18 @@ export function createGraph(
     }
   }
   for (const name of options.entryExports ?? ['default']) discover(entry, name);
+  if (diagnostics.size) {
+    const errors = [...diagnostics.values()];
+    const { code, message: _message, ...firstDetails } = errors[0];
+    const reason = errors
+      .map((d) => `${d.file}:${d.line}:${d.column}\n${d.message} (${d.dependency})`)
+      .join('\n\n');
+    throw new PaneonError(code, reason, {
+      entryPath: firstDetails.file,
+      ...firstDetails,
+      diagnostics: errors,
+    });
+  }
   const sources = new Map<string, string>();
   for (const [file, m] of modules) {
     const lines: string[] = [];

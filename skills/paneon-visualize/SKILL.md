@@ -75,4 +75,6 @@ Read [Authoring](references/authoring.md) before writing a page. It covers the c
 
 Before giving the human a custom page's link, run `paneon panel check <entry.tsx>`. It reports native controls that a Paneon component replaces, and annotation coverage when the page calls `usePageAnnotations`.
 
+Tooltip styling suggestions and annotation findings are advisory and do not change the command's exit code.
+
 Built-in pages and examples are for running and reading, not importing. Build custom pages on `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and the page's own modules.

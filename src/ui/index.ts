@@ -1,6 +1,7 @@
 import './styles.css';
 export * from './button';
 export * from './input';
+export * from './slider';
 export * from './label';
 export * from './field';
 export * from './card';

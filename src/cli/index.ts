@@ -258,7 +258,7 @@ const checkCommand = panel
   )
   .addHelpText(
     'after',
-    '\nExits with 1 when native controls are found; the result is still printed. Annotation findings are advisory and do not change the exit code.',
+    '\nExits with 1 when native controls are found; the result is still printed. Optional component suggestions (including native title tooltips) and annotation findings do not change the exit code.',
   );
 execute(checkCommand, async () => {
   const entryPath = resolve(checkCommand.args[0]);

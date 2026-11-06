@@ -4,6 +4,19 @@
   "baseColor": "neutral",
   "items": [
     {
+      "name": "slider",
+      "retrievedAt": "2026-11-07",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/slider.json",
+      "sha256": "646bcd7913417b786bbf7578484f851bf89c81a62f70ef9c4f3522e2af80a951",
+      "dependencies": ["cn", "@base-ui/react"],
+      "registryDependencies": [],
+      "adaptations": [
+        "Use the local cn helper and preserve Base UI's generic scalar and array value types; scalar values render one thumb, and omitted values use Base UI's min default.",
+        "Forward aria-label to each thumb's range input and expose getAriaLabel for distinct range-thumb names.",
+        "Show the upstream focus ring on the thumb when its nested range input is focus-visible."
+      ]
+    },
+    {
       "name": "markdown-code-block-primitives",
       "retrievedAt": "2026-10-31",
       "url": "https://github.com/shadcn-ui/ui/blob/b8d7baa15b1dca5716f13153e63795fc3d741f6b/apps/v4/registry/bases/base/ui/code-block.tsx",

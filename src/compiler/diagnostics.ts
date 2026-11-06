@@ -3,7 +3,8 @@ import { stripVTControlCharacters } from 'node:util';
 import { PaneonError } from '../shared/types.js';
 import type { Diagnostic, JsonValue } from '../shared/types.js';
 
-export type BuildStage = 'typecheck' | 'client-build' | 'server-build' | 'metadata' | 'process';
+export type BuildStage =
+  'typecheck' | 'dependency-graph' | 'client-build' | 'server-build' | 'metadata' | 'process';
 const limits = { message: 8 * 1024, frame: 16 * 1024, stack: 32 * 1024, stderr: 64 * 1024 };
 const marker = '\n[truncated]';
 export function boundedText(text: string, limit: number, tail = false) {

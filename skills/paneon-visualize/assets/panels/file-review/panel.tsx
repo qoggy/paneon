@@ -540,7 +540,13 @@ function FileReviewPanel() {
         </FileReviewSplit>
       )}
       {submission.message && (
-        <p role={submission.failed ? 'alert' : 'status'}>{submission.message}</p>
+        <Alert
+          variant={submission.failed ? 'destructive' : 'default'}
+          role={submission.failed ? 'alert' : 'status'}
+        >
+          <AlertTitle>{t('Submission')}</AlertTitle>
+          <AlertDescription>{submission.message}</AlertDescription>
+        </Alert>
       )}
     </Page>
   );

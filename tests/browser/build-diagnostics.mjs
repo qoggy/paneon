@@ -21,6 +21,7 @@ const source = (
   broken = false,
 ) => `import{useState}from'react';import{definePanel,z}from'@qoggy/paneon/sdk';
 function Panel(){const [count,setCount]=useState(0);const label:string=${broken ? '42' : JSON.stringify(title)};return <><h1>{label}</h1><button onClick={()=>setCount(count+1)}>Count {count}</button></>}
+const enabled:boolean=${broken ? "'wrong'" : 'true'};
 export default definePanel({id:'build-diagnostics',requires:{paneon:'*'},input:z.object({}),render:Panel});`;
 const evidence = [];
 let service, browser;
@@ -66,6 +67,8 @@ try {
   assert.equal(ordinary.stdout, '');
   assert.match(ordinary.stderr, /not assignable/);
   assert.match(ordinary.stderr, /中文 面板.tsx:2:\d+/);
+  assert.match(ordinary.stderr, /中文 面板.tsx:3:\d+/);
+  assert.match(ordinary.stderr, /Type 'string' is not assignable to type 'boolean'/);
   const plain = await command(['panel', 'reload', panel.instanceId, '--json']);
   const debug = await command(['--debug', 'panel', 'reload', panel.instanceId, '--json']);
   assert.equal(plain.status, 1);
@@ -75,6 +78,12 @@ try {
   assert.match(debug.stderr, /build.stage=typecheck/);
   assert.match(debug.stderr, /build.stack=/);
   const diagnostic = JSON.parse(plain.stdout).error;
+  assert.equal(diagnostic.details.diagnostics.length, 2);
+  for (const issue of diagnostic.details.diagnostics) {
+    assert.equal(issue.code, 2322);
+    assert.ok(diagnostic.message.includes(issue.message));
+    assert.ok(diagnostic.message.includes(`${issue.file}:${issue.line}:${issue.column}`));
+  }
   assert.equal(diagnostic.details.file, entry);
   assert.equal(diagnostic.details.line, 2);
   assert.match(diagnostic.details.frame, /label:string=42/);
@@ -152,6 +161,26 @@ try {
   assert.equal(reopened.get(panel.instanceId).diagnostic, undefined);
   reopened.db.close();
   await page.screenshot({ path: join(artifacts, 'recovered.png'), fullPage: true });
+  const graphSource =
+    "import{readFileSync}from'node:fs';import{basename}from'node:path';\n" +
+    source('Graph failure').replace(
+      'return <>',
+      "return <>{readFileSync('x','utf8')}{basename('x')}",
+    );
+  await writeFile(entry, graphSource);
+  const graphFailure = await command(['--debug', 'panel', 'reload', panel.instanceId, '--json']);
+  assert.equal(graphFailure.status, 1);
+  const graphDiagnostic = JSON.parse(graphFailure.stdout).error;
+  assert.equal(graphDiagnostic.details.stage, 'dependency-graph');
+  assert.deepEqual(
+    graphDiagnostic.details.diagnostics.map((issue) => issue.dependency),
+    ['node:fs', 'node:path'],
+  );
+  assert.match(graphFailure.stderr, /build.stage=dependency-graph/);
+  assert.ok(graphDiagnostic.message.includes('node:fs'));
+  assert.ok(graphDiagnostic.message.includes('node:path'));
+  await page.getByText(graphDiagnostic.message, { exact: true }).waitFor();
+  await frame.getByRole('heading', { name: 'Recovered panel', exact: true }).waitFor();
   // A metadata child that exits without IPC must expose its process information
   // through the same CLI debug stream, while the previous frame stays available.
   const abrupt =
@@ -192,6 +221,7 @@ export const serverOnly=serverAction({input:z.object({}),handler:()=>stopped});`
       'abnormal metadata process exit details reach CLI debug stderr',
       'legacy diagnostic without position',
       'successful reload clears failure and renders corrected panel',
+      'multiple dependency graph errors reach CLI and host with the correct stage',
     ],
     evidence,
   };

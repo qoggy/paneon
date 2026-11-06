@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw } from './icons';
 import { z } from 'zod';
 import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
-import { Badge, Button, Page, toast, usePageAnnotations } from '@qoggy/paneon/ui';
+import { Badge, Button, Page, Slider, toast, usePageAnnotations } from '@qoggy/paneon/ui';
 import {
   PHILOSOPHERS,
   STRATEGIES,
@@ -511,15 +511,13 @@ function DiningPhilosophersPanel() {
               {simulationText(summary, language)}
             </p>
           </div>
-          <input
-            type="range"
+          <Slider
             min={0}
             max={trace.length - 1}
             value={step}
             step={1}
             aria-label={copy.timeline}
-            className="block h-2 w-full cursor-pointer accent-foreground"
-            onChange={(event) => seek(Number(event.target.value))}
+            onValueChange={seek}
           />
         </footer>
       </section>

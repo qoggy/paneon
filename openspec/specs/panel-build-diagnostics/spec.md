@@ -20,6 +20,19 @@ Paneon SHALL preserve the original build error message and stage, plus file, one
 - **WHEN** the tool reports an error without a source position
 - **THEN** the diagnostic retains its reason and stage without fabricated file or line values
 
+#### Scenario: TypeScript reports multiple errors
+
+- **WHEN** one type-checking pass reports multiple errors, including errors in imported source files
+- **THEN** the failure includes every error in a structured `details.diagnostics` list with its TypeScript error code, original message and available one-based source position and code frame
+- **AND** the failure message includes the errors and their available positions for existing CLI and host displays, subject to the existing text length limit; truncating that message does not remove errors from the structured list
+
+#### Scenario: Dependency graph analysis finds independent import errors
+
+- **WHEN** type checking succeeds and dependency graph analysis finds multiple browser Node-module imports or unresolved local source dependencies
+- **THEN** the failure has stage `dependency-graph` and includes the independent errors in `details.diagnostics`, each with its original reason, dependency, file and one-based source position
+- **AND** each import or re-export is reported once even if multiple bindings reach it; an unresolved local source stops only that dependency branch while other reachable sources are checked
+- **AND** the failure message exposes the errors to existing CLI and host displays, and the invalid graph does not proceed to bundling or module execution
+
 ### Requirement: Preserve bounded process failure details
 
 The compiler SHALL preserve an abnormal exit code or signal and bounded stderr when no structured failure was returned. Diagnostic serialization MUST handle ordinary errors and cyclic causes without throwing, and MUST label truncated text. Cleanup failure MUST NOT replace the initiating build error.

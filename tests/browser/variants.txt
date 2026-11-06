@@ -1,8 +1,12 @@
 import {useState} from 'react';
 import * as U from '../../src/ui/index';
 export default function Variants() {
- const [tab,setTab]=useState('one'); const [text,setText]=useState(''); const [open,setOpen]=useState(false); const [popover,setPopover]=useState(false); const [menu,setMenu]=useState(false);
+ const [tab,setTab]=useState('one'); const [text,setText]=useState(''); const [open,setOpen]=useState(false); const [popover,setPopover]=useState(false); const [menu,setMenu]=useState(false); const [slider,setSlider]=useState(25);
  return <U.Page title="Behavior variants">
+ <U.Slider aria-label="Default slider" />
+ <U.Slider min={10} max={50} aria-label="Minimum slider" />
+ <U.Slider defaultValue={[20,80]} aria-label="Range slider" getAriaLabel={index=>index===0?'Lower bound':'Upper bound'} />
+ <U.Slider value={slider} onValueChange={setSlider} aria-label="Controlled slider" /><output aria-label="Slider value">{slider}</output>
  <U.Tabs value={tab} onValueChange={setTab}><U.TabsList><U.TabsTrigger value="one">Controlled one</U.TabsTrigger><U.TabsTrigger value="two">Controlled two</U.TabsTrigger></U.TabsList><U.TabsContent value="one">Controlled first panel</U.TabsContent><U.TabsContent value="two">Controlled second panel</U.TabsContent></U.Tabs>
  <U.Checkbox aria-label="Uncontrolled checkbox" defaultChecked/><U.Switch aria-label="Uncontrolled switch" defaultChecked/>
  <U.Textarea aria-label="Controlled textarea" value={text} onChange={e=>setText(e.target.value)}/><output aria-label="Textarea value">{text}</output>

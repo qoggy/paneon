@@ -8,6 +8,7 @@ import {
   cpSync,
   rmSync,
   realpathSync,
+  existsSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -15,6 +16,14 @@ import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import type { Diagnostic } from '../src/shared/types.js';
+type LocatedTypeScriptError = {
+  code: number;
+  message: string;
+  file: string;
+  line: number;
+  column: number;
+  frame: string;
+};
 const { buildDiagnostic, boundedText, stderrTail } = (await import(
   '../dist/compiler/' + 'diagnostics.js'
 )) as typeof import('../src/compiler/diagnostics.js');
@@ -121,6 +130,160 @@ void test(
         assert.equal(d.details?.diagnostic, d.message);
         return true;
       });
+    });
+  },
+);
+void test(
+  'all TypeScript errors across source files survive compiler IPC in one failure',
+  { timeout: 60000 },
+  async () => {
+    await fixture(async (root, entry) => {
+      const dependency = join(root, 'dependency.ts');
+      writeFileSync(dependency, "export const enabled:boolean='wrong';\n");
+      writeFileSync(
+        entry,
+        source(
+          "import {enabled} from './dependency';\nconst value:number='wrong';\nconst label:string=enabled;",
+        ),
+      );
+      const compiler = new CompilerProcess(entry, join(root, 'build'));
+      await assert.rejects(compiler.result, (error: unknown) => {
+        const d = failure(error);
+        const errors = d.details?.diagnostics as LocatedTypeScriptError[];
+        assert.equal(d.code, 'BUILD_FAILED');
+        assert.equal(d.details?.stage, 'typecheck');
+        assert.equal(errors.length, 3);
+        assert.deepEqual(
+          errors.map(({ file, line, code }) => ({ file, line, code })),
+          [
+            { file: dependency, line: 1, code: 2322 },
+            { file: entry, line: 2, code: 2322 },
+            { file: entry, line: 3, code: 2322 },
+          ],
+        );
+        for (const issue of errors) {
+          assert.ok(Number(issue.column) > 0);
+          assert.match(issue.message, /not assignable/);
+          assert.match(issue.frame, /\^/);
+          assert.ok(d.message.includes(issue.message));
+          assert.ok(d.message.includes(`${issue.file}:${issue.line}:${issue.column}`));
+        }
+        assert.deepEqual(jsonValue(JSON.parse(JSON.stringify(d))), d);
+        return true;
+      });
+    });
+  },
+);
+void test(
+  'all TypeScript errors remain structured when the existing summary length limit is reached',
+  { timeout: 60000 },
+  async () => {
+    await fixture(async (root, entry) => {
+      const expectedType = '中文'.repeat(150);
+      const declarations = Array.from(
+        { length: 25 },
+        (_, index) => `const item${index}: '${expectedType}' = 'wrong';`,
+      ).join('\n');
+      writeFileSync(entry, source(`const value=1;\n${declarations}`));
+      await assert.rejects(
+        new CompilerProcess(entry, join(root, 'build')).result,
+        (error: unknown) => {
+          const d = failure(error);
+          const errors = d.details?.diagnostics as LocatedTypeScriptError[];
+          assert.equal(errors.length, 25);
+          assert.equal(d.details?.truncated, true);
+          assert.ok(Buffer.byteLength(d.message) <= 8192);
+          assert.ok(!d.message.includes('\ufffd'));
+          for (const [index, issue] of errors.entries()) {
+            assert.equal(issue.code, 2322);
+            assert.equal(issue.file, entry);
+            assert.equal(issue.line, index + 2);
+            assert.ok(issue.message.includes(expectedType));
+          }
+          return true;
+        },
+      );
+    });
+  },
+);
+void test(
+  'dependency graph errors follow typecheck, survive IPC, and stop before bundling',
+  { timeout: 60000 },
+  async () => {
+    await fixture(async (root, entry) => {
+      const content = (value: string) => `
+import {definePanel,z} from '@qoggy/paneon/sdk';
+import {readFileSync} from 'node:fs';
+import {basename} from 'node:path';
+const value:number=${value};
+function Panel(){return <div>{value+readFileSync('x','utf8')+basename('x')}</div>}
+export default definePanel({id:'dependency-errors',requires:{paneon:'*'},input:z.object({}),render:Panel});`;
+      const buildRoot = join(root, 'build');
+      writeFileSync(entry, content("'wrong'"));
+      await assert.rejects(new CompilerProcess(entry, buildRoot).result, (error: unknown) => {
+        const d = failure(error);
+        assert.equal(d.details?.stage, 'typecheck');
+        assert.doesNotMatch(d.message, /Browser code cannot import/);
+        return true;
+      });
+      writeFileSync(entry, content('1'));
+      await assert.rejects(new CompilerProcess(entry, buildRoot).result, (error: unknown) => {
+        const d = failure(error);
+        const errors = d.details?.diagnostics as Record<string, string | number>[];
+        assert.equal(d.details?.stage, 'dependency-graph');
+        assert.deepEqual(
+          errors.map((issue) => issue.dependency),
+          ['node:fs', 'node:path'],
+        );
+        assert.deepEqual(
+          errors.map((issue) => issue.line),
+          [3, 4],
+        );
+        assert.ok(d.message.includes('node:fs'));
+        assert.ok(d.message.includes('node:path'));
+        assert.deepEqual(jsonValue(JSON.parse(JSON.stringify(d))), d);
+        return true;
+      });
+      assert.equal(existsSync(buildRoot), false, 'invalid graphs must not enter bundling');
+    });
+  },
+);
+void test(
+  'a missing runtime dependency does not hide an independent browser Node import',
+  { timeout: 60000 },
+  async () => {
+    await fixture(async (root, entry) => {
+      // TypeScript can read declarations even when the runtime source is missing.
+      writeFileSync(join(root, 'missing.d.ts'), 'export const missing:string;');
+      writeFileSync(
+        join(root, 'available.ts'),
+        "import {basename} from 'node:path';\nexport const value=basename('x');",
+      );
+      writeFileSync(
+        entry,
+        `import {definePanel,z} from '@qoggy/paneon/sdk';
+import {missing} from './missing.js';
+import {value} from './available';
+function Panel(){return <div>{missing+value}</div>}
+export default definePanel({id:'missing-runtime',requires:{paneon:'*'},input:z.object({}),render:Panel});`,
+      );
+      await assert.rejects(
+        new CompilerProcess(entry, join(root, 'build')).result,
+        (error: unknown) => {
+          const d = failure(error);
+          const errors = d.details?.diagnostics as Record<string, string | number>[];
+          assert.equal(d.details?.stage, 'dependency-graph');
+          assert.deepEqual(
+            errors.map((issue) => issue.dependency),
+            ['./missing.js', 'node:path'],
+          );
+          assert.deepEqual(
+            errors.map((issue) => issue.file),
+            [entry, join(root, 'available.ts')],
+          );
+          return true;
+        },
+      );
     });
   },
 );

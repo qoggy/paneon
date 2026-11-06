@@ -114,27 +114,43 @@ function typecheck(entry: string, snapshot: SourceSnapshot) {
     .getPreEmitDiagnostics(program)
     .filter((d) => d.category === ts.DiagnosticCategory.Error);
   if (errors.length) {
-    const d = errors[0];
-    const location =
-      d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : undefined;
-    const reason = ts.flattenDiagnosticMessageText(d.messageText, ' ');
-    let frame: string | undefined;
-    if (d.file && location) {
-      const line = location.line + 1;
-      const start = Math.max(0, location.character - 120);
-      const prefix = start ? '…' : '';
-      const excerpt = d.file.text
-        .split(/\r?\n/)
-        [location.line].slice(start, location.character + 120);
-      frame = `${line} | ${prefix}${excerpt}\n${' '.repeat(String(line).length + 3 + prefix.length + location.character - start)}^`;
-    }
-    throw buildError(
-      new PaneonError('BUILD_FAILED', reason, {
-        entryPath: d.file?.fileName ?? entry,
+    const diagnostics = errors.map((d) => {
+      const location =
+        d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : undefined;
+      let frame: string | undefined;
+      if (d.file && location) {
+        const line = location.line + 1;
+        const start = Math.max(0, location.character - 120);
+        const prefix = start ? '…' : '';
+        const excerpt = d.file.text
+          .split(/\r?\n/)
+          [location.line].slice(start, location.character + 120);
+        frame = `${line} | ${prefix}${excerpt}\n${' '.repeat(String(line).length + 3 + prefix.length + location.character - start)}^`;
+      }
+      return {
+        code: d.code,
+        message: ts.flattenDiagnosticMessageText(d.messageText, ' '),
         ...(d.file ? { file: d.file.fileName } : {}),
         ...(location ? { line: location.line + 1, column: location.character + 1 } : {}),
-        diagnostic: reason,
         ...(frame ? { frame } : {}),
+      };
+    });
+    const { code: _code, message: firstMessage, ...firstDetails } = diagnostics[0];
+    const reason =
+      diagnostics.length === 1
+        ? firstMessage
+        : diagnostics
+            .map((d) => {
+              const location = d.file ? `${d.file}${d.line ? `:${d.line}:${d.column}` : ''}\n` : '';
+              return `${location}TS${d.code}: ${d.message}`;
+            })
+            .join('\n\n');
+    throw buildError(
+      new PaneonError('BUILD_FAILED', reason, {
+        entryPath: firstDetails.file ?? entry,
+        ...firstDetails,
+        diagnostic: reason,
+        diagnostics,
       }),
       'typecheck',
       entry,
@@ -212,6 +228,7 @@ async function compileSnapshot(
     const environmentFiles = captureBuildEnvironment(snapshot, entry);
     const range = validateRequirement(entry, PACKAGE_VERSION, readSource);
     typecheck(entry, snapshot);
+    stage = 'dependency-graph';
     const isFile = (file: string) => snapshot.track(() => snapshot.exists(file, 'file'));
     const client = createGraph(entry, 'client', readSource, isFile);
     const server = createGraph(entry, 'server', readSource, isFile);

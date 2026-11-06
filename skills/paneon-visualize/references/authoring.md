@@ -154,6 +154,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 | `Page`, `Section`, `Stack` | Page with title, titled region, row/column spacing |
 | `Button` | Action button |
 | `Input`, `Textarea` | Single-line and multiline text input |
+| `Slider` | Select a numeric value or range |
 | `Label`, `Field` | Control label; field with description and error |
 | `Select` | Dropdown choice |
 | `RadioGroup`, `Checkbox`, `Switch` | Single choice, multiple choice, on/off |
@@ -185,6 +186,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 
 - `Page` centers its content at most 1152px wide (`max-w-6xl`, `p-4 md:p-8`). For multi-column workbenches, side-by-side diffs, wide tables or large diagrams, use the full width: `<Page className="max-w-none md:p-4">`. Narrow a form with `max-w-160`.
 - `Select` needs `items` to display labels for values.
+- `Slider` uses `aria-label` for a single thumb. Give range thumbs distinct names with `getAriaLabel`: `<Slider defaultValue={[20, 80]} getAriaLabel={(index) => index === 0 ? 'Lower bound' : 'Upper bound'} />`.
 - `CodeBlock`: `<CodeBlock code={source} language="ts" header="Retry strategy" />`. Only `code` is required. `header` defaults to `true` for the language title; pass a string for a custom title, or `false` to hide the title bar. Use `lineNumbers` when line references help the explanation, or `highlightedLines={{ start: 3, end: 5 }}` to emphasize a range (1-based, both endpoints included). Line numbers default to `false`; wrapping defaults to `true`, with `defaultWrap={false}` for initial horizontal scrolling. To collect feedback on code, see [annotations](#markdown-codeblock-and-diffview).
 - `Markdown` renders GFM without raw HTML. Its `outline` prop defaults to `"popover"` for a heading directory that opens on demand at every width without reserving a sidebar. Replacing `pre` through `components` also drops Mermaid rendering.
 - `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath`, `className` and `annotationTarget`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component. To annotate it, see [Image and Mermaid](#image-and-mermaid).
