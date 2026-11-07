@@ -147,51 +147,9 @@ return <Button onClick={() => void save()}>Save selection</Button>;
 
 Prefer the existing components over hand-built ones: pages get built faster and stay consistent in style and experience. Import them from `@qoggy/paneon/ui`. They follow upstream shadcn with its default Neutral theme; do not redefine the palette, font scale, radius or control height. Compound components export their parts with the same prefix, such as `Card` with `CardHeader` and `CardContent`.
 
-<!-- prettier-ignore -->
-| Component | Purpose |
-| --- | --- |
-| `Page`, `Section`, `Stack` | Page with title, titled region, row/column spacing |
-| `Button` | Action button |
-| `Input`, `Textarea` | Single-line and multiline text input |
-| `Slider` | Select a numeric value or range |
-| `Label`, `Field` | Control label; field with description and error |
-| `Select` | Dropdown choice |
-| `RadioGroup`, `Checkbox`, `Switch` | Single choice, multiple choice, on/off |
-| `Card` | Grouped content block |
-| `Badge`, `StatusBadge` | Short label or status |
-| `Alert` | Inline message |
-| `Empty` | Empty state |
-| `Spinner` | Loading indicator |
-| `toast` | Transient notification: `toast.add({ title, type })` |
-| `Table` | Static table |
-| `Pagination` | Page navigation |
-| `Tabs` | Switch between views |
-| `NavigationMenu` | Navigation bar |
-| `Accordion`, `Collapsible` | Expandable sections |
-| `Dialog`, `AlertDialog` | Modal dialog, confirmation |
-| `Sheet` | Side panel |
-| `Popover`, `Tooltip` | Floating content, hover hint |
-| `DropdownMenu`, `ContextMenu` | Click menu, right-click menu |
-| `Separator` | Divider |
-| `CodeBlock` | Read-only highlighted code with optional annotations |
-| `Markdown` | GFM Markdown, including Mermaid fences |
-| `Image` | Remote or local image |
-| `FileIcon` | File type icon selected from a file name or path |
-| `Mermaid` | Diagram |
-| `DiffView` | Text diff |
-| `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` | Resizable split layout |
-| `Tree` | Expandable hierarchy, such as a file tree |
-| `usePageAnnotations`, `AnnotationText`, `useAnnotations` | Annotations; see [annotations](#annotations) |
+Find a component in the [component index](components/index.md), then read its file for the import statement and common props. Annotation APIs are described [below](#annotations).
 
-- `Page` centers its content at most 1152px wide (`max-w-6xl`, `p-4 md:p-8`). For multi-column workbenches, side-by-side diffs, wide tables or large diagrams, use the full width: `<Page className="max-w-none md:p-4">`. Narrow a form with `max-w-160`.
-- `Select` needs `items` to display labels for values.
-- `Slider` uses `aria-label` for a single thumb. Give range thumbs distinct names with `getAriaLabel`: `<Slider defaultValue={[20, 80]} getAriaLabel={(index) => index === 0 ? 'Lower bound' : 'Upper bound'} />`.
-- `CodeBlock`: `<CodeBlock code={source} language="ts" header="Retry strategy" />`. Only `code` is required. `header` defaults to `true` for the language title; pass a string for a custom title, or `false` to hide the title bar. Use `lineNumbers` when line references help the explanation, or `highlightedLines={{ start: 3, end: 5 }}` to emphasize a range (1-based, both endpoints included). Line numbers default to `false`; wrapping defaults to `true`, with `defaultWrap={false}` for initial horizontal scrolling. To collect feedback on code, see [annotations](#markdown-codeblock-and-diffview).
-- `Markdown` renders GFM without raw HTML. Its `outline` prop defaults to `"popover"` for a heading directory that opens on demand at every width without reserving a sidebar. Replacing `pre` through `components` also drops Mermaid rendering. `~~~` fences avoid backtick escaping in template strings.
-- `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath`, `className` and `annotationTarget`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component. To annotate it, see [Image and Mermaid](#image-and-mermaid).
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
-- `Mermaid` is bundled; never load Mermaid from a CDN. Render a diagram with `<Mermaid code="flowchart LR; A-->B" />`; `code` is the required Mermaid source string.
-- `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [annotations](#markdown-codeblock-and-diffview).
 
 ## Theme and language
 
