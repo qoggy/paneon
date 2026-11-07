@@ -53,6 +53,7 @@ const browserScripts = [
   'feedback',
   'annotation-api',
   'panel-annotation-submission',
+  'event-payloads',
   'element-annotations',
   'annotation-positioning',
   'media-annotations',

@@ -16,7 +16,7 @@ const selected = 'Earlier selected content 🙂';
 const comment = 'Keep the complete opinion.';
 let service, github, browser;
 
-// Exercise each real page's onSubmit, including its server actions and event schema.
+// Exercise each real page's onSubmit, including its server actions and durable event storage.
 // The test controller changes only saved coordinates/quote; it never replaces submission.
 async function instrument(entry) {
   const source = await readFile(entry, 'utf8');

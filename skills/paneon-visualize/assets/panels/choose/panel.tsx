@@ -25,12 +25,7 @@ import {
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import { ArrowRight, ArrowUpRight, Check, X } from '../../shared/icons';
-import {
-  answerSchema,
-  answersSubmittedSchema,
-  chooseParamsSchema,
-  completeAnswersSchema,
-} from './schema';
+import { answerSchema, chooseParamsSchema, completeAnswersSchema } from './schema';
 import type { ChoiceAnswer, ChooseParams } from './schema';
 
 type Draft = {
@@ -700,6 +695,5 @@ export default definePanel({
   id: 'choose',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: chooseParamsSchema,
-  events: { 'answers-submitted': answersSubmittedSchema },
   render: ChoosePanel,
 });

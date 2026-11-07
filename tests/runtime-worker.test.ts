@@ -12,7 +12,7 @@ const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
 )) as typeof import('../src/runtime/lifecycle.js');
 
-void test('worker loads encoded file paths and runs actions/events without filesystem watchers', async () => {
+void test('worker loads encoded file paths and runs actions without filesystem watchers', async () => {
   const root = mkdtempSync(join(tmpdir(), 'paneon-native-worker-'));
   const serverFile = join(root, 'server #?%.js');
   const sdkUrl = new URL('../dist/sdk/server.js', import.meta.url).href;
@@ -23,7 +23,7 @@ export const read=serverAction({input:z.object({}),handler:async()=>{
 const{basename}=await import('node:path');return{cwd:process.cwd(),file:basename(fileURLToPath(import.meta.url)),
 watchers:process.getActiveResourcesInfo().filter(type=>/FSEvent|FSWatcher/.test(type))};}});
 export const __paneonActions={'panel.tsx#read':read};
-export default definePanel({id:'native',input:z.object({}),events:{done:z.object({text:z.string()})},render(){}});`,
+export default definePanel({id:'native',input:z.object({}),render(){}});`,
   );
   const worker = fork(new URL('../dist/runtime/worker.js', import.meta.url), [], {
     cwd: root,
@@ -51,14 +51,7 @@ export default definePanel({id:'native',input:z.object({}),events:{done:z.object
       file: 'server #?%.js',
       watchers: [],
     });
-    const event = await request({
-      kind: 'validate-event',
-      requestId: 'event',
-      type: 'done',
-      payload: { text: '中文', extra: 'stripped' },
-    });
-    assert.equal(event.error, undefined);
-    assert.deepEqual(event.data, { text: '中文' });
+    assert.equal(Object.hasOwn(ready.data as object, 'events'), false);
     const invalid = await request({
       kind: 'invoke',
       requestId: 'invalid',

@@ -80,7 +80,7 @@ void test(
     const entry = join(home, 'panel.tsx');
     await writeFile(
       entry,
-      `import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';export const length=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>({length:input.text.length})});function Panel(){return <p>Limits</p>}export default definePanel({id:'request-limits',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()}),['t'.repeat(128)]:z.object({text:z.string()})},render:Panel});`,
+      `import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';export const length=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>({length:input.text.length})});function Panel(){return <p>Limits</p>}export default definePanel({id:'request-limits',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
     );
     const service = await startServer(join(home, '.paneon'));
     const origin = `http://127.0.0.1:${service.descriptor.port}`;

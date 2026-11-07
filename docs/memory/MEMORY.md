@@ -10,7 +10,7 @@
 - [Commit messages](workflow-commit-messages.md) — Write English type(scope): summary messages based on the actual staged changes, with explanatory bodies when needed
 
 - [Agent scope](product-agent-scope.md) — Paneon targets general-purpose agents; local CLI access enables reuse and TSX generation enables authoring
-- [Product responsibility boundary](architecture-responsibilities.md) — Paneon owns rendering, local calls, events and framework diagnostics; panels own business execution policies
+- [Product responsibility boundary](architecture-responsibilities.md) — Paneon owns rendering, local calls and JSON event transport; panels own business validation and execution policies
 - [Local file access](architecture-file-access.md) — Image owns image reads and Markdown owns linked text reads; component actions reuse existing registration; no dedicated file endpoint
 - [Scenario boundaries and defensive logic](coding-scenario-boundaries.md) — Design for explicit supported scenarios; avoid speculative defenses for out-of-scope operations
 - [Caught errors](coding-caught-errors.md) — Log caught errors, propagate them, or both; never silently discard failures

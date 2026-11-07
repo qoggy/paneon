@@ -17,7 +17,7 @@ const { Runtime } = (await import(
 )) as typeof import('../src/runtime/lifecycle.js');
 const execute = promisify(execFile);
 const source = (extra = '') =>
-  `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${extra}function Panel(){return <div>Deletion fixture</div>}export default definePanel({id:'deletion',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+  `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';${extra}function Panel(){return <div>Deletion fixture</div>}export default definePanel({id:'deletion',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 function stored(root: string, status: StoredPanel['status']): Omit<StoredPanel, 'instanceId'> {
   const now = new Date().toISOString();
   return {

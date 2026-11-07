@@ -154,7 +154,7 @@ void test('runtime aliases share execution, artifacts, notifications and resourc
   const entry = join(root, 'panel.tsx');
   writeFileSync(
     entry,
-    "import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';export const read=serverAction({kind:'query',input:z.object({}),handler:()=>42});export default definePanel({id:'ids',requires:{paneon:'*'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:()=> <div>Stored identity</div>});",
+    "import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';export const read=serverAction({kind:'query',input:z.object({}),handler:()=>42});export default definePanel({id:'ids',requires:{paneon:'*'},input:z.object({}),render:()=> <div>Stored identity</div>});",
   );
   try {
     const panel = await runtime.run(entry, root, {}, true);

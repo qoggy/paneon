@@ -205,6 +205,6 @@ export default definePanel({
   id: 'release-panel',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: { 'analyze-requested': z.object({ environment: z.string() }) },
+
   render: ReleasePanel,
 });

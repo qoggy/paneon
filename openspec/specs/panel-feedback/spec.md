@@ -128,19 +128,25 @@ Adapters SHALL preserve target identity across presentation changes such as sort
 - **WHEN** a renderer registers text rendered from Markdown or a code diff
 - **THEN** it provides explicit DOM-boundary-to-source mappings, preserves Unicode character boundaries, and validates the original-source quote rather than searching for the first matching text
 
-### Requirement: Submit through existing declared events
+### Requirement: Submit through durable JSON events
 
-The common controls SHALL deliver a feedback snapshot through an explicit page-provided submission callback. The shared session and all supplied file, diff, Git, PR and table pages SHALL validate submission structure without resolving targets, comparing saved ranges and quotes against source text, requiring quote length to match coordinates, or rechecking content hashes. Source checks SHALL be used only for locating and highlighting annotations. Missing, changed, unmounted or unlocatable content SHALL NOT prevent delivery of saved targets and comments; source checks SHALL remain part of location. Pages SHALL declare an event schema and reuse agent.emit and the existing durable events/ack mechanism, without requiring a new protocol, database, or universal event name. Selection and draft editing SHALL NOT automatically emit events. Success SHALL be shown only after durable event submission completes; failed submission SHALL retain drafts. Existing page-specific answer and revision contracts SHALL remain authoritative.
+The common controls SHALL deliver a feedback snapshot through an explicit page-provided submission callback. The shared session and all supplied file, diff, Git, PR and table pages SHALL validate submission structure without resolving targets, comparing saved ranges and quotes against source text, requiring quote length to match coordinates, or rechecking content hashes. Source checks SHALL be used only for locating and highlighting annotations. Missing, changed, unmounted or unlocatable content SHALL NOT prevent delivery of saved targets and comments; source checks SHALL remain part of location. Pages SHALL reuse agent.emit and the existing durable events/ack mechanism without declaring event types or event schemas in definePanel. Paneon SHALL retain JSON, size, instance-state and revision checks and SHALL preserve submitted payload fields without business-schema parsing. Page-specific business validation SHALL remain in the page's submission logic. Selection and draft editing SHALL NOT automatically emit events. Success SHALL be shown only after durable event submission completes; failed submission SHALL retain drafts. Existing page-specific answer and revision contracts SHALL remain authoritative.
 
 #### Scenario: Submit and read feedback
 
-- **WHEN** a person explicitly submits completed feedback through a page's declared event
+- **WHEN** a person explicitly submits completed feedback through agent.emit
 - **THEN** the agent can read it through the existing CLI events command and acknowledge it through ack
 
 #### Scenario: Submission fails
 
 - **WHEN** the submission callback fails
 - **THEN** the controls retain editable drafts and do not show a successful submission
+
+#### Scenario: Submit layout headings without event declarations
+
+- **WHEN** a custom page submits Page or Section title/description annotations through agent.emit without declaring events in definePanel
+- **THEN** Paneon stores their object refs and text ranges unchanged, including additional JSON fields and correction event IDs
+- **AND** the agent can read and acknowledge those events without waking a panel execution worker
 
 #### Scenario: Submit annotations whose source cannot be located
 
@@ -173,7 +179,7 @@ The HTTP request body limit SHALL be 262144 UTF-8 bytes while event payloads SHA
 
 ### Requirement: Edit annotations beside registered content
 
-UI and guides SHALL call this feature 批注 in Chinese and annotation (annotations in the plural) in English. API names SHALL use annotation without legacy-name aliases. Event entries SHALL use annotations/targets/comment, where comment is the annotation text; a top-level comment SHALL remain invalid. Selecting text SHALL show a nearby Annotation action without creating a saved draft or emitting an event. Activating it SHALL open an anchored temporary editor. Save SHALL commit to page draft state only. Cancel or Escape SHALL discard the temporary edit, preserve an existing annotation, and remove a cancelled new draft. Delete SHALL remove the selected annotation and its markers. Each saved annotation SHALL have a clickable session-stable UI number beside matching mounted targets; unmounting SHALL not delete the annotation. No large independent selection-and-annotation section SHALL be required.
+UI and guides SHALL call this feature 批注 in Chinese and annotation (annotations in the plural) in English. API names SHALL use annotation without legacy-name aliases. Annotation drafts and supplied annotation results SHALL use annotations/targets/comment, where comment is the annotation text; a top-level comment SHALL NOT be part of this annotation format. Selecting text SHALL show a nearby Annotation action without creating a saved draft or emitting an event. Activating it SHALL open an anchored temporary editor. Save SHALL commit to page draft state only. Cancel or Escape SHALL discard the temporary edit, preserve an existing annotation, and remove a cancelled new draft. Delete SHALL remove the selected annotation and its markers. Each saved annotation SHALL have a clickable session-stable UI number beside matching mounted targets; unmounting SHALL not delete the annotation. No large independent selection-and-annotation section SHALL be required.
 
 #### Scenario: Cancel editing an existing annotation
 

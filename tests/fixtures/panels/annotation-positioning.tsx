@@ -77,6 +77,6 @@ export default definePanel({
   id: 'annotation-positioning-acceptance',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: {},
+
   render: Panel,
 });

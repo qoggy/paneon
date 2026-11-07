@@ -40,7 +40,7 @@ function Panel() {
 }
 export default definePanel({
   id: 'action-input', requires: { paneon: '${PACKAGE_VERSION}' }, input: z.object({}),
-  events: { authenticated: z.object({ ok: z.boolean() }) }, render: Panel,
+   render: Panel,
 });`,
   );
   service = await startServer(join(root, 'data'));

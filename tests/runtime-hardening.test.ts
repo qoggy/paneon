@@ -58,7 +58,7 @@ ${options.marker || options.moduleMarker ? `import {appendFileSync} from 'node:f
 ${options.moduleMarker ? `const loaded=(appendFileSync(${JSON.stringify(options.moduleMarker)},'loaded\\n'),1);` : ''}
 export const invoke=serverAction({kind:'mutation',input:z.object({}),handler:async()=>{${options.marker ? `appendFileSync(${JSON.stringify(options.marker)},'called\\n');` : ''}return {done:true${options.moduleMarker ? ',loaded' : ''}};}});
 function Panel(){return <div>${options.missingApi ? '{nonexistentPaneonApi()}' : id}</div>}
-export default definePanel({id:${JSON.stringify(id)},requires:{paneon:${JSON.stringify(range)}},input:z.object({topic:z.string().min(1)}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+export default definePanel({id:${JSON.stringify(id)},requires:{paneon:${JSON.stringify(range)}},input:z.object({topic:z.string().min(1)}),render:Panel});`;
 }
 async function cli(
   home: string,
@@ -123,7 +123,7 @@ async function until(check: () => boolean | Promise<boolean>, message: string, t
   assert.fail(message);
 }
 
-void test('manifest persists the panel input schema alongside action and event schemas', async () => {
+void test('manifest persists input and action schemas without event declarations', async () => {
   const root = directory('paneon-schema-');
   const entry = join(root, 'panel.tsx');
   writeFileSync(entry, source('schema', PACKAGE_VERSION));
@@ -143,7 +143,7 @@ void test('manifest persists the panel input schema alongside action and event s
     assert.equal(schema.properties.topic.minLength, 1);
     assert.deepEqual(schema.required, ['topic']);
     assert.equal(disk.actions.length, 1);
-    assert.ok(disk.events.feedback);
+    assert.equal(Object.hasOwn(disk, 'events'), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

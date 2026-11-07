@@ -56,12 +56,7 @@ import {
 import type { PRChecks, PRComparison, PRDetail, PRList, PRSnapshot } from './github.ts';
 import { safeLink } from './model.ts';
 import { buildPRFeedback } from './feedback.ts';
-import {
-  githubPRParamsSchema,
-  prFeedbackSubmittedSchema,
-  prReviewRequestedSchema,
-  repositorySchema,
-} from './schema.ts';
+import { githubPRParamsSchema, repositorySchema } from './schema.ts';
 import type { GitHubPRParams, PRRef } from './schema.ts';
 async function readResult<T>(work: () => T | Promise<T>) {
   try {
@@ -1130,9 +1125,5 @@ export default definePanel({
   id: 'github-pr',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: githubPRParamsSchema,
-  events: {
-    'review-requested': prReviewRequestedSchema,
-    'pr-feedback-submitted': prFeedbackSubmittedSchema,
-  },
   render: GithubPR,
 });

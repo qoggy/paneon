@@ -35,7 +35,7 @@ void test(
     const entry = join(home, 'feedback.tsx');
     await writeFile(
       entry,
-      `import {definePanel,z} from '@qoggy/paneon/sdk';function Panel(){return <p>Feedback</p>}export default definePanel({id:'feedback',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string().min(1)})},render:Panel});`,
+      `import {definePanel,z} from '@qoggy/paneon/sdk';function Panel(){return <p>Feedback</p>}export default definePanel({id:'feedback',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
     );
     const started = await startServer(storage);
     const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
@@ -219,14 +219,6 @@ void test(
       );
       await read(secondPanel.instanceId, 'agent');
       await acknowledge(panel.instanceId, 'agent', foreign.id, false);
-      await assert.rejects(
-        started.runtime.append(panel.instanceId, panel.revision, 'unknown', { text: 'rejected' }),
-        { code: 'INVALID_EVENT' },
-      );
-      await assert.rejects(
-        started.runtime.append(panel.instanceId, panel.revision, 'feedback', { text: 7 }),
-        { code: 'INVALID_EVENT' },
-      );
       await assert.rejects(
         started.runtime.append(panel.instanceId, panel.revision, 'feedback', {
           text: 'x'.repeat(65_537),

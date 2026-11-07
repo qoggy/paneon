@@ -67,11 +67,7 @@ import type {
   GitRevision,
   HistoryRef,
 } from './git.ts';
-import {
-  gitReviewParamsSchema,
-  gitReviewSubmittedSchema,
-  gitCheckoutCompletedSchema,
-} from './schema.ts';
+import { gitReviewParamsSchema } from './schema.ts';
 import type { CheckoutReason } from './checkout.ts';
 import type { GitRef, GitReviewParams, GitRepository } from './schema.ts';
 
@@ -994,7 +990,7 @@ function Review() {
               </TabsList>
               {request.type === 'history' && listingStatus}
               <div className="ml-auto flex items-center gap-2">
-                {(checkingOut || catalogPending) && (
+                {(checkingOut || catalogPending || (request.type === 'changes' && pending)) && (
                   <span
                     role="status"
                     className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -1099,7 +1095,7 @@ function Review() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              {request.type !== 'history' && listingStatus}
+              {request.type === 'compare' && listingStatus}
               <div
                 data-git-workspace=""
                 className={`grid min-h-0 flex-1 gap-3 ${request.type === 'history' ? (historyDiff ? 'md:min-h-[calc(15rem+1px)] md:grid-rows-1 md:gap-y-0' : 'md:min-h-[12.75rem] md:grid-rows-1') : fileDiff ? 'md:grid-cols-1 md:gap-x-0' : 'md:grid-cols-1'}`}
@@ -1148,9 +1144,5 @@ export default definePanel({
   id: 'git-review',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: gitReviewParamsSchema,
-  events: {
-    'git-review-submitted': gitReviewSubmittedSchema,
-    'git-checkout-completed': gitCheckoutCompletedSchema,
-  },
   render: Review,
 });

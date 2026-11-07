@@ -49,7 +49,7 @@ void test('real external TSX separates handler code, runs in cwd, persists event
   const data = join(root, 'data');
   const entry = join(root, 'panel.tsx');
   const sideEffect = join(root, 'called.txt');
-  const source = `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{Button}from'@qoggy/paneon/ui';import{appendFileSync}from'node:fs';export const run=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>{appendFileSync(${JSON.stringify(sideEffect)},'call\\n');return{cwd:process.cwd(),text:input.text,marker:'SERVER_ONLY_HANDLER_MARKER'};}});function Panel(){return <Button onClick={()=>run({text:'中文'})}>Run</Button>}export default definePanel({id:'external',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+  const source = `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';import{Button}from'@qoggy/paneon/ui';import{appendFileSync}from'node:fs';export const run=serverAction({input:z.object({text:z.string()}),handler:async(_ctx,input)=>{appendFileSync(${JSON.stringify(sideEffect)},'call\\n');return{cwd:process.cwd(),text:input.text,marker:'SERVER_ONLY_HANDLER_MARKER'};}});function Panel(){return <Button onClick={()=>run({text:'中文'})}>Run</Button>}export default definePanel({id:'external',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
   writeFileSync(entry, source);
   let runtime = new Runtime(data);
   try {
@@ -69,9 +69,6 @@ void test('real external TSX separates handler code, runs in cwd, persists event
     assert.equal(result.text, '中文');
     await assert.rejects(runtime.invoke(p.instanceId, p.revision, 'panel.tsx#run', { text: 7 }), {
       code: 'INPUT_VALIDATION_FAILED',
-    });
-    await assert.rejects(runtime.append(p.instanceId, p.revision, 'unknown', {}), {
-      code: 'INVALID_EVENT',
     });
     const event = await runtime.append(p.instanceId, p.revision, 'feedback', { text: '反馈' });
     assert.equal((await runtime.events(p.instanceId, 'agent', 100, 0)).events[0]?.id, event.id);
@@ -146,7 +143,7 @@ void test('real CLI watch choices, compact command results, English debug, and e
   const entry = join(root, 'panel.tsx');
   writeFileSync(
     entry,
-    `import{definePanel,z}from'@qoggy/paneon/sdk';function Panel(){return <div>CLI</div>}export default definePanel({id:'cli',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({topic:z.string()}),events:{feedback:z.object({text:z.string()})},render:Panel});`,
+    `import{definePanel,z}from'@qoggy/paneon/sdk';function Panel(){return <div>CLI</div>}export default definePanel({id:'cli',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({topic:z.string()}),render:Panel});`,
   );
   const { startServer } =
     (await import('./runtime-fixture.ts')) as typeof import('../src/runtime/server.js');

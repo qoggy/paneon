@@ -16,7 +16,7 @@ import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';
 import {Checkbox} from '@qoggy/paneon/ui';
 export const environment=serverAction({kind:'query',input:z.object({}),handler:async()=>({nodeEnv:process.env.NODE_ENV??'unset'})});
 function Panel(){return <><h1>${heading}</h1><Checkbox aria-label="Include details" /></>}
-export default definePanel({id:'production-test',requires:{paneon:'${range}'},input:z.object({}),events:{},render:Panel});`;
+export default definePanel({id:'production-test',requires:{paneon:'${range}'},input:z.object({}),render:Panel});`;
 async function until(condition, description) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {

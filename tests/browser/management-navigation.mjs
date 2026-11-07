@@ -36,7 +36,7 @@ try {
   await writeFile(
     entry,
     `import {definePanel,z} from '@qoggy/paneon/sdk';
-export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{},render:()=> <h1>Author content 原文</h1>});`,
+export default definePanel({id:'navigation-probe',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:()=> <h1>Author content 原文</h1>});`,
   );
   const panel = await service.runtime.run(entry, root, {}, false);
   browser = await chromium.launch({

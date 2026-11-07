@@ -36,8 +36,6 @@ async function handle(raw: unknown) {
     requestId: string;
     actionId: string;
     input: unknown;
-    type: string;
-    payload: unknown;
   };
   if (m.kind === 'init') {
     // The compiler already bundled this revision. Source watching and worker
@@ -83,32 +81,12 @@ async function handle(raw: unknown) {
         definitionId: definition.id,
         inputSchema: z.toJSONSchema(definition.input),
         actions: actionManifests,
-        events: Object.fromEntries(
-          Object.entries(definition.events ?? {}).map(([type, schema]) => [
-            type,
-            z.toJSONSchema(schema),
-          ]),
-        ),
       },
     });
     return;
   }
   if (m.kind === 'stop') {
     stop();
-    return;
-  }
-  if (m.kind === 'validate-event') {
-    try {
-      const schema = definition.events?.[m.type];
-      if (!schema) throw new PaneonError('INVALID_EVENT', 'The event type is not declared.');
-      const result = schema.safeParse(m.payload);
-      if (!result.success)
-        throw new PaneonError('INVALID_EVENT', 'Event input does not match its schema.');
-      const payload = jsonValue(result.data);
-      send({ kind: 'result', requestId: m.requestId, data: payload });
-    } catch (e) {
-      send({ kind: 'result', requestId: m.requestId, error: diagnostic(e) });
-    }
     return;
   }
   if (m.kind === 'invoke') {

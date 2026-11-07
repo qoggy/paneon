@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import { Button, AnnotationText, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
 import type { AnnotationAdapter } from '@qoggy/paneon/ui';
 
@@ -70,6 +70,5 @@ export default definePanel({
   id: 'annotation-editor-acceptance',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: { feedback: annotationValueSchema(z.string()) },
   render: Panel,
 });

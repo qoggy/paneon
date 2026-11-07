@@ -145,6 +145,6 @@ export default definePanel({
   id: 'table-panel',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: { 'row-selected': z.object({ id: z.number().int().positive() }) },
+
   render: TablePanel,
 });

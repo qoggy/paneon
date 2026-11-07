@@ -1,4 +1,4 @@
-import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Page,
   Card,
@@ -17,15 +17,6 @@ const refSchema = z.union([
   }),
 ]);
 type Ref = z.infer<typeof refSchema>;
-const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
-const resultSchema = z.object({
-  annotations: z.array(
-    z.object({
-      targets: draftAnnotation.shape.targets,
-      comment: draftAnnotation.shape.comment,
-    }),
-  ),
-});
 
 function Draft() {
   const { value } = useAnnotations<Ref>();
@@ -65,6 +56,5 @@ export default definePanel({
   id: 'custom-annotations',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}).strict(),
-  events: { 'annotations-submitted': resultSchema },
   render: Panel,
 });

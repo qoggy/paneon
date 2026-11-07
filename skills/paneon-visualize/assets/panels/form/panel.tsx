@@ -29,13 +29,7 @@ import {
 } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import { X } from '../../shared/icons';
-import {
-  collectForm,
-  completeFormSchema,
-  formParamsSchema,
-  formSubmittedSchema,
-  initialDraft,
-} from './schema';
+import { collectForm, completeFormSchema, formParamsSchema, initialDraft } from './schema';
 import type { FormDraft, FormParams, FormValue } from './schema';
 
 function FormPanel() {
@@ -309,6 +303,5 @@ export default definePanel({
   id: 'form',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: formParamsSchema,
-  events: { 'form-submitted': formSubmittedSchema },
   render: FormPanel,
 });

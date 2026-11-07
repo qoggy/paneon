@@ -66,7 +66,6 @@ export type Manifest = {
   reuse?: BuildReuse;
   watchInputs?: WatchInputs;
   actions: ActionManifest[];
-  events: Record<string, JsonValue>;
 };
 export type PanelInstance = {
   instanceId: string;

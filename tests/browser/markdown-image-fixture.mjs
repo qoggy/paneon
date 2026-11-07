@@ -59,7 +59,7 @@ function Panel() {
     <div id="image-link-target">图片链接目标</div>
   </Page>;
 }
-export default definePanel({id:'markdown-image-acceptance',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{'annotations-submitted':annotationValueSchema(z.string())},render:Panel});
+export default definePanel({id:'markdown-image-acceptance',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});
 `,
     );
     const panel = await service.runtime.run(entry, root, {}, false);

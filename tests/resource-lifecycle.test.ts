@@ -98,7 +98,7 @@ function source(marker: string, label = 'original', stalled = false) {
 const boot=(appendFileSync(${JSON.stringify(marker)},'boot\\n'),${stalled ? '(()=>{while(true){}})()' : 'true'});const state={count:0};
 export const read=serverAction({input:z.object({delay:z.number().optional()}),handler:async(_ctx,input)=>{await new Promise(resolve=>setTimeout(resolve,input.delay??0));return{count:++state.count,boot,label:${JSON.stringify(label)},cwd:process.cwd()};}});
 function Panel(){return <div>${label}</div>}
-export default definePanel({id:'resource',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{done:z.object({text:z.string().refine(text=>text!=='blocked')})},render:Panel});`;
+export default definePanel({id:'resource',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 }
 async function until(check: () => boolean, timeout = 15000) {
   const end = Date.now() + timeout;
@@ -146,7 +146,7 @@ void test('restore and indexed history reads do not evaluate any historical pane
 });
 
 void test(
-  'idle LRU wakes reuse artifacts, preserve concurrent calls and keep event schemas',
+  'idle LRU wakes reuse artifacts, preserve concurrent calls and keep events',
   { timeout: 90000 },
   async () => {
     const root = mkdtempSync(join(tmpdir(), 'paneon-lru-wake-'));
@@ -175,10 +175,6 @@ void test(
         readFileSync(marker, 'utf8').split('\n').length,
         boots + 1,
         'wake must evaluate only execution, not metadata compilation',
-      );
-      await assert.rejects(
-        runtime.append(second.instanceId, second.revision, 'done', { text: 'blocked' }),
-        { code: 'INVALID_EVENT' },
       );
       await runtime.append(second.instanceId, second.revision, 'done', { text: 'retained' });
       // A short second call completes before the long first one: no per-panel serialization.
@@ -378,7 +374,7 @@ void test(
 );
 
 void test(
-  'event persistence rechecks close and revision after worker validation',
+  'event persistence rejects closed instances and stale revisions',
   { timeout: 60000 },
   async () => {
     const root = mkdtempSync(join(tmpdir(), 'paneon-event-commit-race-'));
@@ -389,40 +385,15 @@ void test(
     try {
       for (const mode of ['close', 'reload']) {
         const panel = await runtime.run(entry, root, {}, false);
-        const execution = runtime.live.get(panel.instanceId)?.execution;
-        assert.ok(execution);
-        const original = execution.request.bind(execution);
-        let validated = () => {};
-        let release = () => {};
-        const ready = new Promise<void>((resolve) => {
-          validated = resolve;
-        });
-        const gate = new Promise<void>((resolve) => {
-          release = resolve;
-        });
-        execution.request = async (kind, payload) => {
-          const result = await original(kind, payload);
-          if (kind === 'validate-event') {
-            validated();
-            await gate;
-          }
-          return result;
-        };
-        const pending = assert.rejects(
+        if (mode === 'close') await runtime.closePanel(panel.instanceId);
+        else {
+          writeFileSync(entry, source(marker, 'new revision'));
+          await runtime.reload(panel.instanceId);
+        }
+        await assert.rejects(
           runtime.append(panel.instanceId, panel.revision, 'done', { text: 'never append' }),
           { code: mode === 'close' ? 'PANEL_CLOSED' : 'PANEL_REVISION_MISMATCH' },
         );
-        await ready;
-        try {
-          if (mode === 'close') await runtime.closePanel(panel.instanceId);
-          else {
-            writeFileSync(entry, source(marker, 'new revision'));
-            await runtime.reload(panel.instanceId);
-          }
-        } finally {
-          release();
-        }
-        await pending;
         assert.equal((await runtime.events(panel.instanceId, 'agent', 100, 0)).events.length, 0);
       }
     } finally {

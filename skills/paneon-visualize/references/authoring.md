@@ -46,7 +46,6 @@ export default definePanel({
   id: 'review-panel',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: z.object({ topic: z.string() }),
-  events: { 'review-requested': z.object({ topic: z.string() }) },
   render: Review,
 });
 ```
@@ -60,7 +59,7 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 
 ## Deliver events
 
-Declare every event type in `events`. `await agent.emit(type, payload)` resolves to `{ id }`, the stored event's numeric ID, only after the event is validated and stored; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
+Call `await agent.emit(type, payload)` to submit JSON feedback; event types need no declaration. Paneon preserves the payload's fields and resolves to `{ id }`, the stored event's numeric ID, only after durable storage; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
 
 ## Server actions
 
@@ -191,7 +190,7 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 - `Markdown` renders GFM without raw HTML. Its `outline` prop defaults to `"popover"` for a heading directory that opens on demand at every width without reserving a sidebar. Replacing `pre` through `components` also drops Mermaid rendering.
 - `Image`: `<Image src="./picture.png" alt="Analysis result" className="max-w-md" />`. Props are `src`, `alt`, optional `sourcePath`, `className` and `annotationTarget`. Local relative paths use `--cwd` or `sourcePath`'s directory, and absolute paths work directly. Markdown images automatically use the same component. To annotate it, see [Image and Mermaid](#image-and-mermaid).
 - Links to local files, such as `[retry loop](./src/app.ts#L12-L18)`, open the file read-only with those lines highlighted. Use them in explanations to point at the code being discussed. Relative paths resolve against `--cwd`; when rendering a Markdown file, pass `sourcePath="docs/plan.md"` so its links resolve from that file's directory. Absolute paths and `file://` also work.
-- `Mermaid` is bundled; never load Mermaid from a CDN.
+- `Mermaid` is bundled; never load Mermaid from a CDN. Render a diagram with `<Mermaid code="flowchart LR; A-->B" />`; `code` is the required Mermaid source string.
 - `DiffView` needs no repository: pass `oldText` / `newText`, or a `model` from `createDiffModel` (`@qoggy/paneon/sdk`). Optional `oldPath` / `newPath`, `oldRevision` / `newRevision`, `defaultExpanded` (defaults to `true`) and `onCollapse`. To annotate it, see [annotations](#markdown-codeblock-and-diffview).
 
 ## Theme and language
@@ -203,26 +202,16 @@ Prefer the existing components over hand-built ones: pages get built faster and 
 
 ## Annotations
 
-Import `annotationValueSchema` and data types from `@qoggy/paneon/sdk`; import components, `useAnnotations` and `AnnotationAdapter` from `@qoggy/paneon/ui`. Call the feature 批注 in Chinese copy and annotation in English copy.
+Import annotation data types and optional `annotationValueSchema` from `@qoggy/paneon/sdk`; import components, `useAnnotations` and `AnnotationAdapter` from `@qoggy/paneon/ui`. Call the feature 批注 in Chinese copy and annotation in English copy.
 
 ### Complete annotation panel
 
 ```tsx
-import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import { Card, AnnotationText, toast, usePageAnnotations } from '@qoggy/paneon/ui';
 
 const source = 'Use Redis for shared cache storage.';
-const refSchema = z.literal('redis-plan');
-type Ref = z.infer<typeof refSchema>;
-const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
-const resultSchema = z.object({
-  annotations: z.array(
-    z.object({
-      targets: draftAnnotation.shape.targets,
-      comment: draftAnnotation.shape.comment,
-    }),
-  ),
-});
+type Ref = 'redis-plan';
 
 function Panel() {
   usePageAnnotations<Ref>({
@@ -244,7 +233,6 @@ export default definePanel({
   id: 'custom-annotations',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: z.object({}).strict(),
-  events: { 'annotations-submitted': resultSchema },
   render: Panel,
 });
 ```
@@ -254,7 +242,7 @@ export default definePanel({
 - `onSubmit` receives the editable draft `{annotations: [{id, targets, comment}]}`. `id` only identifies drafts on the page; leave it out of the event, as the example does. There is no page-level comment; an opinion about a whole document is an annotation on its heading or on the [picked element](#element-annotations). A target is `{ref, src?, sourceRef?, type?, text?}`; without `text` it means the whole object. `sourceRef` appears only on [file annotations](#file-annotations).
 - `text` is `{start, end, quote}`: original-source UTF-16 offsets on grapheme boundaries, end excluded, and the selected text in `quote`. Mermaid targets have `type: 'mermaid'` and optional `text: {start, end}`.
 - `ref` is a finite JSON value identifying the annotated content, such as `"redis-plan"`. Include state or version when content changes, such as ``annotationTarget={`result-${env}`}``. Use an [adapter](#adapters) to locate a saved version.
-- `annotationValueSchema(refSchema)` checks structure only. It also accepts [element targets](#element-annotations), so event schemas derived from it, as in the complete example, accept them too. A hand-written target schema needs `elementAnnotationRefSchema` beside its own ref schema. `onSubmit` and `useAnnotations<TRef>()` values include `ElementAnnotationRef`; check `isElementAnnotationRef(target.ref)` before reading a ref as the page's own.
+- `annotationValueSchema(refSchema)` is available for page-owned draft validation and accepts [element targets](#element-annotations) beside the page's own refs. `onSubmit` and `useAnnotations<TRef>()` values include `ElementAnnotationRef`; check `isElementAnnotationRef(target.ref)` before reading a ref as the page's own.
 
 ### Element annotations
 
@@ -335,7 +323,7 @@ type AnnotationAdapter<TRef> = {
 ### Submission
 
 - Explicit submission passes the complete saved annotations to `onSubmit`; a failed submission retains the draft for retry.
-- To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the `id` that the earlier `agent.emit` returned, as built-in pages do. Declare `replacesEventId` in the event schema: validation drops undeclared fields, and a strict schema rejects them. The draft is not cleared after submission.
+- To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the `id` that the earlier `agent.emit` returned, as built-in pages do. The draft is not cleared after submission.
 - Drafts live in browser memory, so a reload can lose them. [Event limits](#deliver-events) apply.
 
 ## Examples
@@ -373,6 +361,6 @@ paneon panel run <skill>/assets/examples/github-pr/panel.tsx \
 
 Input is `{repository: "owner/repo", initialPullRequest?: number}`; without a number it opens the open-PR list. It never publishes to GitHub. It emits `review-requested` (the viewed PR and its fixed base/head commits) and `pr-feedback-submitted` (annotations with their sources); the schemas are in its source.
 
-Borrow: server actions that call a local CLI, list/detail browsing with Tabs, annotations on `Markdown` and `DiffView`, several declared event types.
+Borrow: server actions that call a local CLI, list/detail browsing with Tabs, annotations on `Markdown` and `DiffView`, and several event types sent with `agent.emit`.
 
 These examples ship with Chinese and English copy because they are distributed with Paneon; a one-off page usually needs only one language (see [theme and language](#theme-and-language)).

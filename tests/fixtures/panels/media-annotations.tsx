@@ -1,4 +1,4 @@
-import { agent, annotationValueSchema, definePanel, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Image,
   AnnotationText,
@@ -28,12 +28,6 @@ const frontmatter =
   '---\r\ntitle: Checkout\r\n---\r\n\r\n~~~mermaid\r\n' +
   diagram.replaceAll('\n', '\r\n') +
   '\r\n~~~';
-const annotation = annotationValueSchema(z.unknown()).shape.annotations.element;
-const feedbackSchema = z.object({
-  annotations: z.array(
-    z.object({ targets: annotation.shape.targets, comment: annotation.shape.comment }),
-  ),
-});
 
 function Panel() {
   usePageAnnotations({
@@ -109,6 +103,6 @@ export default definePanel({
   id: 'media-annotation-acceptance',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}).strict(),
-  events: { 'media-feedback': feedbackSchema },
+
   render: Panel,
 });

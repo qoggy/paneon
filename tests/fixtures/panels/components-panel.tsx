@@ -440,6 +440,6 @@ export default definePanel({
   id: 'components-panel',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: {},
+
   render: ComponentsPanel,
 });

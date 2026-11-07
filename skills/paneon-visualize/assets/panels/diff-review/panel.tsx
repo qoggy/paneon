@@ -19,7 +19,6 @@ import { testFilePresentation } from '../../shared/test-file-presentation';
 import {
   comparisonSchema,
   diffReviewParamsSchema,
-  diffReviewSubmittedSchema,
   diffFeedbackResultSchema,
   validateSources,
 } from './schema';
@@ -582,6 +581,5 @@ export default definePanel({
   id: 'diff-review',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: diffReviewParamsSchema,
-  events: { 'diff-review-submitted': diffReviewSubmittedSchema },
   render: DiffReviewPanel,
 });

@@ -13,6 +13,7 @@ const f = await startGitReviewFixture();
 const execute = promisify(execFile);
 let browser;
 let page;
+let releaseFileRead;
 const prefix = 'marketplaces/x-one-cowork/plugins/paw-nextjs/skills';
 const modified = `${prefix}/alpha/same.ts`;
 const deleted = `${prefix}/deleted.ts`;
@@ -216,13 +217,52 @@ try {
   await stagedRoot.click();
   await staged.waitFor();
   await button(`已暂存 · R100 ${renamed}`).dblclick();
+  await frame.locator('[data-diff-source-headers]').filter({ hasText: 'old 原名.ts' }).waitFor();
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
+  // Keep one file read pending while double-clicking another. Loading status must
+  // not move the rows between the first selection click and the second click.
+  let fileReadStarted;
+  const fileReadPending = new Promise((resolve) => {
+    fileReadStarted = resolve;
+  });
+  const fileReadGate = new Promise((resolve) => {
+    releaseFileRead = resolve;
+  });
+  const queryUrl = `**/api/panels/${panel.instanceId}/actions/*`;
+  const specialId = await button(`已暂存 · M ${special}`).getAttribute('data-file-id');
+  await page.route(queryUrl, async (route) => {
+    if (route.request().postDataJSON()?.input?.file?.id === specialId) {
+      fileReadStarted();
+      await fileReadGate;
+    }
+    await route.continue();
+  });
+  const treeTop = (await frame.locator('[data-file-tree]').boundingBox()).y;
   await button(`已暂存 · M ${special}`).dblclick();
+  await fileReadPending;
+  await frame.locator('[data-file-scroll][aria-busy="true"]').waitFor();
+  assert.equal(
+    (await frame.locator('[data-file-tree]').boundingBox()).y,
+    treeTop,
+    'Pending file reads must not shift the file tree',
+  );
   assert.equal(
     await button(`已暂存 · M ${special}`).getAttribute('title'),
     `已暂存 · M ${special}`,
   );
   await staged.dblclick();
+  const stagedLine = frame
+    .locator('[data-code-side="new"][data-line="2"]')
+    .filter({ hasText: 'value = 2' });
+  await stagedLine.waitFor();
+  assert.equal((await frame.locator('[data-file-tree]').boundingBox()).y, treeTop);
+  const delayedResponse = page.waitForResponse(
+    (response) => response.request().postDataJSON()?.input?.file?.id === specialId,
+  );
+  releaseFileRead();
+  await delayedResponse;
+  await page.unroute(queryUrl);
+  await stagedLine.waitFor();
   const annotation = annotationTools(frame, page);
   // Hover can briefly open the directory. Explicit keyboard activation pins it,
   // so the helper does not mistake a pending hover-close for an open directory.
@@ -373,6 +413,7 @@ try {
     );
   throw error;
 } finally {
+  releaseFileRead?.();
   await browser?.close();
   await f.stop();
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
-import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
+import { agent, definePanel } from '@qoggy/paneon/sdk';
 import {
   Badge,
   Button,
@@ -26,14 +26,6 @@ import type { Bucket, Config, Preset, RequestBatch } from './simulation';
 import { simulationCopy } from './copy';
 import type { Copy } from './copy';
 
-// The page registers no text of its own: every annotation is a picked element.
-const draftAnnotation = annotationValueSchema(z.never()).shape.annotations.element;
-const annotationsSchema = z.object({
-  annotations: z.array(
-    z.object({ targets: draftAnnotation.shape.targets, comment: draftAnnotation.shape.comment }),
-  ),
-  replacesEventId: z.number().int().optional(),
-});
 type Row = { at: string; count: string };
 const rowsFor = (requests: RequestBatch[]): Row[] =>
   requests.map((r) => ({ at: String(r.at), count: String(r.count) }));
@@ -625,6 +617,5 @@ export default definePanel({
   id: 'sentinel-leap-array-explanation',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: z.object({}).strict(),
-  events: { 'annotations-submitted': annotationsSchema },
   render: SentinelPanel,
 });

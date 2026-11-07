@@ -2,7 +2,7 @@ import { useLocale } from '../../shared/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw } from './icons';
 import { z } from 'zod';
-import { agent, annotationValueSchema, definePanel } from '@qoggy/paneon/sdk';
+import { agent, definePanel } from '@qoggy/paneon/sdk';
 import { Badge, Button, Page, Slider, toast, usePageAnnotations } from '@qoggy/paneon/ui';
 import {
   PHILOSOPHERS,
@@ -21,14 +21,6 @@ import {
 import type { Language, SimulationRef, Snapshot, Strategy } from './model';
 import { simulationCopy, strategyCopy } from './copy';
 
-// The page registers no text of its own: every annotation is a picked element.
-const draftAnnotation = annotationValueSchema(z.never()).shape.annotations.element;
-const annotationsSchema = z.object({
-  annotations: z.array(
-    z.object({ targets: draftAnnotation.shape.targets, comment: draftAnnotation.shape.comment }),
-  ),
-  replacesEventId: z.number().int().optional(),
-});
 const position = (id: number, radius: number) => {
   const angle = ((-90 + id * 72) * Math.PI) / 180;
   return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
@@ -560,6 +552,5 @@ export default definePanel({
   id: 'dining-philosophers-explanation',
   requires: { paneon: '>=0.4.0 <0.5.0' },
   input: z.object({}).strict(),
-  events: { 'annotations-submitted': annotationsSchema },
   render: DiningPhilosophersPanel,
 });

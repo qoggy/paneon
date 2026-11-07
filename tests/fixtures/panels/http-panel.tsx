@@ -115,6 +115,6 @@ export default definePanel({
   id: 'http-panel',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ baseUrl: z.string().url() }),
-  events: { 'counter-analysis-requested': z.object({ counter: z.number() }) },
+
   render: HttpPanel,
 });

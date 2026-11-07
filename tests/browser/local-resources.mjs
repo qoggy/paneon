@@ -54,7 +54,7 @@ function Panel(){
   <Markdown annotationTarget="notes">{'# 文件预览\n\n[查看源文件](./source.ts#L2-L3)'}</Markdown>
  </Page>;
 }
-export default definePanel({id:'plain-local-resources',requires:{paneon:'*'},input:z.object({}),events:{annotations:annotationValueSchema(z.string())},render:Panel});`,
+export default definePanel({id:'plain-local-resources',requires:{paneon:'*'},input:z.object({}),render:Panel});`,
   );
   service = await startServer(join(root, 'runtime'));
   const panel = await service.runtime.run(entry, root, {}, false);

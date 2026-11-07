@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, definePanel, annotationValueSchema, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   AnnotationText,
   Button,
@@ -53,6 +53,5 @@ export default definePanel({
   id: 'toast-avoidance-acceptance',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: { feedback: annotationValueSchema(z.string()) },
   render: Panel,
 });

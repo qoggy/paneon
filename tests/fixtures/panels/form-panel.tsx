@@ -131,13 +131,6 @@ export default definePanel({
   id: 'form-panel',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: {
-    'parameters-submitted': z.object({
-      name: z.string(),
-      environment: z.string(),
-      notes: z.string(),
-      notify: z.boolean(),
-    }),
-  },
+
   render: FormPanel,
 });

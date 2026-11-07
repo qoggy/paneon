@@ -602,25 +602,25 @@ export class Runtime extends EventEmitter {
       return live.execution.request('invoke', { actionId, input });
     });
   }
+  // Keep Promise-based failures for callers; event storage itself needs no async worker call.
+  // eslint-disable-next-line @typescript-eslint/require-await
   async append(id: string, revision: string, type: string, payload: unknown) {
     if (typeof type !== 'string' || type.length > EVENT_TYPE_LIMIT_CHARACTERS)
       throw new PaneonError(
         'INVALID_EVENT',
         `The event type must be a string of at most ${EVENT_TYPE_LIMIT_CHARACTERS} UTF-16 code units.`,
       );
-    if (JSON.stringify(payload)?.length > EVENT_PAYLOAD_LIMIT_CHARACTERS)
+    const value = jsonValue(payload);
+    if (JSON.stringify(value).length > EVENT_PAYLOAD_LIMIT_CHARACTERS)
       throw new PaneonError(
         'INVALID_EVENT',
         `The serialized event payload exceeds the ${EVENT_PAYLOAD_LIMIT_CHARACTERS}-character UTF-16 limit.`,
       );
-    return this.withExecution(id, revision, async (live) => {
-      const parsed = await live.execution.request('validate-event', { type, payload });
-      const panel = this.current(id, revision);
-      const result = this.store.appendCurrent(panel.instanceId, revision, type, jsonValue(parsed));
-      this.emit('event', panel.instanceId);
-      this.state(panel.instanceId);
-      return result;
-    });
+    const panel = this.current(id, revision);
+    const result = this.store.appendCurrent(panel.instanceId, revision, type, value);
+    this.emit('event', panel.instanceId);
+    this.state(panel.instanceId);
+    return result;
   }
   async events(id: string, consumer: string, limit: number, waitMs: number) {
     id = this.store.get(id).instanceId;

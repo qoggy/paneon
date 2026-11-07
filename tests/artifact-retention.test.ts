@@ -39,7 +39,7 @@ function output(home: string, id: string, hash: string) {
   return path;
 }
 function source(id = 'retention', input = 'z.object({})') {
-  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';export const read=serverAction({input:z.object({}),handler:async()=>({id:${JSON.stringify(id)}})});function Panel(){return <div>${id}</div>}export default definePanel({id:${JSON.stringify(id)},requires:{paneon:'${PACKAGE_VERSION}'},input:${input},events:{done:z.object({text:z.string()})},render:Panel});`;
+  return `import{definePanel,serverAction,z}from'@qoggy/paneon/sdk';export const read=serverAction({input:z.object({}),handler:async()=>({id:${JSON.stringify(id)}})});function Panel(){return <div>${id}</div>}export default definePanel({id:${JSON.stringify(id)},requires:{paneon:'${PACKAGE_VERSION}'},input:${input},render:Panel});`;
 }
 async function until(check: () => boolean | Promise<boolean>, message: string) {
   const deadline = Date.now() + 15000;

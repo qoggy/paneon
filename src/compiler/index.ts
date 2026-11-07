@@ -399,7 +399,6 @@ async function compileSnapshot(
       assets: [...clientFiles, 'frame.html'],
       dependencies,
       actions: metadata.actions,
-      events: metadata.events,
       watchInputs: snapshot.track(() => {
         for (const path of dependencies) snapshot.read(path);
         return snapshot.watchInputs();
@@ -444,7 +443,6 @@ async function inspectServer(
   definitionId: string;
   inputSchema: JsonValue;
   actions: Manifest['actions'];
-  events: Record<string, JsonValue>;
 }> {
   const { fork } = await import('node:child_process');
   return new Promise((resolvePromise, reject) => {

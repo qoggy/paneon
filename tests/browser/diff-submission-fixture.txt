@@ -1,17 +1,8 @@
-import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
 import { DiffView, Page, usePageAnnotations } from '@qoggy/paneon/ui';
 
 const refSchema = z.object({ id: z.string(), side: z.enum(['old', 'new']) });
 type Ref = z.infer<typeof refSchema>;
-const draftAnnotation = annotationValueSchema(refSchema).shape.annotations.element;
-const resultSchema = z.object({
-  annotations: z.array(
-    z.object({
-      targets: draftAnnotation.shape.targets,
-      comment: draftAnnotation.shape.comment,
-    }),
-  ),
-});
 
 function Panel() {
   const { oldText, newText } = usePanelInput<{ oldText: string; newText: string }>();
@@ -43,6 +34,5 @@ export default definePanel({
   id: 'diff-annotations',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ oldText: z.string(), newText: z.string() }),
-  events: { 'diff-annotations-submitted': resultSchema },
   render: Panel,
 });

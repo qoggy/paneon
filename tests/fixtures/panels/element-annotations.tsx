@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
 import {
   AnnotationText,
   Button,
@@ -13,10 +13,6 @@ import {
   usePageAnnotations,
 } from '@qoggy/paneon/ui';
 
-const entry = annotationValueSchema(z.literal('source')).shape.annotations.element;
-const result = z.object({
-  annotations: z.array(z.object({ targets: entry.shape.targets, comment: entry.shape.comment })),
-});
 function Draft() {
   const { value } = useAnnotations();
   return (
@@ -85,6 +81,6 @@ export default definePanel({
   id: 'element-annotation-acceptance',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ excerpt: z.string() }),
-  events: { 'element-feedback': result },
+
   render: Panel,
 });

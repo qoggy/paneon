@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
 import { Button, Dialog, DialogContent, DialogTitle, Markdown, Page, usePageAnnotations } from '@qoggy/paneon/ui';
 
 function existingHeadingId() {
@@ -65,6 +65,5 @@ export default definePanel({
   id: 'markdown-anchors',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ source: z.string() }),
-  events: { 'annotations-submitted': annotationValueSchema(z.string()) },
   render: Panel,
 });

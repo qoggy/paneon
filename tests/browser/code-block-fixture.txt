@@ -1,16 +1,7 @@
 import { useState } from 'react';
-import { agent, annotationValueSchema, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, usePanelInput, z } from '@qoggy/paneon/sdk';
 import { Button, CodeBlock, Page, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
 import type { CodeBlockProps } from '@qoggy/paneon/ui';
-
-const draftAnnotation = annotationValueSchema(z.json()).shape.annotations.element;
-const resultSchema = z.object({
-  annotations: z.array(z.object({
-    targets: draftAnnotation.shape.targets,
-    comment: draftAnnotation.shape.comment,
-  })),
-  replacesEventId: z.number().optional(),
-});
 
 function Draft() {
   const { value } = useAnnotations();
@@ -74,6 +65,5 @@ export default definePanel({
   id: 'code-block-verification',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({ source: z.string(), cases: z.array(z.string()) }),
-  events: { 'annotations-submitted': resultSchema },
   render: Panel,
 });

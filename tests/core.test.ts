@@ -27,7 +27,7 @@ function temporary(fn: (root: string) => void) {
     rmSync(root, { recursive: true, force: true });
   }
 }
-const definition = `export default definePanel({id:'test',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),events:{feedback:z.object({text:z.string()})},render:Panel});`;
+const definition = `export default definePanel({id:'test',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`;
 void test('AST graph follows binding symbols, preserves UI shadowing, and removes action handlers', () =>
   temporary((root) => {
     const entry = join(root, 'panel.tsx');

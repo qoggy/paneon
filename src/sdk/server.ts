@@ -31,7 +31,6 @@ export type PanelDefinition<I = unknown> = {
   id: string;
   requires: { paneon: string };
   input: z.ZodType<I>;
-  events?: Record<string, z.ZodType>;
   render: ComponentType;
 };
 export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<I> {

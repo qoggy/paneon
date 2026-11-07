@@ -1,5 +1,5 @@
 import { Component, useRef, useState, type ReactNode } from 'react';
-import { agent, annotationValueSchema, definePanel, z } from '@qoggy/paneon/sdk';
+import { agent, definePanel, z } from '@qoggy/paneon/sdk';
 import {
   Button,
   DiffView,
@@ -9,17 +9,6 @@ import {
 } from '@qoggy/paneon/ui';
 
 type Ref = { documentId: string; version: string } | boolean | null;
-const draftAnnotation = annotationValueSchema(
-  z.union([z.object({ documentId: z.string(), version: z.string() }), z.boolean(), z.null()]),
-).shape.annotations.element;
-const resultSchema = z.object({
-  annotations: z.array(
-    z.object({
-      targets: draftAnnotation.shape.targets,
-      comment: draftAnnotation.shape.comment,
-    }),
-  ),
-});
 const before = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
 const after = before.replace('line 80', 'changed 80');
 const quote = '重复';
@@ -164,8 +153,5 @@ export default definePanel({
   id: 'diff-annotations',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
   input: z.object({}),
-  events: {
-    'annotations-submitted': resultSchema,
-  },
   render: Panel,
 });
