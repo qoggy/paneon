@@ -182,7 +182,9 @@ debug SHALL 仅输出当前 CLI 调用的框架步骤、请求标识、耗时、
 
 页面导航及公开静态资源 GET SHALL 可以正常加载，但 MUST NOT 调用作者函数或执行状态变更。浏览器配置读取、事件读取、WebSocket 等非公开 GET API SHALL 在有 Origin 时校验 Origin、无 Origin 时校验 Referer 的完整 origin，无法确认来源则拒绝；CLI 的有效控制认证仍适用。宿主 SHALL 设置 Referrer-Policy: same-origin；浏览器操作请求 MUST NOT 以 Referer 绕过必需的 Origin。
 
-面板 iframe 的桥接请求 SHALL 绑定来源窗口、channelId、instanceId 和 revision；API MUST NOT 因 iframe 的 opaque origin 而允许 null。业务密钥可作为普通动作参数传递，收集、使用和存储由页面代码负责。
+面板 iframe 的桥接请求 SHALL 绑定来源窗口、channelId、instanceId 和 revision；API MUST NOT 允许 null Origin。业务密钥可作为普通动作参数传递，收集、使用和存储由页面代码负责。
+
+面板 iframe SHALL 开放脚本、真实来源、下载、新窗口及新窗口不继承 sandbox、整页跳转，并允许 clipboard-write。页面 SHALL 能直接使用标准浏览器 API 完成复制、下载、localStorage、新窗口和整页跳转；浏览器自身的授权及用户操作要求仍然适用。localStorage SHALL 按服务 origin 在面板之间共享，刷新页面后仍保留。宿主和面板在同源情况下 SHALL 视为同一浏览器信任范围，桥接身份校验仅约束桥接协议，不承诺将面板脚本与管理页面或同源接口隔离。
 
 #### Scenario: Accept a same-origin browser action
 
@@ -209,10 +211,10 @@ debug SHALL 仅输出当前 CLI 调用的框架步骤、请求标识、耗时、
 - **WHEN** CLI 不携带 Origin，通过控制凭据请求管理或读取 API
 - **THEN** 验证控制凭据后处理；凭据缺失或无效时拒绝，浏览器 URL 中不包含该凭据
 
-#### Scenario: Reject another panel's bridge message
+#### Scenario: Reject a mismatched bridge identity
 
-- **WHEN** 一个 iframe 试图调用另一实例的动作
-- **THEN** 宿主和服务拒绝调用，其他实例状态不变
+- **WHEN** 一个桥接消息的来源窗口、channelId、instanceId 或 revision 与接收宿主不匹配
+- **THEN** 宿主拒绝此桥接消息，不调用动作或写入事件
 
 ### Requirement: Recover panel configuration and interaction history only
 

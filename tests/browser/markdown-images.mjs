@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { PANEL_IFRAME_SANDBOX } from '../../src/shared/browser-actions.ts';
 import { startMarkdownImageFixture } from './markdown-image-fixture.mjs';
 import { selectAnnotationText } from './annotation-tools.mjs';
 
@@ -115,10 +116,6 @@ try {
   await page
     .context()
     .grantPermissions(['clipboard-read'], { origin: new URL(fixture.url).origin });
-  await page.waitForFunction(
-    (expected) => navigator.clipboard.readText().then((text) => text === expected),
-    source,
-  );
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), source);
   await page.context().clearPermissions();
   await image.hover();
@@ -232,14 +229,14 @@ try {
     const remoteMore = remote.getByRole('button', { name: 'More image options', exact: true });
     await remoteMore.click();
     assert.equal(await remoteTooltip.count(), 0);
+    const copied = frame.locator('[data-slot="toast"]').filter({ hasText: 'Path copied' });
+    await copied.waitFor({ state: 'hidden' });
     await frame.getByRole('menuitem', { name: 'Copy path', exact: true }).click();
+    // Finish the write before grantPermissions changes the clipboard permission state.
+    await copied.waitFor();
     await page
       .context()
       .grantPermissions(['clipboard-read'], { origin: new URL(fixture.url).origin });
-    await page.waitForFunction(
-      (expected) => navigator.clipboard.readText().then((text) => text === expected),
-      `${protocol.toLowerCase()}://images.paneon.test/example.png`,
-    );
     assert.equal(
       await page.evaluate(() => navigator.clipboard.readText()),
       `${protocol.toLowerCase()}://images.paneon.test/example.png`,
@@ -377,7 +374,7 @@ try {
   await frame.locator('[data-slot="mermaid-diagram"] > [role="button"]').last().click();
   await frame.getByRole('dialog', { name: '图表查看器', exact: true }).waitFor();
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
+  assert.equal(await page.locator('iframe').getAttribute('sandbox'), PANEL_IFRAME_SANDBOX);
   assert.deepEqual(errors, []);
   console.log(
     'Markdown images: HTTP/HTTPS remote thumbnails and expanded images, unchanged script/connect policy, zoom, pan, actual size, fit, keyboard, close paths, focus return, links, broken images, custom renderers, nesting, source changes, annotations, themes and shared Mermaid viewer pass.',

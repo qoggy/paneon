@@ -104,7 +104,7 @@ export function definePanel<I>(definition: PanelDefinition<I>): PanelDefinition<
 export const agent = {
   emit: (type: string, payload: unknown) => request<{ id: number }>('event', { type, payload }),
 };
-/** Used by UIProvider to keep browser operations outside the opaque-origin panel. */
+/** Used by UIProvider to delegate browser operations to the host. */
 export const panelBrowserAction = (action: BrowserAction) => request<void>('browser', action);
 export function useQuery<I, O>(
   action: Action<I, O, 'query'>,

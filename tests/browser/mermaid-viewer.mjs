@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { PANEL_IFRAME_SANDBOX } from '../../src/shared/browser-actions.ts';
 import { startMermaidFixture } from './mermaid-fixture.mjs';
 
 const fixture = await startMermaidFixture();
@@ -273,10 +274,10 @@ try {
     .click();
   await darkViewer.waitFor();
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
+  assert.equal(await page.locator('iframe').getAttribute('sandbox'), PANEL_IFRAME_SANDBOX);
   assert.deepEqual(errors, []);
   console.log(
-    'Mermaid viewer: temporary success/error toasts, toast above dialog, real clipboard text/PNG, full PNG downloads, zoom/pan/fit, icon tooltips, three close paths, focus return, Markdown, light/en and dark/zh pass in the unchanged iframe sandbox.',
+    'Mermaid viewer: temporary success/error toasts, toast above dialog, real clipboard text/PNG, full PNG downloads, zoom/pan/fit, icon tooltips, three close paths, focus return, Markdown, light/en and dark/zh pass with the configured iframe permissions.',
   );
 } finally {
   await browser?.close();

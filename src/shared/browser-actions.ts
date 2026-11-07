@@ -1,4 +1,8 @@
-/** Browser-only operations delegated by an isolated panel to its authenticated host. */
+export const PANEL_IFRAME_SANDBOX =
+  'allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox allow-top-navigation';
+export const PANEL_IFRAME_ALLOW = 'clipboard-write';
+
+/** Browser-only operations delegated by a panel to its host. */
 export type BrowserAction =
   | { kind: 'copy-text'; text: string }
   | { kind: 'open-url'; url: string }

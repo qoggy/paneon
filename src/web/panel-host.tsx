@@ -7,7 +7,11 @@ import { useUI } from '../ui/use-ui';
 import { BuildDiagnostic } from './build-diagnostic';
 import { api, ApiError, errorMessage, type PanelDetails } from './api';
 import { validRequest, validSource, type BridgeIdentity, type BridgeRequest } from './bridge';
-import { isBrowserAction } from '../shared/browser-actions';
+import {
+  isBrowserAction,
+  PANEL_IFRAME_ALLOW,
+  PANEL_IFRAME_SANDBOX,
+} from '../shared/browser-actions';
 import { performBrowserAction } from '../ui/browser-actions';
 
 export function PanelHost({ instanceId }: { instanceId: string }) {
@@ -285,7 +289,8 @@ function Frame({ panel }: { panel: PanelDetails }) {
     <iframe
       ref={frame}
       title={panel.definitionId}
-      sandbox="allow-scripts"
+      sandbox={PANEL_IFRAME_SANDBOX}
+      allow={PANEL_IFRAME_ALLOW}
       referrerPolicy="same-origin"
       src={`/panels/${encodeURIComponent(panel.instanceId)}/${encodeURIComponent(panel.revision)}/frame.html`}
       className="block min-h-0 w-full flex-1 border-0 bg-background"

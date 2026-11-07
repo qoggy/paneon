@@ -6,7 +6,7 @@ export type BridgeRequest = SdkBridgeRequest & { payload: Record<string, unknown
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-// The source window is checked separately: opaque-origin frames intentionally have origin null.
+// The source window is checked separately; the shared origin does not identify a panel.
 export function validRequest(value: unknown, identity: BridgeIdentity): value is BridgeRequest {
   if (
     !record(value) ||
