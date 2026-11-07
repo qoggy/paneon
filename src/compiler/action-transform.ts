@@ -14,6 +14,7 @@ export type SourceModule = {
   imports: Map<string, { statement: ts.ImportDeclaration; specifier: string; imported: string }>;
   checker: ts.TypeChecker;
   symbols: Map<ts.Symbol, string>;
+  initializers: Map<string, Set<ts.Statement>>;
 };
 const printer = ts.createPrinter();
 function bindingIdentifiers(name: ts.BindingName): ts.Identifier[] {
@@ -170,7 +171,61 @@ export function parseModule(
     const symbol = node && checker.getSymbolAtLocation(node);
     if (symbol) symbols.set(symbol, name);
   }
-  return { file, source, names, imports, actions, checker, symbols };
+  const initializers = new Map<string, Set<ts.Statement>>();
+  for (const statement of source.statements) {
+    function record(target: ts.Node) {
+      if (
+        ts.isPropertyAccessExpression(target) ||
+        ts.isElementAccessExpression(target) ||
+        ts.isParenthesizedExpression(target) ||
+        ts.isAsExpression(target) ||
+        ts.isTypeAssertionExpression(target) ||
+        ts.isNonNullExpression(target)
+      ) {
+        record(target.expression);
+      } else if (ts.isArrayLiteralExpression(target)) {
+        for (const element of target.elements)
+          record(ts.isSpreadElement(element) ? element.expression : element);
+      } else if (ts.isObjectLiteralExpression(target)) {
+        for (const property of target.properties) {
+          if (ts.isPropertyAssignment(property)) record(property.initializer);
+          else if (ts.isShorthandPropertyAssignment(property)) record(property.name);
+          else if (ts.isSpreadAssignment(property)) record(property.expression);
+        }
+      } else if (ts.isIdentifier(target)) {
+        const symbol = ts.isShorthandPropertyAssignment(target.parent)
+          ? checker.getShorthandAssignmentValueSymbol(target.parent)
+          : checker.getSymbolAtLocation(target);
+        const name = symbol && symbols.get(symbol);
+        if (name) {
+          const statements = initializers.get(name) ?? new Set<ts.Statement>();
+          statements.add(statement);
+          initializers.set(name, statements);
+        }
+      }
+    }
+    function visitWrites(node: ts.Node) {
+      // Function bodies run when called, not when their declaration is evaluated.
+      // In particular, action handlers must not become browser initializers.
+      if (ts.isFunctionLike(node) || ts.isClassLike(node) || ts.isTypeNode(node)) return;
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+      )
+        record(node.left);
+      else if (
+        (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken ||
+          node.operator === ts.SyntaxKind.MinusMinusToken)
+      )
+        record(node.operand);
+      else if (ts.isDeleteExpression(node)) record(node.expression);
+      ts.forEachChild(node, visitWrites);
+    }
+    visitWrites(statement);
+  }
+  return { file, source, names, imports, actions, checker, symbols, initializers };
 }
 export function staticRequirement(module: SourceModule, version: string): string {
   const statement = module.source.statements.find(ts.isExportAssignment);
@@ -301,6 +356,7 @@ export function createGraph(
   const modules = new Map<string, SourceModule>();
   const selected = new Map<string, Set<ts.Statement>>();
   const selectedImports = new Map<string, Set<string>>();
+  const referenced = new Map<string, Set<string>>();
   const roots = new Map<string, Set<string>>();
   const selectedExports = new Map<ts.ExportDeclaration, Set<string>>();
   const actions: Graph['actions'] = [];
@@ -311,6 +367,7 @@ export function createGraph(
       modules.set(file, m);
       selected.set(file, new Set());
       selectedImports.set(file, new Set());
+      referenced.set(file, new Set());
       roots.set(file, new Set());
     }
     return m;
@@ -349,6 +406,12 @@ export function createGraph(
   }
   function reference(file: string, name: string) {
     const m = load(file);
+    const names = referenced.get(file)!;
+    if (names.has(name)) return;
+    names.add(name);
+    // A reachable binding needs both its declaration and its module-level writes.
+    // select() follows each write's dependencies; output retains source order.
+    for (const statement of m.initializers.get(name) ?? []) select(file, statement);
     const imported = m.imports.get(name);
     if (imported) {
       selectedImports.get(file)!.add(name);

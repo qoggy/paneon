@@ -18,7 +18,6 @@ const { AnnotationStore } = (await import(
     onSubmit(value: AnnotationValue): Promise<unknown>;
     disabled?: boolean;
     adapter?: {
-      resolve(target: unknown): Promise<{ status: 'ready' }>;
       locate(target: unknown): Promise<void>;
     };
   }) => {
@@ -49,7 +48,7 @@ const { AnnotationStore } = (await import(
 void test('annotation numbers follow the current list while ids and submitted snapshots stay stable', async () => {
   const delivered: AnnotationValue[] = [];
   const store = new AnnotationStore({
-    adapter: { resolve: () => Promise.resolve({ status: 'ready' }), locate: async () => {} },
+    adapter: { locate: async () => {} },
     onSubmit: (value) => {
       delivered.push(value);
       return Promise.resolve();

@@ -7,7 +7,7 @@ import {
   prFeedbackSubmittedSchema,
 } from '#test-skill/assets/examples/github-pr/schema.ts';
 import { diffAnnotationTargets } from '#test-skill/assets/shared/diff-schema.ts';
-import { resolvePRTarget, safeLink } from '#test-skill/assets/examples/github-pr/model.ts';
+import { safeLink } from '#test-skill/assets/examples/github-pr/model.ts';
 import { buildPRFeedback } from '#test-skill/assets/examples/github-pr/feedback.ts';
 import { body, code, ids, routeGh } from './github-pr-fixture.ts';
 import type { PRFixtureState } from './github-pr-fixture.ts';
@@ -41,7 +41,6 @@ void test('browser PR submission preserves comments when description text and ha
   const draft = { annotations: [{ id: 'kept', targets: [target], comment: 'Keep this feedback' }] };
   for (const body of [undefined, 'Different body']) {
     const snapshot = { ...description, body };
-    assert.throws(() => resolvePRTarget(snapshot, target));
     const calls = f.calls.length;
     const result = buildPRFeedback(f.repository, draft, new Map([[snapshot.id, snapshot]]));
     assert.deepEqual(result.sources[0].annotations, [
@@ -141,13 +140,7 @@ void test('description and stable-ID check observations survive same-head change
     result.sources[0].annotations[0].targets[2].source,
     second.snapshots.find((s) => s.source.kind === 'pull-request')?.source,
   );
-  assert.equal(resolvePRTarget(oldBody, target), body());
-  assert.throws(
-    () => resolvePRTarget(oldBody, { ref: { sourceId: oldBody.id, kind: 'check' } }),
-    /kind/,
-  );
   const saved = { ...target, text: { start, end: start + 2, quote: 'Earlier selection' } };
-  assert.throws(() => resolvePRTarget(oldBody, saved), /Markdown/);
   const submitted = f.client.feedback(f.repository, f.session, {
     annotations: [{ id: 'saved-text', comment: 'Keep this opinion', targets: [saved] }],
   });

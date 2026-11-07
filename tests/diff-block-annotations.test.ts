@@ -44,7 +44,6 @@ const { diffAnnotationBlocks, diffBlockSummary, diffBlockKey, AnnotationStore } 
   diffBlockKey(this: void, targets: readonly AnnotationTarget<unknown>[]): string;
   AnnotationStore: new <T>(options: {
     adapter: {
-      resolve(target: AnnotationTarget<T>): { status: 'ready'; text?: string };
       locate(target: AnnotationTarget<T>): void;
     };
     onSubmit(value: AnnotationValue<T>): Promise<void>;
@@ -156,10 +155,6 @@ void test('block creation and editing share one temporary editor; cancel saves n
   const delivered: unknown[] = [];
   const store = new AnnotationStore<string>({
     adapter: {
-      resolve: (target) => ({
-        status: 'ready',
-        text: target.ref === 'before' ? oldText : newText,
-      }),
       locate: () => {},
     },
     onSubmit: (value) => {
@@ -226,7 +221,7 @@ void test('opening a text annotation preserves the source captured at selection 
     else Reflect.deleteProperty(globalThis, 'NodeFilter');
   });
   const store = new AnnotationStore<string>({
-    adapter: { resolve: () => ({ status: 'ready' }), locate: () => {} },
+    adapter: { locate: () => {} },
     onSubmit: async () => {},
   });
   t.after(store.mountSurface());

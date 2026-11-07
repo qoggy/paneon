@@ -4,7 +4,6 @@ import { z } from '@qoggy/paneon/sdk';
 import {
   tableParamsSchema,
   completeTableSchema,
-  tableTargetError,
   tableSubmittedSchema,
   visibleRows,
 } from '#test-skill/assets/panels/table/schema.ts';
@@ -113,10 +112,6 @@ void test('table submission preserves mixed targets, independent entries and sav
       text: { start: 9, end: 10, quote: source.slice(9, 10) },
     },
   ]) {
-    assert.notEqual(
-      tableTargetError(params, target as Parameters<typeof tableTargetError>[1]),
-      null,
-    );
     const draft = {
       annotations: [{ id: 'saved', targets: [target], comment: 'Keep this opinion' }],
     };
@@ -240,16 +235,7 @@ void test('special own keys survive schema metadata and Markdown containers pres
   assert.deepEqual(markdownOffsets('```\nx', 0, 5, 'x\n', 'code'), [4, 5, 5]);
 });
 
-void test('table header references distinguish labels from full columns and preserve exact Unicode sources', () => {
-  const params = tableParamsSchema.parse({
-    title: 'Headers',
-    columns: [
-      { key: 'left', label: '说明 🙂 e\u0301' },
-      { key: 'right', label: '说明 🙂 e\u0301' },
-      { key: 'number', label: '123', type: 'number' },
-    ],
-    rows: [{ left: 'not the label', right: 'different source', number: 123 }],
-  });
+void test('table header references distinguish labels from full columns and retain Unicode quotes', () => {
   const schema = completeTableSchema();
   const header = (columnKey: string, start: number, end: number, quote: string) => ({
     ref: { kind: 'header' as const, columnKey },
@@ -261,25 +247,12 @@ void test('table header references distinguish labels from full columns and pres
     header('left', 6, 8, 'e\u0301'),
     header('number', 0, 3, '123'),
   ];
-  for (const target of valid) assert.equal(tableTargetError(params, target), null);
   assert.equal(
     schema.safeParse({
       annotations: [{ id: 'headers', targets: valid, comment: 'Header text' }],
     }).success,
     true,
   );
-  for (const target of [
-    header('unknown', 0, 2, '说明'),
-    header('left', -1, 2, '说明'),
-    header('left', 0, 100, '说明'),
-    header('left', 0, 2, '错误'),
-    header('left', 3, 4, '\ud83d'),
-    header('left', 6, 7, 'e'),
-    header('left', 0.5, 2, '说明'),
-    header('left', 2, 2, ''),
-    header('left', 0, 13, 'not the label'),
-  ])
-    assert.notEqual(tableTargetError(params, target), null);
   for (const ref of [
     { kind: 'header', columnKey: 'left', rowIndex: 0 },
     { kind: 'header', label: '说明' },

@@ -36,15 +36,7 @@ function Panel() {
       });
     },
     adapter: {
-      resolve: (target) => {
-        if (target.ref !== 'source') throw new Error('Element ref reached the author adapter');
-        return { status: 'ready', text: 'Original registered text.' };
-      },
       locate: () => {},
-      targetRanges: (target) => {
-        if (target.ref !== 'source') throw new Error('Element ref reached author targetRanges');
-        return [];
-      },
     },
   });
   return (

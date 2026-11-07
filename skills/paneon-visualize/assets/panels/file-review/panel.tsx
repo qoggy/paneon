@@ -274,15 +274,6 @@ function FileReviewPanel() {
     onSubmit: (feedback) => submission.submit(feedback),
     allowEmptySubmit: submission.hasReceipt,
     adapter: {
-      resolve(target) {
-        const snapshot = snapshots.current.get(snapshotKey(target.ref));
-        return snapshot
-          ? {
-              status: 'ready',
-              text: target.ref.part === 'path' ? value.files[snapshot.fileIndex] : snapshot.text,
-            }
-          : { status: 'missing', message: 'Missing original file snapshot. Draft retained.' };
-      },
       async locate(target) {
         const key = snapshotKey(target.ref);
         const snapshot = snapshots.current.get(key);

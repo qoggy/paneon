@@ -12,7 +12,6 @@ import type {
   AnnotationEditor,
   PageAnnotationOptions,
   AnnotationTextRegistration,
-  AnnotationTargetResolution,
   AnnotationPresentation,
   AnnotationUI,
 } from './annotation-types';
@@ -30,6 +29,8 @@ export type FileSnapshot<TRef = unknown> = {
   sourceRef: JsonValue;
   file: FilePreview;
 };
+type AnnotationTargetResolution =
+  { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string };
 export type FileAnnotationView<TRef = unknown> = {
   id: number;
   ref: TRef;
@@ -713,7 +714,7 @@ export class AnnotationStore<TRef> {
       const visible = clipRect(bounds, object.element);
       return visible ? [visible] : [];
     }
-    if (!target.text) return this.adapterRects(target, firstOnly, viewport);
+    if (!target.text) return [];
     const text = target.text;
     const original =
       this.sources.get(annotationTargetKey(target)) ??
@@ -726,7 +727,6 @@ export class AnnotationStore<TRef> {
         validTextRange(item.source, target),
     );
     const rects: ClippedRect[] = [];
-    let mapped = false;
     for (const registration of registrations) {
       for (const segment of textSegmentsInRange(registration.index, text.start, text.end)) {
         if (!segment.node.isConnected) continue;
@@ -741,7 +741,6 @@ export class AnnotationStore<TRef> {
           }
         }
         if (start < 0 || end <= start) continue;
-        mapped = true;
         const document = segment.node.ownerDocument;
         let range = this.measurementRanges.get(document);
         if (!range) {
@@ -760,40 +759,12 @@ export class AnnotationStore<TRef> {
         }
       }
     }
-    return mapped ? rects : this.adapterRects(target, firstOnly, viewport);
-  };
-  private adapterRects(
-    target: AnnotationTarget<TRef>,
-    firstOnly = false,
-    viewport?: AnnotationViewport,
-  ): ClippedRect[] {
-    const rects: ClippedRect[] = [];
-    const clipRect = createRectClipper(viewport);
-    if (this.fileSnapshots.has(sourceKey(target)) || isElementAnnotationRef(target.ref))
-      return rects;
-    for (const range of this.options?.adapter?.targetRanges?.(target) ?? []) {
-      if (!range.startContainer.isConnected || !range.endContainer.isConnected) continue;
-      const element =
-        range.startContainer.nodeType === 1
-          ? (range.startContainer as HTMLElement)
-          : range.startContainer.parentElement;
-      if (!element) continue;
-      for (const rect of range.getClientRects()) {
-        const visible = clipRect(rect, element);
-        if (visible) {
-          rects.push(visible);
-          if (firstOnly) return rects;
-        }
-      }
-    }
     return rects;
-  }
+  };
 
-  private async resolve(target: AnnotationTarget<TRef>): Promise<AnnotationTargetResolution> {
+  private resolve(target: AnnotationTarget<TRef>): AnnotationTargetResolution {
     const snapshot = this.fileSnapshots.get(sourceKey(target));
     if (snapshot) return { status: 'ready', text: snapshot.file.text };
-    if (this.options?.adapter && !isElementAnnotationRef(target.ref))
-      return this.options.adapter.resolve(target);
     const key = sourceKey(target);
     const texts = [...this.texts.values()].filter(
       (item) =>
@@ -816,7 +787,7 @@ export class AnnotationStore<TRef> {
       return target.text ? { status: 'ready', text: last } : { status: 'ready' };
     return {
       status: 'missing',
-      message: 'The target is not registered. Supply an adapter to validate and locate it.',
+      message: 'The target is not registered.',
     };
   }
   private checkResolution(target: AnnotationTarget<TRef>, resolution: AnnotationTargetResolution) {
@@ -850,7 +821,7 @@ export class AnnotationStore<TRef> {
     const request = ++this.locating;
     try {
       const fileSnapshot = this.fileSnapshots.get(sourceKey(target));
-      const resolution = await this.resolve(target);
+      const resolution = this.resolve(target);
       this.checkResolution(target, resolution);
       const source = resolution.status === 'ready' ? resolution.text : undefined;
       if (request !== this.locating) return;

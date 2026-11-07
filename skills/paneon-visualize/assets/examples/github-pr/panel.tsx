@@ -16,7 +16,6 @@ import {
 } from './icons';
 import { useEffect, useRef, useState } from 'react';
 import { agent, definePanel, serverAction, usePanelInput, z } from '@qoggy/paneon/sdk';
-import type { AnnotationTarget as Target } from '@qoggy/paneon/sdk';
 import {
   Alert,
   AlertDescription,
@@ -46,11 +45,7 @@ import {
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
-import {
-  diffAnnotationTargets,
-  diffTargetCoordinates,
-  diffTargetLocation,
-} from '../../shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
 import { locateMarkdownAnnotation } from '../../shared/markdown-annotation';
 import {
   GitHubReview,
@@ -59,7 +54,7 @@ import {
   prComparisonInputSchema,
 } from './github.ts';
 import type { PRChecks, PRComparison, PRDetail, PRList, PRSnapshot } from './github.ts';
-import { resolvePRTarget, safeLink } from './model.ts';
+import { safeLink } from './model.ts';
 import { buildPRFeedback } from './feedback.ts';
 import {
   githubPRParamsSchema,
@@ -445,30 +440,6 @@ function GithubPR() {
       toast.add({ title: t('Annotations submitted.'), type: 'success' });
     },
     adapter: {
-      resolve(target) {
-        const snapshot = snapshots.current.get(target.ref.sourceId);
-        if (!snapshot) return { status: 'missing', message: t('Original content is unavailable.') };
-        try {
-          const text = resolvePRTarget(snapshot, target);
-          return { status: 'ready', ...(text === undefined ? {} : { text }) };
-        } catch (error) {
-          return {
-            status: 'stale',
-            message: error instanceof Error ? error.message : String(error),
-          };
-        }
-      },
-      targetRanges(target: Target<PRRef>) {
-        const snapshot = snapshots.current.get(target.ref.sourceId);
-        if (
-          !snapshot?.model ||
-          mountedDiff.current !== snapshot.id ||
-          (target.ref.kind !== 'file' && target.ref.kind !== 'hunk' && target.ref.kind !== 'lines')
-        )
-          return [];
-        const location = diffTargetCoordinates(snapshot.model, { ...target, ref: target.ref });
-        return location ? (diffView.current?.getRanges(location) ?? []) : [];
-      },
       async locate(target) {
         const serial = ++locating.current,
           snapshot = snapshots.current.get(target.ref.sourceId);

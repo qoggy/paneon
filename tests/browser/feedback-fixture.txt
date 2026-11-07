@@ -101,15 +101,7 @@ function SplitGrapheme() {
     </p>
   );
 }
-function Contents({
-  snapshot,
-  adapterMode,
-  setAdapterMode,
-}: {
-  snapshot: string;
-  adapterMode: string;
-  setAdapterMode: (mode: string) => void;
-}) {
+function Contents({ snapshot }: { snapshot: string }) {
   const feedback = useAnnotations<Ref>();
   const [clicks, setClicks] = useState(0);
   const [linkClicks, setLinkClicks] = useState(0);
@@ -133,6 +125,10 @@ function Contents({
   }, [submit]);
   return (
     <>
+      <p>
+        <AnnotationText target="remote:slow">Slow target</AnnotationText>{' '}
+        <AnnotationText target="remote:fast">Fast target</AnnotationText>
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button
           onClick={() => {
@@ -230,8 +226,8 @@ function Contents({
           feedback.createAnnotation(
             [
               {
-                ref: 'bridge-lines:one',
-                text: { start: 0, end: bridgeLine.length, quote: bridgeLine },
+                ref: 'bridge-source:one',
+                text: { start: 6, end: 6 + bridgeLine.length, quote: bridgeLine },
               },
             ],
             '桥接行范围',
@@ -245,9 +241,6 @@ function Contents({
       <Discontinuous />
       <SplitGrapheme />
       <Button onClick={() => setMappedShown(!mappedShown)}>Toggle mapped</Button>
-      <Button onClick={() => setAdapterMode(adapterMode === 'ready' ? 'missing' : 'ready')}>
-        Adapter {adapterMode}
-      </Button>
       <Button
         onClick={() => {
           feedback.editAnnotation(null);
@@ -325,49 +318,17 @@ function Panel() {
   const [attempts, setAttempts] = useState(0);
   const [fail, setFail] = useState(true);
   const [adapt, setAdapt] = useState(false);
-  const [adapterMode, setAdapterMode] = useState('ready');
   const [located, setLocated] = useState('');
+  const locating = useRef(0);
   const adapter = useMemo<AnnotationAdapter<Ref>>(
     () => ({
-      async resolve(target) {
-        if (target.ref === 'remote:slow') await new Promise((resolve) => setTimeout(resolve, 120));
-        if (adapterMode !== 'ready') return { status: 'missing', message: 'Snapshot unavailable' };
-        return {
-          status: 'ready',
-          text:
-            target.ref === 'card:a'
-              ? 'Card A'
-              : target.ref === 'card:b'
-                ? 'Card B'
-                : target.ref === 'mapped:one'
-                  ? mappedSource
-                  : target.ref === 'bridge-lines:one'
-                    ? bridgeLine
-                    : original,
-        };
-      },
-      targetRanges(target) {
-        if (target.ref !== 'bridge-lines:one') return [];
-        const node = document.querySelector(
-          '[data-testid="bridge"] [data-annotation-text]',
-        )?.firstChild;
-        if (
-          !node ||
-          !target.text ||
-          bridgeLine.slice(target.text.start, target.text.end) !== target.text.quote
-        )
-          return [];
-        const range = document.createRange();
-        range.setStart(node, 6 + target.text.start);
-        range.setEnd(node, 6 + target.text.end);
-        return [range];
-      },
       async locate(target) {
-        await Promise.resolve();
-        setLocated(target.ref);
+        const request = ++locating.current;
+        if (target.ref === 'remote:slow') await new Promise((resolve) => setTimeout(resolve, 120));
+        if (request === locating.current) setLocated(target.ref);
       },
     }),
-    [adapterMode],
+    [],
   );
   async function submit(value: AnnotationValue<Ref | ElementAnnotationRef>) {
     if (!Object.isFrozen(value) || !Object.isFrozen(value.annotations))
@@ -387,7 +348,7 @@ function Panel() {
       <output data-testid="attempts">{attempts}</output>
       <output data-testid="located">{located}</output>
       <>
-        <Contents snapshot={snapshot} adapterMode={adapterMode} setAdapterMode={setAdapterMode} />
+        <Contents snapshot={snapshot} />
       </>
     </Page>
   );

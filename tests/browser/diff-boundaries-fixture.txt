@@ -5,7 +5,7 @@ import type { GitRef } from './shared/diff-schema.ts';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
-import { diffAnnotationTargets, diffTargetLocation, diffTargetText } from './shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation } from './shared/diff-schema.ts';
 const original = Array.from({ length: 140 }, (_, i) => `source ${i + 1} 中文é🙂\r\n`).join('');
 const insertion = Array.from({ length: 82 }, (_, i) => `insert ${i + 1} 中文é🙂\r\n`).join('');
 const modified = original
@@ -17,8 +17,6 @@ function Panel() {
   usePageAnnotations<GitRef>({
     onSubmit: async () => {},
     adapter: {
-      resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-      targetRanges: (target) => diff.current?.getRanges(diffTargetLocation(model, target)) ?? [],
       locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
     },
   });

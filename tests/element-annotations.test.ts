@@ -80,7 +80,7 @@ void test('framework element submission bypasses author-only adapters and retain
     `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
   )) as {
     AnnotationStore: new (options: {
-      adapter: { resolve(): never; locate(): void };
+      adapter: { locate(): void };
       onSubmit(value: unknown): Promise<void>;
     }) => {
       registerObject(registration: {
@@ -97,9 +97,6 @@ void test('framework element submission bypasses author-only adapters and retain
   let submitted: unknown;
   const store = new AnnotationStore({
     adapter: {
-      resolve: () => {
-        throw new Error('Business adapter must not receive element refs');
-      },
       locate: () => {},
     },
     onSubmit: (value: unknown) => {

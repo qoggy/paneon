@@ -60,7 +60,7 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 
 ## Deliver events
 
-Declare every event type in `events`. `await agent.emit(type, payload)` resolves only after the event is validated and stored; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
+Declare every event type in `events`. `await agent.emit(type, payload)` resolves to `{ id }`, the stored event's numeric ID, only after the event is validated and stored; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.
 
 ## Server actions
 
@@ -290,17 +290,13 @@ When an annotatable `Markdown` links to a local file, the human can annotate the
 
 ### Adapters
 
-Without an adapter, registered text can be located only while it is mounted. Content that unmounts, such as an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, still submits, but locating its annotations fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned source content needs an adapter as well. Once supplied, the adapter resolves every target except element targets and linked-file targets (with `sourceRef`), which Paneon handles itself:
+Without an adapter, registered text can be located only while it is mounted. Content that unmounts, such as an inactive `Tabs` panel, a closed `Accordion`, `Collapsible` or `Dialog`, or conditional rendering, still submits, but locating its annotations fails unless an adapter's `locate` switches back to that view. Paginated, virtualized or versioned source content needs an adapter as well. The adapter only restores the view. Paneon retains registered source text and handles validation, text geometry and highlighting. Element targets and linked-file targets (with `sourceRef`) are handled by Paneon itself:
 
 ```tsx
 // Each Tabs value is also the annotation ref of the Markdown rendered in that panel.
 const [tab, setTab] = useState('plan');
 const adapter = useMemo<AnnotationAdapter<string>>(
   () => ({
-    resolve: (target) =>
-      target.ref in sections
-        ? { status: 'ready', text: sections[target.ref] }
-        : { status: 'missing', message: 'Unknown section.' },
     async locate(target) {
       setTab(target.ref);
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -315,22 +311,11 @@ The full type:
 
 ```ts
 type AnnotationAdapter<TRef> = {
-  resolve(
-    target: AnnotationTarget<TRef>,
-  ):
-    | { status: 'ready'; text?: string }
-    | { status: 'missing' | 'stale'; message: string }
-    | Promise<
-        { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string }
-      >;
   locate(target: AnnotationTarget<TRef>): void | Promise<void>;
-  targetRanges?(target: AnnotationTarget<TRef>): readonly Range[];
 };
 ```
 
-- `resolve` returns the original source string for a target with `text`, or `missing` / `stale` with a message. Retain snapshots used by saved annotations.
 - `locate` restores the right page or view before highlighting. Ignore obsolete async responses.
-- `targetRanges` positions highlights for references that do not equal a registration, such as a line range within one diff side. Return `[]` when the source is not mounted; never search for the first matching quote.
 
 ### Markdown, CodeBlock and DiffView
 
@@ -338,7 +323,7 @@ type AnnotationAdapter<TRef> = {
 - `<CodeBlock code={source} language="ts" annotationTarget="example-v1" />` registers the code with the same page session. Offsets address the exact original `code`, including CRLF/CR line endings. Use different targets for distinct snippets, and include a version for changing content.
 - `<DiffView oldText="before" newText="after" annotationTargets={{ old: refA, new: refB }} />` registers each side; its reference becomes `ref` unchanged. The two sides need different references. Omit a side to disable annotations on it. Offsets address that side's complete original string.
 - With page annotations on, the human can also annotate a whole edit: one annotation with a target on each changed side.
-- A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)` for the adapter's `targetRanges`. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
+- A `DiffViewHandle` ref (`useRef<DiffViewHandle>(null)`) provides `reveal(location)`, which expands context and scrolls once rendered, and `getRanges(location)`, which returns DOM ranges for a location. `DiffLocation` is `{kind: 'text', side, start, end, quote}`, `{kind: 'hunk', index}` (zero-based) or `{kind: 'file'}`; convert the page's own references into it.
 - For another renderer, pass `registerText` `segments: {node: Text, sourceOffsets: (number | null)[]}[]`. Each array has `node.data.length + 1` UTF-16 boundaries into one `source`; use `null` for an unmappable boundary.
 
 ### Image and Mermaid
@@ -350,7 +335,7 @@ type AnnotationAdapter<TRef> = {
 ### Submission
 
 - Explicit submission passes the complete saved annotations to `onSubmit`; a failed submission retains the draft for retry.
-- To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the earlier event's ID, as built-in pages do. The draft is not cleared after submission.
+- To replace an earlier result, emit the complete corrected result with `replacesEventId` set to the `id` that the earlier `agent.emit` returned, as built-in pages do. Declare `replacesEventId` in the event schema: validation drops undeclared fields, and a strict schema rejects them. The draft is not cleared after submission.
 - Drafts live in browser memory, so a reload can lose them. [Event limits](#deliver-events) apply.
 
 ## Examples

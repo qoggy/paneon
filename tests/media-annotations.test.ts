@@ -97,7 +97,7 @@ async function loadAnnotationStore() {
     // The Node-only test program must not import the UI module's DOM types.
     AnnotationStore: new (options: {
       onSubmit(value: AnnotationValue<string>): Promise<void>;
-      adapter?: { resolve(): { status: 'ready' }; locate(): void };
+      adapter?: { locate(): void };
     }) => {
       registerObject(registration: {
         target: AnnotationTarget<string>;
@@ -195,12 +195,12 @@ void test(
     const store = new AnnotationStore({
       onSubmit: async () => {},
       adapter: {
-        resolve: () => ({ status: 'ready' }),
         locate: () => {
           unregister = store.registerObject(registration);
         },
       },
     });
+    store.registerObject(registration)();
     const id = store.createAnnotation([target], 'Keep this opinion');
     const locating = store.locateAndEdit(id, target);
     await new Promise((resolve) => setImmediate(resolve));
@@ -224,7 +224,6 @@ void test(
     const store = new AnnotationStore({
       onSubmit: async () => {},
       adapter: {
-        resolve: () => ({ status: 'ready' }),
         locate() {},
       },
     });

@@ -33,12 +33,7 @@ import {
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
-import {
-  diffAnnotationTargets,
-  diffTargetCoordinates,
-  diffTargetLocation,
-  diffTargetText,
-} from '../../shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
 import {
   checkFeedback,
@@ -905,25 +900,6 @@ function Review() {
     disabled: submission.pending || checkingOut,
     onSubmit: (feedback) => submission.submit(feedback),
     adapter: {
-      resolve(target) {
-        const snapshot = snapshots.current.get(target.ref.sourceId);
-        if (!snapshot) return { status: 'missing', message: '原始快照已丢失，草稿保留。' };
-        try {
-          const text = diffTargetText(snapshot.model, target);
-          return { status: 'ready', ...(text === undefined ? {} : { text }) };
-        } catch (failure) {
-          return {
-            status: 'stale',
-            message: failure instanceof Error ? failure.message : String(failure),
-          };
-        }
-      },
-      targetRanges(target) {
-        const snapshot = snapshots.current.get(target.ref.sourceId);
-        if (!snapshot || mountedDiff.current !== snapshot.id) return [];
-        const location = diffTargetCoordinates(snapshot.model, target);
-        return location ? (diffView.current?.getRanges(location) ?? []) : [];
-      },
       async locate(target) {
         const snapshot = snapshots.current.get(target.ref.sourceId);
         if (snapshot) {

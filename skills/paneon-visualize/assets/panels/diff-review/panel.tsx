@@ -329,11 +329,9 @@ function DiffReviewPanel() {
   const [preserved, setPreserved] = useState<{ fileIndex: number; snapshot: Snapshot } | null>(
     null,
   );
-  const mounted = useRef<string | null>(null);
   const locating = useRef(0);
   const recordSnapshot = useCallback((index: number, snapshot: Snapshot) => {
     snapshots.current.set(`${index}:${snapshot.id}`, snapshot);
-    mounted.current = `${index}:${snapshot.id}`;
   }, []);
   function open(comparison: Comparison) {
     locating.current++;
@@ -369,23 +367,6 @@ function DiffReviewPanel() {
     onSubmit: (feedback) => submission.submit(feedback),
     allowEmptySubmit: submission.hasReceipt,
     adapter: {
-      resolve(target) {
-        const { fileIndex, snapshotId, side } = target.ref;
-        const snapshot = snapshots.current.get(`${fileIndex}:${snapshotId}`);
-        return snapshot
-          ? { status: 'ready', text: snapshot[`${side}Text`] }
-          : { status: 'missing', message: 'Missing original comparison snapshot. Draft retained.' };
-      },
-      targetRanges(target) {
-        return mounted.current === `${target.ref.fileIndex}:${target.ref.snapshotId}` && target.text
-          ? (diff.current?.getRanges({
-              kind: 'text',
-              side: target.ref.side,
-              ...target.text,
-              quote: target.text.quote!,
-            }) ?? [])
-          : [];
-      },
       async locate(target) {
         const serial = ++locating.current;
         const { fileIndex, snapshotId, side } = target.ref;
@@ -396,7 +377,6 @@ function DiffReviewPanel() {
         setOpened(value.files[fileIndex]);
         setPreserved({ fileIndex, snapshot });
         recordStatus(value.files[fileIndex], comparisonStatus(value.files[fileIndex], snapshot));
-        mounted.current = `${fileIndex}:${snapshotId}`;
         // Restore the preserved view before asking its DOM-based coordinate adapter to reveal.
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),

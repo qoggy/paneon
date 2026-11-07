@@ -6,15 +6,8 @@ import type {
   ElementAnnotationRef,
 } from '../sdk/annotation.js';
 
-export type AnnotationTargetResolution =
-  { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string };
 export type AnnotationAdapter<TRef = JsonValue> = {
-  resolve(
-    target: AnnotationTarget<TRef>,
-  ): AnnotationTargetResolution | Promise<AnnotationTargetResolution>;
   locate(target: AnnotationTarget<TRef>): void | Promise<void>;
-  /** Optional synchronous source-to-DOM bridge for references represented by another registration. */
-  targetRanges?(target: AnnotationTarget<TRef>): readonly Range[];
 };
 export type PageAnnotationOptions<TRef = JsonValue> = {
   onSubmit: (value: AnnotationValue<TRef | ElementAnnotationRef>) => Promise<unknown>;

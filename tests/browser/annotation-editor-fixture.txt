@@ -30,7 +30,6 @@ function Panel() {
   const [renders, setRenders] = useState(0);
   const adapter = useMemo<AnnotationAdapter<Ref>>(
     () => ({
-      resolve: () => ({ status: 'ready', text }),
       locate: (target) => {
         setLocated(target.ref);
         setLocateCount((count) => count + 1);

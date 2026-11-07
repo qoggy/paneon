@@ -45,8 +45,6 @@ import {
   tableFeedbackSchema,
   tableParamsSchema,
   tableSubmittedSchema,
-  tableTargetError,
-  tableTargetText,
   visibleRows,
 } from './schema';
 import type { TableParams, TableRef, TableView } from './schema';
@@ -342,15 +340,6 @@ function TablePanel() {
   );
   const adapter = useMemo(
     () => ({
-      resolve(target: Target<TableRef>) {
-        const message = tableTargetError(params, target);
-        if (message) return { status: 'stale' as const, message };
-        const source = tableTargetText(params, target.ref);
-        return {
-          status: 'ready' as const,
-          ...(typeof source === 'string' ? { text: source } : {}),
-        };
-      },
       async locate(target: Target<TableRef>) {
         const ref = target.ref;
         if (ref.kind === 'description') setDescriptionOpen(true);

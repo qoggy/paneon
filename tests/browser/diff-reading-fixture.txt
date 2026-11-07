@@ -4,7 +4,7 @@ import { Button, useAnnotations, usePageAnnotations } from '@qoggy/paneon/ui';
 import { DiffView } from './shared/diff.tsx';
 import type { DiffViewHandle } from './shared/diff.tsx';
 import { createDiffModel } from './shared/diff-model.ts';
-import { diffAnnotationTargets, diffTargetLocation, diffTargetText } from './shared/diff-schema.ts';
+import { diffAnnotationTargets, diffTargetLocation } from './shared/diff-schema.ts';
 import type { GitRef } from './shared/diff-schema.ts';
 const original = Array.from(
   { length: 340 },
@@ -65,11 +65,6 @@ function Panel() {
   usePageAnnotations<GitRef>({
     onSubmit: async () => {},
     adapter: {
-      resolve: (target) => ({ status: 'ready', text: diffTargetText(model, target) }),
-      targetRanges: (target) =>
-        target.ref.sourceId === kind
-          ? (diff.current?.getRanges(diffTargetLocation(model, target)) ?? [])
-          : [],
       locate: (target) => diff.current?.reveal(diffTargetLocation(model, target)),
     },
   });

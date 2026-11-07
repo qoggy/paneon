@@ -24,9 +24,6 @@ const { AnnotationStore, fileSourceOffsets } = (await import(
   AnnotationStore: new <TRef = string>(options: {
     onSubmit(value: AnnotationValue<TRef>): Promise<void>;
     adapter?: {
-      resolve(
-        target: AnnotationTarget<TRef>,
-      ): { status: 'ready'; text?: string } | { status: 'missing' | 'stale'; message: string };
       locate(): void;
     };
   }) => {
@@ -195,25 +192,23 @@ void test('source identity is optional JSON and does not reserve a file structur
   );
 });
 
-void test('submission delivers arbitrary page refs without resolving their current source', async () => {
+void test('submission delivers unregistered page refs without navigating', async () => {
   const ref = { kind: 'paneon-file', custom: 'business' };
-  let resolved = 0;
+  let located = 0;
   const store = new AnnotationStore<typeof ref>({
     onSubmit: async () => {},
     adapter: {
-      resolve() {
-        resolved++;
-        return { status: 'ready' };
+      locate() {
+        located++;
       },
-      locate() {},
     },
   });
   store.getSnapshot().createAnnotation([{ ref }]);
   await store.getSnapshot().submit();
-  assert.equal(resolved, 0);
+  assert.equal(located, 0);
 });
 
-void test('submission preserves all targets and comments when the adapter source omits a rendered heading', async () => {
+void test('registered source including its heading survives unmounting and submission', async () => {
   const delivered: AnnotationValue<string>[] = [];
   const body = 'Use shared storage.';
   const source = '## Cache plan\n\n' + body;
@@ -223,11 +218,10 @@ void test('submission preserves all targets and comments when the adapter source
       return Promise.resolve();
     },
     adapter: {
-      resolve: () => ({ status: 'ready', text: body }),
       locate() {},
     },
   });
-  store.registerText({
+  const unregister = store.registerText({
     ref: 'plan',
     source,
     segments: [
@@ -245,47 +239,46 @@ void test('submission preserves all targets and comments when the adapter source
     );
   store.getSnapshot().createAnnotation([{ ref: 'other' }], 'Agreed.');
   const before = store.getSnapshot().value;
+  unregister();
   await store.getSnapshot().submit();
   assert.deepEqual(delivered, [before]);
   assert.deepEqual(store.getSnapshot().value, before);
-  await assert.rejects(store.getSnapshot().locate(before.annotations[0].targets[0]), /stale/);
+  await store.getSnapshot().locate(before.annotations[0].targets[0]);
 });
 
-void test('missing, stale and throwing location adapters cannot block submission', async () => {
-  for (const resolution of ['missing', 'stale', 'throw'] as const) {
-    let resolved = 0;
-    const delivered: AnnotationValue<string>[] = [];
-    const store = new AnnotationStore<string>({
-      onSubmit: (value) => {
-        delivered.push(value);
-        return Promise.resolve();
+void test('a failed locate callback cannot block submission or discard its draft', async () => {
+  let located = 0;
+  const delivered: AnnotationValue<string>[] = [];
+  const store = new AnnotationStore<string>({
+    onSubmit: (value) => {
+      delivered.push(value);
+      return Promise.resolve();
+    },
+    adapter: {
+      locate() {
+        located++;
+        throw new Error('Location unavailable');
       },
-      adapter: {
-        resolve() {
-          resolved++;
-          if (resolution === 'throw') throw new Error('Location unavailable');
-          return { status: resolution, message: 'Location unavailable' };
-        },
-        locate() {},
-      },
-    });
-    store
-      .getSnapshot()
-      .createAnnotation(
-        [{ ref: 'hidden', text: { start: 10, end: 14, quote: 'text' } }],
-        'Keep this feedback.',
-      );
-    const before = store.getSnapshot().value;
-    await store.getSnapshot().submit();
-    assert.deepEqual(delivered, [before]);
-    assert.equal(resolved, 0);
-    await assert.rejects(
-      store.getSnapshot().locate(before.annotations[0].targets[0]),
-      /Location unavailable/,
+    },
+  });
+  const source = 'Hidden text';
+  store.registerText({ ref: 'hidden', source, segments: [] })();
+  store
+    .getSnapshot()
+    .createAnnotation(
+      [{ ref: 'hidden', text: { start: 7, end: 11, quote: 'text' } }],
+      'Keep this feedback.',
     );
-    assert.equal(resolved, 1, 'Only locating consults the adapter');
-    assert.deepEqual(store.getSnapshot().value, before);
-  }
+  const before = store.getSnapshot().value;
+  await store.getSnapshot().submit();
+  assert.deepEqual(delivered, [before]);
+  assert.equal(located, 0);
+  await assert.rejects(
+    store.getSnapshot().locate(before.annotations[0].targets[0]),
+    /Location unavailable/,
+  );
+  assert.equal(located, 1);
+  assert.deepEqual(store.getSnapshot().value, before);
 });
 
 void test('normalized code boundaries preserve raw UTF-16 offsets and CRLF quotes', () => {
@@ -299,17 +292,12 @@ void test('normalized code boundaries preserve raw UTF-16 offsets and CRLF quote
 
 void test('file drafts share explicit submission, retain original source and bypass page adapter', async () => {
   const delivered: AnnotationValue<string>[] = [];
-  let pageResolutions = 0;
   const store = new AnnotationStore<string>({
     onSubmit: (value) => {
       delivered.push(value);
       return Promise.resolve();
     },
     adapter: {
-      resolve: () => {
-        pageResolutions++;
-        return { status: 'ready' };
-      },
       locate: () => {
         throw new Error('File must not reach page adapter');
       },
@@ -330,7 +318,6 @@ void test('file drafts share explicit submission, retain original source and byp
   await locating;
   store.closeFile();
   await store.getSnapshot().submit();
-  assert.equal(pageResolutions, 0);
   assert.equal(delivered.length, 1);
   assert.deepEqual(delivered[0].annotations[0].targets[0], target);
   assert.equal(JSON.stringify(delivered[0]).includes(file.text), false);
@@ -365,12 +352,12 @@ void test('locating a page target closes the file preview and delegates to its p
   const store = new AnnotationStore<string>({
     onSubmit: () => Promise.resolve(),
     adapter: {
-      resolve: () => ({ status: 'ready' }),
       locate: () => {
         located = true;
       },
     },
   });
+  store.registerText({ ref: 'page', source: 'Page', segments: [] })();
   store.openFile({ href: file.path }, ref);
   await store.getSnapshot().locate({ ref: 'page' });
   assert.equal(store.getFileView()?.open, false);
@@ -420,7 +407,6 @@ void test('a later page locate releases an unfinished file locate', async () => 
   const store = new AnnotationStore<string>({
     onSubmit: () => Promise.resolve(),
     adapter: {
-      resolve: () => ({ status: 'ready' }),
       locate: () => {
         pageLocated++;
       },
@@ -432,6 +418,7 @@ void test('a later page locate releases an unfinished file locate', async () => 
   store.closeFile();
   const first = store.getSnapshot().locate(target);
   await new Promise((resolve) => setImmediate(resolve));
+  store.registerText({ ref: 'page', source: 'Page', segments: [] })();
   const second = store.getSnapshot().locate({ ref: 'page' });
   await Promise.all([first, second]);
   assert.equal(pageLocated, 1);

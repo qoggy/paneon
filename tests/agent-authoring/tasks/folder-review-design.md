@@ -1,0 +1,1 @@
+我想让 file-review 也能传入文件夹的绝对路径，查看里面全部文件的内容，并把通用文件树组件抽出来公开使用。shared 里的文件树不一定够用，先结合现有代码给我讲讲方案。项目在 /Users/yuguo/IdeaProjects/paneon。

@@ -1,6 +1,4 @@
-import { annotationValueSchema, isElementAnnotationRef, z } from '@qoggy/paneon/sdk';
-import type { AnnotationTarget, ElementAnnotationRef } from '@qoggy/paneon/sdk';
-import { validSourceRange } from '../../shared/markdown-annotation-schema.ts';
+import { annotationValueSchema, z } from '@qoggy/paneon/sdk';
 const label = z.string().refine((value) => value.trim().length > 0, 'Must not be blank.');
 const cell = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
 // Preserve unrestricted own data keys, including __proto__, while keeping metadata serializable.
@@ -108,45 +106,6 @@ export const tableSubmittedSchema = z.object({
   replacesEventId: tableFeedbackSchema.shape.replacesEventId,
 });
 export type TableSubmitted = z.infer<typeof tableSubmittedSchema>;
-export function tableTargetText(params: TableParams, ref: TableRef): string | undefined {
-  switch (ref.kind) {
-    case 'title':
-      return params.title;
-    case 'description':
-      return params.description;
-    case 'header':
-      return params.columns.find((column) => column.key === ref.columnKey)?.label;
-    case 'cell':
-      return cellText(params.rows[ref.rowIndex][ref.columnKey]);
-  }
-}
-export function tableTargetError(
-  params: TableParams,
-  target: AnnotationTarget<TableRef | ElementAnnotationRef>,
-): string | null {
-  if (isElementAnnotationRef(target.ref)) return null;
-  const ref = tableRefSchema.safeParse(target.ref);
-  if (!ref.success) return 'Invalid table reference.';
-  const value = ref.data;
-  if ('rowIndex' in value && value.rowIndex >= params.rows.length)
-    return 'Unknown original rowIndex.';
-  if ('columnKey' in value && !params.columns.some((column) => column.key === value.columnKey))
-    return 'Unknown column key.';
-  if (value.kind === 'description' && params.description === undefined)
-    return 'Table description is unavailable.';
-  if (target.text) {
-    if (value.kind === 'row' || value.kind === 'column')
-      return 'Rows and columns do not support text ranges.';
-    const source = tableTargetText(params, value);
-    if (typeof source !== 'string' || !validSourceRange(source, target))
-      return value.kind === 'header'
-        ? 'Text range does not match the original header label.'
-        : value.kind === 'cell'
-          ? 'Text range does not match the original cell text.'
-          : `Text range does not match the original ${value.kind}.`;
-  }
-  return null;
-}
 export function completeTableSchema() {
   return tableFeedbackSchema.superRefine((value, ctx) => {
     if (value.replacesEventId === undefined && !value.annotations.length)

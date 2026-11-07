@@ -44,7 +44,6 @@ export { AnnotationText } from './annotation';
 export { useAnnotations } from './annotation-context';
 export { usePageAnnotations } from './page-annotations';
 export type {
-  AnnotationTargetResolution,
   AnnotationAdapter,
   PageAnnotationOptions,
   AnnotationTextProps,

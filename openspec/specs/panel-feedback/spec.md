@@ -55,7 +55,7 @@ The common UI SHALL allow registered text to be selected during normal browsing,
 
 ### Requirement: Identify semantic objects and selected text
 
-Submitted targets SHALL contain a JSON-serializable reference and an optional original-source text range. Author-defined targets SHALL preserve their page-defined semantic reference; framework-selected rendered elements SHALL use `{element:{path,tag,excerpt}}` without requiring author registration. These DOM element references SHALL describe rendered content and SHALL NOT claim a business identity or source-code location. Ordinary text and image-syntax ranges SHALL contain start, end and exact quote. Mermaid targets SHALL carry type='mermaid'; their optional text range SHALL contain only start/end, while the framework retains full original source and AST evidence internally for validation and location. Whole-object targets SHALL omit the text range. Registered plain text SHALL support selecting a word or continuous fragment using original-string UTF-16 offsets and a quote consistent with that range. Page adapters SHALL define semantic identity, content association, validation, and navigation for author-defined targets; framework element targets SHALL use their registered rendered geometry instead of being passed to business-specific adapters.
+Submitted targets SHALL contain a JSON-serializable reference and an optional original-source text range. Author-defined targets SHALL preserve their page-defined semantic reference; framework-selected rendered elements SHALL use `{element:{path,tag,excerpt}}` without requiring author registration. These DOM element references SHALL describe rendered content and SHALL NOT claim a business identity or source-code location. Ordinary text and image-syntax ranges SHALL contain start, end and exact quote. Mermaid targets SHALL carry type='mermaid'; their optional text range SHALL contain only start/end, while the framework retains full original source and AST evidence internally for validation and location. Whole-object targets SHALL omit the text range. Registered plain text SHALL support selecting a word or continuous fragment using original-string UTF-16 offsets and a quote consistent with that range. Pages SHALL define semantic identity and content association through renderer registrations. Page adapters SHALL expose only locate for restoring the view of author-defined targets; the shared session SHALL validate registered original sources and compute annotation geometry; framework element targets SHALL use their registered rendered geometry instead of being passed to business-specific adapters.
 
 #### Scenario: Select two objects together
 
@@ -111,7 +111,7 @@ Common feedback SHALL use one annotations list for selected objects and their op
 
 ### Requirement: Respect content identity and adapter boundaries
 
-Adapters SHALL preserve target identity across presentation changes such as sorting and pagination. Dynamic-content integrations SHALL associate feedback with the content actually shown, retain drafts when content becomes stale, and SHALL NOT silently reinterpret text offsets against different content. Plain-text registration SHALL NOT be documented as automatically mapping arbitrary Markdown, diff, or virtualized DOM to source content. Specialized content SHALL use an appropriate adapter.
+Adapters SHALL preserve target identity across presentation changes such as sorting and pagination. Dynamic-content integrations SHALL associate feedback with the content actually shown, retain drafts when content becomes stale, and SHALL NOT silently reinterpret text offsets against different content. Plain-text registration SHALL NOT be documented as automatically mapping arbitrary Markdown, diff, or virtualized DOM to source content. Specialized renderers SHALL register their source mappings; adapters SHALL only restore hidden or unmounted views.
 
 #### Scenario: Content changes after selecting text
 
@@ -121,11 +121,11 @@ Adapters SHALL preserve target identity across presentation changes such as sort
 #### Scenario: A selected target is no longer mounted
 
 - **WHEN** sorting, filtering, or pagination unmounts the selected content
-- **THEN** the draft remains and the page adapter validates and locates it against its original snapshot, without treating DOM unmounting as deletion
+- **THEN** the draft remains, the shared session validates its retained registered source, and the page adapter restores its original view before the session locates it, without treating DOM unmounting as deletion
 
 #### Scenario: Map formatted text to source
 
-- **WHEN** an adapter registers text rendered from Markdown or a code diff
+- **WHEN** a renderer registers text rendered from Markdown or a code diff
 - **THEN** it provides explicit DOM-boundary-to-source mappings, preserves Unicode character boundaries, and validates the original-source quote rather than searching for the first matching text
 
 ### Requirement: Submit through existing declared events
@@ -144,7 +144,7 @@ The common controls SHALL deliver a feedback snapshot through an explicit page-p
 
 #### Scenario: Submit annotations whose source cannot be located
 
-- **WHEN** a person submits saved annotations after their source changes or disappears, or the page adapter cannot resolve their original ranges
+- **WHEN** a person submits saved annotations after their source changes or disappears, or their original ranges cannot be located
 - **THEN** the common submission path and supplied pages deliver the saved selected content and comments without calling the adapter or checking source ranges or content hashes
 - **AND** locating those annotations still checks the source and can report a location failure without deleting their comments or preventing submission
 

@@ -163,9 +163,10 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   )) as {
     AnnotationStore: new (options: {
       onSubmit(value: unknown): Promise<void>;
-      adapter: { resolve(): { status: 'ready' }; locate(): void | Promise<void> };
+      adapter: { locate(): void | Promise<void> };
     }) => {
       mountSurface(): () => void;
+      registerText(registration: { ref: string; source: string; segments: [] }): () => void;
       createAnnotation(targets: CardTarget[], comment?: string): string;
       changeEditor(comment: string): void;
       submit(): Promise<void>;
@@ -189,7 +190,6 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
     };
   };
   const delivered: unknown[] = [];
-  let resolutions = 0;
   let locations = 0;
   const store = new module.AnnotationStore({
     onSubmit: (value) => {
@@ -197,15 +197,12 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
       return Promise.resolve();
     },
     adapter: {
-      resolve: () => {
-        resolutions++;
-        return { status: 'ready' };
-      },
       locate: () => {
         locations++;
       },
     },
   });
+  store.registerText({ ref: 'card:c', source: 'Card C', segments: [] })();
   const unmount = store.mountSurface();
   const id = store.createAnnotation([target, { ref: 'card:b' }]);
   store.openAnnotation(id);
@@ -225,7 +222,6 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   store.openAnnotation(id);
   assert.equal(store.getSnapshot().editorAttention, 3);
   assert.equal(store.getSnapshot().uiError, null);
-  assert.equal(resolutions, 0, 'An open editor blocks navigation before resolving another target.');
   assert.equal(locations, 0, 'An open editor must not navigate away from its source.');
   store.cancelEditor();
   assert.equal(store.getSnapshot().value.annotations[0].comment, '');
@@ -275,10 +271,11 @@ void test('contextual editor buffers isolate Save, Cancel and saved multi-target
   const racing = new module.AnnotationStore({
     onSubmit: () => Promise.resolve(),
     adapter: {
-      resolve: () => ({ status: 'ready' }),
       locate: () => new Promise<void>((resolve) => pendingLocations.push(resolve)),
     },
   });
+  racing.registerText({ ref: target.ref, source: 'Card A', segments: [] })();
+  racing.registerText({ ref: 'card:c', source: 'Card C', segments: [] })();
   const firstId = racing.createAnnotation([target], 'first');
   const latestId = racing.createAnnotation([{ ref: 'card:c' }], 'latest');
   const firstEdit = racing.locateAndEdit(firstId, target);

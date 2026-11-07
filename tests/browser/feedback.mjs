@@ -384,12 +384,14 @@ try {
   await button('Change source').click();
   await clearSelection();
   await button('Locate family').click();
+  await frame.getByRole('alert').filter({ hasText: 'stale' }).waitFor();
+  await button('Change source').click();
+  await button('Locate family').click();
   await frame
     .getByTestId('located')
     .filter({ hasText: /^text:one$/ })
     .waitFor();
-  assert.equal(await content.evaluate(() => document.getSelection().isCollapsed), true);
-  await button('Change source').click();
+  assert.equal(await content.evaluate(() => document.getSelection().toString()), '👨‍👩‍👧‍👦');
   await button('Locate race').click();
   await frame
     .getByTestId('located')
@@ -402,11 +404,9 @@ try {
     .getByTestId('located')
     .filter({ hasText: /^card:b$/ })
     .waitFor();
-  await button('Adapter ready').click();
   await submitAnnotations(frame);
   await frame.getByRole('alert').filter({ hasText: 'Deliberate submission failure' }).waitFor();
   assert.equal(await frame.getByTestId('attempts').textContent(), '2');
-  await button('Adapter missing').click();
 
   // Nested-scroller, narrow iframe viewport, and marker editing use current mounted geometry.
   await select('[data-testid="nested-text"] [data-annotation-text]', 0, 2);
@@ -451,7 +451,7 @@ try {
   await clickFloating(button('删除批注'));
   assert.equal((await read()).events.length, 0, 'Saving and navigation never emit events.');
 
-  // A narrower semantic reference maps through adapter source offsets, not quote searches.
+  // Registered full-source offsets keep the selected interval anchored across remounts.
   await clickFixtureButton('Select bridge interval');
   const bridgeId = (await draft()).annotations.at(-1).id;
   const bridgeMarker = frame.locator(`[data-annotation-marker="${bridgeId}"]`);

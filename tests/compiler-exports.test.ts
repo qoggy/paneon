@@ -59,6 +59,92 @@ async function evaluate(entry: string, graph = createGraph(entry, 'client')) {
 }
 const panel = (imports: string, expression: string) =>
   `${imports}export default {render:()=>(${expression})};`;
+void test('top-level property assignments retain their dependencies and execute in source order', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {body,ending} from './content';const docs:Record<string,string>={};docs.sources=body;docs.sources+=ending;",
+        'docs.sources',
+      ),
+      'content.ts': "export const body='源码阅读路线';export const ending='与边界';",
+    },
+    async (_root, entry) => assert.equal(await evaluate(entry), '源码阅读路线与边界'),
+  );
+});
+void test('computed and conditional module writes preserve initialization and later updates', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "const docs:Record<string,any>={};let key='initial';key='sources';if(key==='sources'){docs[key] ||= 'route';}docs.count=0;docs.count++;docs.discard='unused';delete docs.discard;",
+        '[docs[key],docs.count,docs.discard]',
+      ),
+    },
+    async (_root, entry) => assert.deepEqual(await evaluate(entry), ['route', 1, undefined]),
+  );
+});
+void test('destructured writes and imported object initialization retain the original binding', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {docs as reading} from './barrel';let heading='';({heading}={heading:'源码'});[reading.sources]=['阅读路线'];",
+        'heading+reading.sources',
+      ),
+      'barrel.ts': "export {docs} from './content';",
+      'content.ts': 'export const docs:Record<string,string>={};docs.sources="before";',
+    },
+    async (_root, entry) => assert.equal(await evaluate(entry), '源码阅读路线'),
+  );
+});
+void test('many writes to one binding do not recursively reselect its initialization list', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel('const docs={count:0};' + 'docs.count++;'.repeat(2000), 'docs.count'),
+    },
+    async (_root, entry) => assert.equal(await evaluate(entry), 2000),
+  );
+});
+void test('module initialization follows selected bindings without pulling server-only writes into the browser', async () => {
+  await fixture(
+    {
+      'panel.tsx':
+        "import {definePanel,serverAction,z} from '@qoggy/paneon/sdk';import {readFileSync} from 'node:fs';const docs:Record<string,string>={};const privateDocs:Record<string,string>={};docs.sources='Browser route';privateDocs.secret=readFileSync('/server-only','utf8');export const read=serverAction({input:z.object({}),handler:()=>privateDocs.secret});function Panel(){return <p>{docs.sources}</p>}export default definePanel({id:'initialization',requires:{paneon:'*'},input:z.object({}),render:Panel});",
+    },
+    (_root, entry) => {
+      const client = createGraph(entry, 'client').sources.get(entry)!;
+      assert.match(client, /docs.sources='Browser route'/);
+      assert.doesNotMatch(client, /privateDocs|readFileSync|server-only/);
+      const server = createGraph(entry, 'server').sources.get(entry)!;
+      assert.match(server, /privateDocs.secret=readFileSync/);
+      assert.doesNotMatch(server, /Browser route|function Panel/);
+    },
+  );
+});
+void test('a Node dependency in a selected browser initializer is diagnosed instead of discarded', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {readFileSync} from 'node:fs';const docs:Record<string,string>={};docs.sources=readFileSync('/private','utf8');",
+        'docs.sources',
+      ),
+    },
+    (_root, entry) => assert.throws(() => createGraph(entry, 'client'), { code: 'BUILD_FAILED' }),
+  );
+});
+void test('deferred mutations and shadowed bindings do not become module initializers', async () => {
+  await fixture(
+    {
+      'panel.tsx': panel(
+        "import {readFileSync} from 'node:fs';const docs={sources:'before'};function deferred(){docs.sources=readFileSync('/deferred','utf8');}const callback=()=>{docs.sources=readFileSync('/callback','utf8');};{const docs={sources:''};docs.sources=readFileSync('/shadowed','utf8');}docs.sources='visible';",
+        'docs.sources',
+      ),
+    },
+    async (_root, entry) => {
+      const graph = createGraph(entry, 'client');
+      assert.doesNotMatch(graph.sources.get(entry)!, /readFileSync|deferred|callback|shadowed/);
+      assert.equal(await evaluate(entry, graph), 'visible');
+    },
+  );
+});
 void test('JavaScript helpers bind object shorthand dependencies during action extraction', async () => {
   await fixture(
     {
@@ -397,7 +483,7 @@ void test(
           "export {read as invoke} from './actions';export {first as label,second} from './values';export {unused} from './unrelated';",
         'values.ts': "export const first='Browser label';export const second='must be pruned';",
         'actions.ts':
-          "import {serverAction,z} from '@qoggy/paneon/sdk';import {fromPath} from './server-barrel';export const read=serverAction({kind:'query',input:z.object({suffix:z.string()}),handler:(_ctx,input)=>fromPath('/SERVER_IMPLEMENTATION_ONLY/result')+input.suffix});",
+          "import {serverAction,z} from '@qoggy/paneon/sdk';import {fromPath} from './server-barrel';const settings:Record<string,string>={};settings.path='/SERVER_IMPLEMENTATION_ONLY/result';export const read=serverAction({kind:'query',input:z.object({suffix:z.string()}),handler:(_ctx,input)=>fromPath(settings.path)+input.suffix});",
         'server-barrel.ts': "export {basename as fromPath,dirname} from 'node:path';",
         'unrelated.ts':
           "import {readFileSync} from 'node:fs';export const unused=readFileSync('/must-never-evaluate','utf8');",

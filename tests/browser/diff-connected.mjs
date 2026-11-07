@@ -36,8 +36,6 @@ try {
       const diff = useRef<DiffViewHandle>(null);
       const [bounded, setBounded] = useState(true);
       usePageAnnotations<'old' | 'new'>({onSubmit: async () => {}, adapter: {
-        resolve: target => ({status:'ready', text:target.ref === 'old' ? oldText : newText}),
-        targetRanges: target => target.type !== 'mermaid' && target.text ? diff.current?.getRanges({kind:'text', side:target.ref, ...target.text}) ?? [] : [],
         locate: target => diff.current?.reveal(target.type !== 'mermaid' && target.text ? {kind:'text', side:target.ref, ...target.text} : {kind:'file'}),
       }});
       return <><Draft /><Button onClick={() => setBounded(!bounded)}>Toggle document</Button>
