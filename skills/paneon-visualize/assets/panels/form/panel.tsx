@@ -301,7 +301,7 @@ function FormPanel() {
 }
 export default definePanel({
   id: 'form',
-  requires: { paneon: '>=0.4.0 <0.5.0' },
+  requires: { paneon: '>=0.5.0 <0.6.0' },
   input: formParamsSchema,
   render: FormPanel,
 });

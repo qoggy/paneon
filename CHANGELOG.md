@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Use the new `Slider` component from `@qoggy/paneon/ui` for single-value or range controls. The dining philosophers and Sentinel sliding-window examples now use it.
+- Look up public UI components in the bundled skill's component index, with individual references covering imports, common props and usage examples.
+- Follow the README's uninstall instructions to remove Paneon and optionally clean up installed skills and local data.
+- Get optional `Tooltip` component suggestions from `paneon panel check` for native HTML `title` tooltips, without affecting the command's exit code.
+
+### Changed
+
+- **Breaking:** Remove `events` from `definePanel` and the panel manifest. Send JSON feedback directly with `agent.emit(type, payload)` without declaring event types or schemas; Paneon preserves the payload's fields instead of validating or transforming them through an event schema. Move any required validation into the page before sending.
+- **Breaking:** Simplify `AnnotationAdapter` to `locate(target)` only. Remove `resolve`, `targetRanges` and the exported `AnnotationTargetResolution` type; custom adapters should restore the relevant view and let Paneon locate and highlight registered content.
+- Allow custom pages to use browser clipboard writes, downloads, popups, top-level navigation and local storage directly. Local storage persists across reloads and is shared by pages served from the same Paneon origin.
+- Report multiple TypeScript or dependency errors together, with file locations, when a panel build fails, instead of stopping at the first error.
+
+### Fixed
+
+- Avoid blocking saved annotation submissions on text-range, quote or content-hash checks used for locating their sources, preserving selected quotes and comments across file review, diff review, Git review, tables and the GitHub PR example.
+- Preserve module-level assignments to bindings used by a page, avoiding missing initialization in compiled panels.
+- Correct `paneon panel check` handling of component aliases and conditional annotation targets, distinguishing intentionally optional diff sides from missing targets.
+
 ## [0.4.0] - 2026-11-06
 
 ### Added

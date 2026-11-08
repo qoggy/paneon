@@ -1123,7 +1123,7 @@ function GithubPR() {
 }
 export default definePanel({
   id: 'github-pr',
-  requires: { paneon: '>=0.4.0 <0.5.0' },
+  requires: { paneon: '>=0.5.0 <0.6.0' },
   input: githubPRParamsSchema,
   render: GithubPR,
 });

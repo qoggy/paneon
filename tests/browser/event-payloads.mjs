@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
+import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import { selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-event-browser-'));
@@ -32,7 +33,7 @@ function Panel(){
     </Section>
   </Page>;
 }
-export default definePanel({id:'event-browser',requires:{paneon:'>=0.4.0 <0.5.0'},input:z.object({}),render:Panel});
+export default definePanel({id:'event-browser',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});
 `,
   );
   service = await startServer(join(root, 'data'));

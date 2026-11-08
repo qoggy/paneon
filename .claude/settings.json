@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(paneon *)",
+      "Bash(openspec *)",
+      "Bash(npm run lint)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run format:check)",
+      "Bash(npm ls --depth=0)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh run view *)",
+      "Bash(npm run build)",
+      "Bash(npm run build:cli)",
+      "Bash(npm run build:ui)",
+      "Bash(npm run build:web)",
+      "Bash(npm test)",
+      "Bash(npm run format)",
+      "Bash(npm run lint -- --fix --fix-type layout)"
+    ]
+  }
+}
