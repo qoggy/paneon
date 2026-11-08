@@ -213,21 +213,32 @@ function Panel(){usePageAnnotations({onSubmit:value=>agent.emit('feedback-submit
   await ff.getByText('未保存。Save 草稿仍可使用。', { exact: true }).waitFor();
   await form.unroute('**/api/panels/*/events');
   const firstDark = await context.newPage();
-  await firstDark.addInitScript(() => {
+  const observeContentTheme = () => {
     window.__contentThemes = [];
     new MutationObserver(() => {
       if (document.getElementById('root')?.textContent)
         window.__contentThemes.push(document.documentElement.classList.contains('dark'));
     }).observe(document, { childList: true, subtree: true });
+  };
+  await firstDark.route('**/frame.html', async (route) => {
+    const response = await route.fetch();
+    // Observe the actual frame document; its initial about:blank document may be replaced.
+    await route.fulfill({
+      response,
+      body: (await response.text()).replace(
+        '<head>',
+        `<head><script>(${observeContentTheme.toString()})()</script>`,
+      ),
+    });
   });
   await firstDark.goto(f.url(custom));
   const darkFrame = firstDark.frameLocator('iframe');
   await darkFrame.getByRole('heading', { name: 'Author title 原文', exact: true }).waitFor();
-  assert.equal(
-    await darkFrame
-      .locator('html')
-      .evaluate(() => window.__contentThemes.length > 0 && window.__contentThemes.every(Boolean)),
-    true,
+  const contentThemes = await darkFrame.locator('html').evaluate(() => window.__contentThemes);
+  assert.ok(contentThemes.length > 0, 'Initial content must produce theme samples.');
+  assert.ok(
+    contentThemes.every(Boolean),
+    'The dark theme must apply before any panel content appears.',
   );
   assert.deepEqual(errors, []);
   console.log(

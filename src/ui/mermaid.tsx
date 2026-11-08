@@ -1,5 +1,5 @@
 import { useUI } from './use-ui';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Spinner } from './spinner';
 import { cn } from './utils';
@@ -133,6 +133,12 @@ function MermaidDiagram({
   const [image, setImage] = useState<DiagramImage | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [width, setWidth] = useState<number>();
+  useLayoutEffect(() => {
+    const source = diagram.current?.querySelector('svg');
+    // Percentage-width SVGs need an explicit basis to shrink-wrap at their natural size.
+    if (source) setWidth(source.viewBox.baseVal.width);
+  }, [diagram, svg]);
   function capture() {
     const source = diagram.current?.querySelector('svg');
     if (!source) throw new Error('The diagram is unavailable.');
@@ -179,7 +185,8 @@ function MermaidDiagram({
           role="button"
           tabIndex={0}
           aria-label={t('Expand diagram')}
-          className="min-w-0 flex-1 cursor-zoom-in overflow-x-auto rounded-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+          className="min-w-0 cursor-zoom-in overflow-x-auto rounded-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+          style={{ width }}
           onClick={(event) => {
             if ((event.target as Element).closest('a')) return;
             const selection = window.getSelection();

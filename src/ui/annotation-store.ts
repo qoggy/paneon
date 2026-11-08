@@ -470,9 +470,23 @@ export class AnnotationStore<TRef> {
   }
   private async locateObject(target: AnnotationTarget<TRef>, request: number) {
     const key = annotationTargetKey(target);
+    const source = sourceKey(target);
+    const start = target.text?.start;
     while (request === this.locating) {
       const object = this.objectPresentations(target)[0];
-      if (object) return object.element;
+      // Earlier media can grow after this object is ready, invalidating scrollIntoView's
+      // destination. Wait for those renderers in the same source before measuring it.
+      const precedingMediaLoading =
+        start !== undefined &&
+        [...this.objects.values()].some(
+          (item) =>
+            sourceKey(item.target) === source &&
+            item.target.text &&
+            item.target.text.start < start &&
+            !item.element &&
+            !item.error,
+        );
+      if (object && !precedingMediaLoading) return object.element;
       const registrations = [...this.objects.values()].filter(
         (item) => annotationTargetKey(item.target) === key,
       );
@@ -482,7 +496,7 @@ export class AnnotationStore<TRef> {
         this.locating++;
         return;
       }
-      if (!registrations.some((item) => !item.element && !item.error)) {
+      if (!object && !registrations.some((item) => !item.element && !item.error)) {
         const failed = registrations.find((item) => item.error);
         if (failed) throw new Error(failed.error);
         return;
@@ -880,6 +894,8 @@ export class AnnotationStore<TRef> {
         if (element) await waitForAnnotationLocation(element);
       }
       if (request !== this.locating) return;
+      if (objectElement && !this.targetRects(target, true).length)
+        throw new Error('The annotation target is outside the visible viewport.');
       element?.animate?.(
         [{ outline: '2px solid var(--ring)' }, { outline: '2px solid transparent' }],
         1200,

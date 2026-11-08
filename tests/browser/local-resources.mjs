@@ -124,14 +124,14 @@ export default definePanel({id:'plain-local-resources',requires:{paneon:'*'},inp
     ['direct-absolute', picture],
   ]) {
     const content = frame.locator(`[data-case="${name}"]`);
+    const copied = frame.locator('[data-slot="toast"]').filter({ hasText: 'Path copied' });
+    await copied.waitFor({ state: 'hidden' });
     await content.locator('img').hover();
     await content.getByRole('button', { name: 'More image options', exact: true }).click();
     await frame.getByRole('menuitem', { name: 'Copy path', exact: true }).click();
+    // The success toast confirms the write finished before clipboard permissions change.
+    await copied.waitFor();
     await page.context().grantPermissions(['clipboard-read'], { origin });
-    await page.waitForFunction(
-      (expected) => navigator.clipboard.readText().then((text) => text === expected),
-      path,
-    );
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), path);
     await page.context().clearPermissions();
     await frame.getByRole('menu').waitFor({ state: 'hidden' });

@@ -253,71 +253,106 @@ try {
   await save(preview.locator('[data-slot="mermaid"]'), 'File Mermaid');
   await writeFile(join(root, 'review.md'), '# Changed on disk\n');
 
-  // Leave a pending image edit by ordinary file navigation, then release its late read.
-  await frame.locator('[data-tree-item="file:1"]').click();
-  await preview.locator('[data-code-line="1"]').waitFor();
-  let releaseImage;
-  const imageGate = new Promise((resolve) => {
-    releaseImage = resolve;
-  });
   const isImageRead = (request) => decodeURIComponent(request.url()).includes('/image#readImage');
-  const holdImageRead = async (route) => {
-    if (isImageRead(route.request())) await imageGate;
-    await route.continue();
-  };
-  await page.route('**/actions/**', holdImageRead);
-  try {
-    const readingImage = page.waitForRequest(isImageRead);
-    await frame.locator('[data-tree-item="file:0"]').click();
-    await readingImage;
-    await preview.getByRole('status').filter({ hasText: 'Loading image…' }).waitFor();
-    await openAnnotationDirectory(frame);
-    await frame.getByRole('button', { name: 'Edit annotation 1', exact: true }).click();
-    assert.equal(await editor.count(), 0, 'The edit waits for the image to load');
+  const waitForPaintedFrames = (count) =>
+    frame.locator('html').evaluate(async (_, count) => {
+      for (let i = 0; i < count; i++) await new Promise(requestAnimationFrame);
+    }, count);
+
+  // Navigation cancels edits waiting for either the image itself or media above the diagram.
+  for (const number of [1, 2]) {
     await frame.locator('[data-tree-item="file:1"]').click();
     await preview.locator('[data-code-line="1"]').waitFor();
-    const assertNavigationRetained = async () => {
-      await frame.locator('html').evaluate(async () => {
-        for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame);
-      });
-      assert.equal(await frame.locator('[data-file-review-path]').textContent(), 'other.ts');
-      assert.equal(
-        await editor.count(),
-        0,
-        'A cancelled media edit must not open in the code file',
-      );
-      assert.equal(await frame.getByRole('alert').count(), 0, 'Navigation is not a load error');
+    let releaseImage;
+    const imageGate = new Promise((resolve) => {
+      releaseImage = resolve;
+    });
+    const holdImageRead = async (route) => {
+      if (isImageRead(route.request())) await imageGate;
+      await route.continue();
     };
-    await assertNavigationRetained();
-    const lateImage = page.waitForResponse((response) => isImageRead(response.request()));
-    releaseImage();
-    assert.equal((await lateImage).status(), 200);
-    await assertNavigationRetained();
-  } finally {
-    releaseImage();
-    await page.unroute('**/actions/**', holdImageRead);
+    await page.route('**/actions/**', holdImageRead);
+    try {
+      const readingImage = page.waitForRequest(isImageRead);
+      await frame.locator('[data-tree-item="file:0"]').click();
+      await readingImage;
+      await preview.getByRole('status').filter({ hasText: 'Loading image…' }).waitFor();
+      await openAnnotationDirectory(frame);
+      await frame.getByRole('button', { name: `Edit annotation ${number}`, exact: true }).click();
+      await preview.locator('svg[id^="mermaid-"]').waitFor();
+      await waitForPaintedFrames(30);
+      assert.equal(await editor.count(), 0, 'The edit waits for the image to load');
+      await frame.locator('[data-tree-item="file:1"]').click();
+      await preview.locator('[data-code-line="1"]').waitFor();
+      const assertNavigationRetained = async () => {
+        await waitForPaintedFrames(4);
+        assert.equal(await frame.locator('[data-file-review-path]').textContent(), 'other.ts');
+        assert.equal(
+          await editor.count(),
+          0,
+          'A cancelled media edit must not open in the code file',
+        );
+        assert.equal(await frame.getByRole('alert').count(), 0, 'Navigation is not a load error');
+      };
+      await assertNavigationRetained();
+      const lateImage = page.waitForResponse((response) => isImageRead(response.request()));
+      releaseImage();
+      assert.equal((await lateImage).status(), 200);
+      await assertNavigationRetained();
+    } finally {
+      releaseImage();
+      await page.unrouteAll({ behavior: 'wait' });
+    }
   }
 
   const locationFailures = [];
-  for (const [number, selector, comment] of [
+  for (const [number, selector, comment, missingImage] of [
     [1, '[data-file-review-viewport] [data-slot="image"] img', 'Located file image'],
     [
       2,
       '[data-file-review-viewport] [data-slot="mermaid-diagram"] > [role="button"]',
       'Located file Mermaid',
     ],
+    [
+      2,
+      '[data-file-review-viewport] [data-slot="mermaid-diagram"] > [role="button"]',
+      'Located file Mermaid',
+      true,
+    ],
   ]) {
     await frame.locator('[data-tree-item="file:1"]').click();
     await preview.locator('[data-code-line="1"]').filter({ hasText: 'const other' }).waitFor();
+    if (missingImage) await rm(join(root, 'tests/fixtures/checkout.svg'));
+    let releaseImage;
+    const imageGate = new Promise((resolve) => {
+      releaseImage = resolve;
+    });
+    const holdImageRead = async (route) => {
+      if (isImageRead(route.request())) await imageGate;
+      await route.continue();
+    };
+    if (number === 2) await page.route('**/actions/**', holdImageRead);
     try {
       await assertAnnotationEditorOpensAfterLocate(frame, selector, async () => {
+        const readingImage = number === 2 ? page.waitForRequest(isImageRead) : undefined;
         await openAnnotationDirectory(frame);
         await frame.getByRole('button', { name: `Edit annotation ${number}`, exact: true }).click();
+        if (number === 2) {
+          await readingImage;
+          await preview.locator('svg[id^="mermaid-"]').waitFor();
+          await preview.getByRole('status').filter({ hasText: 'Loading image…' }).waitFor();
+          await waitForPaintedFrames(30);
+          assert.equal(await editor.count(), 0, 'The diagram edit waits for the preceding image');
+          releaseImage();
+        }
       });
     } catch (error) {
       if (error.code !== 'ERR_ASSERTION') throw error;
       locationFailures.push({ number, message: error.message });
       console.error(`File Review media annotation ${number}: ${error.message}`);
+    } finally {
+      releaseImage();
+      if (number === 2) await page.unrouteAll({ behavior: 'wait' });
     }
     assert.equal(await frame.locator('[data-file-review-path]').textContent(), 'review.md');
     assert.equal(

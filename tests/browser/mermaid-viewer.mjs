@@ -29,6 +29,8 @@ try {
     const content = host.querySelector('[data-slot="mermaid-diagram"] > [role="button"]');
     const toolbar = host.querySelector('[data-slot="media-toolbar"]');
     const contentBox = content.getBoundingClientRect();
+    const svg = content.querySelector('svg');
+    const svgBox = svg.getBoundingClientRect();
     const toolbarBox = toolbar.getBoundingClientRect();
     const buttons = [...toolbar.querySelectorAll('button')].map((button) => {
       const box = button.getBoundingClientRect();
@@ -42,6 +44,9 @@ try {
       toolbarOutsideContent: toolbarBox.left >= contentBox.right,
       toolbarTop: toolbarBox.top,
       contentTop: contentBox.top,
+      visibleGap: toolbarBox.left - svgBox.right,
+      svgWidth: svgBox.width,
+      intrinsicWidth: svg.viewBox.baseVal.width,
       buttons,
     };
   });
@@ -60,7 +65,57 @@ try {
   assert.ok(geometry.buttons[0].top < geometry.buttons[1].top);
   assert.equal(geometry.toolbarOutsideContent, true);
   assert.equal(geometry.toolbarTop, geometry.contentTop);
+  assert.equal(geometry.visibleGap, 8, 'Toolbar stays next to the visible diagram.');
+  assert.equal(geometry.svgWidth, geometry.intrinsicWidth, 'Small diagrams retain their size.');
+  const markdownChart = frame
+    .locator('[data-testid="markdown-diagrams"] [data-slot="mermaid-diagram"]')
+    .first();
+  await markdownChart.locator('[role="button"] > svg').waitFor();
+  assert.equal(
+    await markdownChart.evaluate((element) => {
+      const svg = element.querySelector('svg').getBoundingClientRect();
+      const toolbar = element.querySelector('[data-slot="media-toolbar"]').getBoundingClientRect();
+      return toolbar.left - svg.right;
+    }),
+    8,
+    'Markdown diagram controls also stay next to the SVG.',
+  );
+  const wideDiagram = frame.locator('[data-testid="editable"] [data-slot="mermaid-diagram"]');
+  await frame
+    .getByRole('textbox', { name: 'Diagram source', exact: true })
+    .fill(
+      'flowchart LR\n' + Array.from({ length: 12 }, (_, index) => `Step${index}`).join(' --> '),
+    );
+  await wideDiagram.getByText('Step11', { exact: true }).waitFor();
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const wide = await wideDiagram.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const content = element.querySelector('[role="button"]');
+      const svg = content.querySelector('svg');
+      const toolbar = element.querySelector('[data-slot="media-toolbar"]').getBoundingClientRect();
+      return {
+        intrinsicWidth: svg.viewBox.baseVal.width,
+        svgWidth: svg.getBoundingClientRect().width,
+        contentWidth: content.getBoundingClientRect().width,
+        visibleGap: toolbar.left - svg.getBoundingClientRect().right,
+        overflow: toolbar.right - box.right,
+      };
+    });
+    assert.ok(
+      wide.intrinsicWidth > wide.contentWidth,
+      'Exercise a diagram wider than its container.',
+    );
+    assert.ok(
+      Math.abs(wide.svgWidth - wide.contentWidth) < 1,
+      'Wide SVGs still fit the container.',
+    );
+    assert.ok(Math.abs(wide.visibleGap - 8) < 1, 'Wide diagram controls remain adjacent.');
+    assert.ok(wide.overflow < 1, 'Controls remain within the available width.');
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await chart.hover();
+  await page.screenshot({ path: join(artifacts, 'inline-spacing.png') });
   const more = flow.getByRole('button', { name: 'More diagram options', exact: true });
   await more.hover();
   await frame

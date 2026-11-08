@@ -130,15 +130,14 @@ try {
   );
   assert.equal(await diagram('editable').getByRole('alert').count(), 0);
 
-  await frame
-    .getByRole('textbox', { name: 'Diagram source' })
-    .fill(
-      [
-        'flowchart LR',
-        '  A["<img src=x onerror=window.__mermaidExecuted=true>"] --> B["Safe"]',
-        '  click B "javascript:window.__mermaidExecuted=true"',
-      ].join('\n'),
-    );
+  await frame.getByRole('textbox', { name: 'Diagram source' }).fill(
+    [
+      'flowchart LR',
+      // A broken data image exercises onerror without requesting a nonexistent HTTP asset.
+      '  A["<img src=data:image/png;base64,AA== onerror=window.__mermaidExecuted=true>"] --> B["Safe"]',
+      '  click B "javascript:window.__mermaidExecuted=true"',
+    ].join('\n'),
+  );
   await until(
     async () => (await diagram('editable').textContent()).includes('Safe'),
     'Strict Mermaid input must render without executing HTML or unsafe links.',
