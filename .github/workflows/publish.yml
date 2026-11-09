@@ -1,0 +1,51 @@
+name: Publish npm package
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate version and choose npm dist-tag
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node .github/scripts/npm-publish.ts prepare
+      - name: Build package
+        run: npm run build
+      - name: Pack built package
+        id: pack
+        run: node .github/scripts/npm-publish.ts pack
+      - name: Publish packed artifact with OIDC
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+        run: npm publish "$TARBALL" --access public --tag "$DIST_TAG" --registry=https://registry.npmjs.org/
+      - name: Verify published package
+        env:
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+          NPM_INTEGRITY: ${{ steps.pack.outputs.integrity }}
+        run: node .github/scripts/npm-publish.ts verify

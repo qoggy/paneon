@@ -39,6 +39,7 @@ export default defineConfig([
       'src/runtime/**/*.ts',
       'src/shared/**/*.ts',
       'tests/**/*.ts',
+      '.github/scripts/**/*.ts',
       'vite*.config.ts',
     ],
     languageOptions: { globals: globals.node },
