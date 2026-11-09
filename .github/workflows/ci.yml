@@ -1,0 +1,99 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  select-run:
+    name: Select run
+    if: ${{ github.event_name != 'push' || !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.select.outputs.run }}
+    steps:
+      - name: Avoid duplicate push and PR checks
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            pull_requests=$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls" \
+              -f state=open \
+              -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH_NAME" \
+              --jq '.[].number')
+            while IFS= read -r number; do
+              [[ -n "$number" ]] || continue
+              details=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" \
+                --jq '[.mergeable // false, .head.sha] | @tsv')
+              read -r mergeable head_sha <<< "$details"
+              if [[ "$mergeable" == "true" && "$head_sha" == "$GITHUB_SHA" ]]; then
+                echo "run=false" >> "$GITHUB_OUTPUT"
+                echo "Push checks are covered by pull request #$number." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            done <<< "$pull_requests"
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+  checks:
+    name: ${{ matrix.name }}
+    needs: select-run
+    if: ${{ needs.select-run.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint
+            script: lint
+          - name: Formatting
+            script: format:check
+          - name: Build and types
+            script: build
+          - name: Tests
+            script: test
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package declarations for lint
+        if: ${{ matrix.script == 'lint' }}
+        run: npm run build:cli && npm run build:ui
+      - name: Report test runner resources
+        if: ${{ matrix.script == 'test' }}
+        run: |
+          node -e 'const os = require("node:os"); console.log({ cpus: os.availableParallelism(), memoryGiB: os.totalmem() / 2 ** 30 });'
+      - name: Run ${{ matrix.name }}
+        env:
+          # Compilers spawn their own workers; leave room on four-core runners.
+          PANEON_TEST_CONCURRENCY: 2
+        run: npm run ${{ matrix.script }}

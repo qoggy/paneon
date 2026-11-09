@@ -32,7 +32,7 @@
     "build:cli": "tsc -p tsconfig.cli.json && node -e \"const fs=require('node:fs');fs.chmodSync('dist/cli/index.js',0o755);for(const ext of ['js','d.ts'])fs.copyFileSync('dist/runtime/read-text-file.'+ext,'skills/paneon-visualize/assets/shared/read-text-file.'+ext)\" && prettier --write skills/paneon-visualize/assets/shared/read-text-file.js skills/paneon-visualize/assets/shared/read-text-file.d.ts",
     "build:web": "vite build",
     "prepack": "npm run build",
-    "test": "npm run build:cli && npm run build:ui && node --test --test-concurrency=6 tests/*.test.ts",
+    "test": "npm run build:cli && npm run build:ui && npm run build:web && node tests/node-tests.mjs",
     "test:release": "node tests/release-test.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.examples.json",
     "lint": "eslint .",
