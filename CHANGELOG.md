@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-10
+
+### Added
+
+- Build grouped navigation with the new `Sidebar` components from `@qoggy/paneon/ui`, including active items, optional collapsing and localized controls.
+
+### Changed
+
+- Follow the bundled skill's layout guidance for centered reading pages, full-width workspaces and sidebars beside page content.
+
 ### Fixed
 
 - Allow prerelease Paneon versions within a panel's declared version range, so `0.5.1-beta.1` satisfies `>=0.5.0 <0.6.0` while versions outside the range remain rejected.
@@ -150,7 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.5.0...0.5.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.6.0...0.6.x
+[0.6.0]: https://github.com/qoggy/paneon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/qoggy/paneon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/qoggy/paneon/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/qoggy/paneon/compare/v0.2.0...v0.3.0

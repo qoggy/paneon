@@ -449,7 +449,7 @@ function TablePanel() {
 }
 export default definePanel({
   id: 'table',
-  requires: { paneon: '>=0.5.0 <0.6.0' },
+  requires: { paneon: '>=0.6.0 <0.7.0' },
   input: tableParamsSchema,
   render: TablePanel,
 });
