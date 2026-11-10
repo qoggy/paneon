@@ -34,9 +34,47 @@ const npmJson = (args: string[]) =>
   JSON.parse(
     execFileSync('npm', [...args, '--json', `--registry=${registry}`], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'inherit'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     }),
   ) as unknown;
+
+function versionNotFound(error: unknown): boolean {
+  if (
+    !error ||
+    typeof error !== 'object' ||
+    !('stdout' in error) ||
+    typeof error.stdout !== 'string'
+  )
+    return false;
+  try {
+    const response = JSON.parse(error.stdout) as { error?: { code?: string } };
+    return response.error?.code === 'E404';
+  } catch {
+    return false;
+  }
+}
+
+export async function waitForPublishedIntegrity(read: () => unknown): Promise<unknown> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let announced = false;
+  for (;;) {
+    try {
+      return read();
+    } catch (error) {
+      if (!versionNotFound(error)) throw error;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0)
+        throw new Error('Published npm version did not become visible within 10 minutes.', {
+          cause: error,
+        });
+      if (!announced) {
+        console.log('npm is processing the published version; waiting up to 10 minutes.');
+        announced = true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, Math.min(10_000, remaining)));
+    }
+  }
+}
 
 function outputs(values: Record<string, string>) {
   assert.ok(process.env.GITHUB_OUTPUT, 'GITHUB_OUTPUT is required');
@@ -49,7 +87,7 @@ function outputs(values: Record<string, string>) {
   console.log(values);
 }
 
-function main() {
+async function main() {
   const pkg = readPackage();
   switch (process.argv[2]) {
     case 'prepare': {
@@ -83,12 +121,9 @@ function main() {
     case 'verify': {
       assert.ok(process.env.NPM_INTEGRITY, 'NPM_INTEGRITY is required');
       assert.ok(process.env.DIST_TAG, 'DIST_TAG is required');
-      const integrity = npmJson([
-        'view',
-        `${pkg.name}@${pkg.version}`,
-        'dist.integrity',
-        '--prefer-online',
-      ]);
+      const integrity = await waitForPublishedIntegrity(() =>
+        npmJson(['view', `${pkg.name}@${pkg.version}`, 'dist.integrity', '--prefer-online']),
+      );
       const tags = npmJson(['view', pkg.name, 'dist-tags', '--prefer-online']) as Record<
         string,
         string
@@ -117,4 +152,4 @@ function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
