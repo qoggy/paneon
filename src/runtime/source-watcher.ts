@@ -1,6 +1,5 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve, sep } from 'node:path';
-import { createServer } from 'vite';
 import type { ViteDevServer } from 'vite';
 import type { WatchInputs } from '../shared/types.js';
 import { PACKAGE_ROOT } from '../shared/paths.js';
@@ -103,45 +102,49 @@ export class SourceWatcher {
     return result;
   }
   private start() {
-    return (this.server ??= createServer({
-      root: PACKAGE_ROOT,
-      configFile: false,
-      envDir: false,
-      publicDir: false,
-      logLevel: 'silent',
-      optimizeDeps: { noDiscovery: true },
-      server: {
-        middlewareMode: true,
-        hmr: false,
-        watch: {
-          // Chokidar 3's macOS exact-file callback has depth one.
-          depth: 1,
-          ignored: (path: string) => {
-            const key = resolve(path);
-            return !this.owners.has(key) && !this.ancestors.has(key);
+    return (this.server ??= import('vite')
+      .then(({ createServer }) =>
+        createServer({
+          root: PACKAGE_ROOT,
+          configFile: false,
+          envDir: false,
+          publicDir: false,
+          logLevel: 'silent',
+          optimizeDeps: { noDiscovery: true },
+          server: {
+            middlewareMode: true,
+            hmr: false,
+            watch: {
+              // Chokidar 3's macOS exact-file callback has depth one.
+              depth: 1,
+              ignored: (path: string) => {
+                const key = resolve(path);
+                return !this.owners.has(key) && !this.ancestors.has(key);
+              },
+            },
           },
-        },
-      },
-    }).then((server) => {
-      server.watcher.on('error', this.onError);
-      server.watcher.on('all', (kind, file) => {
-        if (!['change', 'add', 'unlink', 'addDir', 'unlinkDir'].includes(kind)) return;
-        try {
-          const affected = new Set([
-            ...(this.owners.get(resolve(file)) ?? []),
-            ...(this.owners.get(canonical(file)) ?? []),
-          ]);
-          if (kind === 'addDir') {
-            this.directories.add(resolve(file));
-            this.directories.add(canonical(file));
+        }),
+      )
+      .then((server) => {
+        server.watcher.on('error', this.onError);
+        server.watcher.on('all', (kind, file) => {
+          if (!['change', 'add', 'unlink', 'addDir', 'unlinkDir'].includes(kind)) return;
+          try {
+            const affected = new Set([
+              ...(this.owners.get(resolve(file)) ?? []),
+              ...(this.owners.get(canonical(file)) ?? []),
+            ]);
+            if (kind === 'addDir') {
+              this.directories.add(resolve(file));
+              this.directories.add(canonical(file));
+            }
+            for (const subscriber of affected) this.notify(subscriber);
+          } catch (error) {
+            this.onError(error);
           }
-          for (const subscriber of affected) this.notify(subscriber);
-        } catch (error) {
-          this.onError(error);
-        }
-      });
-      return server;
-    }));
+        });
+        return server;
+      }));
   }
   private notify(subscriber: Subscriber) {
     if (subscriber.closed || this.stopped) return;

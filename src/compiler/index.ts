@@ -47,7 +47,7 @@ export function validateRequirement(
       'requires.paneon must be a valid npm semver range.',
       { requiredRange: range, currentVersion: version, entryPath: entry },
     );
-  if (!semver.satisfies(version, range))
+  if (!semver.satisfies(version, range, { includePrerelease: true }))
     throw new PaneonError(
       'PANEON_VERSION_UNSUPPORTED',
       'The panel requires a different Paneon version.',
@@ -168,8 +168,11 @@ export function panelPlugin(
     resolveId(source, importer) {
       if (source === '@qoggy/paneon/sdk' || source === '@qoggy/paneon/sdk/client')
         return join(sdkPath, side === 'client' ? 'client.js' : 'server.js');
+      // The built UI entry only re-exports components; its extracted CSS is added to the frame.
       if (source === '@qoggy/paneon/ui')
-        return existsSync(uiEntry) ? uiEntry : join(PACKAGE_ROOT, 'src/ui/index.ts');
+        return existsSync(uiEntry)
+          ? { id: uiEntry, moduleSideEffects: false }
+          : join(PACKAGE_ROOT, 'src/ui/index.ts');
       if (
         source === 'react' ||
         source.startsWith('react/') ||
@@ -254,6 +257,7 @@ async function compileSnapshot(
     const buildDirectory = temporary;
     rmSync(buildDirectory, { recursive: true, force: true });
     mkdirSync(buildDirectory, { recursive: true, mode: 0o700 });
+    const buildPrefix = realpathSync(buildDirectory) + '/';
     const capturedResources = new Set<string>();
     const captureResource = (path: string) => {
       if (capturedResources.has(path)) return;
@@ -276,7 +280,7 @@ async function compileSnapshot(
         const raw = id.split('?')[0];
         if (!existsSync(raw) || !statSync(raw).isFile()) return;
         const path = realpathSync(raw);
-        if (path.startsWith(realpathSync(buildDirectory) + '/')) return;
+        if (path.startsWith(buildPrefix)) return;
         snapshot.read(path);
         if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
           return;
@@ -293,7 +297,7 @@ async function compileSnapshot(
           const raw = file.split('?')[0];
           if (!existsSync(raw) || !statSync(raw).isFile()) continue;
           const path = realpathSync(raw);
-          if (path.startsWith(realpathSync(buildDirectory) + '/')) continue;
+          if (path.startsWith(buildPrefix)) continue;
           snapshot.read(path);
           if (path.includes('/node_modules/') || path.startsWith(join(PACKAGE_ROOT, 'dist') + '/'))
             continue;
@@ -338,6 +342,8 @@ async function compileSnapshot(
         minify: false,
         lib: { entry: frameSource, formats: ['es'], fileName: 'client' },
         rollupOptions: {
+          // Avoid loading dependency graphs of unused component re-exports.
+          experimental: { lazyBarrel: true },
           output: { entryFileNames: 'client.js', assetFileNames: '[name][extname]' },
         },
       },

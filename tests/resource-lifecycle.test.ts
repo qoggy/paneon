@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import pino from 'pino';
 import type { ResourcePool } from '../src/runtime/resource-pool.js';
+import { watchState } from './watch-state-fixture.ts';
 const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
 )) as typeof import('../src/runtime/lifecycle.js');
@@ -244,7 +245,7 @@ void test(
 void test(
   'bounded watch reactivation detects sleeping edits without starting an execution child',
   { timeout: 60000 },
-  async () => {
+  async (t) => {
     const root = mkdtempSync(join(tmpdir(), 'paneon-lru-watch-'));
     const entry = join(root, 'panel.tsx');
     const marker = join(root, 'boots');
@@ -262,8 +263,13 @@ void test(
         1,
         'a cold failed build must keep watching for correction',
       );
-      writeFileSync(entry, source(marker, 'changed'));
-      await until(() => runtime.inspect(first.instanceId).revision !== first.revision);
+      await watchState(
+        runtime,
+        first.instanceId,
+        () => writeFileSync(entry, source(marker, 'changed')),
+        (state) => state.revision !== first.revision && !state.diagnostic,
+        t.signal,
+      );
       const current = runtime.inspect(first.instanceId);
       assert.notEqual(current.revision, first.revision);
       assert.equal(runtime.resourceUsage.workers, 0);
@@ -278,8 +284,13 @@ void test(
       await runtime.restore();
       await runtime.observe(first.instanceId);
       assert.equal(runtime.resourceUsage.workers, 0);
-      writeFileSync(entry, source(marker, 'watched'));
-      await until(() => runtime.inspect(first.instanceId).revision !== current.revision);
+      await watchState(
+        runtime,
+        first.instanceId,
+        () => writeFileSync(entry, source(marker, 'watched')),
+        (state) => state.revision !== current.revision && !state.diagnostic,
+        t.signal,
+      );
       assert.equal(runtime.resourceUsage.workers, 0, 'watch-only updates must stay execution-cold');
     } finally {
       await runtime.stop();

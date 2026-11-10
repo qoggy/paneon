@@ -105,6 +105,15 @@ void test('a complete basic panel client stays under two MB including SDK and st
       0,
     );
     assert.ok(bytes < 2_000_000, `Basic panel client assets are ${bytes} bytes.`);
+    assert.ok(compiled.manifest.reuse);
+    assert.deepEqual(
+      Object.keys(compiled.manifest.reuse.files).filter(
+        (file) =>
+          /\/(mermaid|shiki|@shikijs|material-icon-theme)\//.test(file) && /\.[cm]?js$/.test(file),
+      ),
+      [],
+      'A basic panel must not load unused rich-content runtime modules before tree-shaking.',
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

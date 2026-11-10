@@ -1,10 +1,87 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { deduplicateJobs, runJobs } from './release-support.ts';
+import { createReleaseWorkspace, deduplicateJobs, runJobs } from './release-support.ts';
+
+void test('release builds and prebuilt runs keep private files during a concurrent source rebuild', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'paneon-release-workspace-'));
+  const source = join(root, 'source');
+  try {
+    for (const path of ['src', 'dist/ui', 'node_modules/.bin', 'tmp'])
+      await mkdir(join(source, path), { recursive: true });
+    const execute = promisify(execFile);
+    await execute('git', ['init', '--quiet', '--initial-branch=develop', source]);
+    await execute('git', [
+      '-C',
+      source,
+      '-c',
+      'user.name=Release Test',
+      '-c',
+      'user.email=release@example.invalid',
+      'commit',
+      '--quiet',
+      '--allow-empty',
+      '-m',
+      'fixture',
+    ]);
+    await writeFile(join(source, 'package.json'), '{"version":"0.5.1-beta.1"}');
+    await writeFile(join(source, 'src/panel.ts'), 'source before rebuild');
+    await writeFile(join(source, 'node_modules/tool.js'), 'dependency before rebuild');
+    await symlink('../tool.js', join(source, 'node_modules/.bin/tool'));
+    await writeFile(join(source, 'dist/ui/index.d.ts'), 'original declarations');
+    const workspace = join(root, 'workspace');
+    const prebuilt = join(root, 'prebuilt');
+    await createReleaseWorkspace(source, workspace);
+    await assert.rejects(readFile(join(workspace, 'dist/ui/index.d.ts')), { code: 'ENOENT' });
+    await createReleaseWorkspace(source, prebuilt, { includeDist: true });
+    await mkdir(join(workspace, 'dist/ui'), { recursive: true });
+    await writeFile(join(workspace, 'dist/ui/index.d.ts'), 'isolated build declarations');
+
+    // npm run build:ui clears dist/ui before writing the new JS and declarations.
+    await rm(join(source, 'dist'), { recursive: true });
+    await writeFile(join(source, 'src/panel.ts'), 'source after rebuild');
+    await writeFile(join(source, 'node_modules/tool.js'), 'dependency after rebuild');
+    assert.equal(
+      await readFile(join(workspace, 'dist/ui/index.d.ts'), 'utf8'),
+      'isolated build declarations',
+    );
+    assert.equal(
+      await readFile(join(prebuilt, 'dist/ui/index.d.ts'), 'utf8'),
+      'original declarations',
+    );
+    assert.equal(await readFile(join(workspace, 'src/panel.ts'), 'utf8'), 'source before rebuild');
+    assert.equal(
+      await readFile(join(workspace, 'node_modules/tool.js'), 'utf8'),
+      'dependency before rebuild',
+    );
+    assert.equal(await readlink(join(workspace, 'node_modules/.bin/tool')), '../tool.js');
+    assert.equal((await lstat(join(workspace, '.git'))).isDirectory(), true);
+    const originalHead = (await execute('git', ['-C', source, 'rev-parse', 'HEAD'])).stdout;
+    assert.equal(
+      (await execute('git', ['-C', workspace, 'rev-parse', 'HEAD'])).stdout,
+      originalHead,
+    );
+    await execute('git', ['-C', workspace, 'config', 'paneon.test', 'isolated']);
+    await assert.rejects(execute('git', ['-C', source, 'config', '--get', 'paneon.test']));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 void test('release CLI defaults to four browser and two package workers and allows overrides', async () => {
   const execute = promisify(execFile);

@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, mkdirSy
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { prepareRuntimeHome } from './runtime-fixture.ts';
+import { watchState } from './watch-state-fixture.ts';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -234,38 +235,39 @@ void test('real CLI watch choices, compact command results, English debug, and e
     rmSync(root, { recursive: true, force: true });
   }
 });
-void test('actual SVG imports are handled by Vite and resource changes update the revision', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'paneon-svg-'));
-  const entry = join(root, 'panel.tsx');
-  const svg = join(root, 'logo.svg');
-  writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>');
-  writeFileSync(
-    entry,
-    `import{definePanel,z}from'@qoggy/paneon/sdk';import logo from './logo.svg';function Panel(){return <img src={logo} alt='Local SVG'/>}export default definePanel({id:'svg',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
-  );
-  const runtime = new Runtime(join(root, 'data'));
-  try {
-    const p = await runtime.run(entry, root, {}, true);
-    assert.ok(runtime.manifest(p.instanceId)?.dependencies.includes(realpathSync(svg)));
-    await delay(200);
+void test(
+  'actual SVG imports are handled by Vite and resource changes update the revision',
+  { timeout: 60000 },
+  async (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'paneon-svg-'));
+    const entry = join(root, 'panel.tsx');
+    const svg = join(root, 'logo.svg');
+    writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>');
     writeFileSync(
-      svg,
-      '<svg xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20"/></svg>',
+      entry,
+      `import{definePanel,z}from'@qoggy/paneon/sdk';import logo from './logo.svg';function Panel(){return <img src={logo} alt='Local SVG'/>}export default definePanel({id:'svg',requires:{paneon:'${PACKAGE_VERSION}'},input:z.object({}),render:Panel});`,
     );
-    let updated = false;
-    for (let i = 0; i < 150; i++) {
-      await delay(100);
-      if (runtime.inspect(p.instanceId).revision !== p.revision) {
-        updated = true;
-        break;
-      }
+    const runtime = new Runtime(join(root, 'data'));
+    try {
+      const p = await runtime.run(entry, root, {}, true);
+      assert.ok(runtime.manifest(p.instanceId)?.dependencies.includes(realpathSync(svg)));
+      await watchState(
+        runtime,
+        p.instanceId,
+        () =>
+          writeFileSync(
+            svg,
+            '<svg xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20"/></svg>',
+          ),
+        (state) => state.revision !== p.revision && !state.diagnostic,
+        t.signal,
+      );
+    } finally {
+      await runtime.stop();
+      rmSync(root, { recursive: true, force: true });
     }
-    assert.equal(updated, true);
-  } finally {
-    await runtime.stop();
-    rmSync(root, { recursive: true, force: true });
-  }
-});
+  },
+);
 void test('a real daemon and CLI stop complete while a framework WebSocket stays open', async () => {
   const root = mkdtempSync(join(tmpdir(), 'paneon-stop-websocket-'));
   const home = join(root, '.paneon');

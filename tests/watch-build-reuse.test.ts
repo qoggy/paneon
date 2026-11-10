@@ -17,6 +17,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import pino from 'pino';
 import type { ResourcePool } from '../src/runtime/resource-pool.js';
 import type { SourceWatcher } from '../src/runtime/source-watcher.js';
+import { watchState } from './watch-state-fixture.ts';
 
 const { Runtime } = (await import(
   '../dist/runtime/' + 'lifecycle.js'
@@ -43,7 +44,7 @@ async function until(check: () => boolean) {
 void test(
   'unchanged watch preserves execution and module state, and undo clears build errors',
   { timeout: 90000 },
-  async () => {
+  async (t) => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'paneon-watch-reuse-')));
     const entry = join(root, 'panel.tsx');
     const marker = join(root, 'boots');
@@ -83,12 +84,22 @@ void test(
       assert.equal(runtime.inspect(panel.instanceId).updatedAt, panel.updatedAt);
 
       await delay(200);
-      writeFileSync(entry, text + '\nconst invalid = ;');
-      await until(() => runtime.inspect(panel.instanceId).diagnostic?.code === 'BUILD_FAILED');
+      await watchState(
+        runtime,
+        panel.instanceId,
+        () => writeFileSync(entry, text + '\nconst invalid = ;'),
+        (state) => state.diagnostic?.code === 'BUILD_FAILED',
+        t.signal,
+      );
       assert.equal(runtime.live.get(panel.instanceId)?.execution?.child, child);
-      writeFileSync(entry, text);
-      await until(() => !runtime.inspect(panel.instanceId).diagnostic);
-      assert.equal(states.at(-1)?.building, false);
+      const recovered = await watchState(
+        runtime,
+        panel.instanceId,
+        () => writeFileSync(entry, text),
+        (state) => !state.diagnostic,
+        t.signal,
+      );
+      assert.equal(recovered.building, false);
       assert.equal(runtime.live.get(panel.instanceId)?.execution?.child, child);
       assert.equal(readFileSync(marker, 'utf8'), boots);
       assert.deepEqual(await read(), { count: 3, value: 'original', boot: true });

@@ -1,3 +1,36 @@
+import { execFile } from 'node:child_process';
+import { constants } from 'node:fs';
+import { cp } from 'node:fs/promises';
+import { join, relative, sep } from 'node:path';
+import { promisify } from 'node:util';
+
+/** Each release owns its source snapshot, dependencies and mutable build outputs. */
+export async function createReleaseWorkspace(
+  source: string,
+  target: string,
+  { includeDist = false } = {},
+): Promise<void> {
+  const excluded = new Set(['.git', '.idea', 'node_modules', 'tmp', 'temp', 'coverage', '.paneon']);
+  if (!includeDist) excluded.add('dist');
+  const execute = promisify(execFile);
+  await execute('git', ['clone', '--local', '--no-hardlinks', '--no-checkout', source, target]);
+  await cp(source, target, {
+    recursive: true,
+    verbatimSymlinks: true,
+    mode: constants.COPYFILE_FICLONE,
+    filter: (path) => !excluded.has(relative(source, path).split(sep)[0]),
+  });
+  await execute('git', ['-C', target, 'reset', '--mixed', 'HEAD']);
+  if (process.platform === 'darwin')
+    await execute('/bin/cp', ['-cRP', join(source, 'node_modules'), join(target, 'node_modules')]);
+  else
+    await cp(join(source, 'node_modules'), join(target, 'node_modules'), {
+      recursive: true,
+      verbatimSymlinks: true,
+      mode: constants.COPYFILE_FICLONE,
+    });
+}
+
 export interface ReleaseJob {
   name: string;
   resources?: string[];

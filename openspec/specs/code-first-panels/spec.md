@@ -208,7 +208,7 @@ Markdown 内容 MUST NOT 作为 JSX、脚本或命令执行，默认 MUST NOT �
 
 面板 SHALL 用 `requires.paneon` 声明非空、合法的 npm semver 包版本范围，CLI、SDK、组件与服务 SHALL 共用 Paneon 包版本，不维护独立 SDK 契约编号。编译器 SHALL 从入口 definePanel 对象中的字符串字面量静态提取范围，在执行任何面板模块前完成校验；缺失、非法或动态计算的范围 SHALL 返回 `INVALID_PANEON_REQUIREMENT`。当前包版本不满足 SHALL 返回 `PANEON_VERSION_UNSUPPORTED`，详情包含所需范围、当前版本和入口路径，不运行 handler。
 
-系统 MUST NOT 自动安装旧 SDK、切换包版本、扩大范围或修改面板源码。预发布版本 SHALL 遵循 semver 库默认匹配规则；0.x 面板定义 SHALL 按已验证版本声明范围，不假设所有 0.x 兼容。范围满足后 SHALL 继续执行类型检查与编译，不将范围匹配视为运行行为的完整证明。
+系统 MUST NOT 自动安装旧 SDK、切换包版本、扩大范围或修改面板源码。范围匹配 SHALL 启用 semver 的 `includePrerelease`，按声明范围和版本优先级判断预发布版本；0.x 面板定义 SHALL 按已验证版本声明范围，不假设所有 0.x 兼容。范围满足后 SHALL 继续执行类型检查与编译，不将范围匹配视为运行行为的完整证明。
 
 #### Scenario: Reject a runtime below the minimum version
 
@@ -235,10 +235,15 @@ Markdown 内容 MUST NOT 作为 JSX、脚本或命令执行，默认 MUST NOT �
 - **WHEN** 版本在声明范围内，但面板引用了不存在的 SDK 导出
 - **THEN** 类型检查或构建拒绝该面板，不把作者声明的范围当作接口存在的证明
 
-#### Scenario: Apply standard prerelease matching rules
+#### Scenario: Accept a prerelease within the declared range
 
-- **WHEN** 当前版本是未被面板范围显式纳入的预发布版本
-- **THEN** 按 semver 默认规则拒绝，不自动放宽兼容声明
+- **WHEN** 面板要求 `>=0.5.0 <0.6.0`，当前版本为 `0.5.1-beta.1`
+- **THEN** 范围校验通过，继续类型检查与编译，无需额外声明该 beta 版本
+
+#### Scenario: Reject a prerelease below the minimum version
+
+- **WHEN** 面板要求 `>=0.5.0 <0.6.0`，当前版本为 `0.5.0-beta.1`
+- **THEN** 返回 `PANEON_VERSION_UNSUPPORTED`，不执行面板模块
 
 ### Requirement: Version compiled panels and switch atomically
 

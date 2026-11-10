@@ -93,7 +93,4 @@ jobs:
         run: |
           node -e 'const os = require("node:os"); console.log({ cpus: os.availableParallelism(), memoryGiB: os.totalmem() / 2 ** 30 });'
       - name: Run ${{ matrix.name }}
-        env:
-          # Compilers spawn their own workers; leave room on four-core runners.
-          PANEON_TEST_CONCURRENCY: 2
         run: npm run ${{ matrix.script }}

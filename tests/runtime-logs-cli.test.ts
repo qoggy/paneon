@@ -162,9 +162,14 @@ void test(
   async (t) => {
     const { home, env } = fixture(t);
     writeFileSync(join(home, '.paneon/config.json'), 'broken json');
+    const viteImport = join(home, 'vite-imported');
+    const importProbe = `import{registerHooks}from'node:module';import{writeFileSync}from'node:fs';registerHooks({resolve(id,context,next){if(id==='vite')writeFileSync(${JSON.stringify(viteImport)},'loaded');return next(id,context);}});`;
     const result = await exec(
       process.execPath,
-      [new URL('../dist/runtime/index.js', import.meta.url).pathname],
+      [
+        `--import=data:text/javascript,${encodeURIComponent(importProbe)}`,
+        new URL('../dist/runtime/index.js', import.meta.url).pathname,
+      ],
       { env },
     ).then(
       () => null,
@@ -183,6 +188,11 @@ void test(
     assert(error.message);
     assert(error.stack);
     assert(!existsSync(join(home, '.paneon/runtime.json')));
+    assert.equal(
+      existsSync(viteImport),
+      false,
+      'Rejecting invalid startup configuration must not load the source watcher bundler.',
+    );
   },
 );
 void test(

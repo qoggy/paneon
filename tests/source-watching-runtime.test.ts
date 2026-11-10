@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdirSync, writeFileSync, unlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { Runtime, directory, logger, source, sources, until } from './source-watching-fixture.ts';
+import { Runtime, directory, logger, source, sources } from './source-watching-fixture.ts';
+import { watchState } from './watch-state-fixture.ts';
 
 void test(
   'production env add/change/delete updates revisions and keeps outside dependencies watched',
   { timeout: 90000 },
-  async () => {
+  async (t) => {
     const root = directory(),
       dir = join(root, 'panel');
     mkdirSync(dir);
@@ -32,20 +33,40 @@ void test(
       const read = () => runtime.invoke(id, current().revision, 'panel.tsx#read', {});
       assert.deepEqual(await read(), { value: 'one', env: 'first' });
       let revision = current().revision;
-      writeFileSync(production, 'VITE_SOURCE_WATCH=production');
-      await until(() => current().revision !== revision);
+      await watchState(
+        runtime,
+        id,
+        () => writeFileSync(production, 'VITE_SOURCE_WATCH=production'),
+        (state) => state.revision !== revision && !state.diagnostic,
+        t.signal,
+      );
       assert.deepEqual(await read(), { value: 'one', env: 'production' });
       revision = current().revision;
-      unlinkSync(production);
-      await until(() => current().revision !== revision);
+      await watchState(
+        runtime,
+        id,
+        () => unlinkSync(production),
+        (state) => state.revision !== revision && !state.diagnostic,
+        t.signal,
+      );
       assert.deepEqual(await read(), { value: 'one', env: 'first' });
       revision = current().revision;
-      writeFileSync(env, 'VITE_SOURCE_WATCH=changed');
-      await until(() => current().revision !== revision);
+      await watchState(
+        runtime,
+        id,
+        () => writeFileSync(env, 'VITE_SOURCE_WATCH=changed'),
+        (state) => state.revision !== revision && !state.diagnostic,
+        t.signal,
+      );
       assert.deepEqual(await read(), { value: 'one', env: 'changed' });
       revision = current().revision;
-      writeFileSync(shared, `export const value='outside-after-env';`);
-      await until(() => current().revision !== revision);
+      await watchState(
+        runtime,
+        id,
+        () => writeFileSync(shared, `export const value='outside-after-env';`),
+        (state) => state.revision !== revision && !state.diagnostic,
+        t.signal,
+      );
       assert.deepEqual(await read(), { value: 'outside-after-env', env: 'changed' });
       assert.equal(sources(runtime).servers, 1);
     } finally {
@@ -58,7 +79,7 @@ void test(
 void test(
   'shared subscriptions survive LRU and close while cold and no-watch paths stay unsubscribed',
   { timeout: 90000 },
-  async () => {
+  async (t) => {
     const root = directory(),
       shared = join(root, 'shared.ts');
     writeFileSync(shared, `export const value='one';`);
@@ -79,8 +100,13 @@ void test(
       await run('c', false);
       assert.equal(runtime.live.has(a.instanceId), false);
       assert.equal(sources(runtime).size, 1);
-      writeFileSync(shared, `export const value='two';`);
-      await until(() => runtime.store.get(b.instanceId).revision !== b.revision);
+      await watchState(
+        runtime,
+        b.instanceId,
+        () => writeFileSync(shared, `export const value='two';`),
+        (state) => state.revision !== b.revision && !state.diagnostic,
+        t.signal,
+      );
       assert.equal(runtime.store.get(a.instanceId).revision, a.revision);
       await runtime.observe(a.instanceId);
       assert.equal(runtime.live.get(a.instanceId)?.execution, undefined);
@@ -88,8 +114,13 @@ void test(
       await runtime.closePanel(b.instanceId);
       assert.equal(sources(runtime).size, 1);
       const revision = runtime.store.get(a.instanceId).revision;
-      writeFileSync(shared, `export const value='three';`);
-      await until(() => runtime.store.get(a.instanceId).revision !== revision);
+      await watchState(
+        runtime,
+        a.instanceId,
+        () => writeFileSync(shared, `export const value='three';`),
+        (state) => state.revision !== revision && !state.diagnostic,
+        t.signal,
+      );
       assert.equal(runtime.store.get(b.instanceId).status, 'closed');
     } finally {
       await runtime.stop();

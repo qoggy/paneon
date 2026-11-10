@@ -1,5 +1,5 @@
 import { SKILL_PACKAGE_PATH } from './skill-paths.ts';
-import { deduplicateJobs, runJobs } from './release-support.ts';
+import { createReleaseWorkspace, deduplicateJobs, runJobs } from './release-support.ts';
 import { packageDownloadCache } from './package-fixture.mjs';
 import { readTestTimings, summarizeTestTimings } from './test-timing.ts';
 import {
@@ -25,10 +25,11 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
-const repository = fileURLToPath(new URL('../', import.meta.url));
+const sourceRepository = fileURLToPath(new URL('../', import.meta.url));
+let repository = sourceRepository;
 const browserScripts = [
   'production-runtime',
   'host-lifecycle',
@@ -143,9 +144,10 @@ import {promisify} from 'node:util';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
 const execute=promisify(execFile), root=await mkdtemp(join(tmpdir(),'paneon-bin-'));
 try {
-  const {createPackageFixture}=await import(${JSON.stringify(new URL('./package-fixture.mjs', import.meta.url).href)});
+  const {createPackageFixture}=await import(pathToFileURL(join(process.cwd(),'tests/package-fixture.mjs')).href);
   const {installation}=await createPackageFixture(root);
   const binary=join(installation,'node_modules/.bin/paneon');
   const version=JSON.parse(await readFile('package.json','utf8')).version;
@@ -334,7 +336,6 @@ if (process.platform === 'darwin' && !env.PANEON_TEST_BROWSER)
   env.PANEON_TEST_BROWSER = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const results = [];
 const backups = [];
-const directorySnapshots = [];
 const active = new Set();
 const jobHomes = [];
 const phaseTimings = [];
@@ -433,7 +434,7 @@ async function run(test, environment = env, queueMilliseconds = 0) {
     ? [
         '--test-reporter=spec',
         '--test-reporter-destination=stdout',
-        `--test-reporter=${new URL('./release-node-reporter.mjs', import.meta.url).href}`,
+        `--test-reporter=${pathToFileURL(join(repository, 'tests/release-node-reporter.mjs')).href}`,
         `--test-reporter-destination=${unitReport}`,
         ...test.args,
       ]
@@ -479,7 +480,8 @@ async function run(test, environment = env, queueMilliseconds = 0) {
     `[${success ? '通过' : '失败'} ${releasePhaseName(test.phase)}] ${test.name}` +
       `${unit?.counts ? `：${formatUnitCounts(unit.counts)}` : ''} (${formatReleaseDuration(milliseconds)})`,
   );
-  const showCaptured = verbose || (unitReport && options.has('--coverage'));
+  // A final timeout/assertion can hide an earlier asynchronous build failure.
+  const showCaptured = verbose || (unitReport && (options.has('--coverage') || !success));
   if (showCaptured || !success) {
     if (!showCaptured && unit?.failures.length) {
       for (const failure of unit.failures)
@@ -520,20 +522,11 @@ try {
     env.GH_TOKEN = stdout.trim();
   }
   const setupStarted = performance.now();
-  await preserve(join(repository, 'dist'));
-  for (const path of ['tmp', 'node_modules/.vite', 'node_modules/.vite-temp', 'tests']) {
-    const absolute = join(repository, path);
-    directorySnapshots.push({
-      path: absolute,
-      existed: await exists(absolute),
-      entries: new Set(
-        await readdir(absolute).catch((error) => {
-          if (error.code === 'ENOENT') return [];
-          throw error;
-        }),
-      ),
-    });
-  }
+  repository = join(scratch, 'repository');
+  await createReleaseWorkspace(sourceRepository, repository, {
+    includeDist: options.has('--skip-build'),
+  });
+  console.log(`Isolated release workspace: ${repository}`);
   // Legacy scripts still use literal screenshot paths. Save and restore those exact paths.
   const literalPaths = new Set();
   const systemTemporary = await realpath('/tmp');
@@ -639,19 +632,6 @@ try {
           { ...env, HOME: isolatedHome },
         );
     }
-    for (const snapshot of directorySnapshots) {
-      for (const entry of await readdir(snapshot.path).catch((error) => {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-      })) {
-        if (snapshot.entries.has(entry)) continue;
-        // Only generated entries are removed from tests/, never newly authored test cases.
-        if (snapshot.path === join(repository, 'tests') && !entry.startsWith('.mermaid-test-'))
-          continue;
-        await rm(join(snapshot.path, entry), { recursive: true, force: true });
-      }
-      if (!snapshot.existed) await rm(snapshot.path, { recursive: true, force: true });
-    }
     for (const { path, backup, existed } of backups.reverse()) {
       await rm(path, { recursive: true, force: true });
       if (existed) await cp(backup, path, { recursive: true, verbatimSymlinks: true });
@@ -663,9 +643,18 @@ try {
       );
       console.log(`\nRelease test results:\n${JSON.stringify(results, null, 2)}`);
     }
+    if (interrupted || runnerError || results.some(releaseResultFailed)) {
+      const retained = await mkdtemp(join(tmpdir(), 'paneon-release-failure-'));
+      await cp(artifacts, join(retained, 'commands'), { recursive: true });
+      for (const [index, isolatedHome] of jobHomes.entries())
+        await cp(join(dirname(isolatedHome), 'artifacts'), join(retained, `job-${index}`), {
+          recursive: true,
+        });
+      console.log(`Failure artifacts retained: ${retained}`);
+    }
     await rm(scratch, { recursive: true, force: true });
     console.log(
-      `清理完成（${formatReleaseDuration(performance.now() - cleanupStarted)}）：已恢复原 dist，移除临时测试数据，保留 npm 下载缓存。`,
+      `清理完成（${formatReleaseDuration(performance.now() - cleanupStarted)}）：已移除隔离构建与临时测试数据，恢复原测试产物，保留 npm 下载缓存。`,
     );
   } catch (error) {
     runnerError ??= error;

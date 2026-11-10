@@ -36,7 +36,7 @@ export class SourceSnapshot {
     return this.contents.keys();
   }
   read(file: string): Buffer {
-    const path = realpathSync(file);
+    const path = this.contents.has(file) ? file : realpathSync(file);
     let bytes = this.contents.get(path);
     if (!bytes) {
       bytes = readFileSync(path);

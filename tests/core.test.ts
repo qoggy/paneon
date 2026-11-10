@@ -120,16 +120,29 @@ void test('mixed type and value imports retain their runtime bindings', () =>
       }
     }
   }));
-void test('version preflight follows npm ranges and never evaluates imports', () =>
+void test('version preflight includes prereleases within declared ranges and never evaluates imports', () =>
   temporary((root) => {
     const entry = join(root, 'panel.tsx');
     const source = `import{definePanel}from'@qoggy/paneon/sdk';throw new Error('must not evaluate');export default definePanel({requires:{paneon:'>=1.4.0 <2.0.0'}});`;
-    writeFileSync(entry, source);
-    assert.equal(validateRequirement(entry, '1.5.0'), '>=1.4.0 <2.0.0');
-    for (const version of ['1.3.0', '2.0.0', '1.5.0-beta.1'])
-      assert.throws(() => validateRequirement(entry, version), {
-        code: 'PANEON_VERSION_UNSUPPORTED',
-      });
+    for (const { range, accepted, rejected } of [
+      {
+        range: '>=1.4.0 <2.0.0',
+        accepted: ['1.4.0', '1.5.0', '1.5.0-beta.1'],
+        rejected: ['1.3.0', '1.4.0-beta.1', '2.0.0', '2.0.1-beta.1'],
+      },
+      {
+        range: '>=0.5.0 <0.6.0',
+        accepted: ['0.5.0', '0.5.1-beta.1'],
+        rejected: ['0.5.0-beta.1', '0.6.0', '0.6.1-beta.1'],
+      },
+    ]) {
+      writeFileSync(entry, source.replace('>=1.4.0 <2.0.0', range));
+      for (const version of accepted) assert.equal(validateRequirement(entry, version), range);
+      for (const version of rejected)
+        assert.throws(() => validateRequirement(entry, version), {
+          code: 'PANEON_VERSION_UNSUPPORTED',
+        });
+    }
     writeFileSync(entry, source.replace("'>=1.4.0 <2.0.0'", 'process.env.RANGE'));
     assert.throws(() => validateRequirement(entry, '1.5.0'), {
       code: 'INVALID_PANEON_REQUIREMENT',

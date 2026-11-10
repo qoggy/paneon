@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Allow prerelease Paneon versions within a panel's declared version range, so `0.5.1-beta.1` satisfies `>=0.5.0 <0.6.0` while versions outside the range remain rejected.
+
 ## [0.5.0] - 2026-11-08
 
 ### Added

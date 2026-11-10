@@ -197,6 +197,7 @@ void test('semver preflight covers 0.x, prereleases, missing/empty/illegal/dynam
     const valid = source('semver', TEST_RANGE, { moduleMarker: marker });
     writeFileSync(entry, valid);
     assert.equal(validateRequirement(entry, TEST_VERSION), TEST_RANGE);
+    assert.equal(validateRequirement(entry, `${UPGRADED_VERSION}-beta.1`), TEST_RANGE);
     assert.throws(() => validateRequirement(entry, NEXT_MINOR_VERSION), {
       code: 'PANEON_VERSION_UNSUPPORTED',
     });

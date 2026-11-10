@@ -65,7 +65,17 @@ export async function acceptance({ cliPath, fixturesPath, label = 'repository' }
     process.env.PANEON_TEST_ARTIFACTS || (await mkdtemp(join(tmpdir(), 'paneon-evidence-')));
   await Promise.all([mkdir(home), mkdir(workspace), mkdir(artifacts, { recursive: true })]);
   await copyPanelFixtures(fixturesPath, join(workspace, 'fixtures/panels'));
-  const env = { ...process.env, HOME: home };
+  const env = {
+    ...process.env,
+    HOME: home,
+    PANEON_TEST_ARTIFACTS: artifacts,
+    NODE_OPTIONS: [
+      process.env.NODE_OPTIONS,
+      `--import=${new URL('./fixtures/compiler-input-trace.mjs', import.meta.url).href}`,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  };
   // HOME isolates os.homedir(); this does not add a Paneon storage override.
   delete env.PANEON_HOME;
   const command = async (...args) => {
