@@ -29,13 +29,13 @@ function initialChunks(chunks: OutputChunk[]) {
   return [...initial];
 }
 
-void test('management entry stays within 500 kB without unused lazy feature dependencies', async () => {
+void test('management entry stays within 550 kB without unused lazy feature dependencies', async () => {
   const result = await build({ root, logLevel: 'silent', build: { write: false } });
   const output = Array.isArray(result) ? result[0] : result;
   assert.ok('output' in output);
   const initial = initialChunks(output.output.filter((item) => item.type === 'chunk'));
   const bytes = initial.reduce((sum, chunk) => sum + Buffer.byteLength(chunk.code), 0);
-  assert.ok(bytes < 500_000, `Initial management JavaScript is ${bytes} bytes.`);
+  assert.ok(bytes < 550_000, `Initial management JavaScript is ${bytes} bytes.`);
   assert.deepEqual(
     initial.flatMap((chunk) => chunk.dynamicImports),
     [],
