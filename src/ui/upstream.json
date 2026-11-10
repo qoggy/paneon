@@ -4,6 +4,40 @@
   "baseColor": "neutral",
   "items": [
     {
+      "name": "sidebar",
+      "retrievedAt": "2026-11-10",
+      "url": "https://ui.shadcn.com/r/styles/base-nova/sidebar.json",
+      "sha256": "02b1ea430fb246da062048f0161a01d1b34a2c787f6974958c9b20a3142120a6",
+      "dependencies": ["cn", "@base-ui/react", "class-variance-authority", "lucide-react"],
+      "registryDependencies": [
+        "button",
+        "input",
+        "separator",
+        "sheet",
+        "skeleton",
+        "tooltip",
+        "use-mobile"
+      ],
+      "adaptations": [
+        "Use local UI components and cn; resolve the upstream icon placeholder to lucide-react PanelLeftIcon.",
+        "Translate built-in sidebar labels through the existing useUI preference.",
+        "Forward mobile HTML props to SheetContent rather than the Base UI Sheet root.",
+        "Keep the upstream 767px viewport boundary with useSyncExternalStore for React-compatible subscriptions."
+      ],
+      "supportingSources": [
+        {
+          "name": "skeleton",
+          "url": "https://ui.shadcn.com/r/styles/base-nova/skeleton.json",
+          "sha256": "85692a09912f518ffd64c540dfcf098fe748a807baf288c107cf8126496cf886"
+        },
+        {
+          "name": "use-mobile",
+          "url": "https://ui.shadcn.com/r/styles/base-nova/use-mobile.json",
+          "sha256": "f4bfd840445a84352265d7cf66fcd886454b6a2f3834f7caf29d00f68620f87d"
+        }
+      ]
+    },
+    {
       "name": "slider",
       "retrievedAt": "2026-11-07",
       "url": "https://ui.shadcn.com/r/styles/base-nova/slider.json",

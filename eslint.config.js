@@ -60,6 +60,7 @@ export default defineConfig([
             'badgeVariants',
             'tabsListVariants',
             'navigationMenuTriggerStyle',
+            'useSidebar',
           ],
         },
       ],

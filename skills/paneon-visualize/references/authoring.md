@@ -57,6 +57,26 @@ paneon panel run ./review-panel.tsx --cwd "$PWD" --params '{"topic":"Review this
 - `@qoggy/paneon/sdk`, `@qoggy/paneon/ui` and React resolve from Paneon's installation; the source directory needs no npm setup. Other third-party imports must already be resolvable; Paneon never installs them.
 - `requires.paneon` is a literal npm semver range that includes the installed CLI, such as `>=0.5.0 <0.6.0`. On `PANEON_VERSION_UNSUPPORTED`, migrate the source or install a compatible Paneon.
 
+## Page layout
+
+`Page` provides a centered, width-limited frame with padding. Keep that layout for reading pages.
+
+For a workspace that fills the viewport, remove the width limit and padding, and let its main content use the available width:
+
+```tsx
+<Page className="h-dvh max-w-none p-0 md:p-0">{/* Workspace content */}</Page>
+```
+
+When using `max-w-none`, allocate the full available width: keep sidebars at their intended width and let the main pane take the rest, using `flex-1`, a `minmax(0, 1fr)` grid column, or resizable panel proportions that total 100%. Avoid a narrower `max-w-*` on the main pane that leaves unused space on the right.
+
+## Sidebar navigation
+
+Use [Sidebar](components/sidebar.md) for a grouped directory beside a reading pane or application content. Its reference covers imports, props and a complete directory example.
+
+For a directory inside `Page`, use `SidebarProvider` with `className="min-h-0 items-start gap-8"`, `Sidebar collapsible="none"`, and a main pane with `className="min-w-0 flex-1"`. This keeps the directory in the page layout and lets the main pane fill the remaining width.
+
+Set `isActive` on the current item. Use `render={<a href="..." />}` for links and `aria-current="page"` for the current page; use button actions for page-local content switching. Sidebar supplies the directory's layout and active styling; links or page state determine which content is shown.
+
 ## Deliver events
 
 Call `await agent.emit(type, payload)` to submit JSON feedback; event types need no declaration. Paneon preserves the payload's fields and resolves to `{ id }`, the stored event's numeric ID, only after durable storage; show success only then. A type allows 128 characters and a serialized payload 65536 UTF-16 characters; a complete request over 262144 UTF-8 bytes fails with `BODY_TOO_LARGE`. Never truncate or split a result silently.

@@ -200,5 +200,8 @@ const zh: Record<keyof typeof en, string> = {
   '文本内容相同；可展开查看上下文。': '文本内容相同；可展开查看上下文。',
   无差异: '无差异',
   调整差异两侧宽度: '调整差异两侧宽度',
+  Sidebar: '侧边栏',
+  'Toggle Sidebar': '切换侧边栏',
+  'Displays the mobile sidebar.': '显示侧边栏。',
 };
 export default zh;

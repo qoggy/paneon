@@ -17,6 +17,7 @@ export * from './table';
 export * from './pagination';
 export * from './tabs';
 export * from './navigation-menu';
+export * from './sidebar';
 export * from './breadcrumb';
 export * from './dialog';
 export * from './sheet';

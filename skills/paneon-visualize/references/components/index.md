@@ -34,21 +34,22 @@ Each file covers one module of `@qoggy/paneon/ui`: when to use it, its import st
 
 ## Navigation and overlays
 
-| Component                            | Use when                                                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| [Tabs](tabs.md)                      | Switch between several views of related content in the same place, showing one view at a time.    |
-| [Pagination](pagination.md)          | Show page links with previous and next controls for content split into pages.                     |
-| [NavigationMenu](navigation-menu.md) | Show a horizontal set of site-style navigation links, where some items open a panel of sub-links. |
-| [Breadcrumb](breadcrumb.md)          | Show the path from a root to the current location, such as folders or nested sections.            |
-| [Accordion](accordion.md)            | Stack several titled sections that each expand and collapse in place.                             |
-| [Collapsible](collapsible.md)        | Show or hide one block of secondary content behind a toggle.                                      |
-| [Dialog](dialog.md)                  | Open a modal window over the page for a focused task or details that need the human's attention.  |
-| [AlertDialog](alert-dialog.md)       | Ask the human to confirm or cancel an action before it happens.                                   |
-| [Sheet](sheet.md)                    | Slide a panel in from a screen edge to show details or a form while keeping the page in context.  |
-| [Popover](popover.md)                | Show a small floating panel anchored to a trigger, for extra details or a short form.             |
-| [Tooltip](tooltip.md)                | Show a short text hint when the human hovers or focuses an element, such as an icon button.       |
-| [DropdownMenu](dropdown-menu.md)     | Open a list of actions or options from a button.                                                  |
-| [ContextMenu](context-menu.md)       | Open a menu of actions when the human right-clicks or long-presses an area.                       |
+| Component                            | Use when                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| [Sidebar](sidebar.md)                | Build a grouped sidebar directory or application navigation with an active item and optional collapsing. |
+| [Tabs](tabs.md)                      | Switch between several views of related content in the same place, showing one view at a time.           |
+| [Pagination](pagination.md)          | Show page links with previous and next controls for content split into pages.                            |
+| [NavigationMenu](navigation-menu.md) | Show a horizontal set of site-style navigation links, where some items open a panel of sub-links.        |
+| [Breadcrumb](breadcrumb.md)          | Show the path from a root to the current location, such as folders or nested sections.                   |
+| [Accordion](accordion.md)            | Stack several titled sections that each expand and collapse in place.                                    |
+| [Collapsible](collapsible.md)        | Show or hide one block of secondary content behind a toggle.                                             |
+| [Dialog](dialog.md)                  | Open a modal window over the page for a focused task or details that need the human's attention.         |
+| [AlertDialog](alert-dialog.md)       | Ask the human to confirm or cancel an action before it happens.                                          |
+| [Sheet](sheet.md)                    | Slide a panel in from a screen edge to show details or a form while keeping the page in context.         |
+| [Popover](popover.md)                | Show a small floating panel anchored to a trigger, for extra details or a short form.                    |
+| [Tooltip](tooltip.md)                | Show a short text hint when the human hovers or focuses an element, such as an icon button.              |
+| [DropdownMenu](dropdown-menu.md)     | Open a list of actions or options from a button.                                                         |
+| [ContextMenu](context-menu.md)       | Open a menu of actions when the human right-clicks or long-presses an area.                              |
 
 ## Rich content
 

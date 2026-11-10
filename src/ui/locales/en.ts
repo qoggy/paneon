@@ -205,5 +205,8 @@ const en = {
   '文本内容相同；可展开查看上下文。': 'The text is identical; expand to view context.',
   无差异: 'No differences',
   调整差异两侧宽度: 'Resize diff columns',
+  Sidebar: 'Sidebar',
+  'Toggle Sidebar': 'Toggle sidebar',
+  'Displays the mobile sidebar.': 'Displays the mobile sidebar.',
 } as const;
 export default en;
