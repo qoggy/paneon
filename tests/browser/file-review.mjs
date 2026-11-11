@@ -76,6 +76,57 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const url = (panel) => `http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`;
+  // Resolve mixed path spellings before grouping, including a file outside the panel cwd.
+  const mixedFiles = [
+    join(root, 'docs/plan.MARKDOWN'),
+    './notes.md',
+    '../docs/plan.MARKDOWN',
+    join(root, 'config.json'),
+  ];
+  const mixed = await service.runtime.run(
+    join(skill, 'assets/panels/file-review/panel.tsx'),
+    join(root, 'docs'),
+    { files: mixedFiles },
+    false,
+  );
+  let releasePaths;
+  const pathsGate = new Promise((resolve) => {
+    releasePaths = resolve;
+  });
+  const mixedActions = `**/api/panels/${mixed.instanceId}/actions/**`;
+  await page.route(mixedActions, async (route) => {
+    if (decodeURIComponent(route.request().url()).endsWith('/actions.ts#resolvePaths'))
+      await pathsGate;
+    await route.continue();
+  });
+  await page.goto(url(mixed));
+  const mixedFrame = page.frameLocator('iframe');
+  await mixedFrame.locator('strong [data-source-leaf]').waitFor();
+  const pendingDirectories = await mixedFrame.locator('[data-tree-item^="directory:"]').count();
+  releasePaths();
+  assert.equal(pendingDirectories, 0, 'Pending resolution must not show literal path roots');
+  const mixedDirectory = mixedFrame.locator(`[data-tree-item="directory:${root}/docs"]`);
+  await mixedFrame.locator('[data-tree-item="file:1"]').waitFor();
+  assert.equal(await mixedFrame.locator('[data-tree-item^="directory:"]').count(), 2);
+  assert.equal(await mixedDirectory.getAttribute('aria-expanded'), 'true');
+  assert.equal(await mixedDirectory.getAttribute('title'), 'docs · 3');
+  assert.equal(
+    await mixedFrame.locator(`[data-tree-item="directory:${root}"]`).getAttribute('title'),
+    `${root} · 4`,
+  );
+  const mixedChildren = await mixedDirectory.getAttribute('aria-controls');
+  assert.ok(mixedChildren);
+  assert.deepEqual(
+    await mixedFrame
+      .locator(`[id="${mixedChildren}"] [data-tree-item^="file:"]`)
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute('data-tree-item'))),
+    ['file:1', 'file:0', 'file:2'],
+    'Equivalent paths share a directory while duplicate entries retain their indices',
+  );
+  await mixedFrame.locator('[data-tree-item="file:1"]').click();
+  await mixedFrame.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
+  assert.equal(await mixedFrame.locator('[data-file-review-path]').textContent(), './notes.md');
+  await page.unroute(mixedActions);
   await page.goto(url(panel));
   const frame = page.frameLocator('iframe');
   const comments = annotationTools(frame, page);
@@ -136,7 +187,7 @@ try {
   };
   page.on('request', observe);
   const group = frame.getByRole('button', { name: '按目录分组', exact: true });
-  const directory = frame.locator('[data-tree-item="directory:docs"]');
+  const directory = frame.locator(`[data-tree-item="directory:${root}/docs"]`);
   const expand = frame.getByRole('button', { name: '全部展开', exact: true });
   const collapse = frame.getByRole('button', { name: '全部折叠', exact: true });
   assert.equal(

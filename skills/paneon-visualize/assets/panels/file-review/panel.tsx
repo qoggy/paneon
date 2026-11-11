@@ -185,14 +185,14 @@ function FileReviewPanel() {
           source: 'Source',
           locatedSource: 'Switched to source to locate the annotation.',
         };
-  const directoryRoots = useMemo(() => fileTree(value.files), [value.files]);
+  const paths = useQuery(resolvePaths, value.files);
+  const directoryRoots = useMemo(() => fileTree(paths.data ?? []), [paths.data]);
   const [grouped, setGrouped] = useState(true);
   const roots = useMemo(
     () => (grouped ? directoryRoots : fileTree(value.files, false)),
     [grouped, directoryRoots, value.files],
   );
-  const paths = useQuery(resolvePaths, value.files);
-  const [expanded, setExpanded] = useState<readonly string[]>(() => directoryKeys(directoryRoots));
+  const [expanded, setExpanded] = useState<readonly string[]>();
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState(0);
   const [markdownViews, setMarkdownViews] = useState<Record<number, MarkdownView>>({});
@@ -280,7 +280,10 @@ function FileReviewPanel() {
         if (!snapshot) throw new Error('Missing original file snapshot. Draft retained.');
         setSearch('');
         setExpanded((previous) => [
-          ...new Set([...previous, ...(ancestorKeys(directoryRoots, snapshot.fileIndex) ?? [])]),
+          ...new Set([
+            ...(previous ?? directoryKeys(directoryRoots)),
+            ...(ancestorKeys(directoryRoots, snapshot.fileIndex) ?? []),
+          ]),
         ]);
         const reveal = async (nextView: MarkdownView) => {
           const viewKey = `${key}:${nextView}`;
@@ -461,7 +464,7 @@ function FileReviewPanel() {
           onSelectionChange={(key) => {
             if (key) setOpened(Number(key.slice(5)));
           }}
-          expandedIds={expanded}
+          expandedIds={expanded ?? directoryKeys(directoryRoots)}
           onExpandedChange={setExpanded}
           onAction={(node) => {
             if (node.fileIndex !== undefined) setOpened(node.fileIndex);
