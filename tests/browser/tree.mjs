@@ -311,7 +311,7 @@ try {
     ),
   );
   await page.screenshot({
-    path: '/private/tmp/paneon-neutral-tree-evidence/tree-diff-example.png',
+    path: join(tmpdir(), 'paneon-neutral-tree-evidence', 'tree-diff-example.png'),
   });
   assert.deepEqual(errors, []);
   console.log(
@@ -333,7 +333,9 @@ try {
 } catch (error) {
   console.error('Tree contract failed:', error);
   if (page) {
-    await page.screenshot({ path: '/private/tmp/paneon-neutral-tree-evidence/tree-failure.png' });
+    await page.screenshot({
+      path: join(tmpdir(), 'paneon-neutral-tree-evidence', 'tree-failure.png'),
+    });
     console.error(
       await page
         .frameLocator('iframe')

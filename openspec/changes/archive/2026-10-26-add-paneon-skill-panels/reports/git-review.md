@@ -2,7 +2,7 @@
 
 ## 状态
 
-基于 `c7d667e`，在 `/Users/yuguo/.codex/worktrees/skill-git-review/paneon` 实现 2.3/2.9 中的 Git 页与 PR 后续可复用的 diff 适配。仅修改分配资源与专属测试/报告，没有修改 SDK/UI/runtime、总入口、package/tsconfig 或中央 design/tasks。等待主 agent 验收；未合入、推送、发布或清理 worktree。
+基于 `c7d667e`，在 `~/.codex/worktrees/skill-git-review/paneon` 实现 2.3/2.9 中的 Git 页与 PR 后续可复用的 diff 适配。仅修改分配资源与专属测试/报告，没有修改 SDK/UI/runtime、总入口、package/tsconfig 或中央 design/tasks。等待主 agent 验收；未合入、推送、发布或清理 worktree。
 
 ## 实现
 
@@ -25,7 +25,7 @@
 - 专属 TypeScript 定向 ESLint：0 errors、0 warnings。源码、专属测试和指南的 Prettier 检查通过；Git diff whitespace 检查通过。
 - `node tests/browser/git-review.mjs`：宿主真实 Chrome，通过仓库外完整 skill 复制运行。覆盖物理鼠标拖选与普通复制、重复中文词精确偏移、文件/hunk/连续行/词句目标，左右/统一/上下文，同路径 staged+unstaged，手动刷新且旧批注回看，跨仓库/跨视图的 4 个来源，明确提交、更正、失败保留、明确清空，以及真实 CLI events/ack；history/root/compare 初始定位和缺失文件错误。
 - `node tests/browser/git-review-pack.mjs`：真实 npm pack 并安装到临时独立目录；验证完整配套资源，运行安装包的 runtime/CLI 和复制后的 skill，不依赖源码符号链接。复用同一 Chrome 场景，额外验证旧整行目标实际精确高亮、65536 字符与 262144 字节超限均保留四条草稿且不发事件。最终独立验收包 SHA-256：`79edff7c354f4fcd057730d8365d60a499e206d3ecd26119aa2bca8c948f275d`。
-- 已实际查看源码 Chrome 截图 `/private/tmp/paneon-git-evidence/git-review.png`，左右代码、行号、增删色、路径和默认组件显示正确。该临时证据未加入产品资源。
+- 已实际查看源码 Chrome 截图 `/tmp/paneon-git-evidence/git-review.png`，左右代码、行号、增删色、路径和默认组件显示正确。该临时证据未加入产品资源。
 
 ## 边界
 
@@ -36,16 +36,16 @@
 
 ## 文件清单
 
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/panels/git-review/panel.tsx
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/panels/git-review/schema.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/panels/git-review/git.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/shared/diff.tsx
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/shared/diff-model.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/assets/shared/diff-schema.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/skills/paneon/references/git-review.md
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/tests/git-review-fixture.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/tests/git-review.test.ts
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/tests/browser/git-review-fixture.mjs
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/tests/browser/git-review.mjs
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/tests/browser/git-review-pack.mjs
-- /Users/yuguo/.codex/worktrees/skill-git-review/paneon/openspec/changes/add-paneon-skill-panels/reports/git-review.md
+- skills/paneon/assets/panels/git-review/panel.tsx
+- skills/paneon/assets/panels/git-review/schema.ts
+- skills/paneon/assets/panels/git-review/git.ts
+- skills/paneon/assets/shared/diff.tsx
+- skills/paneon/assets/shared/diff-model.ts
+- skills/paneon/assets/shared/diff-schema.ts
+- skills/paneon/references/git-review.md
+- tests/git-review-fixture.ts
+- tests/git-review.test.ts
+- tests/browser/git-review-fixture.mjs
+- tests/browser/git-review.mjs
+- tests/browser/git-review-pack.mjs
+- openspec/changes/add-paneon-skill-panels/reports/git-review.md

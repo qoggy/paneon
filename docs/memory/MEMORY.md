@@ -17,6 +17,7 @@
 - [Structured error handling](coding-structured-errors.md) — Classify external errors by stable types/codes, never by matching error messages
 - [Reuse foundational capabilities](coding-reuse-foundations.md) — Prefer standard libraries and mature community SDKs over custom general-purpose infrastructure
 - [Root-cause bug fixes](coding-root-cause-fixes.md) — Establish the cause with logs/reproduction before a minimal targeted fix; add diagnostics when evidence is insufficient
+- [Portable paths](coding-portable-paths.md) — Keep personal machine paths out of repository files; use relative references and system path APIs
 - [CLI output and debugging](cli-output-and-debugging.md) — English CLI text; moderate results omit repeated inputs while preserving useful information
 - [Default UI styling](ui-default-styling.md) — Public components use shadcn defaults; layout helpers provide necessary layout and panels may customize their pages
 - [Components in built-in panels](ui-builtin-panel-components.md) — Compose paneon/ui components such as Empty, Spinner and toast; ask the user before developing or adopting a missing component

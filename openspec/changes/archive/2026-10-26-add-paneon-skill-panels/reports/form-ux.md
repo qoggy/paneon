@@ -2,7 +2,7 @@
 
 ## Implementation
 
-Worktree: `/Users/yuguo/.codex/worktrees/form-ux/paneon`.
+Worktree: `~/.codex/worktrees/form-ux/paneon`.
 
 Base: `bb67ef8` plus the prepared choose delivery `d4ed240` (equivalent to original `32bc21d`). The choose dependency is not part of this delivery commit.
 

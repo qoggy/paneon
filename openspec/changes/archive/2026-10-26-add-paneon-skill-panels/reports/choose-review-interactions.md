@@ -1,6 +1,6 @@
 # 选择页详情与汇总交互验收
 
-2026-10-23。在独立 worktree `/Users/yuguo/.codex/worktrees/choose-review-interactions/paneon` 完成；基于 `5070397e42833843530eb5810cb7b2b7f612feec`。实施完成后由主 agent 在当前工作区独立验收并整合；未 push、未更新已安装 skill、未操作用户现有实例。
+2026-10-23。在独立 worktree `~/.codex/worktrees/choose-review-interactions/paneon` 完成；基于 `5070397e42833843530eb5810cb7b2b7f612feec`。实施完成后由主 agent 在当前工作区独立验收并整合；未 push、未更新已安装 skill、未操作用户现有实例。
 
 ## 实现
 
@@ -22,8 +22,8 @@ npm run build
 npm run typecheck
 npm run lint
 node_modules/.bin/prettier --check skills/paneon/assets/panels/choose/panel.tsx skills/paneon/assets/shared/locales/en.ts skills/paneon/assets/shared/locales/zh-CN.ts tests/browser/skill-pages.mjs tests/browser/choose-review-interactions.mjs
-PANEON_TEST_ARTIFACTS=/private/tmp/choose-review-interactions-evidence/skill-pages node tests/browser/skill-pages.mjs
-PANEON_TEST_ARTIFACTS=/private/tmp/choose-review-interactions-evidence/focused node tests/browser/choose-review-interactions.mjs
+PANEON_TEST_ARTIFACTS=/tmp/choose-review-interactions-evidence/skill-pages node tests/browser/skill-pages.mjs
+PANEON_TEST_ARTIFACTS=/tmp/choose-review-interactions-evidence/focused node tests/browser/choose-review-interactions.mjs
 git diff --check
 ```
 
@@ -33,11 +33,11 @@ git diff --check
 - 新 `choose-review-interactions.mjs` 覆盖详情重复关闭/切换、显式关闭/Escape、移动 Dialog、详情不改答案、已答/未答/空白 Other 混合汇总、无效提交不离开汇总/不发事件、第一/中间/最后一行键盘跳题、直接返回、各题草稿和说明保留、四种主题语言组合各两个宽度无横向溢出、一次明确提交的完整 payload。
 - 开发中精确文本断言暴露图标和状态文字共用节点的问题，现为独立文字节点；新增键盘焦点测试曾在产品预定的下一动画帧前断言，现同步下一帧验证，没有增加重试或任意等待。最终两套浏览器测试通过。
 
-日志：`/private/tmp/choose-review-build.log`、`/private/tmp/choose-review-final-typecheck.log`、`/private/tmp/choose-review-lint.log`、`/private/tmp/choose-review-format.log`、`/private/tmp/choose-review-skill-pages.log`、`/private/tmp/choose-review-focused.log`。
+日志：`/tmp/choose-review-build.log`、`/tmp/choose-review-final-typecheck.log`、`/tmp/choose-review-lint.log`、`/tmp/choose-review-format.log`、`/tmp/choose-review-skill-pages.log`、`/tmp/choose-review-focused.log`。
 
 ## 截图证据
 
-截图根目录：`/private/tmp/choose-review-interactions-evidence/`。
+截图根目录：`/tmp/choose-review-interactions-evidence/`。
 
 重点证据：
 
@@ -81,7 +81,7 @@ git diff --check
 
 首次并行验收中的完整回归在 fixture 启动时触发 `Panel metadata evaluation timed out.`，未进入浏览器断言；日志为 `/tmp/paneon-choose-review-root-skill-pages.log`。确认是 compiler 的 15 秒 metadata 求值等待失败；未证实具体负载根因。其他验收结束后，单独执行同一未修改命令通过；未调整超时、增加测试重试或改动 compiler。此记录不将首次失败描述为通过，也不声称解决了 compiler 的偶发超时。
 
-独立截图：`/private/tmp/paneon-choose-review-root/`。主 agent 实际查看了 `focused/summary-dark-zh-CN-390.png`、`focused/return-to-summary-en-390.png` 和 `skill-pages/choose-details-desktop.png`；未完成状态明显，移动布局无溢出，按钮和侧栏状态与设计一致。验收通过。
+独立截图：`/tmp/paneon-choose-review-root/`。主 agent 实际查看了 `focused/summary-dark-zh-CN-390.png`、`focused/return-to-summary-en-390.png` 和 `skill-pages/choose-details-desktop.png`；未完成状态明显，移动布局无溢出，按钮和侧栏状态与设计一致。验收通过。
 
 本任务已在当前分支本地提交，提交信息为 `fix(choose): keep review navigation and validation in context`，未 push。managed-worktree 归档工具返回 `queued`，尚未确认物理移除。除原先列出的 6 个实施文件，主 agent 还同步了以下文件：
 

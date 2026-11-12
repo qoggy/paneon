@@ -2,7 +2,7 @@
 
 ## 范围与状态
 
-实现任务 2.4、2.11，基线 47f1d8d，独立 worktree 为 /Users/yuguo/.codex/worktrees/skill-input/paneon。未修改中央 design/tasks，不将本报告当作主 agent 的集成验收。未推送、未自行合入、未删除 worktree。
+实现任务 2.4、2.11，基线 47f1d8d，独立 worktree 为 ~/.codex/worktrees/skill-input/paneon。未修改中央 design/tasks，不将本报告当作主 agent 的集成验收。未推送、未自行合入、未删除 worktree。
 
 ## 实现
 

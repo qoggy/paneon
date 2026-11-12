@@ -2,7 +2,7 @@
 
 ## 状态
 
-基于 `19b9486`，在 `/Users/yuguo/.codex/worktrees/skill-github-pr/paneon` 完成剩余 GitHub PR 场景示例。仅修改分配的示例、指南、专属测试和本报告；没有修改中央设计/任务、SKILL.md、package/tsconfig、SDK/UI/runtime 或已有 shared 模块。本报告随本地交付提交保存，提交哈希由交付消息提供。未推送、合入、发布或清理 worktree。
+基于 `19b9486`，在 `~/.codex/worktrees/skill-github-pr/paneon` 完成剩余 GitHub PR 场景示例。仅修改分配的示例、指南、专属测试和本报告；没有修改中央设计/任务、SKILL.md、package/tsconfig、SDK/UI/runtime 或已有 shared 模块。本报告随本地交付提交保存，提交哈希由交付消息提供。未推送、合入、发布或清理 worktree。
 
 实现与静态检查已完成；完整交互验收尚未通过。源码和独立 npm 安装的 Chrome 均为 **2 项通过、1 项失败**，失败是已有公共反馈事件处理对程序定位 Selection 的误收集，下面保留精确复现和断言。主 agent 已收到复现，将在核心修复集成后重新验收；本组没有越界修改公共模块，也没有清除定位选区或删除断言掩盖问题。
 
@@ -45,7 +45,7 @@ fixture 证明可重复的版本变化、特殊文件、覆盖上限、失败、
 
 `PANEON_LIVE_PR=14727 node tests/github-pr-live.mjs` 对 [fork PR #14727](https://github.com/cli/cli/pull/14727) 也通过：head owner 为 umairnaeem0309，base/merge base `fa92838bef95fe4a29c1587693885d5e9bdb6cf1`，head `1156f977ff6d12d592bc152987b9d9b378f6718d`；2/2 文件、14 条检查，同名检查有不同 node ID。首文件 pkg/cmd/issue/create/create.go 原文 17809→18360 字符，1 个 hunk；两侧 SHA-256 分别为 `aeb951405e9d7fae96d4ac12d409a726eb470b7d670ee75a34da942c98f2dedf` 和 `d30fc5704def361c74fb5d1ce44268da46b3e4c1d4a604c964e8da3b12e12908`。这验证了实际 fork 对象在目标仓库固定对象 API 中可读，没有用猜测降级代替。
 
-`node tests/browser/github-pr-live.mjs` 及独立包中的同一测试均通过真实 Chrome：仓库外完整 skill、真实 PR 详情、固定对象 diff、11 条检查，浏览事件数 0，pageerror 空。已实际查看 `/private/tmp/paneon-pr-live-evidence/github-pr-live.png`，元信息、列表、固定版本与检查展示正确。真实网络验收没有向 GitHub 发写操作，也没有将测试意见发给外部账号。
+`node tests/browser/github-pr-live.mjs` 及独立包中的同一测试均通过真实 Chrome：仓库外完整 skill、真实 PR 详情、固定对象 diff、11 条检查，浏览事件数 0，pageerror 空。已实际查看 `/tmp/paneon-pr-live-evidence/github-pr-live.png`，元信息、列表、固定版本与检查展示正确。真实网络验收没有向 GitHub 发写操作，也没有将测试意见发给外部账号。
 
 覆盖依据为官方 [compare API](https://docs.github.com/en/rest/commits/commits#compare-two-commits)、[tree API](https://docs.github.com/en/rest/git/trees#get-a-tree)、[blob API](https://docs.github.com/en/rest/git/blobs#get-a-blob)。compare 的首分页最多 300 文件与单提交接口的分页行为不能混为一谈。
 
@@ -73,16 +73,16 @@ fixture 证明可重复的版本变化、特殊文件、覆盖上限、失败、
 
 ## 文件清单
 
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/skills/paneon/assets/examples/github-pr/panel.tsx
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/skills/paneon/assets/examples/github-pr/schema.ts
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/skills/paneon/assets/examples/github-pr/github.ts
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/skills/paneon/assets/examples/github-pr/model.ts
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/skills/paneon/references/github-pr.md
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/github-pr-fixture.ts
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/github-pr.test.ts
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/github-pr-live.mjs
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/browser/github-pr-fixture.mjs
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/browser/github-pr.mjs
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/browser/github-pr-live.mjs
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/tests/browser/github-pr-pack.mjs
-- /Users/yuguo/.codex/worktrees/skill-github-pr/paneon/openspec/changes/add-paneon-skill-panels/reports/github-pr.md
+- skills/paneon/assets/examples/github-pr/panel.tsx
+- skills/paneon/assets/examples/github-pr/schema.ts
+- skills/paneon/assets/examples/github-pr/github.ts
+- skills/paneon/assets/examples/github-pr/model.ts
+- skills/paneon/references/github-pr.md
+- tests/github-pr-fixture.ts
+- tests/github-pr.test.ts
+- tests/github-pr-live.mjs
+- tests/browser/github-pr-fixture.mjs
+- tests/browser/github-pr.mjs
+- tests/browser/github-pr-live.mjs
+- tests/browser/github-pr-pack.mjs
+- openspec/changes/add-paneon-skill-panels/reports/github-pr.md

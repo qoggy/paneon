@@ -68,20 +68,20 @@ PR 场景依赖本批共享 Markdown/diff，待这些模块验收后单独接入
 
 ## Files maintained before dispatch
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/.openspec.yaml
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/review.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/guided-choice-panel/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/panel-file-input/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/panel-feedback/spec.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/MEMORY.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-reusable-examples.md
+- openspec/changes/add-paneon-skill-panels/.openspec.yaml
+- openspec/changes/add-paneon-skill-panels/proposal.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/review.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
+- openspec/changes/add-paneon-skill-panels/specs/guided-choice-panel/spec.md
+- openspec/changes/add-paneon-skill-panels/specs/panel-file-input/spec.md
+- openspec/changes/add-paneon-skill-panels/specs/panel-feedback/spec.md
+- docs/memory/MEMORY.md
+- docs/memory/agent-skill-assets.md
+- docs/memory/ui-selection-feedback.md
+- docs/memory/ui-reusable-examples.md
 
 ## B36 guidance consolidation
 
@@ -89,14 +89,14 @@ PR 场景依赖本批共享 Markdown/diff，待这些模块验收后单独接入
 
 本轮主 agent 改动文件：
 
-- /Users/yuguo/IdeaProjects/paneon/README.md
-- /Users/yuguo/IdeaProjects/paneon/package.json
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/MEMORY.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
+- README.md
+- package.json
+- docs/memory/MEMORY.md
+- docs/memory/agent-skill-assets.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
 
 ## Installation entry discussion
 
@@ -104,9 +104,9 @@ B37 已确认安装体验只有一个入口，不让用户自行分别寻找/安
 
 本轮对焦修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- docs/memory/agent-skill-assets.md
 
 ## Skill installation research
 
@@ -130,20 +130,20 @@ B37 已确认安装体验只有一个入口，不让用户自行分别寻找/安
 
 ### 本轮准备及此前已确认方案的文件清单
 
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/init-implementation.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/research/skill-installation.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/README.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/tsconfig.json
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-update/README.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-update/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/prototypes/skill-update/tsconfig.json
+- docs/memory/agent-skill-assets.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/proposal.md
+- openspec/changes/add-paneon-skill-panels/init-implementation.md
+- openspec/changes/add-paneon-skill-panels/research/skill-installation.md
+- openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/README.md
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/panel.tsx
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-installation/tsconfig.json
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-update/README.md
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-update/panel.tsx
+- openspec/changes/add-paneon-skill-panels/prototypes/skill-update/tsconfig.json
 
 ## Choice UX correction dispatch
 
@@ -151,11 +151,11 @@ B37 已确认安装体验只有一个入口，不让用户自行分别寻找/安
 
 本轮文档改动文件：
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/guided-choice-panel/spec.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/choose-ux.md
+- openspec/changes/add-paneon-skill-panels/specs/guided-choice-panel/spec.md
 
 B43 补充纠正：多选支持已有选项与自填同时选中，自填是同级答案，不是整题补充。选择结果统一 selections 项级 kind，取消整题 options/custom 判别；单选仍总共恰好一项。主 agent 已同步进行中的 choose-ux 组，此修正不改变其文件边界。
 
@@ -167,25 +167,25 @@ B44 根据六张用户截图明确；公共交互与各页接入分两组，以 
 
 本轮修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/MEMORY.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/annotation-interaction.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/panel-feedback/spec.md
+- docs/memory/MEMORY.md
+- docs/memory/ui-selection-feedback.md
+- openspec/changes/add-paneon-skill-panels/annotation-interaction.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/proposal.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/specs/panel-feedback/spec.md
 
 ## Git layout follow-up — B45
 
-用户直接要求参考 JetBrains Git Log 改进 Git 页面。主 agent 已核对历史行自然文本流、层层 Page 间距和 split diff min-w-max 溢出，与截图对应；方案见 [git-review-layout.md](git-review-layout.md)。此新增任务交给原 comment-pages 组，在 /Users/yuguo/.codex/worktrees/comment-pages/paneon 一并实现并验证，不新派另组修改相同文件。公共组的布局锚点/滚动更新契约继续适用。仅记录并派工，尚未完成验收。
+用户直接要求参考 JetBrains Git Log 改进 Git 页面。主 agent 已核对历史行自然文本流、层层 Page 间距和 split diff min-w-max 溢出，与截图对应；方案见 [git-review-layout.md](git-review-layout.md)。此新增任务交给原 comment-pages 组，在 ~/.codex/worktrees/comment-pages/paneon 一并实现并验证，不新派另组修改相同文件。公共组的布局锚点/滚动更新契约继续适用。仅记录并派工，尚未完成验收。
 
 本次新增/修改：
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/git-review-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/git-review-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
 
 ## Form layout dispatch — B46
 
@@ -193,10 +193,10 @@ B44 根据六张用户截图明确；公共交互与各页接入分两组，以 
 
 本轮文档文件：
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/form-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/form-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/development.md
 
 ## Main acceptance progress
 

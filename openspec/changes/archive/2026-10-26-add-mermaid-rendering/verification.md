@@ -40,24 +40,24 @@ npm pack 使用已经完成的真实构建产物，禁用重复 prepack；tarbal
 
 ## Changed files
 
-- /Users/yuguo/IdeaProjects/paneon/package.json
-- /Users/yuguo/IdeaProjects/paneon/package-lock.json
-- /Users/yuguo/IdeaProjects/paneon/src/ui/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/markdown.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/mermaid.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/runtime/server.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/mermaid.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/mermaid-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/mermaid-fixture.txt
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/mermaid.mjs
-- /Users/yuguo/IdeaProjects/paneon/examples/mermaid-panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/examples/components-panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/examples/README.md
-- /Users/yuguo/IdeaProjects/paneon/docs/agent-guide.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-markdown-rendering.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-mermaid-rendering/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-mermaid-rendering/verification.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-mermaid-rendering/evidence/mermaid-installed.png
+- package.json
+- package-lock.json
+- src/ui/index.ts
+- src/ui/markdown.tsx
+- src/ui/mermaid.tsx
+- src/runtime/server.ts
+- tests/mermaid.test.ts
+- tests/browser/mermaid-fixture.mjs
+- tests/browser/mermaid-fixture.txt
+- tests/browser/mermaid.mjs
+- examples/mermaid-panel.tsx
+- examples/components-panel.tsx
+- examples/README.md
+- docs/agent-guide.md
+- docs/memory/ui-markdown-rendering.md
+- openspec/changes/add-mermaid-rendering/tasks.md
+- openspec/changes/add-mermaid-rendering/verification.md
+- openspec/changes/add-mermaid-rendering/evidence/mermaid-installed.png
 
 ## Delivery
 

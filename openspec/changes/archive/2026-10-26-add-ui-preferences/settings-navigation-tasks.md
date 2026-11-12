@@ -6,7 +6,7 @@
 
 ## 范围和依据
 
-以 settings-navigation-design.md 为设计依据；体验源为 `/private/tmp/paneon-navigation-review/panel.tsx`，仅参考顶部导航和已精简的文案，不移植评审工具和快照说明。基于 `de40e35e59720f6b90f4bcb24e873a56f47deea2` 创建独立 worktree。
+以 settings-navigation-design.md 为设计依据；体验源为 `/tmp/paneon-navigation-review/panel.tsx`，仅参考顶部导航和已精简的文案，不移植评审工具和快照说明。基于 `de40e35e59720f6b90f4bcb24e873a56f47deea2` 创建独立 worktree。
 
 ## 任务归属
 
@@ -14,7 +14,7 @@
 
 ## 实现与验证记录
 
-实现位于 `/Users/yuguo/.codex/worktrees/management-navigation/paneon`，基线 `de40e35e59720f6b90f4bcb24e873a56f47deea2`。主 agent 已验收合入；仅本地提交，不 push。
+实现位于 `~/.codex/worktrees/management-navigation/paneon`，基线 `de40e35e59720f6b90f4bcb24e873a56f47deea2`。主 agent 已验收合入；仅本地提交，不 push。
 
 - `src/App.tsx`：管理页顶部导航、原生 history 路由、面板列表页码/数据/滚动保留；设置保存状态跨导航保留；具体 PanelHost 继续使用独立路径，没有管理路由行为或外层导航。
 - `src/web/preferences-settings.tsx`：普通内容页，640px 宽度上限、低强调外观分段、语言下拉和真实保存状态。

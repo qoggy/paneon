@@ -58,31 +58,31 @@ The existing runtime was stopped using the user's prior restart authorization to
 
 ## Evidence
 
-Logs: `/tmp/paneon-678-full-test-final.log`, `/tmp/paneon-678-targeted-final.log`, `/tmp/paneon-678-pack.log`, `/tmp/paneon-678-chrome-{source,mermaid,lifecycle,credentials,production,artifacts}.log`, `/tmp/paneon-678-lint-final.log`, `/tmp/paneon-678-format-full.log`, `/tmp/paneon-678-live-{before,after,health}.json`. Installed-package browser artifacts: `/var/folders/01/7961y03s2xbdldhx3v2vfcmr0000gp/T/paneon-evidence-5Ow1Nj`.
+Logs: `/tmp/paneon-678-full-test-final.log`, `/tmp/paneon-678-targeted-final.log`, `/tmp/paneon-678-pack.log`, `/tmp/paneon-678-chrome-{source,mermaid,lifecycle,credentials,production,artifacts}.log`, `/tmp/paneon-678-lint-final.log`, `/tmp/paneon-678-format-full.log`, `/tmp/paneon-678-live-{before,after,health}.json`. Installed-package browser artifacts: `/tmp/paneon-evidence-5Ow1Nj`.
 
 ## Changed files
 
-- `/Users/yuguo/IdeaProjects/paneon/vite.ui.config.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/index.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/source-snapshot.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/build-inputs.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/watch-inputs.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/process.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/compiler/worker.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/shared/types.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/runtime/source-watcher.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/runtime/lifecycle.ts`
-- `/Users/yuguo/IdeaProjects/paneon/tests/ui-tree-shaking.test.ts`
-- `/Users/yuguo/IdeaProjects/paneon/tests/source-watching.test.ts`
-- `/Users/yuguo/IdeaProjects/paneon/tests/browser/source-watching.mjs`
-- `/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-source-updates.md`
-- `/Users/yuguo/IdeaProjects/paneon/docs/memory/tech-resource-residency.md`
-- `/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/cli.md`
-- `/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/.openspec.yaml`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/proposal.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/design.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/specs/lean-panel-bundles/spec.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/specs/precise-source-watching/spec.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/tasks.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/reduce-bundles-and-fix-source-watching/verification.md`
+- `vite.ui.config.ts`
+- `src/compiler/index.ts`
+- `src/compiler/source-snapshot.ts`
+- `src/compiler/build-inputs.ts`
+- `src/compiler/watch-inputs.ts`
+- `src/compiler/process.ts`
+- `src/compiler/worker.ts`
+- `src/shared/types.ts`
+- `src/runtime/source-watcher.ts`
+- `src/runtime/lifecycle.ts`
+- `tests/ui-tree-shaking.test.ts`
+- `tests/source-watching.test.ts`
+- `tests/browser/source-watching.mjs`
+- `docs/memory/tech-source-updates.md`
+- `docs/memory/tech-resource-residency.md`
+- `skills/paneon/references/cli.md`
+- `skills/paneon/references/authoring.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/.openspec.yaml`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/proposal.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/design.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/specs/lean-panel-bundles/spec.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/specs/precise-source-watching/spec.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/tasks.md`
+- `openspec/changes/reduce-bundles-and-fix-source-watching/verification.md`

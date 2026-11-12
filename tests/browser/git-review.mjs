@@ -8,6 +8,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
@@ -109,7 +110,7 @@ try {
   const physicallySelected = await content.evaluate(() => document.getSelection().toString());
   if (physicallySelected !== '缓存') {
     console.error({ drag, iframeBox, physicallySelected });
-    await page.screenshot({ path: '/private/tmp/paneon-git-drag-failure.png', fullPage: true });
+    await page.screenshot({ path: join(tmpdir(), 'paneon-git-drag-failure.png'), fullPage: true });
   }
   assert.equal(physicallySelected, '缓存');
   assert.equal(await comments.count(), 0);

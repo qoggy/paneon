@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createLayoutRepository, startGitReviewFixture } from './git-review-fixture.mjs';
@@ -7,6 +9,8 @@ import { verifyHistoryColumns, verifyHistorySplit } from './git-review-layout.mj
 import { annotationTools, selectDiffLines } from './annotation-tools.mjs';
 
 const f = await startGitReviewFixture();
+const artifacts =
+  process.env.PANEON_TEST_ARTIFACTS ?? join(tmpdir(), 'paneon-history-resizable-evidence');
 let browser, page, panel;
 try {
   const layout = await createLayoutRepository(f.root);
@@ -81,10 +85,8 @@ try {
   assert.equal(annotations.length, 1);
   assert.equal(annotations[0].comment, '保留历史分栏中的批注');
   assert.deepEqual(errors, []);
-  const artifacts =
-    process.env.PANEON_TEST_ARTIFACTS ?? '/private/tmp/paneon-history-resizable-evidence';
   await mkdir(artifacts, { recursive: true });
-  await page.screenshot({ path: `${artifacts}/history.png` });
+  await page.screenshot({ path: join(artifacts, 'history.png') });
   console.log(
     JSON.stringify({
       status: 'passed',
@@ -102,8 +104,7 @@ try {
       'Visible errors',
       await page.frameLocator('iframe').getByRole('alert').allTextContents(),
     );
-  if (page)
-    await page.screenshot({ path: '/private/tmp/paneon-history-resizable-evidence/failure.png' });
+  if (page) await page.screenshot({ path: join(artifacts, 'failure.png') });
   throw error;
 } finally {
   await browser?.close();

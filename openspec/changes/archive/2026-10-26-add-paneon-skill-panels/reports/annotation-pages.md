@@ -2,7 +2,7 @@
 
 ## 交付范围
 
-独占 worktree：`/Users/yuguo/.codex/worktrees/comment-pages/paneon`。基线 `c10da98`；`2f05f1c` 是主树 `ee0e8f5` 的文档副本，主 agent 不需要重复合入。
+独占 worktree：`~/.codex/worktrees/comment-pages/paneon`。基线 `c10da98`；`2f05f1c` 是主树 `ee0e8f5` 的文档副本，主 agent 不需要重复合入。
 
 本组实现提交：`613f153`、`6ee8af0`。公共组件未复制到本组提交；页面依赖 comment-core 的完整运行时代码链：`b33de55` → `6a3fd7c` → `70d1f7d` → `c03e007` → `5671d84` → `4dbc140`。公共组最后的 `bb3cb23` 是其测试、指南和报告，仍由主 agent 单独集成。
 
@@ -17,7 +17,7 @@
 
 ## 验证环境和结果
 
-所有组合验证在 `/private/tmp/paneon-comment-pages-combined`，组合本组源码和上列公共组件真实提交。该目录不是主树；没有假 stub。完整 npm 包通过 `npm pack`，在独立安装目录使用真实安装的 runtime、UI 和拷贝的 skill 源码进行 Chrome 验证。最终包 SHA-256：
+所有组合验证在 `/tmp/paneon-comment-pages-combined`，组合本组源码和上列公共组件真实提交。该目录不是主树；没有假 stub。完整 npm 包通过 `npm pack`，在独立安装目录使用真实安装的 runtime、UI 和拷贝的 skill 源码进行 Chrome 验证。最终包 SHA-256：
 
 `f96eb733ed25d0e6c53bfff3b87b9dda6024a1c4893a77916763f139cb845235`
 
@@ -43,16 +43,16 @@
 
 最终独立包截图（主 agent 可直接打开检查）：
 
-- `/private/tmp/paneon-comment-pages-final-evidence/git-history-desktop.png`
-- `/private/tmp/paneon-comment-pages-final-evidence/git-history-mobile.png`
-- `/private/tmp/paneon-comment-pages-final-evidence/git-review.png`
-- `/private/tmp/paneon-comment-pages-final-evidence/github-pr.png`
-- `/private/tmp/paneon-comment-pages-final-evidence/table-review-annotated.png`
-- `/private/tmp/paneon-comment-pages-final-evidence/table-review.png`
+- `/tmp/paneon-comment-pages-final-evidence/git-history-desktop.png`
+- `/tmp/paneon-comment-pages-final-evidence/git-history-mobile.png`
+- `/tmp/paneon-comment-pages-final-evidence/git-review.png`
+- `/tmp/paneon-comment-pages-final-evidence/github-pr.png`
+- `/tmp/paneon-comment-pages-final-evidence/table-review-annotated.png`
+- `/tmp/paneon-comment-pages-final-evidence/table-review.png`
 
-并发与 Sentinel 截图：`/private/tmp/paneon-comment-pages-evidence/explanations-concurrency.png`、`explanations-sentinel.png`。完整编辑器各阶段的公共截图由 comment-core 报告提供。本组截图仍有基线 host 外壳，未越界修改它。
+并发与 Sentinel 截图：`/tmp/paneon-comment-pages-evidence/explanations-concurrency.png`、`explanations-sentinel.png`。完整编辑器各阶段的公共截图由 comment-core 报告提供。本组截图仍有基线 host 外壳，未越界修改它。
 
-日志：`/private/tmp/paneon-combined-build-final.log`、`paneon-comment-pages-unit-final.log`、`paneon-comment-pages-lint-final.log`、`paneon-comment-pages-format-final.log`、`paneon-table-review-final.log`、`paneon-git-review-pack-final.log`、`paneon-github-pr-pack-final.log`；前述省略目录的文件都位于 `/private/tmp/`。
+日志：`/tmp/paneon-combined-build-final.log`、`paneon-comment-pages-unit-final.log`、`paneon-comment-pages-lint-final.log`、`paneon-comment-pages-format-final.log`、`paneon-table-review-final.log`、`paneon-git-review-pack-final.log`、`paneon-github-pr-pack-final.log`；前述省略目录的文件都位于 `/tmp/`。
 
 ## 文件清单
 

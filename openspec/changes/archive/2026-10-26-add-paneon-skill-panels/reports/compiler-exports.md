@@ -50,6 +50,6 @@ node --test --test-name-pattern='named barrel exports|real panel compilation' te
 
 ## Changed files
 
-- /Users/yuguo/.codex/worktrees/skill-compiler-exports/paneon/src/compiler/action-transform.ts
-- /Users/yuguo/.codex/worktrees/skill-compiler-exports/paneon/tests/compiler-exports.test.ts
-- /Users/yuguo/.codex/worktrees/skill-compiler-exports/paneon/openspec/changes/add-paneon-skill-panels/reports/compiler-exports.md
+- src/compiler/action-transform.ts
+- tests/compiler-exports.test.ts
+- openspec/changes/add-paneon-skill-panels/reports/compiler-exports.md

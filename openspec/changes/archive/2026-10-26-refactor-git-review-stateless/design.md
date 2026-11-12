@@ -26,7 +26,7 @@
 
 ## Context
 
-仓库 `/Users/yuguo/IdeaProjects/paneon`，分支 `0.0.x`，实施基线 `a32404d8d97fef89fa0eb86f3e76bf1c00081aea`。`git.ts:275-303` 的 sessions 保存 snapshots/listings/histories；`readGitFile` 以 listingId/fileId 查 Map；`validateGitFeedback:756` 以 sourceId 查 Map。浏览器 `panel.tsx:131,275` 已存 GitSnapshot。`branches.tsx`、`history.tsx`、`file-tree.tsx` 主要是展示部件；`shared/diff.tsx:35` 已支持字符串但强依赖 sourceId/FeedbackProvider。编译器要求 serverAction 顶层命名导出，封装不能变成在 React render 闭包内动态创建 action。
+仓库 `.`，分支 `0.0.x`，实施基线 `a32404d8d97fef89fa0eb86f3e76bf1c00081aea`。`git.ts:275-303` 的 sessions 保存 snapshots/listings/histories；`readGitFile` 以 listingId/fileId 查 Map；`validateGitFeedback:756` 以 sourceId 查 Map。浏览器 `panel.tsx:131,275` 已存 GitSnapshot。`branches.tsx`、`history.tsx`、`file-tree.tsx` 主要是展示部件；`shared/diff.tsx:35` 已支持字符串但强依赖 sourceId/FeedbackProvider。编译器要求 serverAction 顶层命名导出，封装不能变成在 React render 闭包内动态创建 action。
 
 页面持有所见原文、完整请求校验及后台可丢弃边界见本文件 Browser-owned annotation data 和 Implemented API and ownership；资源约束见 [资源生命周期设计](../add-panel-resource-lifecycle/design.md)。旧资源设计中的两个章节已被重整，不再引用不存在的章节；其 runtime 任务仍不属于本 change。
 

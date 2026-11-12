@@ -79,15 +79,15 @@ During review the earlier image-authoring paragraph in `skills/paneon/references
 Files changed during this audit follow-up:
 
 ```text
-/Users/yuguo/IdeaProjects/paneon/src/sdk/client.ts
-/Users/yuguo/IdeaProjects/paneon/src/ui/markdown.tsx
-/Users/yuguo/IdeaProjects/paneon/src/compiler/component-actions.ts
-/Users/yuguo/IdeaProjects/paneon/src/ui/README.md
-/Users/yuguo/IdeaProjects/paneon/tests/component-actions.test.ts
-/Users/yuguo/IdeaProjects/paneon/tests/markdown-standalone.test.ts
-/Users/yuguo/IdeaProjects/paneon/tests/file-references.test.ts
-/Users/yuguo/IdeaProjects/paneon/tests/markdown-frontmatter.test.ts
-/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md
+src/sdk/client.ts
+src/ui/markdown.tsx
+src/compiler/component-actions.ts
+src/ui/README.md
+tests/component-actions.test.ts
+tests/markdown-standalone.test.ts
+tests/file-references.test.ts
+tests/markdown-frontmatter.test.ts
+openspec/changes/component-server-actions/verification.md
 ```
 
 ## Changed files
@@ -151,28 +151,28 @@ openspec/changes/component-server-actions/verification.md
 
 Files changed in this extraction:
 
-- [src/ui/image.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image.tsx)
-- [src/ui/image-preview.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image-preview.tsx)
-- [src/ui/markdown.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/markdown.tsx)
-- [src/ui/index.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/index.ts)
-- [src/ui/locales/en.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/locales/en.ts)
-- [src/ui/locales/zh-CN.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/locales/zh-CN.ts)
-- [tests/markdown-resources.test.ts](/Users/yuguo/IdeaProjects/paneon/tests/markdown-resources.test.ts)
-- [tests/markdown-standalone.test.ts](/Users/yuguo/IdeaProjects/paneon/tests/markdown-standalone.test.ts)
-- [tests/runtime-integration.test.ts](/Users/yuguo/IdeaProjects/paneon/tests/runtime-integration.test.ts)
-- [tests/browser/markdown-image-fixture.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-image-fixture.mjs)
-- [tests/browser/markdown-images.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs)
-- [tests/browser/local-resources.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/local-resources.mjs)
-- [tests/browser/file-references.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/file-references.mjs)
-- [src/ui/README.md](/Users/yuguo/IdeaProjects/paneon/src/ui/README.md)
-- [skills/paneon/references/authoring.md](/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md)
-- [docs/memory/MEMORY.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/MEMORY.md)
-- [docs/memory/architecture-file-access.md](/Users/yuguo/IdeaProjects/paneon/docs/memory/architecture-file-access.md)
-- [openspec/changes/component-server-actions/proposal.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/proposal.md)
-- [openspec/changes/component-server-actions/design.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/design.md)
-- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md)
-- [openspec/changes/component-server-actions/tasks.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/tasks.md)
-- [openspec/changes/component-server-actions/verification.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md)
+- [src/ui/image.tsx](../../../../src/ui/image.tsx)
+- [src/ui/image-preview.tsx](../../../../src/ui/image-preview.tsx)
+- [src/ui/markdown.tsx](../../../../src/ui/markdown.tsx)
+- [src/ui/index.ts](../../../../src/ui/index.ts)
+- [src/ui/locales/en.ts](../../../../src/ui/locales/en.ts)
+- [src/ui/locales/zh-CN.ts](../../../../src/ui/locales/zh-CN.ts)
+- [tests/markdown-resources.test.ts](../../../../tests/markdown-resources.test.ts)
+- [tests/markdown-standalone.test.ts](../../../../tests/markdown-standalone.test.ts)
+- [tests/runtime-integration.test.ts](../../../../tests/runtime-integration.test.ts)
+- [tests/browser/markdown-image-fixture.mjs](../../../../tests/browser/markdown-image-fixture.mjs)
+- [tests/browser/markdown-images.mjs](../../../../tests/browser/markdown-images.mjs)
+- [tests/browser/local-resources.mjs](../../../../tests/browser/local-resources.mjs)
+- [tests/browser/file-references.mjs](../../../../tests/browser/file-references.mjs)
+- [src/ui/README.md](../../../../src/ui/README.md)
+- [skills/paneon/references/authoring.md](../../../../skills/paneon/references/authoring.md)
+- [docs/memory/MEMORY.md](../../../../docs/memory/MEMORY.md)
+- [docs/memory/architecture-file-access.md](../../../../docs/memory/architecture-file-access.md)
+- [openspec/changes/component-server-actions/proposal.md](proposal.md)
+- [openspec/changes/component-server-actions/design.md](design.md)
+- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](specs/markdown-local-resources/spec.md)
+- [openspec/changes/component-server-actions/tasks.md](tasks.md)
+- [openspec/changes/component-server-actions/verification.md](verification.md)
 
 ## Public Image independent audit follow-up (2026-10-28)
 
@@ -189,9 +189,9 @@ Post-review verification: the complete `tests/browser/markdown-images.mjs` suite
 
 Files changed during this audit follow-up:
 
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/proposal.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md`
-- `/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs`
+- `openspec/changes/component-server-actions/proposal.md`
+- `openspec/changes/component-server-actions/verification.md`
+- `tests/browser/markdown-images.mjs`
 
 ## Image and Mermaid interaction unification (2026-10-28)
 
@@ -216,26 +216,26 @@ Validation:
 
 Files changed for this interaction update:
 
-- [src/shared/browser-actions.ts](/Users/yuguo/IdeaProjects/paneon/src/shared/browser-actions.ts)
-- [src/ui/browser-actions.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/browser-actions.ts)
-- [src/ui/image.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image.tsx)
-- [src/ui/image-preview.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image-preview.tsx)
-- [src/ui/media-toolbar.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/media-toolbar.tsx)
-- [src/ui/mermaid.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/mermaid.tsx)
-- [src/ui/locales/en.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/locales/en.ts)
-- [src/ui/locales/zh-CN.ts](/Users/yuguo/IdeaProjects/paneon/src/ui/locales/zh-CN.ts)
-- [src/ui/README.md](/Users/yuguo/IdeaProjects/paneon/src/ui/README.md)
-- [skills/paneon/references/authoring.md](/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md)
-- [tests/ui-bridge.test.ts](/Users/yuguo/IdeaProjects/paneon/tests/ui-bridge.test.ts)
-- [tests/markdown-resources.test.ts](/Users/yuguo/IdeaProjects/paneon/tests/markdown-resources.test.ts)
-- [tests/browser/markdown-image-fixture.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-image-fixture.mjs)
-- [tests/browser/markdown-images.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs)
-- [tests/browser/local-resources.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/local-resources.mjs)
-- [openspec/changes/component-server-actions/proposal.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/proposal.md)
-- [openspec/changes/component-server-actions/design.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/design.md)
-- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md)
-- [openspec/changes/component-server-actions/tasks.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/tasks.md)
-- [openspec/changes/component-server-actions/verification.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md)
+- [src/shared/browser-actions.ts](../../../../src/shared/browser-actions.ts)
+- [src/ui/browser-actions.ts](../../../../src/ui/browser-actions.ts)
+- [src/ui/image.tsx](../../../../src/ui/image.tsx)
+- [src/ui/image-preview.tsx](../../../../src/ui/image-preview.tsx)
+- [src/ui/media-toolbar.tsx](../../../../src/ui/media-toolbar.tsx)
+- [src/ui/mermaid.tsx](../../../../src/ui/mermaid.tsx)
+- [src/ui/locales/en.ts](../../../../src/ui/locales/en.ts)
+- [src/ui/locales/zh-CN.ts](../../../../src/ui/locales/zh-CN.ts)
+- [src/ui/README.md](../../../../src/ui/README.md)
+- [skills/paneon/references/authoring.md](../../../../skills/paneon/references/authoring.md)
+- [tests/ui-bridge.test.ts](../../../../tests/ui-bridge.test.ts)
+- [tests/markdown-resources.test.ts](../../../../tests/markdown-resources.test.ts)
+- [tests/browser/markdown-image-fixture.mjs](../../../../tests/browser/markdown-image-fixture.mjs)
+- [tests/browser/markdown-images.mjs](../../../../tests/browser/markdown-images.mjs)
+- [tests/browser/local-resources.mjs](../../../../tests/browser/local-resources.mjs)
+- [openspec/changes/component-server-actions/proposal.md](proposal.md)
+- [openspec/changes/component-server-actions/design.md](design.md)
+- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](specs/markdown-local-resources/spec.md)
+- [openspec/changes/component-server-actions/tasks.md](tasks.md)
+- [openspec/changes/component-server-actions/verification.md](verification.md)
 
 ## Experience-page corrections (2026-10-29)
 
@@ -263,20 +263,20 @@ The existing experience panel was reloaded in place without restarting the share
 
 Files changed for these corrections:
 
-- [src/ui/media-toolbar.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/media-toolbar.tsx)
-- [src/ui/mermaid.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/mermaid.tsx)
-- [src/ui/image-viewer.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image-viewer.tsx)
-- [src/ui/image-preview.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image-preview.tsx)
-- [src/ui/image.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image.tsx)
-- [tests/browser/markdown-images.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs)
-- [tests/browser/local-resources.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/local-resources.mjs)
-- [tests/browser/mermaid-viewer.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/mermaid-viewer.mjs)
-- [src/ui/README.md](/Users/yuguo/IdeaProjects/paneon/src/ui/README.md)
-- [skills/paneon/references/authoring.md](/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md)
-- [openspec/changes/component-server-actions/design.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/design.md)
-- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md)
-- [openspec/changes/component-server-actions/tasks.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/tasks.md)
-- [openspec/changes/component-server-actions/verification.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md)
+- [src/ui/media-toolbar.tsx](../../../../src/ui/media-toolbar.tsx)
+- [src/ui/mermaid.tsx](../../../../src/ui/mermaid.tsx)
+- [src/ui/image-viewer.tsx](../../../../src/ui/image-viewer.tsx)
+- [src/ui/image-preview.tsx](../../../../src/ui/image-preview.tsx)
+- [src/ui/image.tsx](../../../../src/ui/image.tsx)
+- [tests/browser/markdown-images.mjs](../../../../tests/browser/markdown-images.mjs)
+- [tests/browser/local-resources.mjs](../../../../tests/browser/local-resources.mjs)
+- [tests/browser/mermaid-viewer.mjs](../../../../tests/browser/mermaid-viewer.mjs)
+- [src/ui/README.md](../../../../src/ui/README.md)
+- [skills/paneon/references/authoring.md](../../../../skills/paneon/references/authoring.md)
+- [openspec/changes/component-server-actions/design.md](design.md)
+- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](specs/markdown-local-resources/spec.md)
+- [openspec/changes/component-server-actions/tasks.md](tasks.md)
+- [openspec/changes/component-server-actions/verification.md](verification.md)
 
 ## Screenshot-aligned right toolbar (2026-10-29)
 
@@ -292,17 +292,17 @@ The user's annotated screenshot clarified that the controls belong vertically ou
 
 Files changed for this correction:
 
-- [src/ui/media-toolbar.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/media-toolbar.tsx)
-- [src/ui/image.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image.tsx)
-- [src/ui/mermaid.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/mermaid.tsx)
-- [tests/browser/markdown-images.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs)
-- [tests/browser/mermaid-viewer.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/mermaid-viewer.mjs)
-- [src/ui/README.md](/Users/yuguo/IdeaProjects/paneon/src/ui/README.md)
-- [skills/paneon/references/authoring.md](/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md)
-- [openspec/changes/component-server-actions/design.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/design.md)
-- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md)
-- [openspec/changes/component-server-actions/tasks.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/tasks.md)
-- [openspec/changes/component-server-actions/verification.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md)
+- [src/ui/media-toolbar.tsx](../../../../src/ui/media-toolbar.tsx)
+- [src/ui/image.tsx](../../../../src/ui/image.tsx)
+- [src/ui/mermaid.tsx](../../../../src/ui/mermaid.tsx)
+- [tests/browser/markdown-images.mjs](../../../../tests/browser/markdown-images.mjs)
+- [tests/browser/mermaid-viewer.mjs](../../../../tests/browser/mermaid-viewer.mjs)
+- [src/ui/README.md](../../../../src/ui/README.md)
+- [skills/paneon/references/authoring.md](../../../../skills/paneon/references/authoring.md)
+- [openspec/changes/component-server-actions/design.md](design.md)
+- [openspec/changes/component-server-actions/specs/markdown-local-resources/spec.md](specs/markdown-local-resources/spec.md)
+- [openspec/changes/component-server-actions/tasks.md](tasks.md)
+- [openspec/changes/component-server-actions/verification.md](verification.md)
 
 ## Right-toolbar independent audit follow-up (2026-10-29)
 
@@ -328,7 +328,7 @@ Post-review validation:
 
 Files changed during this audit follow-up:
 
-- [src/ui/image.tsx](/Users/yuguo/IdeaProjects/paneon/src/ui/image.tsx)
-- [tests/browser/markdown-images.mjs](/Users/yuguo/IdeaProjects/paneon/tests/browser/markdown-images.mjs)
-- [src/ui/README.md](/Users/yuguo/IdeaProjects/paneon/src/ui/README.md)
-- [openspec/changes/component-server-actions/verification.md](/Users/yuguo/IdeaProjects/paneon/openspec/changes/component-server-actions/verification.md)
+- [src/ui/image.tsx](../../../../src/ui/image.tsx)
+- [tests/browser/markdown-images.mjs](../../../../tests/browser/markdown-images.mjs)
+- [src/ui/README.md](../../../../src/ui/README.md)
+- [openspec/changes/component-server-actions/verification.md](verification.md)

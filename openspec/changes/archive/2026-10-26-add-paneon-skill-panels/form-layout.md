@@ -94,12 +94,12 @@ form/panel.tsx 将全部字段统一放在默认 vertical Field 中；src/ui/fie
 
 验证证据（本机临时目录，不作为源码提交）：
 
-- `npm run build`：通过，含 CLI/UI/web 构建与全部 TypeScript 检查；日志 `/private/tmp/paneon-b64-build.log`。
-- `node --test tests/skill-pages.test.ts`：6/6 通过；日志 `/private/tmp/paneon-b64-schema.log`。
+- `npm run build`：通过，含 CLI/UI/web 构建与全部 TypeScript 检查；日志 `/tmp/paneon-b64-build.log`。
+- `node --test tests/skill-pages.test.ts`：6/6 通过；日志 `/tmp/paneon-b64-schema.log`。
 - 限定文件 ESLint / Prettier：通过。
-- 独立 Chrome：`PANEON_TEST_ARTIFACTS=/private/tmp/paneon-b64-evidence node tests/browser/form-responsive.mjs`；日志 `/private/tmp/paneon-b64-responsive.log`，几何 `/private/tmp/paneon-b64-evidence/form-responsive-measurements.json`，截图同目录 `form-{desktop-1440,wide-2560,sidebar-360,mobile-390,mobile-320}{,-actions}.png`。弹层最终截图 `form-mobile-320-select-options.png` 已查看；320px 真实数字边界错误换行为两行（使用原有 min 校验，仅测试参数）。还验证长 select 选项弹层完整可用、required 清除、必填 false/0、输入原文、失败草稿、完整更正及 replacesEventId。
-- 共享 choose/form Chrome 原样通过：日志 `/private/tmp/paneon-b64-regression.log`，截图 `/private/tmp/paneon-b64-regression/`；包含 keyboard、清除只影响对应字段、pending 防重复、失败/更正和 CLI events/ack。
-- 独立 npm 安装包的共享 choose/form Chrome 通过：日志 `/private/tmp/paneon-b64-package.log`，截图 `/private/tmp/paneon-b64-package/`。
+- 独立 Chrome：`PANEON_TEST_ARTIFACTS=/tmp/paneon-b64-evidence node tests/browser/form-responsive.mjs`；日志 `/tmp/paneon-b64-responsive.log`，几何 `/tmp/paneon-b64-evidence/form-responsive-measurements.json`，截图同目录 `form-{desktop-1440,wide-2560,sidebar-360,mobile-390,mobile-320}{,-actions}.png`。弹层最终截图 `form-mobile-320-select-options.png` 已查看；320px 真实数字边界错误换行为两行（使用原有 min 校验，仅测试参数）。还验证长 select 选项弹层完整可用、required 清除、必填 false/0、输入原文、失败草稿、完整更正及 replacesEventId。
+- 共享 choose/form Chrome 原样通过：日志 `/tmp/paneon-b64-regression.log`，截图 `/tmp/paneon-b64-regression/`；包含 keyboard、清除只影响对应字段、pending 防重复、失败/更正和 CLI events/ack。
+- 独立 npm 安装包的共享 choose/form Chrome 通过：日志 `/tmp/paneon-b64-package.log`，截图 `/tmp/paneon-b64-package/`。
 
 当前未提供主题/语言配置，本次验证的是现有主题及混合中英文内容，未把未来主题/语言方案当作已实现功能。本任务不 push、不合入主 checkout、不删除 worktree；交付后在等主 agent 验收。
 

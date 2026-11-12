@@ -94,7 +94,7 @@
 
 验证命令与实际结果：
 
-- `npm run build` 通过，包含 CLI/UI 构建、四个 TypeScript 配置和 web 构建；日志 `/private/tmp/paneon-table-b65/build.log`。只有已有 npm email 配置警告。
+- `npm run build` 通过，包含 CLI/UI 构建、四个 TypeScript 配置和 web 构建；日志 `/tmp/paneon-table-b65/build.log`。只有已有 npm email 配置警告。
 - 对本次 TSX、公共导出和表格浏览器文件运行限定范围 ESLint 与 Prettier，通过；日志同目录的 `lint.log`、`format.log`。
 - `node --test tests/table-review.test.ts tests/feedback-state.test.ts tests/feedback-selection.test.ts tests/feedback.test.ts`：17/17 通过，日志 `unit.log`。
 - 原 `tests/browser/table-review.mjs` 增加筛选/移除/重置、排序重置、普通浏览态 Unicode 圈选、整体意见及空更正检查；真实 Chrome 全流程通过（含 Markdown 批注、失败保留、并发提交冻结、完整更正、CLI events/ack），日志 `table-review.log`。
@@ -102,7 +102,7 @@
 - 原 `tests/browser/feedback.mjs` 通过，涵盖原生/键盘圈选、保存/取消/删除、对象组、目录/定位、窄屏、失败保留、CLI events/ack；日志 `feedback-browser.log`。
 - 原 `tests/browser/github-pr.mjs`：3/3 通过，涵盖跨 PR 批注、源快照、查询/事件失败、更正、300 文件覆盖和 CLI events/ack；日志 `pr-browser.log`。
 
-截图已由实现 agent 读取像素检查，位于 `/private/tmp/paneon-table-b65/`：`table-1440-normal.png`、`table-390-normal.png`、`table-390-description.png`、`table-390-filter-popover.png`、`table-1440-long-content.png`、`table-390-long-content-scrolled.png`、`table-390-many-columns-scrolled.png`、`table-390-empty.png`、`table-390-no-match.png`、`table-review-annotated.png`。布局专项截图关闭过渡动画后采集，设计 HTML 不作为产品验收截图。
+截图已由实现 agent 读取像素检查，位于 `/tmp/paneon-table-b65/`：`table-1440-normal.png`、`table-390-normal.png`、`table-390-description.png`、`table-390-filter-popover.png`、`table-1440-long-content.png`、`table-390-long-content-scrolled.png`、`table-390-many-columns-scrolled.png`、`table-390-empty.png`、`table-390-no-match.png`、`table-review-annotated.png`。布局专项截图关闭过渡动画后采集，设计 HTML 不作为产品验收截图。
 
 ### Existing Git drag failure
 

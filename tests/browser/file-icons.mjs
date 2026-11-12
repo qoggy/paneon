@@ -91,7 +91,10 @@ try {
     const toml = await icon('config.toml').getAttribute('src');
     if (previousToml) assert.notEqual(toml, previousToml, 'Theme variants must update live.');
     previousToml = toml;
-    await page.screenshot({ path: `/private/tmp/paneon-file-icons-${theme}.png`, fullPage: true });
+    await page.screenshot({
+      path: join(tmpdir(), `paneon-file-icons-${theme}.png`),
+      fullPage: true,
+    });
   }
   assert.deepEqual(errors, []);
   console.log(

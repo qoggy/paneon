@@ -4,7 +4,7 @@
 
 - Base: `6ecf59c`.
 - Implementation: `b03c50a` — `feat(init): install bundled skills with centralized records`.
-- Isolated worktree: `/Users/yuguo/.codex/worktrees/init-installer/paneon`.
+- Isolated worktree: `~/.codex/worktrees/init-installer/paneon`.
 - Implements only the backend of task 2.13. Does not implement `paneon update`, npm self-upgrade, a remote skill catalog, runtime startup, or the terminal UI owned by the other unit.
 
 ## Delivered behavior
@@ -58,10 +58,10 @@ Local logs for this run:
 
 ## Changed files
 
-- `/Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/UPSTREAM-LICENSE.md`
-- `/Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/agents.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/index.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/installer.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/types.ts`
-- `/Users/yuguo/IdeaProjects/paneon/tests/skill-install.test.ts`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/init-installer.md`
+- `src/cli/skill-install/UPSTREAM-LICENSE.md`
+- `src/cli/skill-install/agents.ts`
+- `src/cli/skill-install/index.ts`
+- `src/cli/skill-install/installer.ts`
+- `src/cli/skill-install/types.ts`
+- `tests/skill-install.test.ts`
+- `openspec/changes/add-paneon-skill-panels/reports/init-installer.md`

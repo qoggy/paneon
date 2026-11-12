@@ -16,7 +16,7 @@
 
 ## Context
 
-仓库：paneon（/Users/yuguo/IdeaProjects/paneon）。分支：0.0.x。设计基线：ba6e731a78700ecfdc5dfbb58f20483ba6927c7f。
+仓库：paneon（.）。分支：0.0.x。设计基线：ba6e731a78700ecfdc5dfbb58f20483ba6927c7f。
 
 变更前的基线产品有 CLI、SDK、UI 和独立 agent 指南；当前已提供 Paneon skill，并按 B36 将全部 agent 使用指导收拢到 skill，删除独立指南。现有 .agents/skills/ 是开发工具，不作为产品 skill 的资源目录。原基线 examples 主要证明组件或调用能力；当前标准页与场景示例均位于产品 skill。此 change 与 add-mermaid-rendering 分开；使用 Markdown Mermaid 能力时依赖其完成集成和验收，不在此处声称已交付。
 

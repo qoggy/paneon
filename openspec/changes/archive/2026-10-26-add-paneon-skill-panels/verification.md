@@ -51,58 +51,58 @@ editAnnotation(string | null) 的 null 结束编辑但保留条目，避免为�
 
 ## Changed files
 
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/evidence/first-batch-form.png
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/input.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/standard-pages.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
-- /Users/yuguo/IdeaProjects/paneon/package.json
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/SKILL.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/form/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/form/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/submission.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/form.md
-- /Users/yuguo/IdeaProjects/paneon/src/cli/client.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/runtime/lifecycle.ts
-- /Users/yuguo/IdeaProjects/paneon/src/runtime/server.ts
-- /Users/yuguo/IdeaProjects/paneon/src/sdk/client.ts
-- /Users/yuguo/IdeaProjects/paneon/src/sdk/feedback.ts
-- /Users/yuguo/IdeaProjects/paneon/src/sdk/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/sdk/server.ts
-- /Users/yuguo/IdeaProjects/paneon/src/shared/limits.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-context.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-provider.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-selection.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-store.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-types.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/web/api.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback-fixture.txt
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/feedback-state.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/feedback.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/file-input.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/request-limits.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/skill-pages.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tsconfig.app.json
-- /Users/yuguo/IdeaProjects/paneon/tsconfig.examples.json
-- /Users/yuguo/IdeaProjects/paneon/tsconfig.ui.json
+- docs/memory/agent-skill-assets.md
+- docs/memory/ui-selection-feedback.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/evidence/first-batch-form.png
+- openspec/changes/add-paneon-skill-panels/proposal.md
+- openspec/changes/add-paneon-skill-panels/reports/feedback.md
+- openspec/changes/add-paneon-skill-panels/reports/input.md
+- openspec/changes/add-paneon-skill-panels/reports/standard-pages.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
+- package.json
+- skills/paneon/SKILL.md
+- skills/paneon/assets/panels/choose/panel.tsx
+- skills/paneon/assets/panels/choose/schema.ts
+- skills/paneon/assets/panels/form/panel.tsx
+- skills/paneon/assets/panels/form/schema.ts
+- skills/paneon/assets/shared/submission.ts
+- skills/paneon/references/choose.md
+- skills/paneon/references/form.md
+- src/cli/client.ts
+- src/cli/index.ts
+- src/runtime/lifecycle.ts
+- src/runtime/server.ts
+- src/sdk/client.ts
+- src/sdk/feedback.ts
+- src/sdk/index.ts
+- src/sdk/server.ts
+- src/shared/limits.ts
+- src/ui/feedback-context.ts
+- src/ui/feedback-provider.tsx
+- src/ui/feedback-selection.ts
+- src/ui/feedback-store.ts
+- src/ui/feedback-types.ts
+- src/ui/feedback.tsx
+- src/ui/index.ts
+- src/web/api.ts
+- tests/browser/feedback-fixture.mjs
+- tests/browser/feedback-fixture.txt
+- tests/browser/feedback-pack.mjs
+- tests/browser/feedback.mjs
+- tests/browser/skill-pages-fixture.mjs
+- tests/browser/skill-pages-pack.mjs
+- tests/browser/skill-pages.mjs
+- tests/feedback-state.test.ts
+- tests/feedback.test.ts
+- tests/file-input.test.ts
+- tests/request-limits.test.ts
+- tests/skill-pages.test.ts
+- tsconfig.app.json
+- tsconfig.examples.json
+- tsconfig.ui.json
 
 ## Second-batch acceptance
 
@@ -151,60 +151,60 @@ PR 工作台、最终指南与选择性重导出修复按 development.md 派工�
 
 ### 第二批完整文件清单
 
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-markdown-rendering.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/evidence/second-batch-git.png
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/evidence/second-batch-sentinel.png
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/explanations.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/git-review.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/table-review.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/SKILL.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/concurrency/model.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/concurrency/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/sentinel-leap-array/model.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/sentinel-leap-array/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/git.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/review/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/table/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/table/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff-model.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff-schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/markdown-feedback-mapper.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/markdown-feedback-schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/markdown-feedback.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/examples.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/git-review.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/review.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/table.md
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-selection.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/markdown.tsx
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations-concurrency.png
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations-sentinel.png
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/table-review-evidence.png
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/table-review-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/table-review-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/table-review.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/explanations.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/git-review-fixture.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/git-review.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/mermaid.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/table-review-markdown.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/table-review.test.ts
+- docs/memory/agent-skill-assets.md
+- docs/memory/ui-markdown-rendering.md
+- docs/memory/ui-selection-feedback.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/evidence/second-batch-git.png
+- openspec/changes/add-paneon-skill-panels/evidence/second-batch-sentinel.png
+- openspec/changes/add-paneon-skill-panels/reports/explanations.md
+- openspec/changes/add-paneon-skill-panels/reports/git-review.md
+- openspec/changes/add-paneon-skill-panels/reports/table-review.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/SKILL.md
+- skills/paneon/assets/examples/concurrency/model.ts
+- skills/paneon/assets/examples/concurrency/panel.tsx
+- skills/paneon/assets/examples/sentinel-leap-array/model.ts
+- skills/paneon/assets/examples/sentinel-leap-array/panel.tsx
+- skills/paneon/assets/panels/git-review/git.ts
+- skills/paneon/assets/panels/git-review/panel.tsx
+- skills/paneon/assets/panels/git-review/schema.ts
+- skills/paneon/assets/panels/review/panel.tsx
+- skills/paneon/assets/panels/review/schema.ts
+- skills/paneon/assets/panels/table/panel.tsx
+- skills/paneon/assets/panels/table/schema.ts
+- skills/paneon/assets/shared/diff-model.ts
+- skills/paneon/assets/shared/diff-schema.ts
+- skills/paneon/assets/shared/diff.tsx
+- skills/paneon/assets/shared/markdown-feedback-mapper.ts
+- skills/paneon/assets/shared/markdown-feedback-schema.ts
+- skills/paneon/assets/shared/markdown-feedback.tsx
+- skills/paneon/references/examples.md
+- skills/paneon/references/git-review.md
+- skills/paneon/references/review.md
+- skills/paneon/references/table.md
+- src/ui/feedback-selection.ts
+- src/ui/markdown.tsx
+- tests/browser/explanations-concurrency.png
+- tests/browser/explanations-fixture.mjs
+- tests/browser/explanations-pack.mjs
+- tests/browser/explanations-sentinel.png
+- tests/browser/explanations.mjs
+- tests/browser/git-review-fixture.mjs
+- tests/browser/git-review-pack.mjs
+- tests/browser/git-review.mjs
+- tests/browser/table-review-evidence.png
+- tests/browser/table-review-fixture.mjs
+- tests/browser/table-review-pack.mjs
+- tests/browser/table-review.mjs
+- tests/explanations.test.ts
+- tests/git-review-fixture.ts
+- tests/git-review.test.ts
+- tests/mermaid.test.ts
+- tests/table-review-markdown.test.ts
+- tests/table-review.test.ts
 
 ## Third-batch acceptance — opened tasks complete
 
@@ -255,42 +255,42 @@ PR 工作台、最终指南与选择性重导出修复按 development.md 派工�
 
 ### 第三批及本轮文档完整文件清单
 
-- /Users/yuguo/IdeaProjects/paneon/docs/agent-guide.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/examples/README.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/evidence/third-batch-github-pr.png
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/compiler-exports.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/github-pr.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/guides.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/research/skill-installation.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
-- /Users/yuguo/IdeaProjects/paneon/package.json
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/SKILL.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/github-pr/github.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/github-pr/model.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/github-pr/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/github-pr/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/cli.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/feedback.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/github-pr.md
-- /Users/yuguo/IdeaProjects/paneon/src/compiler/action-transform.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-provider.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-selection.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/github-pr-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/github-pr-live.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/github-pr-pack.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/github-pr.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/compiler-exports.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/github-pr-fixture.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/github-pr-live.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/github-pr.test.ts
+- docs/agent-guide.md
+- docs/memory/agent-skill-assets.md
+- docs/memory/ui-selection-feedback.md
+- examples/README.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/evidence/third-batch-github-pr.png
+- openspec/changes/add-paneon-skill-panels/reports/compiler-exports.md
+- openspec/changes/add-paneon-skill-panels/reports/github-pr.md
+- openspec/changes/add-paneon-skill-panels/reports/guides.md
+- openspec/changes/add-paneon-skill-panels/research/skill-installation.md
+- openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
+- package.json
+- skills/paneon/SKILL.md
+- skills/paneon/assets/examples/github-pr/github.ts
+- skills/paneon/assets/examples/github-pr/model.ts
+- skills/paneon/assets/examples/github-pr/panel.tsx
+- skills/paneon/assets/examples/github-pr/schema.ts
+- skills/paneon/references/authoring.md
+- skills/paneon/references/cli.md
+- skills/paneon/references/feedback.md
+- skills/paneon/references/github-pr.md
+- src/compiler/action-transform.ts
+- src/ui/feedback-provider.tsx
+- src/ui/feedback-selection.ts
+- tests/browser/feedback.mjs
+- tests/browser/github-pr-fixture.mjs
+- tests/browser/github-pr-live.mjs
+- tests/browser/github-pr-pack.mjs
+- tests/browser/github-pr.mjs
+- tests/compiler-exports.test.ts
+- tests/github-pr-fixture.ts
+- tests/github-pr-live.mjs
+- tests/github-pr.test.ts
 
 ## Main acceptance in progress — init and UI corrections
 
@@ -350,75 +350,75 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 
 以下为本轮集成及收尾维护文件，排除五个先前已存在的页头改动：
 
-- /Users/yuguo/IdeaProjects/paneon/README.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/agent-skill-assets.md
-- /Users/yuguo/IdeaProjects/paneon/docs/memory/ui-selection-feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/annotation-interaction.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/form-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/git-review-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/init-implementation.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/proposal.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/annotation-core.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/annotation-pages.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/form-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/init-cli.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/init-installer.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
-- /Users/yuguo/IdeaProjects/paneon/package-lock.json
-- /Users/yuguo/IdeaProjects/paneon/package.json
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/SKILL.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/concurrency/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/examples/github-pr/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/schema.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/form/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/table/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/cli.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/examples.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/feedback.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/form.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/git-review.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/github-pr.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/review.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/table.md
-- /Users/yuguo/IdeaProjects/paneon/src/cli/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/init.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/UPSTREAM-LICENSE.md
-- /Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/agents.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/index.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/installer.ts
-- /Users/yuguo/IdeaProjects/paneon/src/cli/skill-install/types.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-geometry.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-provider.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-store.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-surface.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback-types.ts
-- /Users/yuguo/IdeaProjects/paneon/src/ui/feedback.tsx
-- /Users/yuguo/IdeaProjects/paneon/src/ui/index.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/explanations.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback-fixture.txt
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/feedback.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/annotation-tools.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-layout.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/github-pr.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/table-review.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/feedback.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/init-cli.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/init-interactive.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/skill-install.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/skill-pages.test.ts
+- README.md
+- docs/memory/agent-skill-assets.md
+- docs/memory/ui-selection-feedback.md
+- openspec/changes/add-paneon-skill-panels/choose-ux.md
+- openspec/changes/add-paneon-skill-panels/annotation-interaction.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/form-layout.md
+- openspec/changes/add-paneon-skill-panels/git-review-layout.md
+- openspec/changes/add-paneon-skill-panels/init-implementation.md
+- openspec/changes/add-paneon-skill-panels/proposal.md
+- openspec/changes/add-paneon-skill-panels/reports/choose-ux.md
+- openspec/changes/add-paneon-skill-panels/reports/annotation-core.md
+- openspec/changes/add-paneon-skill-panels/reports/annotation-pages.md
+- openspec/changes/add-paneon-skill-panels/reports/form-ux.md
+- openspec/changes/add-paneon-skill-panels/reports/init-cli.md
+- openspec/changes/add-paneon-skill-panels/reports/init-installer.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
+- package-lock.json
+- package.json
+- skills/paneon/SKILL.md
+- skills/paneon/assets/examples/concurrency/panel.tsx
+- skills/paneon/assets/examples/github-pr/panel.tsx
+- skills/paneon/assets/panels/choose/panel.tsx
+- skills/paneon/assets/panels/choose/schema.ts
+- skills/paneon/assets/panels/form/panel.tsx
+- skills/paneon/assets/panels/git-review/panel.tsx
+- skills/paneon/assets/panels/review/panel.tsx
+- skills/paneon/assets/panels/table/panel.tsx
+- skills/paneon/assets/shared/diff.tsx
+- skills/paneon/references/choose.md
+- skills/paneon/references/cli.md
+- skills/paneon/references/examples.md
+- skills/paneon/references/feedback.md
+- skills/paneon/references/form.md
+- skills/paneon/references/git-review.md
+- skills/paneon/references/github-pr.md
+- skills/paneon/references/review.md
+- skills/paneon/references/table.md
+- src/cli/index.ts
+- src/cli/init.ts
+- src/cli/skill-install/UPSTREAM-LICENSE.md
+- src/cli/skill-install/agents.ts
+- src/cli/skill-install/index.ts
+- src/cli/skill-install/installer.ts
+- src/cli/skill-install/types.ts
+- src/ui/feedback-geometry.ts
+- src/ui/feedback-provider.tsx
+- src/ui/feedback-store.ts
+- src/ui/feedback-surface.tsx
+- src/ui/feedback-types.ts
+- src/ui/feedback.tsx
+- src/ui/index.ts
+- tests/browser/explanations.mjs
+- tests/browser/feedback-fixture.txt
+- tests/browser/feedback.mjs
+- tests/browser/annotation-tools.mjs
+- tests/browser/git-review-fixture.mjs
+- tests/browser/git-review-layout.mjs
+- tests/browser/git-review.mjs
+- tests/browser/github-pr.mjs
+- tests/browser/skill-pages.mjs
+- tests/browser/table-review.mjs
+- tests/feedback.test.ts
+- tests/init-cli.test.ts
+- tests/init-interactive.mjs
+- tests/skill-install.test.ts
+- tests/skill-pages.test.ts
 
 ## B47 — Choice questionnaire layout
 
@@ -439,14 +439,14 @@ form-only原交付09a3ff2已审阅后合入主分支为2eaf111。主agent查看�
 
 本轮改动文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-ux.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/choose/panel.tsx
+- skills/paneon/references/choose.md
+- tests/browser/skill-pages.mjs
+- openspec/changes/add-paneon-skill-panels/choose-layout.md
+- openspec/changes/add-paneon-skill-panels/choose-ux.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B48 — Compact answer summary
 
@@ -458,11 +458,11 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 本轮未提交commit或推送；修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/choose/panel.tsx
+- openspec/changes/add-paneon-skill-panels/choose-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B49 — Independent option details
 
@@ -476,13 +476,13 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 本轮修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/choose/panel.tsx
+- skills/paneon/references/choose.md
+- tests/browser/skill-pages.mjs
+- openspec/changes/add-paneon-skill-panels/choose-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B50 — Separate review step
 
@@ -494,13 +494,13 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 本轮修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/choose/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/choose.md
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/skill-pages.mjs
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/choose-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/choose/panel.tsx
+- skills/paneon/references/choose.md
+- tests/browser/skill-pages.mjs
+- openspec/changes/add-paneon-skill-panels/choose-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B51 — Commit navigation without workbench clearing
 
@@ -516,13 +516,13 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 本轮修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/git-review.md
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-layout.mjs
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/git-review-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/git-review/panel.tsx
+- skills/paneon/references/git-review.md
+- tests/browser/git-review-layout.mjs
+- openspec/changes/add-paneon-skill-panels/git-review-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B52 — Compact Git Log, graph and refs
 
@@ -538,20 +538,20 @@ npm run build（含完整typecheck）通过；选择页scoped ESLint、格式与
 
 本轮修改文件：
 
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/graph.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/history.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/git.ts
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/panels/git-review/panel.tsx
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/git-review.md
-- /Users/yuguo/IdeaProjects/paneon/tests/git-graph.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/git-review.test.ts
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-fixture.mjs
-- /Users/yuguo/IdeaProjects/paneon/tests/browser/git-review-layout.mjs
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/git-review-layout.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/verification.md
+- skills/paneon/assets/panels/git-review/graph.ts
+- skills/paneon/assets/panels/git-review/history.tsx
+- skills/paneon/assets/panels/git-review/git.ts
+- skills/paneon/assets/panels/git-review/panel.tsx
+- skills/paneon/references/git-review.md
+- tests/git-graph.test.ts
+- tests/git-review.test.ts
+- tests/browser/git-review-fixture.mjs
+- tests/browser/git-review-layout.mjs
+- openspec/changes/add-paneon-skill-panels/git-review-layout.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md
+- openspec/changes/add-paneon-skill-panels/verification.md
 
 ## B53 — Own single-branch Git history (2026-10-22)
 

@@ -7,8 +7,8 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
 true !== false
 
-    at eventually (file:///Users/yuguo/IdeaProjects/paneon/tests/browser/ui.mjs:78:12)
-    at async file:///Users/yuguo/IdeaProjects/paneon/tests/browser/ui.mjs:167:5 {
+    at eventually (tests/browser/ui.mjs:78:12)
+    at async tests/browser/ui.mjs:167:5 {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
   actual: true,

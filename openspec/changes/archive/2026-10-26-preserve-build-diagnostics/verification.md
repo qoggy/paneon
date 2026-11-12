@@ -5,9 +5,9 @@
 以下为原 worktree 的历史实现及验证记录。原实现完整有界回归 145/145；最后两处边界修正后完整构建、定向 15/15、真实 Chrome/CLI/SQLite、lint/format 全部通过。
 
 - Change: preserve-build-diagnostics
-- Main workspace: /Users/yuguo/IdeaProjects/paneon
+- Main workspace: .
 - Branch/base: 0.0.x / 412c2aa6e10a3724b602c4b6109a39c2b68fcf6c
-- Implementation worktree: /Users/yuguo/.codex/worktrees/build-diagnostics/paneon
+- Implementation worktree: ~/.codex/worktrees/build-diagnostics/paneon
 - Owner: diagnostics-implementation
 
 主工作区此前问卷、Git 和 host 布局未提交改动不属于此次实现。源码只写入上述 worktree；中央文档只更新本 change 的 design、tasks 和 verification。未重启或 reload 用户旧服务 127.0.0.1:56414，也未操作 53844 演示服务。
@@ -51,10 +51,10 @@
 全部源码命令的 shell workdir 均为独立 worktree。
 
 - `npm ci --no-audit --no-fund`：exit 0，安装 574 packages，未复用主工作区 node_modules。
-- `npm run build`：最终 exit 0，CLI、UI、typecheck、web 全部通过。日志 `/private/tmp/paneon-diagnostics-build.log`。
-- `node --test --test-concurrency=2 tests/build-diagnostics.test.ts tests/cli.test.ts`：最终源码 15/15 通过（包含无 dist source help 和真实工具 ANSI 清理），exit 0。日志 `/private/tmp/paneon-diagnostics-focused.log`。
+- `npm run build`：最终 exit 0，CLI、UI、typecheck、web 全部通过。日志 `/tmp/paneon-diagnostics-build.log`。
+- `node --test --test-concurrency=2 tests/build-diagnostics.test.ts tests/cli.test.ts`：最终源码 15/15 通过（包含无 dist source help 和真实工具 ANSI 清理），exit 0。日志 `/tmp/paneon-diagnostics-focused.log`。
 - 定向覆盖真实 TypeScript、非 ASCII 文件、缺失 CSS 依赖、真实 Rolldown/esbuild 位置、模块顶层初始化错误、无位置、循环 cause、超大 UTF-8 文本和分块 stderr、进程 exit/signal、结构化 IPC 优先、CompilerProcess cleanup 和 compiler catch cleanup 注入失败。
-- `node --test --test-concurrency=2 tests/*.test.ts`：完整回归 145/145 通过，exit 0，耗时 203159.932208 ms。日志 `/private/tmp/paneon-diagnostics-regression.log`。该轮包含新增聚合 sibling 回归；之后仅修正源码 helper 加载与终端颜色显示清理，并新增无 dist source help 回归，已重新完整 build/lint/format，相关最终定向 15/15 和最终真实 Chrome 流程再次通过，不把 145 项写成包含该新增 CLI 用例。
+- `node --test --test-concurrency=2 tests/*.test.ts`：完整回归 145/145 通过，exit 0，耗时 203159.932208 ms。日志 `/tmp/paneon-diagnostics-regression.log`。该轮包含新增聚合 sibling 回归；之后仅修正源码 helper 加载与终端颜色显示清理，并新增无 dist source help 回归，已重新完整 build/lint/format，相关最终定向 15/15 和最终真实 Chrome 流程再次通过，不把 145 项写成包含该新增 CLI 用例。
 - 最终 `npm run lint` exit 0，仅 15 条原有 non-null assertion warning；`npm run format:check` exit 0。
 - `openspec validate preserve-build-diagnostics --strict --json`：通过（valid=true、issues=[]）；权威文档在主工作区，由从 worktree 启动的 Node 子进程按中央项目 cwd 执行 OpenSpec。
 - `git diff --check`：exit 0。
@@ -63,7 +63,7 @@
 
 执行 `node tests/browser/build-diagnostics.mjs`，使用 headless Chrome channel=chrome、临时 HOME 和新端口，通过独立 startServer，不操作用户服务。最终 build 后完整流程已再次 exit 0。
 
-最终通过证据目录：`/private/var/folders/01/7961y03s2xbdldhx3v2vfcmr0000gp/T/paneon-build-diagnostics-evidence-JMnJeF`。日志 `/private/tmp/paneon-diagnostics-browser.log`。
+最终通过证据目录：`/tmp/paneon-build-diagnostics-evidence-JMnJeF`。日志 `/tmp/paneon-diagnostics-browser.log`。
 
 - `failure-expanded.png`：真实 TypeScript “Type 'number' is not assignable to type 'string'.”，中文文件位置 `中文 面板.tsx:2:59`，展开代码片段；旧 iframe 保持原 src，Count 0 按钮仍能点击至 Count 1，pre overflowX=auto。
 - `old-diagnostic.png`：旧格式 BUILD_FAILED 仅有 message，无位置/片段，正常展示且旧 iframe 保持状态。

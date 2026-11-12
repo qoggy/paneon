@@ -159,7 +159,7 @@ try {
   assert.equal(second[1].payload.replacesEventId, first[0].id);
   assert.equal(second[1].payload.files[0].annotations[0].comment, '更正后的意见');
   await page.screenshot({
-    path: '/private/tmp/paneon-neutral-tree-evidence/builtin-diff-review.png',
+    path: join(tmpdir(), 'paneon-neutral-tree-evidence', 'builtin-diff-review.png'),
   });
   await annotations.remove(2);
   await annotations.remove(1);
@@ -289,7 +289,7 @@ try {
 } catch (error) {
   if (page)
     await page.screenshot({
-      path: '/private/tmp/paneon-neutral-tree-evidence/builtin-diff-review-failure.png',
+      path: join(tmpdir(), 'paneon-neutral-tree-evidence', 'builtin-diff-review-failure.png'),
     });
   throw error;
 } finally {

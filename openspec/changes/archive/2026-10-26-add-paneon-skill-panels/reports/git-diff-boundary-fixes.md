@@ -6,7 +6,7 @@
 
 `http://127.0.0.1:60809/panels/instance-7af61ec5-c4e8-4dae-945b-4f6b40f63290`
 
-来源为 `/Users/yuguo/IdeaProjects/x1/x1` 的 `eeff5b06fcc10b25284cf9b82dcc7c0d80aea0e9`，文件为 `lib/workflow/observability/prompts/analyze-session-worker.md`。本次没有修改来源仓库，没有提交 Git commit。
+来源为 `../x1/x1` 的 `eeff5b06fcc10b25284cf9b82dcc7c0d80aea0e9`，文件为 `lib/workflow/observability/prompts/analyze-session-worker.md`。本次没有修改来源仓库，没有提交 Git commit。
 
 ## 根因与修复
 
@@ -54,21 +54,21 @@
 
 下列文件包含本次修复；其中已有的其他任务改动保持原样：
 
-- `/Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff-model.ts`
-- `/Users/yuguo/IdeaProjects/paneon/skills/paneon/assets/shared/diff.tsx`
-- `/Users/yuguo/IdeaProjects/paneon/src/ui/feedback-geometry.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/ui/feedback-store.ts`
-- `/Users/yuguo/IdeaProjects/paneon/src/ui/feedback-surface.tsx`
-- `/Users/yuguo/IdeaProjects/paneon/tests/diff-changes.test.ts`
-- `/Users/yuguo/IdeaProjects/paneon/tests/browser/diff-boundaries-fixture.txt`
-- `/Users/yuguo/IdeaProjects/paneon/tests/browser/diff-boundaries.mjs`
-- `/Users/yuguo/IdeaProjects/paneon/skills/paneon/references/git-review.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md`
-- `/Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/git-diff-boundary-fixes.md`
+- `skills/paneon/assets/shared/diff-model.ts`
+- `skills/paneon/assets/shared/diff.tsx`
+- `src/ui/feedback-geometry.ts`
+- `src/ui/feedback-store.ts`
+- `src/ui/feedback-surface.tsx`
+- `tests/diff-changes.test.ts`
+- `tests/browser/diff-boundaries-fixture.txt`
+- `tests/browser/diff-boundaries.mjs`
+- `skills/paneon/references/git-review.md`
+- `openspec/changes/add-paneon-skill-panels/specs/paneon-agent-skill/spec.md`
+- `openspec/changes/add-paneon-skill-panels/reports/git-diff-boundary-fixes.md`
 
 同步的安装副本文件：
 
-- `/Users/yuguo/.agents/skills/paneon/assets/shared/diff-model.ts`
-- `/Users/yuguo/.agents/skills/paneon/assets/shared/diff.tsx`
+- `~/.agents/skills/paneon/assets/shared/diff-model.ts`
+- `~/.agents/skills/paneon/assets/shared/diff.tsx`
 
-重新生成的构建产物位于 `/Users/yuguo/IdeaProjects/paneon/dist/ui/`，由 build:ui 管理，未纳入本次源码文件清单。
+重新生成的构建产物位于 `dist/ui/`，由 build:ui 管理，未纳入本次源码文件清单。

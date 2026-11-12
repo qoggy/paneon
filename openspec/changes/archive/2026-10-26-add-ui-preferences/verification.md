@@ -2,7 +2,7 @@
 
 ## Delivery boundary
 
-Implementation is in `/Users/yuguo/.codex/worktrees/ui-theme-language/paneon`.
+Implementation is in `~/.codex/worktrees/ui-theme-language/paneon`.
 HEAD remains `cb0e4694cec0e41086f4113a49e7f193ca7b270f`. No commit, push, merge,
 main-checkout edit, or worktree deletion was performed.
 
@@ -107,7 +107,7 @@ transplanted snapshot are delivered in `/tmp/paneon-ui-preferences-delivery/`.
 
 ## Parent acceptance — 2026-10-22
 
-主 agent 已将纯任务补丁应用到 `/Users/yuguo/IdeaProjects/paneon`，74个任务文件逐一核对交付 SHA-256 一致；未复制隔离工作树里的其他文件。移植前已存在的全屏宿主行为保留，其 host/query 两份既有回归一并作为依赖落盘；其他 change 和与本功能无关的指南草稿不修改。subagent 未创建任何提交。
+主 agent 已将纯任务补丁应用到 `.`，74个任务文件逐一核对交付 SHA-256 一致；未复制隔离工作树里的其他文件。移植前已存在的全屏宿主行为保留，其 host/query 两份既有回归一并作为依赖落盘；其他 change 和与本功能无关的指南草稿不修改。subagent 未创建任何提交。
 
 主工作区独立检查与最终产物：
 

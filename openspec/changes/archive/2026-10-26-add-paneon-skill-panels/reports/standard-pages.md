@@ -18,12 +18,12 @@
 - `node --test tests/skill-pages.test.ts`：5 组测试覆盖输入约束、完整答案覆盖及规范顺序、默认值及上下界、false/0/可选空值和特殊字段名。
 - `npx eslint skills/paneon/assets tests/skill-pages.test.ts`。
 - `npx prettier --check skills/paneon tests/skill-pages.test.ts tests/browser/skill-pages*.mjs package.json tsconfig.examples.json`。
-- `python3 /Users/yuguo/.agents/skills/skill-dev/scripts/quick_validate.py skills/paneon`。
+- `python3 ~/.agents/skills/skill-dev/scripts/quick_validate.py skills/paneon`。
 - `git diff --check`。
 - `node tests/browser/skill-pages.mjs`：真实 Chrome，先将完整 skill 复制到临时 agent-skills 目录，再运行源码。验证单/多选、详情、自填及切换草稿、返回更改、切题零事件、末题完整提交、成功前不显示保存、提交期间禁用重复点击、更正失败保留与回执关联、新实例轮次隔离；表单八类控件、Enter 提交、字段错误聚焦、失败草稿和完整更正；最后通过真实 CLI events/ack 读取及确认结果。
-- 最终 `PANEON_TEST_ARTIFACTS=/private/tmp/paneon-standard-pages-acceptance node tests/browser/skill-pages-pack.mjs`：npm pack 检查全部 8 个 skill 文件进入产物，临时目录独立 npm install；从安装包复制 skill，使用该包的 runtime 与 CLI 重跑同一套 Chrome 验收。源码与独立安装包均通过。
+- 最终 `PANEON_TEST_ARTIFACTS=/tmp/paneon-standard-pages-acceptance node tests/browser/skill-pages-pack.mjs`：npm pack 检查全部 8 个 skill 文件进入产物，临时目录独立 npm install；从安装包复制 skill，使用该包的 runtime 与 CLI 重跑同一套 Chrome 验收。源码与独立安装包均通过。
 
-最终表单截图已读取检查：`/private/tmp/paneon-standard-pages-acceptance/form.png`。临时 fixture 服务及安装目录会在测试结束时清理，没有写入用户个人 skill 目录。
+最终表单截图已读取检查：`/tmp/paneon-standard-pages-acceptance/form.png`。临时 fixture 服务及安装目录会在测试结束时清理，没有写入用户个人 skill 目录。
 
 ## Root causes found during acceptance
 

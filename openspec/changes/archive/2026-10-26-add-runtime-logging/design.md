@@ -178,8 +178,8 @@ JS 入口之前的故障、SIGKILL 和掉电可能没有完整尾部日志；不
   "logging": {
     "level": "info",
     "status": "active",
-    "directory": "/Users/yuguo/.paneon/logs",
-    "currentFile": "/Users/yuguo/.paneon/logs/runtime-17be2b65-3cb7-42f6-9d55-35f77f804cc4.jsonl"
+    "directory": "~/.paneon/logs",
+    "currentFile": "~/.paneon/logs/runtime-17be2b65-3cb7-42f6-9d55-35f77f804cc4.jsonl"
   }
 }
 ```

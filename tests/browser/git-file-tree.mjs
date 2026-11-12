@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startGitReviewFixture } from './git-review-fixture.mjs';
 import { annotationTools } from './annotation-tools.mjs';
@@ -309,7 +310,10 @@ try {
   await comments.locate(1);
   await staged.waitFor({ timeout: 3000 });
   assert.equal(await stagedRoot.getAttribute('aria-expanded'), 'true');
-  await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-desktop.png', fullPage: true });
+  await page.screenshot({
+    path: join(tmpdir(), 'paneon-git-file-tree-desktop.png'),
+    fullPage: true,
+  });
   let geometry;
   if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -340,7 +344,10 @@ try {
       geometry.leaves.every((leaf) => leaf.scroll <= leaf.client + 1),
       JSON.stringify(geometry),
     );
-    await page.screenshot({ path: '/private/tmp/paneon-git-file-tree-mobile.png', fullPage: true });
+    await page.screenshot({
+      path: join(tmpdir(), 'paneon-git-file-tree-mobile.png'),
+      fullPage: true,
+    });
     // Folding a different directory must preserve the user's scroll position.
     const unrelated = directory('untracked', 'untracked');
     await unrelated.scrollIntoViewIfNeeded();
@@ -383,15 +390,18 @@ try {
       status: 'passed',
       geometry,
       screenshots: [
-        '/private/tmp/paneon-git-file-tree-desktop.png',
+        join(tmpdir(), 'paneon-git-file-tree-desktop.png'),
         ...(process.env.PANEON_TEST_DESKTOP_ONLY === '1'
           ? []
-          : ['/private/tmp/paneon-git-file-tree-mobile.png']),
+          : [join(tmpdir(), 'paneon-git-file-tree-mobile.png')]),
       ],
     }),
   );
 } catch (error) {
-  await page?.screenshot({ path: '/private/tmp/paneon-git-file-tree-failure.png', fullPage: true });
+  await page?.screenshot({
+    path: join(tmpdir(), 'paneon-git-file-tree-failure.png'),
+    fullPage: true,
+  });
   if (page && process.env.PANEON_TREE_EVIDENCE_DIR)
     await writeFile(
       join(process.env.PANEON_TREE_EVIDENCE_DIR, 'failure-dom.json'),

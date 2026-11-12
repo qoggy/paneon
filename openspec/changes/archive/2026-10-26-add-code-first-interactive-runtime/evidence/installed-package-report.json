@@ -7,6 +7,6 @@
     "Explicit no-watch retained through manual reload, empty and single-page table states",
     "Independent CLI processes, service restart, existing instance URL recovery, saved event and ack position recovery"
   ],
-  "artifacts": "/var/folders/01/7961y03s2xbdldhx3v2vfcmr0000gp/T/paneon-evidence-LPHHzX",
+  "artifacts": "/tmp/paneon-evidence-LPHHzX",
   "tables": ["consumers", "events", "panels", "schema_meta", "sqlite_sequence"]
 }

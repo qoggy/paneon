@@ -1,6 +1,6 @@
 # 一次性交互讲解交付
 
-2026-10-21，在独立 worktree `/Users/yuguo/.codex/worktrees/skill-explanations/paneon` 基于 `c7d667e` 完成本组实现。覆盖 2.3 中的并发讲解与 2.10 Sentinel；中央 design/tasks、SDK/UI、package/tsconfig 和其他工作组文件未修改。未推送、合入或删除 worktree，留待主 agent 验收。
+2026-10-21，在独立 worktree `~/.codex/worktrees/skill-explanations/paneon` 基于 `c7d667e` 完成本组实现。覆盖 2.3 中的并发讲解与 2.10 Sentinel；中央 design/tasks、SDK/UI、package/tsconfig 和其他工作组文件未修改。未推送、合入或删除 worktree，留待主 agent 验收。
 
 ## 实现
 
@@ -40,15 +40,15 @@
 
 ## 文件清单
 
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/skills/paneon/assets/examples/concurrency/model.ts
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/skills/paneon/assets/examples/concurrency/panel.tsx
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/skills/paneon/assets/examples/sentinel-leap-array/model.ts
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/skills/paneon/assets/examples/sentinel-leap-array/panel.tsx
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/skills/paneon/references/examples.md
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/explanations.test.ts
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/browser/explanations-fixture.mjs
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/browser/explanations.mjs
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/browser/explanations-pack.mjs
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/browser/explanations-concurrency.png
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/tests/browser/explanations-sentinel.png
-- /Users/yuguo/.codex/worktrees/skill-explanations/paneon/openspec/changes/add-paneon-skill-panels/reports/explanations.md
+- skills/paneon/assets/examples/concurrency/model.ts
+- skills/paneon/assets/examples/concurrency/panel.tsx
+- skills/paneon/assets/examples/sentinel-leap-array/model.ts
+- skills/paneon/assets/examples/sentinel-leap-array/panel.tsx
+- skills/paneon/references/examples.md
+- tests/explanations.test.ts
+- tests/browser/explanations-fixture.mjs
+- tests/browser/explanations.mjs
+- tests/browser/explanations-pack.mjs
+- tests/browser/explanations-concurrency.png
+- tests/browser/explanations-sentinel.png
+- openspec/changes/add-paneon-skill-panels/reports/explanations.md

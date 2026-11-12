@@ -28,12 +28,12 @@
 
 ## Changed files
 
-合入后的完整路径如下（实现 worktree 为 /Users/yuguo/.codex/worktrees/skill-guides/paneon）：
+合入后的完整路径如下（实现 worktree 为 ~/.codex/worktrees/skill-guides/paneon）：
 
-- /Users/yuguo/IdeaProjects/paneon/docs/agent-guide.md（删除）
-- /Users/yuguo/IdeaProjects/paneon/examples/README.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/SKILL.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/authoring.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/cli.md
-- /Users/yuguo/IdeaProjects/paneon/skills/paneon/references/feedback.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/reports/guides.md
+- docs/agent-guide.md（删除）
+- examples/README.md
+- skills/paneon/SKILL.md
+- skills/paneon/references/authoring.md
+- skills/paneon/references/cli.md
+- skills/paneon/references/feedback.md
+- openspec/changes/add-paneon-skill-panels/reports/guides.md

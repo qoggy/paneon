@@ -1,7 +1,7 @@
 # Shared annotation editor acceptance
 
 Status: accepted by primary on the current branch; integrated.
-Worktree: `/Users/yuguo/.codex/worktrees/annotation-editor-polish/paneon`.
+Worktree: `~/.codex/worktrees/annotation-editor-polish/paneon`.
 Baseline: `d10aa89`. No commit was created. The main checkout, global skill,
 user instances and user service were not changed.
 

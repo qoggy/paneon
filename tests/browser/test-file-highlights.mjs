@@ -9,7 +9,7 @@ import { SKILL_ROOT } from '../skill-paths.ts';
 import { startServer } from '../runtime-fixture.ts';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-test-file-highlights-'));
-const evidence = '/private/tmp/paneon-test-file-evidence';
+const evidence = join(tmpdir(), 'paneon-test-file-evidence');
 const files = [
   ['src/feature.ts', false],
   ['src/feature.test.ts', true],

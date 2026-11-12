@@ -11,7 +11,7 @@
 
 ## Context
 
-仓库 paneon，分支 0.0.x，基线 412c2aa6e10a3724b602c4b6109a39c2b68fcf6c。主工作区有此前选择页、Git 页和 host 布局的未提交改动，禁止覆盖或顺带提交。独立 worktree：/Users/yuguo/.codex/worktrees/build-diagnostics/paneon。
+仓库 paneon，分支 0.0.x，基线 412c2aa6e10a3724b602c4b6109a39c2b68fcf6c。主工作区有此前选择页、Git 页和 host 布局的未提交改动，禁止覆盖或顺带提交。独立 worktree：~/.codex/worktrees/build-diagnostics/paneon。
 
 已核对根因：src/compiler/index.ts 的 catch 丢弃非 PaneonError，只留下固定 message；src/compiler/process.ts 忽略 stderr 和部分进程异常原因；src/runtime/worker.ts 的模块初始化错误同样被替换；TypeScript 检查已经具有部分位置字段，应保留并补齐传递。runtime/lifecycle.ts、Store 与 IPC 已能保存/传递 Diagnostic.details；host 只显示 message，CLI 普通失败只打印 message。当前用户页 11:52 的原异常已丢失，不能补回。
 

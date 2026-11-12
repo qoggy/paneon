@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-2026-10-23. User supplied four screenshots and authorized implementation through distributed-development. Main agent owns this brief and acceptance; one subagent owns the tightly coupled choice-page implementation in an isolated worktree. Status: implementation and independent main-agent acceptance passed; integrated and committed on the current branch. Managed-worktree archive requested; the tool returned queued and physical removal is not yet confirmed. Worktree: `/Users/yuguo/.codex/worktrees/choose-review-interactions/paneon`, based on `5070397e42833843530eb5810cb7b2b7f612feec`. No development accepted yet.
+2026-10-23. User supplied four screenshots and authorized implementation through distributed-development. Main agent owns this brief and acceptance; one subagent owns the tightly coupled choice-page implementation in an isolated worktree. Status: implementation and independent main-agent acceptance passed; integrated and committed on the current branch. Managed-worktree archive requested; the tool returned queued and physical removal is not yet confirmed. Worktree: `~/.codex/worktrees/choose-review-interactions/paneon`, based on `5070397e42833843530eb5810cb7b2b7f612feec`. No development accepted yet.
 
 This iteration does not rename feedback event fields, change question/selection schemas, introduce historical compatibility, update installed skills, or change other standard pages. The existing root worktree has unrelated annotation naming and runtime changes; preserve them and do not commit them as part of this task.
 

@@ -201,10 +201,10 @@ Paneon 可以复用成熟的终端选择组件。第一版常规多选用库自�
 
 ## 本轮改动文件
 
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/research/skill-installation.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/design.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/development.md
-- /Users/yuguo/IdeaProjects/paneon/openspec/changes/add-paneon-skill-panels/tasks.md
+- openspec/changes/add-paneon-skill-panels/research/skill-installation.md
+- openspec/changes/add-paneon-skill-panels/design.md
+- openspec/changes/add-paneon-skill-panels/development.md
+- openspec/changes/add-paneon-skill-panels/tasks.md
 
 ## 更新范围与安装记录：后续讨论稿
 

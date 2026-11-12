@@ -21,7 +21,7 @@
 
 ## Context
 
-仓库：`paneon`，路径 `/Users/yuguo/IdeaProjects/paneon`，分支 `0.0.x`，HEAD 基线 `f417c2f4af9d16a44ffa49aeea28003120425344`。工作区另有未提交的 Git checkout、批注等改动；上述 HEAD 不能代表全部在用行为。实施前记录当时文件树及三个视图的真实浏览器基线，保留其他任务的工作区改动。
+仓库：`paneon`，路径 `.`，分支 `0.0.x`，HEAD 基线 `f417c2f4af9d16a44ffa49aeea28003120425344`。工作区另有未提交的 Git checkout、批注等改动；上述 HEAD 不能代表全部在用行为。实施前记录当时文件树及三个视图的真实浏览器基线，保留其他任务的工作区改动。
 
 当前 `ChangedFileTree` 直接接收 `GitFile[]`。模型中的 `TreeSnapshot` 仍要求 Git `status`、`source.view.area` 和 `source.old/new.path`，因此仅给组件增加泛型不能实现中立复用。当前实现还包含这些必须保留的行为：
 
