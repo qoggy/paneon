@@ -31,10 +31,169 @@ Pick the form that carries the content with the least reading:
 - Flows across components or actors: a Mermaid `sequenceDiagram`; for swimlanes, a `flowchart` with one `subgraph` per actor.
 - Parameter or payload structures: a `jsonc` CodeBlock, with comments on the fields that matter.
 - Comparisons of options: a table with one row per option and one column per criterion.
-- Changes to an interface or configuration: a `DiffView` with `jsonc` on both sides, such as the request body of one endpoint before and after an iteration.
+- Changes to an interface or configuration: a `DiffView` with `jsonc` on both sides, such as the request body of one endpoint before and after an iteration. Include the file, section and nearby unchanged lines so the location of an insertion is visible.
 - Behavior that depends on inputs or state: an interactive view instead of an explanation. Let the human set parameters and watch the result, switch between options to compare them, step through the system's states, or browse request and response examples for different cases to check them against expectations. The Sentinel LeapArray example in [Authoring](authoring.md#sentinel-leaparray) works this way.
+- Several independent topics: choose navigation by how the human will review the material. A design can be split by concern (database design, API design, UI design, affected scope, test plan), or by independent proposal (one item per change, keeping its purpose, before/after behavior and diff together). Use Sidebar or another suitable navigation structure.
+- A runnable example whose output matters to the explanation: show its usage and corresponding rendered result or execution output together. For an API, pair example request parameters with the corresponding response; for a UI, pair an interaction with the resulting page state. Keep the code, inputs and result consistent, and identify proposed behavior separately from existing capabilities.
 
 Use prose for the reasoning that connects these pieces.
+
+### Example: designing a component
+
+<example>
+User: Help me design a rating component.
+
+**Bad**
+Rating takes value, max and onChange. value is the current score, max is the maximum score, and clicking a star calls onChange.
+
+**Good**
+Props definition:
+
+```ts
+interface RatingProps {
+  /** Current score: an integer from 0 to max. */
+  value: number;
+  /** Total number of stars: a positive integer. */
+  max: number;
+  /** Called with the selected score when a star is clicked. */
+  onChange: (value: number) => void;
+}
+```
+
+The page places editable props, usage code and a rendered component preview together. All three use the same values:
+
+| Props editor           | Usage code                                         | Component preview |
+| ---------------------- | -------------------------------------------------- | ----------------- |
+| value=3, max=5         | `<Rating value={3} max={5} onChange={setScore} />` | ★★★☆☆             |
+| Change max to 7        | `<Rating value={3} max={7} onChange={setScore} />` | ★★★☆☆☆☆           |
+| Then change value to 6 | `<Rating value={6} max={7} onChange={setScore} />` | ★★★★★★☆           |
+
+Editing the props updates the code and preview immediately. Clicking a star in the preview also updates value.
+
+<reasoning>
+Reviewing the component's props requires the complete definition, including types and comments. Sample calls alone cannot replace it. Reviewing the appearance requires seeing how different props affect the result. An editable preview is preferred; several sets of props paired with their rendered results are also useful. The demonstration runs in the page and follows the proposed props contract.
+</reasoning>
+</example>
+
+### Example: changing an API
+
+<example>
+User: Update the quote API so callers can display the discount breakdown.
+
+**Bad**
+The POST /quotes response adds subtotal and discount. total stays unchanged.
+
+**Good**
+The page starts with a JSONC DiffView of the response change (quotes/response.jsonc):
+
+```diff
+ {
++  // Subtotal: unit price multiplied by quantity
++  "subtotal": 60,
++  // Discount amount
++  "discount": 6,
+   // Amount payable
+   "total": 54
+ }
+```
+
+Below the diff, the reviewer can switch between three input/output examples:
+
+| POST /quotes input                           | Response before | Response after                      |
+| -------------------------------------------- | --------------- | ----------------------------------- |
+| unitPrice=20, quantity=3, discountPercent=10 | total=54        | subtotal=60, discount=6, total=54   |
+| unitPrice=20, quantity=3, discountPercent=0  | total=60        | subtotal=60, discount=0, total=60   |
+| unitPrice=50, quantity=2, discountPercent=20 | total=80        | subtotal=100, discount=20, total=80 |
+
+The page also lets the reviewer edit unit price, quantity and discount. Changing the first example's quantity to 4 immediately updates the output to subtotal=80, discount=8, total=72.
+
+<reasoning>
+The JSONC diff shows the contract change; several input/output pairs show its effects in different cases. Editable inputs are a further enhancement, not a substitute for either. Live calculations use an explicit model of the proposal and must not be described as responses from a real endpoint.
+</reasoning>
+</example>
+
+### Example: improving a Skill from failure cases
+
+<example>
+User: Improve the meeting-notes Skill based on these failures:
+1. Given “Mira will deliver a draft by Friday”, the output omits the Friday deadline.
+2. Given “Mira will deliver a draft; also confirm printing costs”, the output also names Mira as the owner of “confirm printing costs”.
+
+Current Skill:
+
+```markdown
+## Action items
+
+Output columns: task, owner.
+When an owner is missing, reuse the previous item's owner.
+```
+
+**Bad**
+Change the output to task, owner and deadline columns. Write “not stated” when the owner is missing.
+
+**Good**
+The page has two Sidebar items: “Missing deadline” and “Incorrectly reused owner”. Each contains its own analysis, before/after output and DiffView.
+
+**Missing deadline**
+
+- Problem: the user supplied “Mira will deliver a draft by Friday”. The agent kept the task and owner but omitted the deadline.
+- Cause and source: “Output columns: task, owner.” provides no deadline field. This is missing guidance; following the specified columns would still omit the deadline.
+- Before: Deliver a draft | Mira.
+- Expected after: Deliver a draft | Mira | Friday.
+- This item's DiffView (meeting-notes/SKILL.md):
+
+```diff
+ ## Action items
+-Output columns: task, owner.
++Output columns: task, owner, deadline.
++Write “not stated” when no deadline is given.
+ When an owner is missing, reuse the previous item's owner.
+```
+
+**Incorrectly reused owner**
+
+- Problem: the user did not assign an owner to “confirm printing costs”. The agent copied Mira's name from the preceding task.
+- Cause and source: “When an owner is missing, reuse the previous item's owner.” explicitly directs that behavior. This is incorrect guidance; following it produces an unsupported assignment.
+- Before: Confirm printing costs | Mira.
+- Expected after: Confirm printing costs | not stated.
+- This item's DiffView (meeting-notes/SKILL.md):
+
+```diff
+ ## Action items
+ Output columns: task, owner.
+-When an owner is missing, reuse the previous item's owner.
++Use only the owner explicitly named for that task; otherwise write “not stated”.
+```
+
+<reasoning>
+The failures can be judged independently, so each gets a Sidebar item. Each item traces the observed behavior to a quoted instruction, then pairs its before/after effects with its own diff. Changes for other cases stay out of that diff. Expected outputs are distinguished from actual evaluation results. If the original instruction already requires the correct behavior, first check whether it was followed rather than assuming the Skill needs a change.
+</reasoning>
+</example>
+
+### Example: improving UI interaction and styling
+
+<example>
+User: The gallery page's navigation looks awful. Can you improve it?
+
+**Bad**
+Reduce the spacing between navigation items, add a background to the selected item, and add hover feedback.
+
+**Good**
+The page shows “Current” and “Proposed” navigation side by side. Both contain “Gallery, Favorites, Settings”, and clicking an item switches the content below it.
+
+| Same action                 | Current                                                               | Proposed                                                                 |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Start with Gallery selected | All three labels look the same                                        | Gallery has a background highlight and bold text                         |
+| Hover over Favorites        | No feedback                                                           | Favorites changes background on hover                                    |
+| Click Favorites             | Favorites content appears, with no selection marker in the navigation | Favorites content appears and the selection highlight moves to Favorites |
+| Then click Settings         | Settings content appears                                              | Settings content appears and the selection highlight moves to Settings   |
+
+Both previews use the same sample content. The reviewer can click through each preview independently and reproduce the states shown above.
+
+<reasoning>
+The user is reviewing appearance and interaction, so optimization advice or static screenshots alone are insufficient. Interactive before/after previews with the same content and actions let them compare layout, hover and selection feedback directly. Switching content within the page is enough for this review; the full gallery page need not be implemented first.
+</reasoning>
+</example>
 
 ## Slice the content
 

@@ -1,6 +1,6 @@
 ---
 name: paneon-visualize
-description: Turns agent output that would be tiring to read as long text into local interactive Paneon pages, and brings the human's choices, inputs and precise feedback back to the agent. Use proactively when explaining code, mechanisms or plans that read better with diagrams, tables or interactive views; showing changed files, commits or PR diffs; presenting data or metrics; illustrating a data model or design; asking several related questions or requesting missing parameters; or collecting line-level feedback on a document. Ready-made pages cover choices, forms, tables, file review, file diff review and Git review; other needs can be built as custom TSX pages. Not for prototyping the product under development.
+description: Turns agent output that would be tiring to read as long text into local interactive Paneon pages, and brings the human's choices, inputs and precise feedback back to the agent. Use proactively when explaining code, mechanisms or plans that read better with diagrams, tables or interactive views; showing changed files, commits or PR diffs; presenting data or metrics; illustrating a data model or design; asking several related questions or requesting missing parameters; or collecting line-level feedback on a document. Ready-made pages cover choices, forms, tables, file review, file diff review and Git review; other needs can be built as custom TSX pages.
 compatibility: Requires the Paneon CLI and Node.js 24.
 ---
 
