@@ -1,6 +1,6 @@
 # Present content on a page
 
-This covers everything written into a page: the content of a custom page and the input of a built-in page, such as Choose questions and options, Form field descriptions and Table columns.
+This covers everything written into a page: the content of a custom page and the input of a built-in page, such as Form field descriptions and Table columns.
 
 ## Lead with the answer
 
@@ -200,25 +200,6 @@ The user is reviewing appearance and interaction, so optimization advice or stat
 - Make each section understandable on its own. Repeat the key fact or number a section depends on, instead of sending the reader back to where it first appeared.
 - Where order matters, reveal content step by step, through steps, Tabs or Accordion.
 - Size slices by the content, one per decision, mechanism step or item. Neither one long scroll nor many fragments.
-
-## Ask one decision per question
-
-Put one decision in each question, whether in Choose or elsewhere. When options bundle several decisions, the human often agrees with part of every option, cannot pick one, and can only answer under **Other** by rewriting the whole plan.
-
-```markdown
-// Bad: one question bundles three decisions.
-Which setup?
-
-- SQLite + in-process cache + single node
-- PostgreSQL + Redis + cluster
-
-// Good: one question per decision.
-Which storage? SQLite / PostgreSQL
-Which cache? In-process / Redis
-Which deployment? Single node / Cluster
-```
-
-When the options of one decision depend on the answer to another, ask the first decision, then ask the next one in a new run.
 
 ## Iterate after feedback
 

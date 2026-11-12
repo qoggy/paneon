@@ -42,3 +42,22 @@ Input:
 - `selectedIds` preselects options of that question, without duplicates and at most one in single mode.
 
 `answers-submitted` contains one answer per question, in input order.
+
+## Ask one decision per question
+
+Put one decision in each question, whether in Choose or elsewhere. When options bundle several decisions, the human often agrees with part of every option, cannot pick one, and can only answer under **Other** by rewriting the whole plan.
+
+```markdown
+// Bad: one question bundles three decisions.
+Which setup?
+
+- SQLite + in-process cache + single node
+- PostgreSQL + Redis + cluster
+
+// Good: one question per decision.
+Which storage? SQLite / PostgreSQL
+Which cache? In-process / Redis
+Which deployment? Single node / Cluster
+```
+
+When the options of one decision depend on the answer to another, ask the first decision, then ask the next one in a new run.
