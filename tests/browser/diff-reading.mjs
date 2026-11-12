@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import { selectDiffLines } from './annotation-tools.mjs';
@@ -60,7 +61,7 @@ try {
     1,
   );
   await page.waitForTimeout(100);
-  assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
+  assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
   assert.equal(await frame.locator('[data-code-side="new"]').count(), 340);
   const visible = await frame.locator('[data-code-side="new"][data-line="250"]').boundingBox();
   const clip = await viewport.boundingBox();
@@ -151,7 +152,7 @@ try {
   await page.keyboard.press('ArrowLeft');
   assert.ok((await left()) < moved - 10);
   const keyWidth = await left();
-  await button('收起上下文').click();
+  await button('隐藏未改动行').click();
   const widths = await frame
     .locator('[data-diff-scroll="old"]')
     .evaluateAll((es) => es.map((e) => e.clientWidth));
@@ -160,9 +161,9 @@ try {
     widths.every((w) => Math.abs(w - keyWidth) < 2),
     'all hunks share ratio',
   );
-  await button('展开全部上下文').click();
-  await button('单列对比').click();
-  await button('左右对比').click();
+  await button('隐藏未改动行').click();
+  await selectDiffLayout(frame, '单列对比');
+  await selectDiffLayout(frame, '左右对比');
   assert.ok(Math.abs((await left()) - keyWidth) < 2, 'ratio survives unified switch');
   await assertSeparatorGeometry();
   await divider.focus();
@@ -319,12 +320,12 @@ try {
   ]) {
     await button(kind).click();
     await frame.locator(`[data-reading-kind="${kind}"] [data-diff-source]`).waitFor();
-    assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
+    assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
     const side = ['deleted', 'cleared'].includes(kind) ? 'old' : 'new';
     const single = ['added', 'deleted', 'filled', 'cleared'].includes(kind);
     assert.equal(await divider.count(), single ? 0 : 1);
     assert.equal(await frame.locator('[data-diff-source-header]').count(), single ? 1 : 2);
-    assert.equal(await button('左右对比').getAttribute('aria-pressed'), 'true');
+    assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
     if (kind === 'empty') {
       assert.equal(await frame.locator('[data-code-side]').count(), 0);
     } else {
@@ -354,12 +355,12 @@ try {
         .evaluate((element) => getComputedStyle(element.closest('td')).backgroundColor);
       assert.notEqual(color, 'rgba(0, 0, 0, 0)', 'single-side rows retain their change color');
       for (const mode of ['单列对比', '左右对比']) {
-        await button(mode).click();
-        await button('收起上下文').click();
+        await selectDiffLayout(frame, mode);
+        await button('隐藏未改动行').click();
         await button('定位当前差异').click();
         assert.equal(await frame.locator(`[data-code-side="${side}"]`).count(), 340);
         assert.equal(await divider.count(), 0);
-        await button('展开全部上下文').click();
+        await button('隐藏未改动行').click();
       }
       if (kind === 'added' || kind === 'deleted') {
         await selectDiffLines(frame, side, 1);

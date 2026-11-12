@@ -54,7 +54,12 @@ try {
     for (const language of ['en', 'zh-CN']) {
       await prefs(theme, language);
       const mode = language === 'en' ? 'Side by side' : '左右对比';
-      await diff.getByRole('button', { name: mode, exact: true }).waitFor();
+      const layout = diff.getByRole('button', {
+        name: language === 'en' ? 'Comparison layout' : '对比方式',
+        exact: true,
+      });
+      await layout.waitFor();
+      assert.equal((await layout.innerText()).trim(), mode);
       await f.locator(`html[data-theme="${theme}"][data-language="${language}"]`).waitFor();
       const color = await diff
         .locator('[data-code-side="new"]')

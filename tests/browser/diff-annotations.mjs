@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -148,13 +149,13 @@ try {
     );
   });
   await editInput.press('Escape');
-  await diff.getByRole('button', { name: '单列对比', exact: true }).click();
+  await selectDiffLayout(frame, '单列对比', diff);
   await save('[data-testid="annotated"] [data-code-side="new"][data-line="12"]', 'unified');
   assert.deepEqual((await draft()).annotations[2].targets, beforeMode.annotations[1].targets);
   await button('Reveal hidden text').click();
   assert.equal(
-    await diff.getByRole('button', { name: '左右对比', exact: true }).getAttribute('aria-pressed'),
-    'true',
+    (await diff.getByRole('button', { name: '对比方式', exact: true }).innerText()).trim(),
+    '左右对比',
   );
   const beforeSubmit = await draft();
   await submitAnnotations(frame);

@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { submitAnnotations } from './annotation-tools.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -115,13 +116,13 @@ try {
   await frame.getByLabel('批注内容', { exact: true }).fill('Discard this edit');
   await frame.getByLabel('批注内容', { exact: true }).press('Escape');
   assert.equal(await comments.text(1), 'Review both complete sources');
-  await button('收起上下文').click();
+  await button('隐藏未改动行').click();
   // Re-registering syntax DOM for unified/expanded/select modes preserves saved coordinates.
   await clear();
-  await button('单列对比').click();
+  await selectDiffLayout(frame, '单列对比');
   await selectAll('unified', 'unified');
   await clear();
-  await button('展开全部上下文').click();
+  await button('隐藏未改动行').click();
 
   await selectAll('expanded-select', 'unified');
   await clear();

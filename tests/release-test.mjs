@@ -84,6 +84,7 @@ const browserScripts = [
   'diff-resize',
   'diff-connected',
   'diff-layout',
+  'diff-wrap',
   'diff-scrollbars',
   'diff-annotations',
   'diff-highlighting',

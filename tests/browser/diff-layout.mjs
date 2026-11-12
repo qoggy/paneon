@@ -146,7 +146,7 @@ try {
   const asymmetric = await measureBottoms();
   console.log('one-sided native scrollbar:', JSON.stringify(asymmetric));
   await frame.getByRole('button', { name: 'Same source', exact: true }).click();
-  await frame.getByRole('button', { name: '收起上下文', exact: true }).click();
+  await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
   const emptyPanes = await source.locator('[data-diff-scroll][tabindex="0"]').count();
   console.log('empty focusable panes:', emptyPanes);
   assert.ok(

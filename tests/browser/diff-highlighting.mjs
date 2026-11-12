@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -162,11 +163,11 @@ try {
   const target = event.payload.files[0].annotations[0].targets[0];
   assert.equal(target.text.quote, 'build{InterfaceName}');
   assert.equal(after.slice(target.text.start, target.text.end), target.text.quote);
-  await frame.getByRole('button', { name: '单列对比', exact: true }).click();
+  await selectDiffLayout(frame, '单列对比');
   assert.equal(await inline('new', 3, 'modify'), 'build');
   assert.equal(await inline('old', 3, 'modify'), 'get');
   await page.screenshot({ path: join(evidence, 'unified.png') });
-  await frame.getByRole('button', { name: '左右对比', exact: true }).click();
+  await selectDiffLayout(frame, '左右对比');
   await annotations.locate(1);
   assert.equal(await inline('new', 3, 'modify'), 'build');
   await preferences('dark');

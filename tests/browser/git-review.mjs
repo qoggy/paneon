@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { realpath } from 'node:fs/promises';
 import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines } from './annotation-tools.mjs';
@@ -133,9 +134,9 @@ try {
   await selectDiffLines(frame, 'new', 2);
   await comments.write('工作区 n=4');
   await finish();
-  await button('单列对比').click();
-  assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
-  await button('左右对比').click();
+  await selectDiffLayout(frame, '单列对比');
+  assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
+  await selectDiffLayout(frame, '左右对比');
   // Refresh never retargets an old annotation.
   await writeFile(join(f.repo, 'a.ts'), 'fresh changed\r\nsecond line\r\n');
   assert.equal(
@@ -182,7 +183,7 @@ try {
     .locator('[data-code-side="new"][data-line="2"]')
     .filter({ hasText: 'const n = 2' })
     .waitFor();
-  await button('收起上下文').click();
+  await button('隐藏未改动行').click();
   await selectDiffLines(frame, 'new', 1, 2);
   await finish();
   // Another repository, same file name.

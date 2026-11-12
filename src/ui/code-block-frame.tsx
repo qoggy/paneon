@@ -81,17 +81,19 @@ export function CodeBlockFrame({
           render={
             <Button
               type="button"
-              variant="ghost"
+              variant={wrap ? 'secondary' : 'ghost'}
               size="icon-xs"
               aria-label={t('Word wrap')}
               aria-pressed={wrap}
               onClick={() => setWrap((value) => !value)}
             >
-              <WrapText />
+              <WrapText className="size-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
           }
         />
-        <TooltipContent>{t(wrap ? 'Disable word wrap' : 'Enable word wrap')}</TooltipContent>
+        <TooltipContent>
+          {t(wrap ? 'Word wrap is on. Click to turn off.' : 'Word wrap is off. Click to turn on.')}
+        </TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger

@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { openAnnotationDirectory, submitAnnotations } from './annotation-tools.mjs';
 import { selectDiffLines, selectAnnotationText } from './annotation-tools.mjs';
 import { annotationTools } from './annotation-tools.mjs';
@@ -318,11 +319,11 @@ async function completeAcceptance() {
     await selectDiffLines(frame, 'new', 2);
     await comment().fill('原 head 的代码');
     await finish();
-    await button('单列对比').click();
-    assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
-    await button('收起上下文').click();
-    await button('展开全部上下文').click();
-    await button('左右对比').click();
+    await selectDiffLayout(frame, '单列对比');
+    assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
+    await button('隐藏未改动行').click();
+    await button('隐藏未改动行').click();
+    await selectDiffLayout(frame, '左右对比');
     // A description can change without a new head; its saved text remains locatable.
     await f.state({ version: 1 });
     await button('刷新 PR').click();

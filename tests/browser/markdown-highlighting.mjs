@@ -87,6 +87,8 @@ try {
   const long = longBlock.locator('pre');
   const wrapButton = longBlock.getByRole('button', { name: 'Word wrap', exact: true });
   assert.equal(await wrapButton.getAttribute('aria-pressed'), 'true');
+  assert.equal(await wrapButton.getAttribute('data-variant'), 'secondary');
+  const wrapIcon = await wrapButton.locator('svg').innerHTML();
   const wrapMetrics = await long.evaluate((el) => {
     const code = el.querySelector('code');
     const content = code.firstElementChild;
@@ -106,6 +108,8 @@ try {
   await wrapButton.click();
   assert.equal(await wrapButton.getAttribute('aria-label'), 'Word wrap');
   assert.equal(await wrapButton.getAttribute('aria-pressed'), 'false');
+  assert.equal(await wrapButton.getAttribute('data-variant'), 'ghost');
+  assert.equal(await wrapButton.locator('svg').innerHTML(), wrapIcon);
   assert.ok(await long.evaluate((el) => el.scrollWidth > el.clientWidth));
   assert.equal(await long.textContent(), longText);
   const copyButton = longBlock.getByRole('button', { name: 'Copy code', exact: true });
@@ -251,7 +255,7 @@ try {
   await annotated.getByRole('button', { name: '自动换行', exact: true }).hover();
   await frame
     .locator('[data-slot="tooltip-content"]')
-    .filter({ hasText: /^启用自动换行$/ })
+    .filter({ hasText: /^当前：自动换行已关闭 · 点击开启$/ })
     .waitFor();
   await annotated.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(artifacts, 'dark.png') });

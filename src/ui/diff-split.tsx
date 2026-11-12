@@ -19,10 +19,12 @@ export function DiffSplit({
   rows,
   renderCell,
   layout,
+  wrap,
 }: {
   rows: DiffSplitRow[];
   renderCell: (side: 'old' | 'new', cell: DiffCell, endingNote: boolean) => ReactNode;
   layout: 'document' | 'bounded';
+  wrap: boolean;
 }) {
   const { t } = useUI();
   const sourceId = useId();
@@ -175,7 +177,7 @@ export function DiffSplit({
       window.removeEventListener('scroll', scroll, true);
       window.removeEventListener('resize', measure);
     };
-  }, [rows, connections, layout]);
+  }, [rows, connections, layout, wrap]);
 
   return (
     <div
@@ -190,13 +192,15 @@ export function DiffSplit({
           className={`min-w-0 overflow-x-auto overflow-y-hidden ${side === 'old' ? 'pr-6 pl-3.5' : 'pr-3.5 pl-6'}`}
           data-diff-scroll={side}
           tabIndex={0}
-          aria-label={t('{side} diff, scroll horizontally for long lines', {
+          aria-label={t(wrap ? '{side} diff' : '{side} diff, scroll horizontally for long lines', {
             side: t(side === 'old' ? 'Old' : 'New'),
           })}
         >
           <table
             id={`${sourceId}-${side}`}
-            className="w-max min-w-full border-collapse"
+            className={
+              wrap ? 'w-full table-fixed border-collapse' : 'w-max min-w-full border-collapse'
+            }
             data-diff-table={side}
           >
             <tbody>
@@ -209,7 +213,9 @@ export function DiffSplit({
                         data-diff-hunk={side === 'old' ? row.hunk.index : undefined}
                         data-diff-hunk-header=""
                       >
-                        <td className="bg-muted p-2 font-mono text-sm whitespace-nowrap">
+                        <td
+                          className={`bg-muted p-2 font-mono text-sm ${wrap ? 'wrap-break-word' : 'whitespace-nowrap'}`}
+                        >
                           {row.hunk.label}
                         </td>
                       </tr>,

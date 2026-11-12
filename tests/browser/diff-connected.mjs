@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -256,13 +257,13 @@ try {
   const located = await line('new', 48).boundingBox(),
     clip = await viewport.boundingBox();
   assert.ok(located.y >= clip.y && located.y < clip.y + clip.height);
-  await frame.getByRole('button', { name: '单列对比', exact: true }).click();
+  await selectDiffLayout(frame, '单列对比');
   assert.equal(await frame.locator('[data-diff-connectors]').count(), 0);
-  await frame.getByRole('button', { name: '左右对比', exact: true }).click();
+  await selectDiffLayout(frame, '左右对比');
   await assertContinuous();
   assert.equal(JSON.parse(await frame.locator('[data-draft]').textContent()).annotations.length, 2);
 
-  await frame.getByRole('button', { name: '收起上下文', exact: true }).click();
+  await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
   assert.ok((await frame.locator('[data-diff-hunk]').count()) > 1);
   assert.equal(
     await frame.locator('tr:not([data-diff-hunk-header]) td:not(:has([data-code-side]))').count(),
@@ -286,7 +287,7 @@ try {
     'Hunk headers and source rows also remain continuous in collapsed context.',
   );
   await source.screenshot({ path: join(artifacts, 'hunks-light.png') });
-  await frame.getByRole('button', { name: '展开全部上下文', exact: true }).click();
+  await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
   await frame.getByRole('button', { name: 'Toggle document', exact: true }).click();
   await source.filter({ has: frame.locator('[data-diff-connectors]') }).waitFor();
   await assertContinuous();

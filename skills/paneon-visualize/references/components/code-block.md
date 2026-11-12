@@ -24,3 +24,5 @@ interface CodeBlockProps<TRef> {
   className?: string; // root container
 }
 ```
+
+The wrap tooltip describes the current state and next action. CodeBlock and DiffView use the same wrap-state interaction, with their own defaults: CodeBlock wraps by default and DiffView does not.

@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
@@ -46,9 +47,9 @@ try {
   const viewport = frame.locator('[data-boundary-viewport]');
   const counter = button('定位当前差异');
   await counter.waitFor();
-  assert.equal(await counter.textContent(), '1 / 2 处差异');
+  assert.equal(await counter.textContent(), '1 / 2');
   await button('下一个差异').click();
-  assert.equal(await counter.textContent(), '2 / 2 处差异');
+  assert.equal(await counter.textContent(), '2 / 2');
   async function assertLineVisible(number) {
     const line = await frame.locator(`[data-code-side="new"][data-line="${number}"]`).boundingBox();
     const header = await frame.locator('[data-diff-header]').boundingBox();
@@ -60,13 +61,13 @@ try {
   }
   await assertLineVisible(115);
   for (const mode of ['单列对比', '左右对比']) {
-    await button(mode).click();
+    await selectDiffLayout(frame, mode);
     await assertLineVisible(115);
-    await button('收起上下文').click();
+    await button('隐藏未改动行').click();
     await counter.click();
     await assertLineVisible(115);
-    assert.equal(await counter.textContent(), '2 / 2 处差异');
-    await button('展开全部上下文').click();
+    assert.equal(await counter.textContent(), '2 / 2');
+    await button('隐藏未改动行').click();
   }
   await button('上一个差异').click();
 

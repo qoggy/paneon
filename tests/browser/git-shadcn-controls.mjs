@@ -49,15 +49,15 @@ try {
   const button = (name) => frame.getByRole('button', { name, exact: true });
   const counter = button('定位当前差异');
   await counter.waitFor();
-  assert.equal(await counter.textContent(), '1 / 3 处差异');
+  assert.equal(await counter.textContent(), '1 / 3');
   await tooltip(page, frame, counter, '定位当前差异');
   await tooltip(page, frame, button('下一个差异'), '下一个差异');
   await button('下一个差异').click();
-  assert.equal(await counter.textContent(), '2 / 3 处差异');
+  assert.equal(await counter.textContent(), '2 / 3');
   await tooltip(page, frame, button('上一个差异'), '上一个差异');
   await button('上一个差异').focus();
   await page.keyboard.press('Enter');
-  assert.equal(await counter.textContent(), '1 / 3 处差异');
+  assert.equal(await counter.textContent(), '1 / 3');
   await page.screenshot({ path: join(artifacts, 'git-diff.png'), fullPage: true });
   const diffText = await frame.locator('[data-diff-source]').innerText();
   const selectedFile = await frame

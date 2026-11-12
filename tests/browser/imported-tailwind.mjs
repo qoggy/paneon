@@ -106,8 +106,10 @@ export default definePanel({id:'imported-tailwind',requires:{paneon:'${PACKAGE_V
       'Imported dark utilities must follow the panel theme rather than the system theme.',
     );
     for (const mode of ['split', 'unified']) {
-      if (mode === 'unified')
-        await frame.getByRole('button', { name: 'Unified', exact: true }).click();
+      if (mode === 'unified') {
+        await frame.getByRole('button', { name: 'Comparison layout', exact: true }).click();
+        await frame.getByRole('menuitemradio', { name: 'Unified', exact: true }).click();
+      }
       const colors = await frame.locator('[data-code-side]').evaluateAll((elements) =>
         elements.map((element) => {
           const cell = element.closest('td');
@@ -141,7 +143,8 @@ export default definePanel({id:'imported-tailwind',requires:{paneon:'${PACKAGE_V
       evidence.push({ theme, mode, colors });
       await page.screenshot({ path: join(artifacts, `${theme}-${mode}.png`), fullPage: true });
     }
-    await frame.getByRole('button', { name: 'Side by side', exact: true }).click();
+    await frame.getByRole('button', { name: 'Comparison layout', exact: true }).click();
+    await frame.getByRole('menuitemradio', { name: 'Side by side', exact: true }).click();
   }
   // Changes to the imported source stay in the revision/watch graph.
   await writeFile(join(shared, 'legacy.tsx'), legacy(14));

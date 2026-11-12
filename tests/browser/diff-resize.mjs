@@ -90,10 +90,10 @@ try {
       await assertAlignment();
     }
     assert.equal(await source.evaluate((element) => element.isConnected), true);
-    await frame.getByRole('button', { name: '收起上下文', exact: true }).click();
+    await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
     await assertAlignment();
     await dragSidebar(60);
-    await frame.getByRole('button', { name: '展开全部上下文', exact: true }).click();
+    await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
     await assertAlignment();
     assert.equal(requests, 0, 'Resizing retains source DOM and does not read files or Git.');
     page.off('request', observe);

@@ -150,8 +150,16 @@ try {
   assert.equal(await block.locator('pre').getAttribute('data-numbered'), null);
   assert.equal(await block.locator('[data-line-highlighted]').count(), 2);
   const wrap = block.getByRole('button', { name: 'Word wrap', exact: true });
+  const offIcon = await wrap.locator('svg').innerHTML();
+  assert.equal(await wrap.getAttribute('data-variant'), 'ghost');
   await wrap.press('Space');
   assert.equal(await wrap.getAttribute('aria-pressed'), 'true');
+  assert.equal(
+    await wrap.locator('svg').innerHTML(),
+    offIcon,
+    'The wrap icon stays fixed while the selected background shows state.',
+  );
+  assert.equal(await wrap.getAttribute('data-variant'), 'secondary');
   assert.ok(await block.locator('pre').evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
   await frame.getByRole('button', { name: '修改初始换行', exact: true }).click();
   await frame.getByRole('button', { name: '修改初始换行', exact: true }).click();

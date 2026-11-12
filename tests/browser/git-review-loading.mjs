@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -61,8 +62,8 @@ try {
   const fileId = await frame
     .locator('[data-file-id][aria-pressed=true]')
     .getAttribute('data-file-id');
-  await button('单列对比').click();
-  assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
+  await selectDiffLayout(frame, '单列对比');
+  assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
   await frame.locator('[data-code-side="new"][data-line="320"]').waitFor();
   const separator = frame.getByRole('separator', { name: '调整提交历史与文件差异高度' });
   await separator.focus();
@@ -102,8 +103,8 @@ try {
   await frame.locator('[data-git-diff-scroll]').waitFor({ state: 'visible' });
   assert.equal(await retained.evaluate((el) => el.isConnected), true);
   assert.equal(await frame.locator('[data-diff-source]').getAttribute('data-diff-source'), source);
-  assert.equal(await button('单列对比').getAttribute('aria-pressed'), 'true');
-  assert.equal(await button('收起上下文').getAttribute('aria-expanded'), 'true');
+  assert.equal((await button('对比方式').innerText()).trim(), '单列对比');
+  assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
   assert.equal(await separator.getAttribute('aria-valuenow'), split);
   assert.deepEqual(
     await content.evaluate(() => ({

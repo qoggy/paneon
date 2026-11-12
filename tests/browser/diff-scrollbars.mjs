@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { PACKAGE_VERSION } from '../panel-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -196,17 +197,17 @@ try {
   assert.equal(await originalNode.evaluate((element) => element.isConnected), true);
   assert.equal(reads, 0, 'Scrolling keeps source DOM and performs no file or Git reads.');
 
-  await frame.getByRole('button', { name: '收起上下文', exact: true }).click();
+  await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
   await settle();
   assert.equal(await source.getByRole('scrollbar').count(), 2);
-  await frame.getByRole('button', { name: '单列对比', exact: true }).click();
+  await selectDiffLayout(frame, '单列对比');
   assert.equal(await source.getByRole('scrollbar').count(), 0);
   assert.notEqual(
     await viewport.evaluate((element) => getComputedStyle(element).scrollbarWidth),
     'none',
   );
-  await frame.getByRole('button', { name: '左右对比', exact: true }).click();
-  await frame.getByRole('button', { name: '展开全部上下文', exact: true }).click();
+  await selectDiffLayout(frame, '左右对比');
+  await frame.getByRole('button', { name: '隐藏未改动行', exact: true }).click();
   await dragThumb('new', 0.5);
   await frame.locator('[data-test-host]').evaluate((element) => {
     element.style.height = '24rem';

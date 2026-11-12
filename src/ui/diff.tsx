@@ -73,6 +73,8 @@ export type DiffViewProps<TRef = JsonValue> = {
   newPath?: string;
   oldRevision?: string;
   newRevision?: string;
+  /** Initial word wrapping; users can toggle it. Defaults to false. */
+  defaultWrap?: boolean;
   defaultExpanded?: boolean;
   onCollapse?: () => void;
   /** Opt into a bounded code viewport; ordinary document consumers retain natural flow. */
@@ -103,12 +105,14 @@ function StringDiffView<TRef>({
   newPath,
   oldRevision,
   newRevision,
+  defaultWrap = false,
   defaultExpanded = true,
   onCollapse,
   layout = 'document',
   feedback,
 }: DiffViewProps<TRef> & { feedback?: ReturnType<typeof useAnnotations<TRef>> }) {
   const sourceId = useId();
+  const [wrap, setWrap] = useState(defaultWrap);
   const oldKey =
     annotationTargets?.old === undefined ? undefined : annotationKey(annotationTargets.old);
   const newKey =
@@ -357,7 +361,7 @@ function StringDiffView<TRef>({
     const highlight = side === 'old' ? oldHighlight : newHighlight;
     return (
       <td className="align-top" data-diff-kind={kind} style={{ backgroundColor: background }}>
-        <div className="flex h-6 font-mono text-sm leading-6">
+        <div className={`flex font-mono text-sm leading-6 ${wrap ? 'min-h-6' : 'h-6'}`}>
           <span
             ref={
               changed
@@ -368,7 +372,7 @@ function StringDiffView<TRef>({
                   }
                 : undefined
             }
-            className={`sticky z-[1] flex shrink-0 items-center bg-background/95 text-muted-foreground select-none ${side === 'old' && !unified ? 'right-0 order-2 border-l' : 'left-0 border-r'}`}
+            className={`sticky z-[1] flex shrink-0 items-start bg-background/95 text-muted-foreground select-none ${side === 'old' && !unified ? 'right-0 order-2 border-l' : 'left-0 border-r'}`}
             data-diff-gutter={side}
             style={
               changed
@@ -389,7 +393,7 @@ function StringDiffView<TRef>({
             data-code-side={side}
             data-source-start={line.start}
             data-line={line.number}
-            className="min-w-max flex-1 px-3 whitespace-pre"
+            className={`flex-1 px-3 ${wrap ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : 'min-w-max whitespace-pre'}`}
           >
             <HighlightedCodeText
               code={body}
@@ -397,13 +401,15 @@ function StringDiffView<TRef>({
               tokens={highlight.tokens ? [highlight.tokens[line.number - 1] ?? []] : undefined}
               sourceStart={line.start}
               spans={spans}
-              className="inline max-w-none overflow-visible rounded-none border-0 bg-transparent p-0 leading-6"
+              className={`inline max-w-none overflow-visible rounded-none border-0 bg-transparent p-0 leading-6 ${wrap ? 'wrap-break-word whitespace-pre-wrap' : ''}`}
             />
             {ending}
           </span>
         </div>
         {endingNote && (
-          <div className="h-5 pl-16 text-xs text-muted-foreground select-none">
+          <div
+            className={`pl-16 text-xs text-muted-foreground select-none ${wrap ? 'min-h-5 wrap-break-word' : 'h-5'}`}
+          >
             {!line.text.endsWith('\n') ? `\\ ${t('No newline at end of file')}` : ''}
           </div>
         )}
@@ -417,9 +423,13 @@ function StringDiffView<TRef>({
         className="min-w-0 overflow-x-auto"
         data-diff-scroll="unified"
         tabIndex={0}
-        aria-label={t('单列差异，横向滚动查看长行')}
+        aria-label={t(wrap ? 'Unified diff' : '单列差异，横向滚动查看长行')}
       >
-        <table className="w-max min-w-full border-collapse">
+        <table
+          className={
+            wrap ? 'w-full table-fixed border-collapse' : 'w-max min-w-full border-collapse'
+          }
+        >
           <tbody>
             {lines.map(({ side, cell }, index) => (
               <tr key={index}>{code(side, cell, !cell.line.text.endsWith('\n'))}</tr>
@@ -432,11 +442,15 @@ function StringDiffView<TRef>({
         className="min-w-0 overflow-x-auto"
         data-diff-scroll={side}
         tabIndex={0}
-        aria-label={t('{side} diff, scroll horizontally for long lines', {
+        aria-label={t(wrap ? '{side} diff' : '{side} diff, scroll horizontally for long lines', {
           side: t(side === 'old' ? 'Old' : 'New'),
         })}
       >
-        <table className="w-max min-w-full border-collapse">
+        <table
+          className={
+            wrap ? 'w-full table-fixed border-collapse' : 'w-max min-w-full border-collapse'
+          }
+        >
           <tbody>
             {split.flatMap((row, index) =>
               row[side]
@@ -460,6 +474,7 @@ function StringDiffView<TRef>({
         ref={root}
         data-diff-source={sourceId}
         data-diff-layout={layout}
+        data-wrap={wrap}
         className={rootClassName}
         aria-busy="true"
       >
@@ -478,6 +493,7 @@ function StringDiffView<TRef>({
       data-diff-source={sourceId}
       className={rootClassName}
       data-diff-layout={layout}
+      data-wrap={wrap}
       aria-busy="false"
     >
       <style>
@@ -492,6 +508,8 @@ function StringDiffView<TRef>({
           <DiffToolbar
             unified={unified}
             expanded={expanded}
+            wrap={wrap}
+            onWrap={() => setWrap((value) => !value)}
             current={currentChange}
             total={changes.length}
             onNavigate={navigate}
@@ -588,7 +606,7 @@ function StringDiffView<TRef>({
           {sideBySide ? (
             splitRows.length > 0 && (
               <div className="min-w-0 border-b">
-                <DiffSplit rows={splitRows} renderCell={code} layout={layout} />
+                <DiffSplit rows={splitRows} renderCell={code} layout={layout} wrap={wrap} />
               </div>
             )
           ) : expanded ? (

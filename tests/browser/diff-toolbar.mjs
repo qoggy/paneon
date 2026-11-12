@@ -1,3 +1,4 @@
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { SKILL_ROOT } from '../skill-paths.ts';
 import { readPanelFixture } from '../panel-fixture.ts';
 import { selectDiffLines } from './annotation-tools.mjs';
@@ -50,31 +51,71 @@ try {
   const next = button('下一个差异');
   const viewport = frame.locator('[data-toolbar-viewport]');
   await counter.waitFor();
-  assert.equal(await counter.textContent(), '1 / 3 处差异');
+  assert.equal(await counter.textContent(), '1 / 3');
   assert.equal(await previous.isDisabled(), true);
   assert.equal(await next.isEnabled(), true);
-  assert.equal(await button('左右对比').getAttribute('aria-pressed'), 'true');
+  assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
+  const toolbar = frame.getByRole('group', { name: '差异操作', exact: true });
+  assert.equal(await toolbar.getByRole('group', { name: '差异导航', exact: true }).count(), 1);
+  assert.equal(await toolbar.getByRole('group', { name: '差异显示选项', exact: true }).count(), 1);
+  const context = button('隐藏未改动行');
+  assert.equal(await context.getAttribute('aria-pressed'), 'true');
+  assert.equal(await context.getAttribute('data-variant'), 'secondary');
+  assert.equal(await context.getAttribute('data-size'), 'icon-sm');
+  const layout = button('对比方式');
+  await layout.focus();
+  await layout.press('Enter');
+  assert.equal(
+    await frame
+      .getByRole('menuitemradio', { name: '左右对比', exact: true })
+      .getAttribute('aria-checked'),
+    'true',
+  );
+  assert.equal(
+    await frame
+      .getByRole('menuitemradio', { name: '单列对比', exact: true })
+      .getAttribute('aria-checked'),
+    'false',
+  );
+  await page.keyboard.press('Escape');
   await next.click();
-  assert.equal(await counter.textContent(), '2 / 3 处差异');
+  assert.equal(await counter.textContent(), '2 / 3');
   assert.ok((await viewport.evaluate((e) => e.scrollTop)) > 0);
   const secondScroll = await viewport.evaluate((e) => e.scrollTop);
   await next.click();
-  assert.equal(await counter.textContent(), '3 / 3 处差异');
+  assert.equal(await counter.textContent(), '3 / 3');
   assert.equal(await next.isDisabled(), true);
   assert.ok((await viewport.evaluate((e) => e.scrollTop)) > secondScroll);
   await previous.focus();
   await page.keyboard.press('Enter');
-  assert.equal(await counter.textContent(), '2 / 3 处差异');
+  assert.equal(await counter.textContent(), '2 / 3');
   await viewport.evaluate((e) => {
     e.scrollTop = 0;
   });
   await counter.click();
   assert.ok((await viewport.evaluate((e) => e.scrollTop)) > 0);
-  await button('单列对比').click();
-  assert.equal(await button('单列对比').getAttribute('aria-pressed'), 'true');
+  await viewport.evaluate((e) => {
+    e.scrollTop = 0;
+  });
+  await selectDiffLayout(frame, '左右对比');
+  assert.ok(
+    (await viewport.evaluate((e) => e.scrollTop)) > 0,
+    'Choosing the current layout still reveals the current difference.',
+  );
+  await selectDiffLayout(frame, '单列对比');
+  assert.equal((await button('对比方式').innerText()).trim(), '单列对比');
+  await layout.focus();
+  await layout.press('Enter');
+  const split = frame.getByRole('menuitemradio', { name: '左右对比', exact: true });
+  await split.focus();
+  await split.press('Enter');
+  assert.equal((await layout.innerText()).trim(), '左右对比');
+  await selectDiffLayout(frame, '单列对比');
   assert.equal(await frame.locator('[data-diff-split]').count(), 0);
-  assert.equal(await counter.textContent(), '2 / 3 处差异');
-  await button('展开全部上下文').click();
+  assert.equal(await counter.textContent(), '2 / 3');
+  await button('隐藏未改动行').click();
+  assert.equal(await context.getAttribute('aria-pressed'), 'false');
+  assert.equal(await context.getAttribute('data-variant'), 'ghost');
   await counter.click();
   const changed = frame.locator('[data-code-side="new"][data-line="45"]');
   assert.ok(await changed.isVisible());
@@ -92,7 +133,7 @@ try {
         `const line${i + 1} = "${[10, 45, 80].includes(i + 1) ? 'changed' : 'original'} ${i + 1}";\r\n`,
     ).join(''),
   );
-  await button('左右对比').click();
+  await selectDiffLayout(frame, '左右对比');
   assert.equal(await frame.locator('[data-diff-split]').count(), 1);
 
   await selectDiffLines(frame, 'new', 45);
@@ -100,8 +141,8 @@ try {
   await comments.write('Keep exact line 45');
   await comments.save();
   assert.equal(await comments.count(), 1);
-  await button('单列对比').click();
-  await button('收起上下文').click();
+  await selectDiffLayout(frame, '单列对比');
+  await button('隐藏未改动行').click();
   assert.equal(await comments.count(), 1);
   assert.equal(await comments.text(1), 'Keep exact line 45');
   if (process.env.PANEON_TEST_DESKTOP_ONLY !== '1') {
@@ -118,10 +159,11 @@ try {
   await button('Binary source').click();
   assert.equal(await frame.getByRole('group', { name: '差异操作', exact: true }).count(), 0);
   await button('Changed source').click();
-  assert.equal(await counter.textContent(), '1 / 3 处差异');
+  assert.equal(await counter.textContent(), '1 / 3');
   await page.setViewportSize({ width: 1100, height: 650 });
-  await button('左右对比').click();
+  await selectDiffLayout(frame, '左右对比');
 
+  await frame.getByRole('menu').waitFor({ state: 'hidden' });
   await viewport.evaluate(async (element) => {
     element.scrollTop = 0;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));

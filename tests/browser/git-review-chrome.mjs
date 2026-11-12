@@ -131,13 +131,13 @@ try {
   await comments.write('Exact bounded line');
   await comments.save();
 
-  await button('收起上下文').click();
+  await button('隐藏未改动行').click();
 
   await selectDiffLines(frame, 'new', 291);
   await comments.write('Context line with unchanged surroundings collapsed');
   await comments.save();
 
-  await button('展开全部上下文').click();
+  await button('隐藏未改动行').click();
   await comments.locate(2);
   const located = await frame.locator('[data-code-side="new"][data-line="290"]').boundingBox();
   assert.ok(located.y >= initial.viewport.top && located.y < initial.viewport.bottom);
