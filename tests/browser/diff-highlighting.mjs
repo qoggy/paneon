@@ -48,12 +48,21 @@ const after = [
   '',
   '仅新增这一行。',
 ].join('\r\n');
+const largeBefore = [
+  '/* multi-line comment',
+  'export const inside = 0;',
+  '*/',
+  ...Array.from({ length: 997 }, (_, i) => `export const value${i} = ${i};`),
+].join('\r\n');
+const largeAfter = largeBefore.replace('value500 = 500', 'value500 = 501');
 let service, browser, page;
 try {
   const skill = join(root, 'skill');
   await cp(process.env.PANEON_TEST_SKILL_SOURCE ?? SKILL_ROOT, skill, { recursive: true });
   await writeFile(join(root, 'before.md'), before);
   await writeFile(join(root, 'after.md'), after);
+  await writeFile(join(root, 'large-before.ts'), largeBefore);
+  await writeFile(join(root, 'large-after.ts'), largeAfter);
   await writeFile(
     join(root, 'before.ts'),
     '// 注意：连接内网，使用 JDK8。\nconst mode = "sync";\ntype Client = string;\n',
@@ -84,6 +93,7 @@ try {
       files: [
         { displayPath: 'docs/client.md', oldPath: 'before.md', newPath: 'after.md' },
         { displayPath: 'src/readability.ts', oldPath: 'before.ts', newPath: 'after.ts' },
+        { displayPath: 'src/large.ts', oldPath: 'large-before.ts', newPath: 'large-after.ts' },
       ],
     },
     false,
@@ -217,6 +227,88 @@ try {
     await page.screenshot({ path: join(evidence, `readability-${theme}.png`) });
   }
   await writeFile(join(evidence, 'contrast.json'), JSON.stringify(contrast, null, 2));
+
+  // Slow reads and syntax preparation share one stable loading state. The first
+  // source DOM must already contain its final tokens, rather than flashing plain text.
+  await preferences('light');
+  let releaseRead, startedRead;
+  const readGate = new Promise((resolve) => (releaseRead = resolve));
+  const readStarted = new Promise((resolve) => (startedRead = resolve));
+  const actionURL = `**/api/panels/${instance.instanceId}/actions/*`;
+  await page.route(actionURL, async (route) => {
+    if (route.request().postDataJSON()?.input?.newPath !== 'large-after.ts')
+      return route.continue();
+    const response = await route.fetch();
+    startedRead();
+    await readGate;
+    await route.fulfill({ response });
+  });
+  const comparison = frame.getByRole('region', { name: '文件差异', exact: true });
+  try {
+    await frame.getByRole('button', { name: 'large.ts', exact: true }).dblclick();
+    await readStarted;
+    const loading = comparison.getByRole('status');
+    await loading.waitFor();
+    assert.equal(await loading.textContent(), '正在准备文件差异…');
+    const regionBox = await comparison.boundingBox();
+    const spinnerBox = await loading.locator('svg').boundingBox();
+    assert.ok(
+      Math.abs(spinnerBox.y + spinnerBox.height / 2 - regionBox.y - regionBox.height / 2) < 2,
+    );
+    await page.screenshot({ path: join(evidence, 'loading.png') });
+    await comparison.evaluate((element) => {
+      window.diffRenderStates = [];
+      window.diffRenderObserver = new MutationObserver(() => {
+        window.diffRenderStates.push({
+          lines: element.querySelectorAll('[data-code-side]').length,
+          tokens: element.querySelectorAll('[data-shiki-token]').length,
+          loading: !!element.querySelector('[role="status"]'),
+        });
+      });
+      window.diffRenderObserver.observe(element, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    });
+    releaseRead();
+    await line('new', 1000).locator('[data-shiki-token]').first().waitFor();
+    const states = await comparison.evaluate(() => {
+      window.diffRenderObserver.disconnect();
+      return window.diffRenderStates;
+    });
+    assert.ok(states.some((state) => state.lines === 2000));
+    assert.ok(
+      states.every((state) =>
+        state.lines === 0
+          ? state.loading
+          : state.lines === 2000 && state.tokens > 0 && !state.loading,
+      ),
+      JSON.stringify(states),
+    );
+    for (const [side, source] of [
+      ['old', largeBefore],
+      ['new', largeAfter],
+    ]) {
+      assert.equal(
+        (await frame.locator(`[data-code-side="${side}"]`).allTextContents()).join(''),
+        source,
+      );
+    }
+    const commentColors = await Promise.all(
+      [1, 2].map((number) =>
+        line('new', number)
+          .locator('[data-shiki-token]')
+          .evaluateAll((tokens) => tokens.map((token) => getComputedStyle(token).color)),
+      ),
+    );
+    assert.deepEqual(commentColors[0], commentColors[1], 'Grammar state crosses line boundaries.');
+    assert.equal(await inline('new', 504, 'modify'), '501');
+    await page.screenshot({ path: join(evidence, 'large-ready.png') });
+  } finally {
+    releaseRead();
+    await page.unroute(actionURL);
+  }
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
@@ -225,6 +317,9 @@ try {
       continuousLines: true,
       exactSourceText: true,
       syntaxHighlighting: true,
+      stableLoading: true,
+      fullyHighlightedFirstRender: true,
+      multilineGrammar: true,
       annotationSubmission: true,
       unified: true,
       darkTheme: true,

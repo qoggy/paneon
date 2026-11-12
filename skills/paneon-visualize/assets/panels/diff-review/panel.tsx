@@ -140,9 +140,12 @@ function ComparisonView({
   }, [comparison, onStatus, onRead, fileIndex, query.loading, query.error, query.data]);
   if (query.loading)
     return (
-      <p role="status" className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+      <p
+        role="status"
+        className="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-muted-foreground"
+      >
         <Spinner aria-hidden="true" />
-        {zh ? '正在读取文件…' : 'Reading files…'}
+        {zh ? '正在准备文件差异…' : 'Preparing file diff…'}
       </p>
     );
   if (query.error)

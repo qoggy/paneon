@@ -1,6 +1,7 @@
 import type { DiffInlineSpan } from './diff-presentation';
 import { cn } from './utils';
 import { codeTokenStyle, useCodeHighlighting } from './code-highlighting';
+import type { ThemedTokenWithVariants } from 'shiki';
 
 /** Private text renderer. Decorations split syntax tokens without changing source text. */
 export function CodeText({
@@ -15,6 +16,33 @@ export function CodeText({
   spans?: readonly DiffInlineSpan[];
 }) {
   const { language: lang, tokens } = useCodeHighlighting(code, language);
+  return (
+    <HighlightedCodeText
+      code={code}
+      language={lang}
+      tokens={tokens}
+      className={className}
+      spans={spans}
+    />
+  );
+}
+
+/** Prepared tokens let a diff tokenize each complete source once, preserving grammar state. */
+export function HighlightedCodeText({
+  code,
+  language,
+  tokens,
+  sourceStart = 0,
+  className,
+  spans = [],
+}: {
+  code: string;
+  language: string;
+  tokens?: ThemedTokenWithVariants[][];
+  sourceStart?: number;
+  className?: string;
+  spans?: readonly DiffInlineSpan[];
+}) {
   const decorate = (text: string, start: number) => {
     if (!spans.length) return text;
     const pieces = [];
@@ -42,7 +70,7 @@ export function CodeText({
   };
   return (
     <pre
-      data-language={lang}
+      data-language={language}
       className={cn(
         'max-w-full overflow-x-auto rounded-md border bg-muted/50 p-4 font-mono text-sm',
         className,
@@ -55,7 +83,7 @@ export function CodeText({
                 <span>
                   {line.map((token, j) => (
                     <span key={j} data-shiki-token="" style={codeTokenStyle(token)}>
-                      {decorate(token.content, token.offset)}
+                      {decorate(token.content, token.offset - sourceStart)}
                     </span>
                   ))}
                   {i < tokens.length - 1 ? '\n' : ''}

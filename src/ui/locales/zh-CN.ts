@@ -183,6 +183,7 @@ const zh: Record<keyof typeof en, string> = {
   'Collapse file diff': '收起文件差异',
   New: '新',
   'No newline at end of file': '文件末尾无换行',
+  'Preparing file diff…': '正在准备文件差异…',
   Old: '旧',
   '{current} / {total} differences': '{current} / {total} 处差异',
   '{side} diff, scroll horizontally for long lines': '{side}侧差异，横向滚动查看长行',

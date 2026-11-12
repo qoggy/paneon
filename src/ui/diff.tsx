@@ -10,7 +10,9 @@ import {
 } from 'react';
 import type { Ref } from 'react';
 import { Button } from './button';
-import { CodeText } from './code-text';
+import { HighlightedCodeText } from './code-text';
+import { useCodeHighlighting } from './code-highlighting';
+import { Spinner } from './spinner';
 import { useAnnotations } from './annotation-context';
 import { annotationKey } from '../sdk/annotation';
 import type { ElementAnnotationRef, JsonValue } from '../sdk/annotation';
@@ -37,6 +39,29 @@ export type DiffViewHandle = {
   reveal(location: DiffLocation): Promise<void>;
   getRanges(location: DiffLocation): Range[];
 };
+function sourceLanguage(path?: string) {
+  const extension = path?.split('.').at(-1);
+  return (
+    {
+      ts: 'typescript',
+      tsx: 'tsx',
+      js: 'javascript',
+      jsx: 'jsx',
+      json: 'json',
+      jsonc: 'jsonc',
+      sh: 'bash',
+      yaml: 'yaml',
+      yml: 'yaml',
+      py: 'python',
+      java: 'java',
+      css: 'css',
+      html: 'html',
+      htm: 'html',
+      md: 'markdown',
+      markdown: 'markdown',
+    } as Record<string, string>
+  )[extension ?? ''];
+}
 export type DiffViewProps<TRef = JsonValue> = {
   ref?: Ref<DiffViewHandle>;
   /** References are delivered unchanged as target.ref; an omitted side cannot be annotated. */
@@ -102,6 +127,11 @@ function StringDiffView<TRef>({
     () => supplied ?? createDiffModel(oldText, newText),
     [supplied, oldText, newText],
   );
+  const oldHighlight = useCodeHighlighting(model.oldText ?? '', sourceLanguage(oldPath));
+  const newHighlight = useCodeHighlighting(model.newText ?? '', sourceLanguage(newPath));
+  const highlightingReady =
+    (oldHighlight.language === 'text' || !!oldHighlight.tokens) &&
+    (newHighlight.language === 'text' || !!newHighlight.tokens);
   const changes = useMemo(() => diffChanges(model.rows), [model]);
   const headerId = useId();
   const registerText = feedback?.registerText;
@@ -212,11 +242,11 @@ function StringDiffView<TRef>({
   );
   useLayoutEffect(() => {
     const request = pendingReveal.current;
-    if (!request || !root.current) return;
+    if (!request || !root.current || !highlightingReady) return;
     pendingReveal.current = null;
     cancelHighlight.current = revealDiffLocation(root.current, model, request.location);
     request.resolve();
-  }, [model, view.reveal, unified, expanded]);
+  }, [model, view.reveal, unified, expanded, highlightingReady]);
   useLayoutEffect(
     () => () => {
       pendingReveal.current?.resolve();
@@ -244,13 +274,14 @@ function StringDiffView<TRef>({
     [changes],
   );
   useLayoutEffect(() => {
+    if (!highlightingReady) return;
     if (initialLocation.current === model) return;
     if (defaultExpanded && !expanded) return;
     initialLocation.current = model;
     if (!defaultExpanded) return;
     const frame = requestAnimationFrame(() => revealChange(0));
     return () => cancelAnimationFrame(frame);
-  }, [model, expanded, defaultExpanded, revealChange]);
+  }, [model, expanded, defaultExpanded, revealChange, highlightingReady]);
   const navigate = (index: number) => {
     setView((current) => ({ ...current, index }));
     revealChange(index);
@@ -263,7 +294,7 @@ function StringDiffView<TRef>({
 
   useLayoutEffect(() => {
     const elementRoot = root.current;
-    if (!elementRoot || !registerText) return;
+    if (!elementRoot || !registerText || !highlightingReady) return;
     let removers: (() => void)[] = [];
     const register = () => {
       removers.forEach((remove) => remove());
@@ -316,34 +347,14 @@ function StringDiffView<TRef>({
       observer.disconnect();
       removers.forEach((remove) => remove());
     };
-  }, [targets, model, unified, expanded, registerText, presentation, reveal]);
+  }, [targets, model, unified, expanded, registerText, presentation, reveal, highlightingReady]);
   function code(side: 'old' | 'new', cell: DiffCell, endingNote: boolean) {
     const { line, kind, spans } = cell;
     const changed = kind !== 'context';
     const background = changed ? `var(--diff-${kind})` : undefined;
     const body = line.text.replace(/\r?\n$/, '');
     const ending = line.text.slice(body.length);
-    const extension = (side === 'old' ? oldPath : newPath)?.split('.').at(-1);
-    const language = (
-      {
-        ts: 'typescript',
-        tsx: 'tsx',
-        js: 'javascript',
-        jsx: 'jsx',
-        json: 'json',
-        jsonc: 'jsonc',
-        sh: 'bash',
-        yaml: 'yaml',
-        yml: 'yaml',
-        py: 'python',
-        java: 'java',
-        css: 'css',
-        html: 'html',
-        htm: 'html',
-        md: 'markdown',
-        markdown: 'markdown',
-      } as Record<string, string>
-    )[extension ?? ''];
+    const highlight = side === 'old' ? oldHighlight : newHighlight;
     return (
       <td className="align-top" data-diff-kind={kind} style={{ backgroundColor: background }}>
         <div className="flex h-6 font-mono text-sm leading-6">
@@ -380,9 +391,11 @@ function StringDiffView<TRef>({
             data-line={line.number}
             className="min-w-max flex-1 px-3 whitespace-pre"
           >
-            <CodeText
+            <HighlightedCodeText
               code={body}
-              language={language}
+              language={highlight.language}
+              tokens={highlight.tokens ? [highlight.tokens[line.number - 1] ?? []] : undefined}
+              sourceStart={line.start}
               spans={spans}
               className="inline max-w-none overflow-visible rounded-none border-0 bg-transparent p-0 leading-6"
             />
@@ -439,14 +452,33 @@ function StringDiffView<TRef>({
       </div>
     );
   };
+  const rootClassName =
+    layout === 'bounded' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'min-w-0';
+  if (!highlightingReady)
+    return (
+      <div
+        ref={root}
+        data-diff-source={sourceId}
+        data-diff-layout={layout}
+        className={rootClassName}
+        aria-busy="true"
+      >
+        <p
+          role="status"
+          className="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-muted-foreground"
+        >
+          <Spinner aria-hidden="true" />
+          {t('Preparing file diff…')}
+        </p>
+      </div>
+    );
   return (
     <div
       ref={root}
       data-diff-source={sourceId}
-      className={
-        layout === 'bounded' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'min-w-0'
-      }
+      className={rootClassName}
       data-diff-layout={layout}
+      aria-busy="false"
     >
       <style>
         {'::highlight(paneon-diff-location) { background-color: Highlight; color: HighlightText; }'}

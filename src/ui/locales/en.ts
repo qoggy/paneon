@@ -187,6 +187,7 @@ const en = {
   'Collapse file diff': 'Collapse file diff',
   New: 'New',
   'No newline at end of file': 'No newline at end of file',
+  'Preparing file diff…': 'Preparing file diff…',
   Old: 'Old',
   '{current} / {total} differences': '{current} / {total} differences',
   '{side} diff, scroll horizontally for long lines':
