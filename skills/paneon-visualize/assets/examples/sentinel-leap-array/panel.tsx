@@ -615,7 +615,7 @@ function SentinelPanel() {
 }
 export default definePanel({
   id: 'sentinel-leap-array-explanation',
-  requires: { paneon: '>=0.6.0 <0.7.0' },
+  requires: { paneon: '>=0.7.0 <0.8.0' },
   input: z.object({}).strict(),
   render: SentinelPanel,
 });

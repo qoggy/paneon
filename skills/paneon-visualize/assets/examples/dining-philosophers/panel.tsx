@@ -550,7 +550,7 @@ function DiningPhilosophersPanel() {
 }
 export default definePanel({
   id: 'dining-philosophers-explanation',
-  requires: { paneon: '>=0.6.0 <0.7.0' },
+  requires: { paneon: '>=0.7.0 <0.8.0' },
   input: z.object({}).strict(),
   render: DiningPhilosophersPanel,
 });

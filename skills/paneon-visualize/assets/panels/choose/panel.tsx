@@ -693,7 +693,7 @@ function ChoosePanel() {
 }
 export default definePanel({
   id: 'choose',
-  requires: { paneon: '>=0.6.0 <0.7.0' },
+  requires: { paneon: '>=0.7.0 <0.8.0' },
   input: chooseParamsSchema,
   render: ChoosePanel,
 });
