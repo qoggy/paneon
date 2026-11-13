@@ -1,18 +1,21 @@
 # File review
 
-Run `<skill>/assets/panels/file-review/panel.tsx` on one or more complete local text files, such as a plan with its code and configuration. The human reads them, annotates text and submits all annotations together.
+Run `<skill>/assets/panels/file-review/panel.tsx` on complete local text files, one or more directories, or their combination. The human reads the files, annotates text and submits all annotations together.
 
 ```json
 {
-  "title": "Review the cache plan and example",
-  "files": ["docs/cache-plan.md", "examples/cache.ts", "config/cache.json"]
+  "title": "Review the cache implementation and tests",
+  "directories": ["src/cache", "tests/cache"],
+  "files": ["docs/cache-plan.md"]
 }
 ```
 
 Input:
 
 - `title`: optional nonblank string.
-- `files`: nonempty array of paths, absolute or relative to `--cwd`. Each must be a regular UTF-8 text file of at most 1 MiB; empty files are fine. `.md` / `.markdown` files are rendered, others shown as source.
-- Files are read each time the page loads, so a reload of the same URL shows their current content and discards unsubmitted annotations. An unreadable file appears as an error in the page, not as a `panel run` failure. Pass the files under review; write a temporary file only for content that exists nowhere on disk.
+- `files`: optional array of file paths.
+- `directories`: optional array of directory paths; may be combined with `files`.
+
+Paths must be nonblank literal strings, absolute or relative to `--cwd`. Supply at least one path across `files` and `directories`. Other fields are rejected. Reviewable files must be regular UTF-8 text files of at most 1 MiB.
 
 `file-review-submitted` groups the annotations by file. Offsets refer to each file as read when the human opened it; if the file has changed since, locate an annotation by its `quote`.

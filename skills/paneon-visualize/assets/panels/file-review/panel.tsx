@@ -39,7 +39,7 @@ import {
   useUI,
 } from '@qoggy/paneon/ui';
 import type { TreeHandle } from '@qoggy/paneon/ui';
-import { CodeXml, Eye } from '../../shared/icons';
+import { ArrowUpRight, CodeXml, Eye } from '../../shared/icons';
 import { ChevronsDownUp, ChevronsUpDown, FolderTree, TreeIcon } from '../diff-review/icons';
 import { FileReviewSplit } from '../../shared/file-review-split';
 import { testFilePresentation } from '../../shared/test-file-presentation';
@@ -49,12 +49,14 @@ import { readFile, resolvePaths, validateFeedback } from './actions';
 import { publicFileFeedback } from './feedback';
 import {
   ancestorKeys,
-  directoryKeys,
+  initialExpandedKeys,
   fileLanguage,
   fileTree,
   isMarkdown,
   visibleFileCount,
 } from './model';
+import type { FileNode } from './model';
+import type { SymbolicLink } from './directory.ts';
 import { fileReviewParamsSchema, snapshotKey } from './schema';
 import type { FileRef, FileReviewParams, Snapshot } from './schema';
 
@@ -168,6 +170,11 @@ function FileReviewPanel() {
           rendered: '渲染',
           source: '源码',
           locatedSource: '已切换到源码，定位批注内容。',
+          scanning: '正在加载文件列表…',
+          noFiles: '目录中没有文件。',
+          scanFailed: '目录读取失败。',
+          incomplete: '部分目录读取失败，其他文件仍可审阅。',
+          cycle: '（循环）',
         }
       : {
           title: 'File review',
@@ -184,17 +191,39 @@ function FileReviewPanel() {
           rendered: 'Rendered',
           source: 'Source',
           locatedSource: 'Switched to source to locate the annotation.',
+          scanning: 'Loading files…',
+          noFiles: 'The directories contain no files.',
+          scanFailed: 'Could not read directories.',
+          incomplete: 'Some directories could not be read. Other files remain available.',
+          cycle: ' (cycle)',
         };
-  const paths = useQuery(resolvePaths, value.files);
-  const directoryRoots = useMemo(() => fileTree(paths.data ?? []), [paths.data]);
+  const paths = useQuery(resolvePaths, value);
+  const files = paths.data?.files ?? value.files ?? [];
+  const directoryRoots = useMemo(
+    () => fileTree(paths.data?.paths ?? [], true, paths.data?.directories ?? [], paths.data?.links),
+    [paths.data],
+  );
+  const initialExpanded = useMemo(
+    () =>
+      initialExpandedKeys(directoryRoots, paths.data?.directories ?? [], value.files?.length ?? 0),
+    [directoryRoots, paths.data, value.files],
+  );
   const [grouped, setGrouped] = useState(true);
   const roots = useMemo(
-    () => (grouped ? directoryRoots : fileTree(value.files, false)),
-    [grouped, directoryRoots, value.files],
+    () => (grouped ? directoryRoots : fileTree(files, false)),
+    [grouped, directoryRoots, files],
   );
   const [expanded, setExpanded] = useState<readonly string[]>();
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState(0);
+  const linksByPath = useMemo(
+    () => new Map(paths.data?.links.map((link) => [link.path, link]) ?? []),
+    [paths.data],
+  );
+  const openedLink = linksByPath.get(paths.data?.paths[opened] ?? '');
+  const linkForNode = (node: FileNode) =>
+    node.link ?? linksByPath.get(paths.data?.paths[node.fileIndex ?? -1] ?? '');
+  const linkHint = (link: SymbolicLink) => `${link.target}${link.cycle ? copy.cycle : ''}`;
   const [markdownViews, setMarkdownViews] = useState<Record<number, MarkdownView>>({});
   const view = markdownViews[opened] ?? 'rendered';
   const viewport = useRef<HTMLDivElement>(null);
@@ -207,10 +236,10 @@ function FileReviewPanel() {
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
-    if (entries.has(opened)) return;
+    if (entries.has(opened) || files[opened] === undefined) return;
     const fileIndex = opened;
     setEntries((previous) => new Map(previous).set(fileIndex, { status: 'loading' }));
-    void readFile({ files: value.files, fileIndex })
+    void readFile({ path: files[fileIndex], fileIndex })
       .then((result) => {
         if (!result.ok) {
           setEntries((previous) =>
@@ -223,7 +252,7 @@ function FileReviewPanel() {
         setEntries((previous) => new Map(previous).set(fileIndex, { status: 'ready', snapshot }));
       })
       .catch((error: unknown) => {
-        console.error('Could not read review file.', value.files[fileIndex], error);
+        console.error('Could not read review file.', files[fileIndex], error);
         setEntries((previous) =>
           new Map(previous).set(fileIndex, {
             status: 'error',
@@ -231,7 +260,7 @@ function FileReviewPanel() {
           }),
         );
       });
-  }, [opened, entries, value.files]);
+  }, [opened, entries, files]);
 
   const previewReady = useCallback((snapshot: Snapshot, view: MarkdownView) => {
     const key = `${snapshotKey(snapshot)}:${view}`;
@@ -281,7 +310,7 @@ function FileReviewPanel() {
         setSearch('');
         setExpanded((previous) => [
           ...new Set([
-            ...(previous ?? directoryKeys(directoryRoots)),
+            ...(previous ?? initialExpanded),
             ...(ancestorKeys(directoryRoots, snapshot.fileIndex) ?? []),
           ]),
         ]);
@@ -319,8 +348,8 @@ function FileReviewPanel() {
   const matches = (index: number, term: string) => {
     const needle = term.toLowerCase();
     return (
-      value.files[index].toLowerCase().includes(needle) ||
-      !!paths.data?.[index].toLowerCase().includes(needle)
+      files[index].toLowerCase().includes(needle) ||
+      !!paths.data?.paths[index].toLowerCase().includes(needle)
     );
   };
   const state = entries.get(opened);
@@ -335,7 +364,7 @@ function FileReviewPanel() {
   const count = (node: Parameters<typeof visibleFileCount>[0]) =>
     visibleFileCount(node, (index) => matches(index, search));
   const hasBranches = roots.some((node) => node.nodes !== undefined);
-  const content = (
+  const content = files.length ? (
     <Tabs
       value={view}
       onValueChange={(nextView) =>
@@ -345,17 +374,35 @@ function FileReviewPanel() {
       aria-label={copy.preview}
     >
       <div className="flex h-[33px] shrink-0 items-center justify-between gap-4 border-y px-4 text-sm font-medium">
-        <div className="min-w-0 truncate" title={value.files[opened]} data-file-review-path="">
+        <div
+          className="min-w-0 truncate"
+          title={openedLink ? undefined : files[opened]}
+          data-file-review-path=""
+        >
           {state?.status === 'ready' ? (
             <AnnotationText
               target={{ fileIndex: opened, snapshotId: state.snapshot.snapshotId, part: 'path' }}
             >
-              {value.files[opened]}
+              {files[opened]}
             </AnnotationText>
           ) : (
-            value.files[opened]
+            files[opened]
           )}
         </div>
+        {openedLink && (
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-block max-w-full truncate align-middle text-xs font-normal text-muted-foreground" />
+                }
+              >
+                → {openedLink.target}
+              </TooltipTrigger>
+              <TooltipContent>{linkHint(openedLink)}</TooltipContent>
+            </Tooltip>
+          </span>
+        )}
         {state?.status === 'ready' && isMarkdown(state.snapshot.path) && (
           <TabsList
             aria-label={copy.view}
@@ -420,9 +467,12 @@ function FileReviewPanel() {
         )}
       </TabsContent>
     </Tabs>
-  );
+  ) : null;
   const sidebar = (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <section
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      data-file-review-sidebar=""
+    >
       <div
         role="toolbar"
         aria-label={copy.actions}
@@ -454,17 +504,28 @@ function FileReviewPanel() {
         </ToolbarButton>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
+        {paths.loading && (
+          <p
+            role="status"
+            className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-muted-foreground"
+          >
+            <Spinner aria-hidden="true" />
+            {copy.scanning}
+          </p>
+        )}
         <Tree
           ref={tree}
           items={roots}
+          loading={paths.loading}
           getItemId={(node) => node.key}
           getItemLabel={(node) => node.name}
           getItemChildren={(node) => node.nodes}
+          isItemSelectable={(node) => node.fileIndex !== undefined}
           selectedId={`file:${opened}`}
           onSelectionChange={(key) => {
             if (key) setOpened(Number(key.slice(5)));
           }}
-          expandedIds={expanded ?? directoryKeys(directoryRoots)}
+          expandedIds={expanded ?? initialExpanded}
           onExpandedChange={setExpanded}
           onAction={(node) => {
             if (node.fileIndex !== undefined) setOpened(node.fileIndex);
@@ -474,45 +535,81 @@ function FileReviewPanel() {
             node.fileIndex !== undefined && matches(node.fileIndex, term)
           }
           getItemPresentation={(node, state) => {
-            if (node.fileIndex === undefined)
-              return { className: 'gap-1.5', title: `${node.name} · ${count(node)}` };
-            const path = value.files[node.fileIndex];
-            const presentation = testFilePresentation(path, state.selected);
+            const link = linkForNode(node);
+            const presentation =
+              node.fileIndex === undefined
+                ? { className: '' }
+                : testFilePresentation(files[node.fileIndex], state.selected);
             return {
               ...presentation,
-              className: `gap-1.5 ${presentation.className}`,
-              title: path,
+              className: `gap-1.5 ${presentation.className} ${link?.kind === 'unavailable' ? 'text-destructive' : ''}`,
+              title: link
+                ? undefined
+                : node.fileIndex === undefined
+                  ? `${node.name} · ${count(node)}`
+                  : files[node.fileIndex],
+              'data-symlink': link?.kind,
+              'aria-description': link ? linkHint(link) : undefined,
             };
           }}
-          renderItemContent={(node, state) => (
-            <>
-              {node.fileIndex === undefined ? (
-                <TreeIcon kind={state.expanded ? 'open' : 'folder'} />
-              ) : (
-                <FileIcon path={value.files[node.fileIndex]} className="size-3.5" />
-              )}
-              <span className="min-w-0 truncate">{node.name}</span>
-              {!grouped &&
-                node.fileIndex !== undefined &&
-                value.files[node.fileIndex].includes('/') && (
-                  <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">
-                    {value.files[node.fileIndex].slice(
-                      0,
-                      value.files[node.fileIndex].lastIndexOf('/'),
-                    ) || '/'}
+          renderItemContent={(node, state) => {
+            const link = linkForNode(node);
+            const label = (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className="relative inline-flex shrink-0">
+                  {node.fileIndex === undefined ? (
+                    <TreeIcon kind={state.expanded ? 'open' : 'folder'} />
+                  ) : (
+                    <FileIcon path={files[node.fileIndex]} className="size-3.5" />
+                  )}
+                  {link && (
+                    <ArrowUpRight
+                      aria-hidden="true"
+                      className="absolute -right-1 -bottom-1 size-2.5 rounded-sm bg-background"
+                    />
+                  )}
+                </span>
+                <span className="min-w-0 truncate">{node.name}</span>
+              </span>
+            );
+            return (
+              <>
+                {link ? (
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex max-w-full min-w-0" />}>
+                      {label}
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{linkHint(link)}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  label
+                )}
+                {!grouped &&
+                  node.fileIndex !== undefined &&
+                  files[node.fileIndex].includes('/') && (
+                    <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">
+                      {files[node.fileIndex].slice(0, files[node.fileIndex].lastIndexOf('/')) ||
+                        '/'}
+                    </span>
+                  )}
+                {node.nodes && (
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                    {count(node)}
                   </span>
                 )}
-              {node.nodes && (
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                  {count(node)}
-                </span>
-              )}
-            </>
-          )}
+              </>
+            );
+          }}
           emptyState={
             <Empty className="flex-none px-3 py-8">
               <EmptyHeader>
-                <EmptyDescription>{copy.empty}</EmptyDescription>
+                <EmptyDescription>
+                  {paths.error || (!files.length && paths.data?.issues.length)
+                    ? copy.scanFailed
+                    : search
+                      ? copy.empty
+                      : copy.noFiles}
+                </EmptyDescription>
               </EmptyHeader>
             </Empty>
           }
@@ -526,7 +623,17 @@ function FileReviewPanel() {
     <Page className="mx-0 flex h-screen min-h-0 max-w-none flex-col gap-4 space-y-0 p-4 md:p-4">
       <h1 className="text-lg font-semibold">{value.title ?? copy.title}</h1>
       {paths.error && <p role="alert">{paths.error.message}</p>}
-      {value.files.length === 1 ? (
+      {!!paths.data?.issues.length && (
+        <Alert>
+          <AlertTitle>{copy.incomplete}</AlertTitle>
+          <AlertDescription>
+            {paths.data.issues.map((issue) => (
+              <p key={issue.path}>{issue.message}</p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+      {files.length === 1 && !value.directories?.length ? (
         content
       ) : (
         <FileReviewSplit separatorLabel={copy.resize} sidebar={sidebar}>

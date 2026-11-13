@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { serverAction, z } from '@qoggy/paneon/sdk';
 import { readTextFile } from '../../shared/read-text-file.js';
+import { discoverFiles, withinDirectory } from './directory.ts';
 import {
   evidenceSchema,
   fileFeedbackSchema,
@@ -26,13 +27,15 @@ export const readFile = serverAction({
   kind: 'query',
   input: z
     .object({
-      files: fileReviewParamsSchema.shape.files,
+      path: z.string(),
       fileIndex: z.number().int().nonnegative(),
     })
     .strict(),
-  handler: async (_ctx, { files, fileIndex }) => {
+  handler: async (_ctx, { path, fileIndex }) => {
     try {
-      const snapshot = await readManifestFile(process.cwd(), files, fileIndex);
+      const resolved = resolve(process.cwd(), path);
+      const text = await readTextFile(resolved);
+      const snapshot = { fileIndex, path: resolved, text, snapshotId: snapshotId(resolved, text) };
       return { ok: true as const, snapshot };
     } catch (error) {
       const code = (error as { code?: string } | null)?.code;
@@ -54,8 +57,11 @@ export const readFile = serverAction({
 
 export const resolvePaths = serverAction({
   kind: 'query',
-  input: fileReviewParamsSchema.shape.files,
-  handler: (_ctx, files) => files.map((path) => resolve(process.cwd(), path)),
+  input: fileReviewParamsSchema,
+  handler: async (_ctx, params) => ({
+    ...(await discoverFiles(process.cwd(), params)),
+    directories: (params.directories ?? []).map((path) => resolve(process.cwd(), path)),
+  }),
 });
 
 export const validateFeedback = serverAction({
@@ -68,9 +74,15 @@ export const validateFeedback = serverAction({
     .strict(),
   handler: (_ctx, { params, feedback, evidence }) => {
     for (const file of evidence.files) {
-      const supplied = params.files[file.fileIndex];
-      if (supplied === undefined || resolve(process.cwd(), supplied) !== file.path)
-        throw new Error('Unknown or inconsistent file snapshot.');
+      const explicit = params.files ?? [];
+      const supplied = explicit[file.fileIndex];
+      const matches =
+        file.fileIndex < explicit.length
+          ? supplied !== undefined && resolve(process.cwd(), supplied) === file.path
+          : params.directories?.some((root) =>
+              withinDirectory(resolve(process.cwd(), root), file.path),
+            );
+      if (!matches) throw new Error('Unknown or inconsistent file snapshot.');
     }
     return validateSources(feedback, evidence);
   },

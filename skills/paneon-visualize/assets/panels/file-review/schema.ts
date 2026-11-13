@@ -3,8 +3,16 @@ import { publishedElementAnnotationsSchema } from '../../shared/element-annotati
 
 const nonblank = z.string().refine((value) => !!value.trim(), 'Must not be blank.');
 export const fileReviewParamsSchema = z
-  .object({ title: nonblank.optional(), files: z.array(nonblank).min(1) })
-  .strict();
+  .object({
+    title: nonblank.optional(),
+    files: z.array(nonblank).optional(),
+    directories: z.array(nonblank).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => !!(value.files?.length || value.directories?.length),
+    'Supply files or directories.',
+  );
 export type FileReviewParams = z.infer<typeof fileReviewParamsSchema>;
 export const fileRefSchema = z
   .object({

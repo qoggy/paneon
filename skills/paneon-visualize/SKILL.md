@@ -23,14 +23,14 @@ Before writing page content, whether a custom page or a built-in page's input, a
 
 `<skill>` stands for the absolute path of this skill directory.
 
-| Need                                                            | Contract                                 | Entry                                         |
-| --------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
-| Sequential questions with options or custom answers             | [Choose](references/choose.md)           | `<skill>/assets/panels/choose/panel.tsx`      |
-| Related parameters on one form                                  | [Form](references/form.md)               | `<skill>/assets/panels/form/panel.tsx`        |
-| Tabular data to search, filter and sort                         | [Table](references/table.md)             | `<skill>/assets/panels/table/panel.tsx`       |
-| Complete text files to read and annotate, such as docs and code | [File review](references/file-review.md) | `<skill>/assets/panels/file-review/panel.tsx` |
-| Original and proposed files, without Git                        | [Diff review](references/diff-review.md) | `<skill>/assets/panels/diff-review/panel.tsx` |
-| Working changes, history and comparisons across repositories    | [Git review](references/git-review.md)   | `<skill>/assets/panels/git-review/panel.tsx`  |
+| Need                                                         | Contract                                 | Entry                                         |
+| ------------------------------------------------------------ | ---------------------------------------- | --------------------------------------------- |
+| Sequential questions with options or custom answers          | [Choose](references/choose.md)           | `<skill>/assets/panels/choose/panel.tsx`      |
+| Related parameters on one form                               | [Form](references/form.md)               | `<skill>/assets/panels/form/panel.tsx`        |
+| Tabular data to search, filter and sort                      | [Table](references/table.md)             | `<skill>/assets/panels/table/panel.tsx`       |
+| Complete text files or directories to read and annotate      | [File review](references/file-review.md) | `<skill>/assets/panels/file-review/panel.tsx` |
+| Original and proposed files, without Git                     | [Diff review](references/diff-review.md) | `<skill>/assets/panels/diff-review/panel.tsx` |
+| Working changes, history and comparisons across repositories | [Git review](references/git-review.md)   | `<skill>/assets/panels/git-review/panel.tsx`  |
 
 ## Run and deliver
 

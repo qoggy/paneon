@@ -12,7 +12,14 @@ const root = await mkdtemp(join(tmpdir(), 'paneon-file-review-pack-'));
 try {
   const { metadata, packageRoot } = await createPackageFixture(root);
   const files = new Set(metadata.files.map((entry) => entry.path));
-  for (const name of ['panel.tsx', 'actions.ts', 'schema.ts', 'feedback.ts', 'model.ts'])
+  for (const name of [
+    'panel.tsx',
+    'actions.ts',
+    'schema.ts',
+    'feedback.ts',
+    'model.ts',
+    'directory.ts',
+  ])
     assert.ok(files.has(`${SKILL_PACKAGE_PATH}/assets/panels/file-review/${name}`));
   for (const name of [
     'references/file-review.md',

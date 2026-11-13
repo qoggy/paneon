@@ -113,7 +113,7 @@ The panel SHALL emit form-submitted with a values object keyed by field name, wi
 
 The product skill SHALL ship `assets/panels/file-review/panel.tsx` with definition id `file-review` and event type `file-review-submitted` as its standard content-review panel, following the file-review capability. It SHALL replace the former `assets/panels/review/panel.tsx`, `review` definition and `review-submitted` event without a legacy alias or acceptance of markdownFilePath. Existing stored historical events SHALL NOT be rewritten or relabeled as the new event type, and existing instances SHALL NOT be automatically migrated.
 
-The built-in panel table SHALL direct one or more complete text files to File Review, original/proposed pairs to Diff Review and repository changes/history to Git Review. A dedicated `references/file-review.md` SHALL document when to use the panel, what it achieves, its strict input and complete submission contract, original snapshot offsets, linked-file source groups and correction/withdrawal semantics using `files: []` for withdrawal. Public examples SHALL nest annotations under file metadata without internal annotation ids, fileIndex/ref, duplicated snapshot ids or separate sources lookup tables. The old review reference SHALL be removed. Agent-facing references SHALL NOT document panel layout specifications or recommend private shared asset modules as public APIs. Existing CodeBlock authoring guidance and public API SHALL remain unchanged by this panel integration.
+The built-in panel table SHALL direct complete text files, directory lists or their combination to File Review, original/proposed pairs to Diff Review and repository changes/history to Git Review. A dedicated `references/file-review.md` SHALL document when to use the panel, what it achieves, its strict input and complete submission contract, original snapshot offsets, linked-file source groups and correction/withdrawal semantics using `files: []` for withdrawal. Public examples SHALL nest annotations under file metadata without internal annotation ids, fileIndex/ref, duplicated snapshot ids or separate sources lookup tables. The old review reference SHALL be removed. Agent-facing references SHALL NOT document panel layout specifications or recommend private shared asset modules as public APIs. Existing CodeBlock authoring guidance and public API SHALL remain unchanged by this panel integration.
 
 #### Scenario: Discover the correct panel for a mixed deliverable
 
@@ -143,7 +143,12 @@ The built-in panel table SHALL direct one or more complete text files to File Re
 #### Scenario: Run the installed skill outside the source repository
 
 - **WHEN** the matching packaged skill is installed and its file-review entry is run from another cwd with valid input
-- **THEN** the entry compiles against public SDK/UI exports, resolves relative file paths against that cwd and supports reading and submitting precise file feedback
+- **THEN** the entry compiles against public SDK/UI exports, resolves relative file and directory paths against that cwd and supports reading and submitting precise file feedback
+
+#### Scenario: Request directory discovery
+
+- **WHEN** an agent wants one page for multiple directories and supplementary files
+- **THEN** the input reference documents directories, combination with files and recursive discovery without requiring caller-side enumeration
 
 ### Requirement: Keep the GitHub PR example read-only and deliver opinions to the agent
 

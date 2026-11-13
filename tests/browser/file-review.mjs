@@ -1,6 +1,6 @@
 import { SKILL_ROOT } from '../skill-paths.ts';
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, realpath, rm, unlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
@@ -76,6 +76,48 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const url = (panel) => `http://127.0.0.1:${service.descriptor.port}/panels/${panel.instanceId}`;
+  const loadingPanel = await service.runtime.run(
+    join(skill, 'assets/panels/file-review/panel.tsx'),
+    root,
+    { directories: ['docs'] },
+    false,
+  );
+  let releaseScan;
+  const scanGate = new Promise((resolve) => {
+    releaseScan = resolve;
+  });
+  const loadingActions = `**/api/panels/${loadingPanel.instanceId}/actions/**`;
+  await page.route(loadingActions, async (route) => {
+    if (decodeURIComponent(route.request().url()).endsWith('/actions.ts#resolvePaths'))
+      await scanGate;
+    await route.continue();
+  });
+  await page.goto(url(loadingPanel));
+  const loadingFrame = page.frameLocator('iframe');
+  const sidebar = loadingFrame.locator('[data-file-review-sidebar]');
+  const scanning = sidebar.getByRole('status').filter({ hasText: '正在加载文件列表…' });
+  await scanning.waitFor();
+  assert.equal(
+    await sidebar.getByRole('group', { name: '审阅文件' }).getAttribute('aria-busy'),
+    'true',
+  );
+  assert.equal(await loadingFrame.getByText('没有匹配的文件。', { exact: true }).count(), 0);
+  assert.equal(await loadingFrame.locator('[data-file-review-viewport]').count(), 0);
+  const loadingSearch = loadingFrame.getByRole('textbox', { name: '搜索文件', exact: true });
+  await loadingSearch.fill('__no_match_while_loading__');
+  assert.equal(await scanning.count(), 1);
+  assert.equal(await loadingFrame.getByText('没有匹配的文件。', { exact: true }).count(), 0);
+  await page.screenshot({ path: join(artifacts, 'directory-loading.png'), fullPage: true });
+  releaseScan();
+  await loadingFrame.getByText('没有匹配的文件。', { exact: true }).waitFor();
+  assert.equal(
+    await sidebar.getByRole('group', { name: '审阅文件' }).getAttribute('aria-busy'),
+    'false',
+  );
+  await loadingSearch.fill('');
+  await loadingFrame.locator('[data-tree-item^="file:"]').first().waitFor();
+  assert.equal(await scanning.count(), 0);
+  await page.unroute(loadingActions);
   // Resolve mixed path spellings before grouping, including a file outside the panel cwd.
   const mixedFiles = [
     join(root, 'docs/plan.MARKDOWN'),
@@ -103,6 +145,11 @@ try {
   const mixedFrame = page.frameLocator('iframe');
   await mixedFrame.locator('strong [data-source-leaf]').waitFor();
   const pendingDirectories = await mixedFrame.locator('[data-tree-item^="directory:"]').count();
+  assert.equal(
+    await mixedFrame.locator('[data-file-review-sidebar]').getByRole('status').count(),
+    1,
+  );
+  assert.equal(await mixedFrame.getByText('没有匹配的文件。', { exact: true }).count(), 0);
   releasePaths();
   assert.equal(pendingDirectories, 0, 'Pending resolution must not show literal path roots');
   const mixedDirectory = mixedFrame.locator(`[data-tree-item="directory:${root}/docs"]`);
@@ -701,6 +748,227 @@ try {
   await line(1).filter({ hasText: 'ttl' }).waitFor();
   await row(1).press('Enter');
   await line(1).filter({ hasText: 'plain text' }).waitFor();
+
+  await mkdir(join(root, 'review-source'));
+  await mkdir(join(root, 'review-tests'));
+  await mkdir(join(root, 'review-empty'));
+  await writeFile(join(root, 'review-source/api.ts'), 'export const directoryValue = 42;\n');
+  await writeFile(join(root, 'review-tests/api.test.ts'), 'expect(directoryValue).toBe(42);\n');
+  const runDirectories = (params) =>
+    service.runtime.run(join(skill, 'assets/panels/file-review/panel.tsx'), root, params, false);
+  const directoryPanel = await runDirectories({
+    files: ['docs/notes.md'],
+    directories: ['review-source', 'review-tests', './review-source'],
+  });
+  const directoryReads = [];
+  const directoryObserver = (request) => {
+    if (
+      request.url().includes(`/panels/${directoryPanel.instanceId}/`) &&
+      decodeURIComponent(request.url()).endsWith('/actions.ts#readFile')
+    )
+      directoryReads.push(request.postDataJSON().input);
+  };
+  page.on('request', directoryObserver);
+  await page.goto(url(directoryPanel));
+  await viewport.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
+  for (const name of ['docs', 'review-source', 'review-tests']) {
+    const branch = frame.locator(`[data-tree-item="directory:${join(root, name)}"]`);
+    await branch.waitFor();
+    assert.equal(await branch.getAttribute('aria-expanded'), 'true');
+  }
+  assert.equal(await row(0).count(), 1, 'The explicit file is initially visible');
+  await search.fill('api.ts');
+  await row(1).click();
+  await line(1).filter({ hasText: 'directoryValue' }).waitFor();
+  assert.equal(await path.textContent(), 'review-source/api.ts');
+  await save('[data-file-review-viewport] [data-code-line="1"]', 13, 27, '目录文件批注');
+  await unlink(join(root, 'review-source/api.ts'));
+  await search.fill('api.test.ts');
+  await row(2).click();
+  await line(1).filter({ hasText: 'expect' }).waitFor();
+  await comments.locate(1);
+  await line(1).filter({ hasText: 'export const directoryValue' }).waitFor();
+  assert.equal(await path.textContent(), 'review-source/api.ts');
+  assert.equal(await search.inputValue(), '');
+  assert.equal(directoryReads.filter((input) => input.fileIndex === 1).length, 1);
+  assert.ok(directoryReads.every((input) => !('files' in input) && typeof input.path === 'string'));
+  await submit();
+  const directoryEvent = (
+    await service.runtime.events(directoryPanel.instanceId, 'directory-test', 100, 0)
+  ).events[0];
+  assert.equal(directoryEvent.type, 'file-review-submitted');
+  assert.equal(directoryEvent.payload.files[0].path, join(root, 'review-source/api.ts'));
+  assert.equal(
+    directoryEvent.payload.files[0].annotations[0].targets[0].text.quote,
+    'directoryValue',
+  );
+  page.off('request', directoryObserver);
+
+  const oneDirectoryFile = await runDirectories({ directories: ['review-tests'] });
+  await page.goto(url(oneDirectoryFile));
+  await line(1).filter({ hasText: 'expect' }).waitFor();
+  assert.equal(await frame.locator('[data-file-review-split]').count(), 1);
+  assert.equal(await path.textContent(), 'review-tests/api.test.ts');
+  const emptyDirectory = await runDirectories({ directories: ['review-empty'] });
+  await page.goto(url(emptyDirectory));
+  await frame.getByText('目录中没有文件。', { exact: true }).waitFor();
+  assert.equal(await viewport.count(), 0);
+  const failedDirectory = await runDirectories({ directories: ['review-missing'] });
+  await page.goto(url(failedDirectory));
+  await frame
+    .locator('[data-file-review-sidebar]')
+    .getByText('目录读取失败。', { exact: true })
+    .waitFor();
+  assert.equal(await frame.getByText('没有匹配的文件。', { exact: true }).count(), 0);
+  assert.equal(await viewport.count(), 0);
+  const partialDirectory = await runDirectories({
+    files: ['docs/notes.md'],
+    directories: ['review-missing'],
+  });
+  await page.goto(url(partialDirectory));
+  await viewport.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
+  await frame.getByRole('alert').filter({ hasText: 'review-missing' }).waitFor();
+
+  for (const name of [
+    'expand-source/components/Button.tsx',
+    'expand-source/forms/nested/input.ts',
+  ]) {
+    await mkdir(join(root, name, '..'), { recursive: true });
+    await writeFile(join(root, name), 'export const value = 1;\n');
+  }
+  const chainDirectory = await runDirectories({ directories: ['expand-source/forms'] });
+  await page.goto(url(chainDirectory));
+  const formsRoot = frame.locator(
+    `[data-tree-item="directory:${join(root, 'expand-source/forms')}"]`,
+  );
+  await formsRoot.waitFor();
+  assert.equal(await formsRoot.getAttribute('aria-expanded'), 'true');
+  assert.equal(
+    await frame
+      .locator(`[data-tree-item="directory:${join(root, 'expand-source/forms/nested')}"]`)
+      .getAttribute('aria-expanded'),
+    'false',
+  );
+  assert.equal(
+    await row(0).count(),
+    0,
+    'Discovered descendants stay inside collapsed subdirectories',
+  );
+
+  const overlappingFile = await runDirectories({
+    files: ['expand-source/components/Button.tsx'],
+    directories: ['expand-source'],
+  });
+  await page.goto(url(overlappingFile));
+  await row(0).waitFor();
+  assert.equal(await row(0).count(), 1, 'The explicit and discovered file share one entry');
+  assert.equal(await frame.locator('[data-tree-item^="file:"]').count(), 1);
+  for (const name of ['expand-source', 'expand-source/components'])
+    assert.equal(
+      await frame
+        .locator(`[data-tree-item="directory:${join(root, name)}"]`)
+        .getAttribute('aria-expanded'),
+      'true',
+    );
+  assert.equal(
+    await frame
+      .locator(`[data-tree-item="directory:${join(root, 'expand-source/forms/nested')}"]`)
+      .getAttribute('aria-expanded'),
+    'false',
+  );
+  await search.fill('input.ts');
+  await row(1).waitFor();
+  assert.equal(await frame.locator('[data-tree-item^="file:"]').count(), 1);
+
+  await mkdir(join(root, 'link-review'));
+  await mkdir(join(root, 'link-targets/ui'), { recursive: true });
+  await mkdir(join(root, 'link-targets/empty'));
+  const linkedCode = 'export const sharedValue = 42;\n';
+  await writeFile(join(root, 'link-targets/ui/Button.tsx'), linkedCode);
+  await writeFile(join(root, 'link-targets/settings.json'), '{"theme":"system"}\n');
+  await symlink('../link-targets/settings.json', join(root, 'link-review/settings.json'));
+  await symlink('../link-targets/ui', join(root, 'link-review/shared-ui'));
+  await symlink('../link-targets/empty', join(root, 'link-review/empty-dir'));
+  await symlink('../link-targets/missing.ts', join(root, 'link-review/broken.ts'));
+  await symlink('../../link-review', join(root, 'link-targets/ui/back'));
+  const linkPanel = await runDirectories({
+    files: ['link-review/settings.json'],
+    directories: ['link-review'],
+  });
+  await page.goto(url(linkPanel));
+  await line(1).filter({ hasText: 'theme' }).waitFor();
+  const linkedDirectory = frame.locator(
+    `[data-tree-item="directory:${join(root, 'link-review/shared-ui')}"]`,
+  );
+  await linkedDirectory.waitFor();
+  assert.equal(await linkedDirectory.getAttribute('data-symlink'), 'directory');
+  assert.equal(await linkedDirectory.getAttribute('aria-expanded'), 'false');
+  assert.equal(await row(0).getAttribute('data-symlink'), 'file');
+  assert.equal(
+    await path.evaluate((element) => element.parentElement.getBoundingClientRect().height),
+    33,
+  );
+  await row(0).locator('[data-slot="tooltip-trigger"]').hover();
+  const linkTip = frame
+    .locator('[data-slot="tooltip-content"]')
+    .filter({ hasText: '../link-targets/settings.json' });
+  await linkTip.waitFor();
+  assert.equal(await linkTip.textContent(), '../link-targets/settings.json');
+  await page.mouse.move(0, 0);
+  await search.fill('Button.tsx');
+  await row(2).click();
+  await line(1).filter({ hasText: 'sharedValue' }).waitFor();
+  assert.equal(await path.textContent(), 'link-review/shared-ui/Button.tsx');
+  await save('[data-file-review-viewport] [data-code-line="1"]', 13, 24, '通过目录链接审阅');
+  await search.fill('');
+  await linkedDirectory.click();
+  const loop = frame.locator(
+    `[data-tree-item="directory:${join(root, 'link-review/shared-ui/back')}"]`,
+  );
+  await loop.waitFor();
+  assert.equal(await loop.innerText(), 'back');
+  await loop.locator('[data-slot="tooltip-trigger"]').hover();
+  const loopTip = frame
+    .locator('[data-slot="tooltip-content"]')
+    .filter({ hasText: '../../link-review（循环）' });
+  await loopTip.waitFor();
+  assert.equal(await loopTip.textContent(), '../../link-review（循环）');
+  await page.mouse.move(0, 0);
+  const beforeLoop = await path.textContent();
+  await loop.click();
+  assert.equal(await path.textContent(), beforeLoop, 'A cycle marker does not select a file');
+  const emptyLink = frame.locator(
+    `[data-tree-item="directory:${join(root, 'link-review/empty-dir')}"]`,
+  );
+  assert.equal(await emptyLink.getAttribute('data-symlink'), 'directory');
+  await emptyLink.click();
+  assert.equal(await emptyLink.getAttribute('aria-expanded'), 'true');
+  assert.equal(await row(1).getAttribute('data-symlink'), 'unavailable');
+  await row(0).click();
+  await line(1).filter({ hasText: 'theme' }).waitFor();
+  await unlink(join(root, 'link-review/shared-ui'));
+  await comments.locate(1);
+  await line(1).filter({ hasText: 'sharedValue' }).waitFor();
+  await submit();
+  const linkEvent = (await service.runtime.events(linkPanel.instanceId, 'symlink-test', 100, 0))
+    .events[0];
+  assert.equal(linkEvent.payload.files[0].path, join(root, 'link-review/shared-ui/Button.tsx'));
+  assert.equal(linkEvent.payload.files[0].annotations[0].targets[0].text.quote, 'sharedValue');
+
+  const explicitLink = await runDirectories({ files: ['link-review/settings.json'] });
+  await page.goto(url(explicitLink));
+  await line(1).filter({ hasText: 'theme' }).waitFor();
+  assert.equal(await frame.locator('[data-file-review-split]').count(), 0);
+  assert.equal(
+    await path.evaluate((element) => element.parentElement.getBoundingClientRect().height),
+    33,
+  );
+  assert.equal(await path.textContent(), 'link-review/settings.json');
+  await frame.getByText('→ ../link-targets/settings.json', { exact: true }).hover();
+  await frame
+    .locator('[data-slot="tooltip-content"]')
+    .filter({ hasText: '../link-targets/settings.json' })
+    .waitFor();
   assert.deepEqual(errors, []);
   console.log(
     'File review: copied Skill, literal paths, single/multi-file tree/search/keyboard/split, main and linked snapshot remount/locate, CRLF/CR/Unicode/repeated text, failure/correction/withdrawal, unknown/empty/missing/near-limit files, late reads and light/dark desktop passed.',
