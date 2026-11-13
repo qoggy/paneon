@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-13
+
+### Added
+
+- Review one or more directories in File Review, optionally combined with explicit files, without enumerating their contents first.
+- Follow file and directory symbolic links in File Review, inspect their targets, and identify unavailable targets and directory cycles.
+- Wrap long lines in Diff Review, Git Review and custom `DiffView` components. Use `defaultWrap` to set the initial state; wrapping preserves source line numbers and annotation locations.
+
+### Changed
+
+- Use a compact diff toolbar with grouped change navigation, a side-by-side or unified layout menu, and toggles for wrapping and unchanged lines. Code blocks and diffs now show wrapping state consistently.
+- Follow expanded bundled skill guidance for reviewing proposals with interactive previews, contextual diffs and matching input/output examples.
+
+### Fixed
+
+- Group File Review entries by their resolved directory paths, so mixed relative and absolute paths share the correct directory tree.
+- Keep diffs in a loading state until syntax highlighting is ready, avoiding unhighlighted content flashes and keeping initial change navigation stable.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added
@@ -160,7 +178,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.6.0...0.6.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.7.0...0.7.x
+[0.7.0]: https://github.com/qoggy/paneon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/qoggy/paneon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/qoggy/paneon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/qoggy/paneon/compare/v0.3.0...v0.4.0
