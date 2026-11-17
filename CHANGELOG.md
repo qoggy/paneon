@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-17
+
 ### Changed
 
 - Limit the bundled skill's presentation guidance to custom pages, with clearer advice on choosing Sidebar or Tabs and giving decisions their own overview-table column.
@@ -186,7 +188,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.7.0...0.7.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.7.1...0.7.x
+[0.7.1]: https://github.com/qoggy/paneon/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/qoggy/paneon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/qoggy/paneon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/qoggy/paneon/compare/v0.4.0...v0.5.0
