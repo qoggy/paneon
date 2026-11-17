@@ -223,7 +223,16 @@ try {
     );
     await frame.locator(`html[data-theme="${theme}"][lang="${language}"]`).waitFor();
     const label = language === 'en' ? 'Collapse file diff' : '收起文件差异';
-    assert.equal(await button(label).getAttribute('title'), label);
+    const collapse = button(label);
+    assert.equal(await collapse.getAttribute('aria-label'), label);
+    assert.equal(await collapse.getAttribute('title'), null);
+    await page.mouse.move(0, 0);
+    await collapse.hover();
+    const tooltip = frame.locator('[data-slot="tooltip-content"]').filter({ hasText: label });
+    await tooltip.waitFor({ state: 'visible' });
+    assert.equal(await tooltip.innerText(), label);
+    await collapse.press('Escape');
+    await tooltip.waitFor({ state: 'hidden' });
   }
   for (const type of ['changes', 'compare']) {
     const initialView = {

@@ -17,8 +17,6 @@ Then pick the source by purpose. Built-in pages collect input or feedback on con
 1. A [built-in page](#built-in-pages) fits: run it with JSON input, without writing TSX.
 2. Otherwise write a [custom page](#custom-pages), for example an explanation of code, a mechanism or a plan, a data model diagram, a metrics view, or a control surface over a local CLI or HTTP service.
 
-Before writing page content, whether a custom page or a built-in page's input, and before revising a page after feedback, read [Presenting](references/presenting.md).
-
 ## Built-in pages
 
 `<skill>` stands for the absolute path of this skill directory.
@@ -62,6 +60,8 @@ paneon panel events <instance-id> --consumer <stable-name> --wait-ms 60000 --jso
 `paneon panel close <instance-id>` ends interaction and retains submitted events and consumer positions for later reading. `paneon panel delete <instance-id>` stops and permanently removes the instance, its submitted events (including unacknowledged feedback) and consumer positions. Delete works in any status and does not delete author source or undo external actions. Use deletion only when the human asks to discard the instance and its feedback; completing an agent task or acknowledging events is not a deletion request.
 
 ## Custom pages
+
+Before writing a custom page's content or revising it after feedback, read [Presenting](references/presenting.md).
 
 Write an ordinary TSX file with `definePanel`, components from `@qoggy/paneon/ui`, optional `serverAction` functions and feedback sent with `agent.emit`. Set `requires.paneon` to a range that includes the installed CLI (`paneon --version`).
 

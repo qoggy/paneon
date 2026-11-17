@@ -1,6 +1,6 @@
 # Present content on a page
 
-This covers everything written into a page: the content of a custom page and the input of a built-in page, such as Form field descriptions and Table columns.
+Use these guidelines when writing or revising content on a custom page.
 
 ## Lead with the answer
 
@@ -33,7 +33,7 @@ Pick the form that carries the content with the least reading:
 - Comparisons of options: a table with one row per option and one column per criterion.
 - Changes to an interface or configuration: a `DiffView` with `jsonc` on both sides, such as the request body of one endpoint before and after an iteration. Include the file, section and nearby unchanged lines so the location of an insertion is visible.
 - Behavior that depends on inputs or state: an interactive view instead of an explanation. Let the human set parameters and watch the result, switch between options to compare them, step through the system's states, or browse request and response examples for different cases to check them against expectations. The Sentinel LeapArray example in [Authoring](authoring.md#sentinel-leaparray) works this way.
-- Several independent topics: choose navigation by how the human will review the material. A design can be split by concern (database design, API design, UI design, affected scope, test plan), or by independent proposal (one item per change, keeping its purpose, before/after behavior and diff together). Use Sidebar or another suitable navigation structure.
+- Several independent topics: choose navigation by how the human will review the material. A design can be split by concern (database design, API design, UI design, affected scope, test plan), or by independent proposal (one item per change, keeping its purpose, before/after behavior and diff together). Use Sidebar or another suitable navigation structure. Tabs suit switching between a small number of views with short labels.
 - A runnable example whose output matters to the explanation: show its usage and corresponding rendered result or execution output together. For an API, pair example request parameters with the corresponding response; for a UI, pair an interaction with the resulting page state. Keep the code, inputs and result consistent, and identify proposed behavior separately from existing capabilities.
 
 Use prose for the reasoning that connects these pieces.
@@ -71,7 +71,9 @@ The page places editable props, usage code and a rendered component preview toge
 Editing the props updates the code and preview immediately. Clicking a star in the preview also updates value.
 
 <reasoning>
-Reviewing the component's props requires the complete definition, including types and comments. Sample calls alone cannot replace it. Reviewing the appearance requires seeing how different props affect the result. An editable preview is preferred; several sets of props paired with their rendered results are also useful. The demonstration runs in the page and follows the proposed props contract.
+Reviewing the component's props requires the complete definition, including types and comments. Sample calls alone cannot replace it.
+Reviewing the appearance requires seeing how different props affect the result. An editable preview is preferred; several sets of props paired with their rendered results are also useful.
+The demonstration runs in the page and follows the proposed props contract.
 </reasoning>
 </example>
 
@@ -108,7 +110,9 @@ Below the diff, the reviewer can switch between three input/output examples:
 The page also lets the reviewer edit unit price, quantity and discount. Changing the first example's quantity to 4 immediately updates the output to subtotal=80, discount=8, total=72.
 
 <reasoning>
-The JSONC diff shows the contract change; several input/output pairs show its effects in different cases. Editable inputs are a further enhancement, not a substitute for either. Live calculations use an explicit model of the proposal and must not be described as responses from a real endpoint.
+The JSONC diff shows the contract change; several input/output pairs show its effects in different cases.
+Editable inputs are a further enhancement, not a substitute for either.
+Live calculations use an explicit model of the proposal and must not be described as responses from a real endpoint.
 </reasoning>
 </example>
 
@@ -166,7 +170,9 @@ The page has two Sidebar items: “Missing deadline” and “Incorrectly reused
 ```
 
 <reasoning>
-The failures can be judged independently, so each gets a Sidebar item. Each item traces the observed behavior to a quoted instruction, then pairs its before/after effects with its own diff. Changes for other cases stay out of that diff. Expected outputs are distinguished from actual evaluation results. If the original instruction already requires the correct behavior, first check whether it was followed rather than assuming the Skill needs a change.
+The failures can be judged independently, so each gets a Sidebar item.
+Each item traces the observed behavior to a quoted instruction, then pairs its before/after effects with its own diff.
+Changes for other cases stay out of that diff. Expected outputs are distinguished from actual evaluation results.
 </reasoning>
 </example>
 
@@ -246,3 +252,10 @@ The user is reviewing appearance and interaction, so optimization advice or stat
 ## Page copy
 
 Add explanatory text only where the human needs guidance, and let the layout carry the rest. Before keeping a hint, caption or instruction, check whether the human could complete the action without it; if so, remove it. Avoid captions that restate what an icon or button shows, usage manuals pasted onto the page, and a short paragraph in every corner.
+
+### Quality self-check checklist
+
+Check each item after writing the page; revise any applicable item that does not pass:
+
+- [ ] **Navigation fits the content**: A custom page uses Sidebar for many independent topics or longer navigation labels, and Tabs for a small number of views with short labels. Each navigation item keeps the content needed to review that topic together.
+- [ ] **Decisions have their own column**: When the answer covers many items, an overview table gives each item's conclusion or decision its own column, separate from the reasons and details.

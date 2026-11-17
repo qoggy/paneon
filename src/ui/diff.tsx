@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { Ref } from 'react';
 import { Button } from './button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { HighlightedCodeText } from './code-text';
 import { useCodeHighlighting } from './code-highlighting';
 import { Spinner } from './spinner';
@@ -527,26 +528,32 @@ function StringDiffView<TRef>({
             }}
           />
           {onCollapse && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onCollapse}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-              aria-label={message('Collapse file diff')}
-              title={message('Collapse file diff')}
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                aria-hidden="true"
-                className="size-4"
-              >
-                <rect x="2" y="2" width="12" height="12" rx="1.5" />
-                <path d="M2 10h12 M6 6l2 2 2-2" />
-              </svg>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={onCollapse}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label={message('Collapse file diff')}
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      aria-hidden="true"
+                      className="size-4"
+                    >
+                      <rect x="2" y="2" width="12" height="12" rx="1.5" />
+                      <path d="M2 10h12 M6 6l2 2 2-2" />
+                    </svg>
+                  </Button>
+                }
+              />
+              <TooltipContent>{message('Collapse file diff')}</TooltipContent>
+            </Tooltip>
           )}
         </div>
         {[oldPath, newPath, oldRevision, newRevision].some((value) => !!value) && (

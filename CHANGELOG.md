@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Limit the bundled skill's presentation guidance to custom pages, with clearer advice on choosing Sidebar or Tabs and giving decisions their own overview-table column.
+
+### Fixed
+
+- Show a consistent, styled tooltip for the file diff collapse control.
+
 ## [0.7.0] - 2026-11-13
 
 ### Added
