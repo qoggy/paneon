@@ -103,7 +103,7 @@ export function DiffToolbar({
           <DropdownMenuTrigger
             render={<Button size="sm" variant="ghost" aria-label={t('对比方式')} />}
           >
-            {mode === 'auto' ? t('Auto · {layout}', { layout }) : layout}
+            {layout}
             <ChevronDown strokeWidth={1.5} aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -111,11 +111,11 @@ export function DiffToolbar({
               <DropdownMenuRadioItem value="auto" onClick={() => onMode('auto')}>
                 {t('Auto')}
               </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="side-by-side" onClick={() => onMode('side-by-side')}>
-                {t('左右对比')}
-              </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="unified" onClick={() => onMode('unified')}>
                 {t('单列对比')}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="side-by-side" onClick={() => onMode('side-by-side')}>
+                {t('左右对比')}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>

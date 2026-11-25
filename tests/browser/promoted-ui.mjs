@@ -53,13 +53,13 @@ try {
   for (const theme of ['light', 'dark'])
     for (const language of ['en', 'zh-CN']) {
       await prefs(theme, language);
-      const mode = language === 'en' ? 'Auto · Side by side' : '自动 · 左右对比';
+      const expectedLayout = language === 'en' ? 'Side by side' : '左右对比';
       const layout = diff.getByRole('button', {
         name: language === 'en' ? 'Comparison layout' : '对比方式',
         exact: true,
       });
       await layout.waitFor();
-      assert.equal((await layout.innerText()).trim(), mode);
+      assert.equal((await layout.innerText()).trim(), expectedLayout);
       await f.locator(`html[data-theme="${theme}"][data-language="${language}"]`).waitFor();
       const color = await diff
         .locator('[data-code-side="new"]')

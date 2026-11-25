@@ -55,4 +55,4 @@ Word wrapping defaults to off; its initial-value lifecycle follows CodeBlock: `d
 
 In Auto, a contiguous edit containing both removed and added lines opens side by side. If every edit only adds or only removes lines, the view opens unified, even when the file has both kinds in separate edits. Identical texts open side by side. Whole-file additions and deletions display at full width.
 
-The layout menu reports the current choice and shows the resolved layout when Auto is selected. Diff Review and Git Review keep a manual choice across file switches within the panel session. A custom page can do the same by storing `onModeChange` and passing that choice as `defaultMode` when mounting another DiffView.
+The toolbar button shows the current layout. The menu separately marks the selected option, including Auto. Diff Review and Git Review keep a manual choice across file switches within the panel session. A custom page can do the same by storing `onModeChange` and passing that choice as `defaultMode` when mounting another DiffView.

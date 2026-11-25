@@ -201,7 +201,6 @@ const en = {
   'Difference navigation': 'Difference navigation',
   'Diff display options': 'Diff display options',
   Auto: 'Auto',
-  'Auto · {layout}': 'Auto · {layout}',
   'Hide unchanged lines': 'Hide unchanged lines',
   'Show all lines': 'Show all lines',
   '{side} diff, scroll horizontally for long lines':

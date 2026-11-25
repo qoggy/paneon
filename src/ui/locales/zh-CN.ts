@@ -197,7 +197,6 @@ const zh: Record<keyof typeof en, string> = {
   'Difference navigation': '差异导航',
   'Diff display options': '差异显示选项',
   Auto: '自动',
-  'Auto · {layout}': '自动 · {layout}',
   'Hide unchanged lines': '隐藏未改动行',
   'Show all lines': '显示全部行',
   '{side} diff, scroll horizontally for long lines': '{side}侧差异，横向滚动查看长行',

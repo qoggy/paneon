@@ -117,7 +117,7 @@ try {
   assert.equal(await frame.locator('[data-diff-column-layout]').count(), 0);
   await selectDiffLayout(frame, '自动');
   await frame.locator('[data-diff-scroll="unified"]').waitFor();
-  assert.equal((await button('对比方式').innerText()).trim(), '自动 · 单列对比');
+  assert.equal((await button('对比方式').innerText()).trim(), '单列对比');
   await selectAnnotationText(frame, '[data-code-side="new"][data-line="1"]', 13, 18);
   await annotations.write('新增文件也可以批注');
   await annotations.save();

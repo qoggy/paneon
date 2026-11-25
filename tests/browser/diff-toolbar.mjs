@@ -54,7 +54,7 @@ try {
   assert.equal(await counter.textContent(), '1 / 3');
   assert.equal(await previous.isDisabled(), true);
   assert.equal(await next.isEnabled(), true);
-  assert.equal((await button('对比方式').innerText()).trim(), '自动 · 左右对比');
+  assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
   const toolbar = frame.getByRole('group', { name: '差异操作', exact: true });
   assert.equal(await toolbar.getByRole('group', { name: '差异导航', exact: true }).count(), 1);
   assert.equal(await toolbar.getByRole('group', { name: '差异显示选项', exact: true }).count(), 1);
@@ -65,6 +65,10 @@ try {
   const layout = button('对比方式');
   await layout.focus();
   await layout.press('Enter');
+  assert.deepEqual(
+    (await frame.getByRole('menuitemradio').allTextContents()).map((label) => label.trim()),
+    ['自动', '单列对比', '左右对比'],
+  );
   assert.equal(
     await frame
       .getByRole('menuitemradio', { name: '自动', exact: true })
@@ -155,7 +159,7 @@ try {
   }
   await button('Same source').click();
   assert.equal(await counter.textContent(), '无差异');
-  assert.equal((await layout.innerText()).trim(), '自动 · 左右对比');
+  assert.equal((await layout.innerText()).trim(), '左右对比');
   for (const control of [counter, previous, next]) assert.equal(await control.isDisabled(), true);
   for (const [sample, count] of [
     ['Separated edits', '1 / 2'],
@@ -165,7 +169,7 @@ try {
     await button(sample).click();
     await frame.locator('[data-diff-scroll="unified"]').waitFor();
     assert.equal(await frame.locator('[data-diff-hunk]').count(), 1);
-    assert.equal((await layout.innerText()).trim(), '自动 · 单列对比');
+    assert.equal((await layout.innerText()).trim(), '单列对比');
     assert.equal(await counter.textContent(), count);
   }
   await button('Binary source').click();

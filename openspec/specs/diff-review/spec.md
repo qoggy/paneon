@@ -99,7 +99,7 @@ Public DiffView SHALL accept `defaultWrap?: boolean`, defaulting to false, and o
 
 ### Requirement: Choose the comparison layout from contiguous edits
 
-Public DiffView SHALL accept `defaultMode?: 'auto' | 'unified' | 'side-by-side'`, defaulting to `auto` and read when the view mounts. Its layout menu SHALL allow choosing Auto, Unified and Side by side, indicate the selected option, and display the resolved layout in Auto. In Auto it SHALL use side by side when any contiguous edit includes both removed and added lines, and unified when each edit has only one side. Identical texts SHALL use side by side, and whole-file additions and deletions SHALL remain full-width. DiffView SHALL report a changed menu choice through `onModeChange`. Diff Review and Git Review SHALL apply that choice to other files in the current panel session.
+Public DiffView SHALL accept `defaultMode?: 'auto' | 'unified' | 'side-by-side'`, defaulting to `auto` and read when the view mounts. Its toolbar's layout button SHALL display only the current layout. Its menu SHALL offer Auto, Unified and Side by side in that order and indicate the selected option. In Auto it SHALL use side by side when any contiguous edit includes both removed and added lines, and unified when each edit has only one side. Identical texts SHALL use side by side, and whole-file additions and deletions SHALL remain full-width. DiffView SHALL report a changed menu choice through `onModeChange`. Diff Review and Git Review SHALL apply that choice to other files in the current panel session.
 
 #### Scenario: Add and remove lines in separate edits
 

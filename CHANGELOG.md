@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fold multiline JSON and JSONC objects and arrays in `CodeBlock`, one section at a time or from the toolbar. Click the ellipsis to expand a section. Copying uses the complete source, and locating an annotation opens any folds covering it.
+- Set the initial layout mode in custom `DiffView` components with `defaultMode` and respond to menu selections with `onModeChange`.
+
+### Changed
+
+- Default to Auto in `DiffView`, Diff Review, and Git Review. Auto uses unified view for edits that only add or only remove lines, including when additions and deletions occur in separate places. Replacements open side by side. The toolbar shows the current layout, and the menu marks the selected mode. Manual choices carry across files in the same review.
+
+### Fixed
+
+- Locate annotations on unchanged lines from the old version in unified diffs, including after switching from side-by-side view.
+
 ## [0.7.1] - 2026-11-17
 
 ### Changed
@@ -188,7 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic source reload, restoration of stored pages on demand, limits on resident page resources, and cleanup of obsolete generated files.
 - Runnable explanation examples for dining philosophers and Sentinel's sliding window, plus a read-only GitHub pull request workspace using the local `gh` CLI.
 
-[unreleased]: https://github.com/qoggy/paneon/compare/v0.7.1...0.7.x
+[unreleased]: https://github.com/qoggy/paneon/compare/v0.7.1...develop
 [0.7.1]: https://github.com/qoggy/paneon/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/qoggy/paneon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/qoggy/paneon/compare/v0.5.0...v0.6.0
