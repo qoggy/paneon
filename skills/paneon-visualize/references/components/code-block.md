@@ -26,3 +26,5 @@ interface CodeBlockProps<TRef> {
 ```
 
 The wrap tooltip describes the current state and next action. CodeBlock and DiffView use the same wrap-state interaction, with their own defaults: CodeBlock wraps by default and DiffView does not.
+
+For `language="json"` or `language="jsonc"`, multiline objects and arrays start expanded. Use the small triangle beside the line to fold a section, and click the triangle or `…` to reopen it. The toolbar places **Expand all** and **Collapse all** before word wrap and copy. Collapse all keeps the top-level keys of an object visible and collapses a top-level array into one line. Copy always uses the complete source, and locating an annotation opens folds that cover its text.

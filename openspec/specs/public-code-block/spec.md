@@ -53,6 +53,20 @@ CodeBlock SHALL 提供可选逻辑行号和单个闭区间的 highlightedLines�
 - **WHEN** lineNumbers=false 且 highlightedLines={start:2,end:3}
 - **THEN** 第 2、3 个逻辑行高亮，不显示或复制行号，折行不会改变高亮范围
 
+### Requirement: Fold multiline JSON objects and arrays
+
+独立 CodeBlock SHALL 在 `language` 为 `json` 或 `jsonc` 时默认展开完整原文，提供多行对象与数组的逐段折叠。折叠结果 SHALL 在开闭括号之间显示可点击的省略号，保留闭括号后的标点和可见行的原行号。工具栏 SHALL 按全部展开、全部折叠、换行、复制的顺序呈现。全部折叠 SHALL 保留顶层对象的键，顶层数组 SHALL 折叠成一行。
+
+#### Scenario: Fold a nested section
+
+- **WHEN** 用户折叠 JSONC 中一个多行子对象或数组
+- **THEN** 只隐藏该范围的内容，点击三角按钮或省略号恢复显示，复制仍取得完整原始 code
+
+#### Scenario: Locate an annotation hidden by folding
+
+- **WHEN** 用户定位原文坐标落在已折叠分段中的批注
+- **THEN** 展开覆盖该范围的分段，定位并选中原文，保留其它分段的折叠状态
+
 ### Requirement: Join the existing page annotation session
 
 提供 annotationTarget 时 CodeBlock SHALL 注册原始 code 和准确的 DOM 文本映射，引用 SHALL 原样作为批注 ref。批注 SHALL 复用 usePageAnnotations 的编辑、定位、草稿与显式提交机制，SHALL NOT 自行提交事件或引入独立批注界面。偏移 SHALL 为原始 code 的 UTF-16 边界，不包含标题、工具栏或行号。高亮完成或显示内容变化时 SHALL 更新注册，旧批注失效处理 SHALL 沿用现有会话机制。

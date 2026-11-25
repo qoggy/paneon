@@ -25,6 +25,23 @@ const cases = [
   '中文😀\n\n',
   '  a\r\n b\r c\n\n',
 ];
+const json = [
+  '{',
+  '  /* [ignored] ',
+  '     } still comment */',
+  '  "routes": [',
+  '    {"retry": {',
+  '      "attempts": 2,',
+  '      "note": "路径😀"',
+  '    }},',
+  '  ],',
+  '  "meta": {',
+  '    "status": "[still text]"',
+  '  },',
+  '  "empty": []',
+  '}',
+  '',
+].join('\r\n');
 let service, browser;
 try {
   await mkdir(artifacts, { recursive: true });
@@ -34,7 +51,7 @@ try {
     await readPanelFixture(new URL('./code-block-fixture.txt', import.meta.url)),
   );
   service = await startServer(join(root, 'runtime'));
-  const panel = await service.runtime.run(entry, root, { source, cases }, false);
+  const panel = await service.runtime.run(entry, root, { source, cases, json }, false);
   browser = await chromium.launch({
     headless: true,
     channel: process.env.PANEON_TEST_BROWSER_CHANNEL ?? 'chrome',
@@ -353,9 +370,87 @@ try {
   });
   assert.equal(await frame.locator('[data-annotation-action]').count(), 0);
 
+  const object = frame.getByTestId('json-object');
+  await object.locator('[data-shiki-token]').first().waitFor();
+  const jsonDisplay = json.replaceAll('\r\n', '\n');
+  assert.equal(await object.locator('code').textContent(), jsonDisplay);
+  assert.deepEqual(
+    await object
+      .locator('[data-slot="code-block-actions"] button')
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
+    ['全部展开', '全部折叠', '自动换行', '复制代码'],
+  );
+  const retry = object.locator('[data-code-line="5"] [data-fold-toggle="inline"]');
+  assert.equal(await retry.getAttribute('aria-expanded'), 'true');
+  await retry.hover();
+  assert.equal(await retry.evaluate((button) => getComputedStyle(button).cursor), 'pointer');
+  await retry.press('Enter');
+  const retryRow = object.locator('[data-code-line="5"]');
+  assert.match(await retryRow.textContent(), /"retry": \{…\}\},/);
+  assert.equal(await object.locator('[data-code-line="6"]').count(), 0);
+  const retryEllipsis = retryRow.locator('[data-fold-summary]');
+  await retryEllipsis.click();
+  assert.equal(await retry.getAttribute('aria-expanded'), 'true');
+  assert.equal(await retry.evaluate((button) => document.activeElement === button), true);
+
+  const quote = '"attempts": 2,\r\n      "note": "路径😀"';
+  const start = json.indexOf(quote);
+  const shown = quote.replaceAll('\r\n', '\n');
+  const shownStart = jsonDisplay.indexOf(shown);
+  await selectAnnotationText(
+    frame,
+    '[data-testid="json-object"] code',
+    shownStart,
+    shownStart + shown.length,
+  );
+  await frame.locator('[data-annotation-action]').click();
+  await frame.locator('[data-annotation-editor] textarea').fill('折叠内容的原文定位');
+  await frame.getByRole('button', { name: '保存', exact: true }).click();
+  const withJsonAnnotation = (await draft()).annotations;
+  assert.deepEqual(withJsonAnnotation.at(-1).targets, [
+    { ref: 'json-object', text: { start, end: start + quote.length, quote } },
+  ]);
+  await object.getByRole('button', { name: '全部折叠', exact: true }).click();
+  assert.match(await object.locator('[data-code-line="4"]').textContent(), /"routes": \[…\],/);
+  assert.match(await object.locator('[data-code-line="10"]').textContent(), /"meta": \{…\},/);
+  assert.equal(await object.locator('[data-code-line="6"]').count(), 0);
+  assert.equal(
+    await object
+      .locator('[data-code-line="13"]')
+      .evaluate((line) => getComputedStyle(line, '::before').content),
+    '"13" / ""',
+  );
+  await object.getByRole('button', { name: '复制代码', exact: true }).click();
+  await frame.locator('[data-slot="toast"]').filter({ hasText: '代码已复制' }).waitFor();
+  await page.context().grantPermissions(['clipboard-read'], { origin: new URL(page.url()).origin });
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), json);
+  await openAnnotationDirectory(frame);
+  await frame
+    .getByRole('button', { name: `定位批注 ${withJsonAnnotation.length}`, exact: true })
+    .click();
+  await object.locator('[data-code-line="6"]').waitFor();
+  assert.equal(
+    await object.evaluate((element) => element.ownerDocument.getSelection().toString()),
+    shown,
+  );
+  assert.equal(await object.locator('[data-code-line="11"]').count(), 0);
+  await page.keyboard.press('Escape');
+  await object.getByRole('button', { name: '全部展开', exact: true }).press('Enter');
+  assert.equal(await object.locator('code').textContent(), jsonDisplay);
+  await object.locator('[data-code-line="1"] [data-fold-toggle]').click();
+  assert.equal(await object.locator('[data-fold-summary]').count(), 1);
+
+  const array = frame.getByTestId('json-array');
+  await array.hover();
+  await array.getByRole('button', { name: '全部折叠', exact: true }).click();
+  assert.equal(await array.locator('code').textContent(), '[…]');
+  assert.equal(await array.locator('[data-code-line]').count(), 1);
+  await array.locator('[data-fold-summary]').click();
+  assert.equal(await array.locator('code').textContent(), '[\n  {…}\n]');
+
   assert.deepEqual(errors, []);
   console.log(
-    'CodeBlock passed: boolean/string header, floating controls on hover and keyboard focus, retained drafts and wrapping across header changes; raw copying/failure/pending focus, logical lines, themes, exact CRLF/CR/Unicode annotations across async tokens, independent identities, locate, explicit submit and correction.',
+    'CodeBlock passed: header, wrapping, copy, themes, logical lines, exact source annotations and JSON/JSONC folding with annotation reveal.',
   );
 } finally {
   await browser?.close();

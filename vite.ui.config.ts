@@ -5,7 +5,13 @@ import { esmExternalRequirePlugin } from 'rolldown/plugins';
 import { fileURLToPath } from 'node:url';
 import { componentActions } from './src/compiler/component-library.ts';
 
-const richDependencies = new Set(['mermaid', 'react-markdown', 'remark-gfm', 'yaml']);
+const browserModulesWithoutSideEffects = ['yaml', 'jsonc-parser'];
+const richDependencies = new Set([
+  'mermaid',
+  'react-markdown',
+  'remark-gfm',
+  ...browserModulesWithoutSideEffects,
+]);
 export default defineConfig({
   plugins: [
     componentActions({
@@ -16,16 +22,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
-      name: 'yaml-browser-module-metadata',
+      name: 'browser-module-metadata',
       generateBundle() {
-        // YAML's initialization only wires its own exported parser classes.
-        // Preserve that boundary after preserveModules so consumers that do
-        // not use Markdown can drop the complete browser parser graph.
-        this.emitFile({
-          type: 'asset',
-          fileName: 'node_modules/yaml/package.json',
-          source: '{"type":"module","sideEffects":false}\n',
-        });
+        // These modules only initialize their own exports. Preserve that boundary
+        // across library builds so consumers can omit unused parsers.
+        for (const name of browserModulesWithoutSideEffects) {
+          this.emitFile({
+            type: 'asset',
+            fileName: `node_modules/${name}/package.json`,
+            source: '{"type":"module","sideEffects":false}\n',
+          });
+        }
       },
     },
   ],

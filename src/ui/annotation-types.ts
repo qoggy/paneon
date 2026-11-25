@@ -36,6 +36,8 @@ export type AnnotationTextRegistration<TRef = JsonValue> = {
   segments: { node: Text; sourceOffsets: (number | null)[] }[];
   /** Reveal renderer-owned content, including text hidden by collapsed context. */
   locate?: (target: AnnotationTarget<TRef>) => void | Promise<void>;
+  /** Also run this renderer's locate after a page adapter has opened the view. */
+  locateAfterAdapter?: boolean;
   presentation?: (targets: readonly AnnotationTarget<TRef>[]) => AnnotationPresentation | undefined;
 };
 export type AnnotationController<TRef = JsonValue> = {

@@ -435,6 +435,7 @@ export class AnnotationStore<TRef> {
       ...(registration.sourceRef === undefined ? {} : { sourceRef: copy(registration.sourceRef) }),
       source: registration.source,
       locate: registration.locate,
+      locateAfterAdapter: registration.locateAfterAdapter,
       presentation: registration.presentation,
       segments,
       index: indexTextSegments(segments),
@@ -843,12 +844,15 @@ export class AnnotationStore<TRef> {
       else if (!isElementAnnotationRef(target.ref)) {
         if (this.fileView?.open) this.closeFile();
         if (this.options?.adapter) await this.options.adapter.locate(copy(target));
-        else {
-          const registration = [...this.texts.values()].find(
-            (item) => sourceKey(item) === sourceKey(target) && item.source === source,
-          );
-          await registration?.locate?.(copy(target));
-        }
+        if (request !== this.locating) return;
+        const registration = [...this.texts.values()].find(
+          (item) =>
+            item.locate &&
+            (!this.options?.adapter || item.locateAfterAdapter) &&
+            sourceKey(item) === sourceKey(target) &&
+            (target.text === undefined || item.source === source),
+        );
+        if (registration) await registration.locate?.(copy(target));
       }
       if (request !== this.locating) return;
       // Only media needs this wait. Yielding for text would let asynchronous highlighting

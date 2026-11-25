@@ -44,6 +44,7 @@ export function CodeBlockFrame({
   defaultWrap = true,
   className,
   'data-slot': slot = 'code-block',
+  leadingActions,
   children,
 }: {
   code: string;
@@ -52,6 +53,7 @@ export function CodeBlockFrame({
   defaultWrap?: boolean;
   className?: string;
   'data-slot'?: string;
+  leadingActions?: ReactNode;
   children: (wrap: boolean) => ReactNode;
 }) {
   const { t } = useUI();
@@ -76,6 +78,7 @@ export function CodeBlockFrame({
 
   const actions = (
     <CodeBlockActions data-annotation-controls="" className="select-none">
+      {leadingActions}
       <Tooltip>
         <TooltipTrigger
           render={

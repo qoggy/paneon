@@ -44,3 +44,34 @@
     @apply bg-destructive/10 after:text-destructive after:content-['−'];
   }
 }
+
+.cn-code-block-content[data-json-folds][data-numbered] [data-code-line]::before {
+  content: attr(data-code-line);
+  content: attr(data-code-line) / '';
+  min-inline-size: max(1.5rem, var(--code-line-digits));
+}
+
+.cn-json-fold-toggle[data-fold-toggle] {
+  inline-size: 0.75rem;
+  block-size: 1lh;
+  font: inherit;
+  vertical-align: top;
+}
+
+.cn-json-fold-toggle[data-fold-toggle='gutter'] {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+}
+
+[data-numbered] .cn-json-fold-toggle[data-fold-toggle='gutter'] {
+  inset-inline-start: 0.75rem;
+  inline-size: calc(0.75rem + max(1.5rem, var(--code-line-digits)));
+  justify-content: end;
+  padding-inline-end: 2px;
+}
+
+.cn-json-fold-toggle[data-fold-toggle]:hover {
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary);
+}

@@ -9,7 +9,7 @@ function Draft() {
 }
 
 function Panel() {
-  const { source, cases } = usePanelInput<{ source: string; cases: string[] }>();
+  const { source, cases, json } = usePanelInput<{ source: string; cases: string[]; json: string }>();
   const [language, setLanguage] = useState('text');
   const [initialWrap, setInitialWrap] = useState(false);
   const [numbered, setNumbered] = useState(true);
@@ -58,12 +58,14 @@ function Panel() {
     <div data-testid="bash"><CodeBlock code={'echo "hello"'} language="sh" /></div>
     <div data-testid="explicit-header"><CodeBlock code="const explicit = true;" language="ts" header /></div>
     {cases.map((code, index) => <div key={index} data-testid={`case-${index}`}><CodeBlock code={code} language={index % 2 ? undefined : 'ts'} lineNumbers annotationTarget={`case-${index}`} /></div>)}
+    <div data-testid="json-object"><CodeBlock code={json} language="jsonc" lineNumbers annotationTarget="json-object" /></div>
+    <div data-testid="json-array"><CodeBlock code={'[\n  {\n    "active": true\n  }\n]'} language="json" header={false} /></div>
   </Page>;
 }
 
 export default definePanel({
   id: 'code-block-verification',
   requires: { paneon: '__PANEON_TEST_VERSION__' },
-  input: z.object({ source: z.string(), cases: z.array(z.string()) }),
+  input: z.object({ source: z.string(), cases: z.array(z.string()), json: z.string() }),
   render: Panel,
 });

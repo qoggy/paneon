@@ -8,10 +8,12 @@ export function fileSourceOffsets(source: string): number[] {
   return offsets;
 }
 export function fileTextSegments(root: HTMLElement, source: string) {
-  const offsets = fileSourceOffsets(source);
+  return textSegmentsAt(root, fileSourceOffsets(source), 0);
+}
+
+export function textSegmentsAt(root: HTMLElement, offsets: number[], cursor: number) {
   const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const segments: { node: Text; sourceOffsets: number[] }[] = [];
-  let cursor = 0;
   while (walker.nextNode()) {
     const node = walker.currentNode as Text;
     segments.push({ node, sourceOffsets: offsets.slice(cursor, cursor + node.data.length + 1) });
