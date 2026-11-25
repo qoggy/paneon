@@ -25,7 +25,12 @@ import { DiffToolbar } from './diff-toolbar';
 import { DiffColumns } from './diff-columns';
 import { DiffSplit } from './diff-split';
 import type { DiffSplitRow } from './diff-split';
-import { diffLocationRanges, revealDiffElement, revealDiffLocation } from './diff-annotation';
+import {
+  diffLocationRanges,
+  diffSourceRows,
+  revealDiffElement,
+  revealDiffLocation,
+} from './diff-annotation';
 import type { DiffLocation } from './diff-annotation';
 import {
   diffAnnotationBlocks,
@@ -40,6 +45,7 @@ export type DiffViewHandle = {
   reveal(location: DiffLocation): Promise<void>;
   getRanges(location: DiffLocation): Range[];
 };
+export type DiffViewMode = 'auto' | 'unified' | 'side-by-side';
 function sourceLanguage(path?: string) {
   const extension = path?.split('.').at(-1);
   return (
@@ -76,6 +82,10 @@ export type DiffViewProps<TRef = JsonValue> = {
   newRevision?: string;
   /** Initial word wrapping; users can toggle it. Defaults to false. */
   defaultWrap?: boolean;
+  /** Initial comparison mode. Defaults to auto. */
+  defaultMode?: DiffViewMode;
+  /** Reports changes made through the layout menu. */
+  onModeChange?: (mode: DiffViewMode) => void;
   defaultExpanded?: boolean;
   onCollapse?: () => void;
   /** Opt into a bounded code viewport; ordinary document consumers retain natural flow. */
@@ -107,6 +117,8 @@ function StringDiffView<TRef>({
   oldRevision,
   newRevision,
   defaultWrap = false,
+  defaultMode = 'auto',
+  onModeChange,
   defaultExpanded = true,
   onCollapse,
   layout = 'document',
@@ -114,6 +126,7 @@ function StringDiffView<TRef>({
 }: DiffViewProps<TRef> & { feedback?: ReturnType<typeof useAnnotations<TRef>> }) {
   const sourceId = useId();
   const [wrap, setWrap] = useState(defaultWrap);
+  const [mode, setMode] = useState(defaultMode);
   const oldKey =
     annotationTargets?.old === undefined ? undefined : annotationKey(annotationTargets.old);
   const newKey =
@@ -138,6 +151,11 @@ function StringDiffView<TRef>({
     (oldHighlight.language === 'text' || !!oldHighlight.tokens) &&
     (newHighlight.language === 'text' || !!newHighlight.tokens);
   const changes = useMemo(() => diffChanges(model.rows), [model]);
+  const automaticMode =
+    changes.length === 0 || changes.some(({ old, new: next }) => old && next)
+      ? 'side-by-side'
+      : 'unified';
+  const unified = (mode === 'auto' ? automaticMode : mode) === 'unified';
   const headerId = useId();
   const registerText = feedback?.registerText;
   const root = useRef<HTMLDivElement>(null);
@@ -151,7 +169,6 @@ function StringDiffView<TRef>({
   const [view, setView] = useState({
     model,
     defaultExpanded,
-    unified: false,
     expanded: defaultExpanded,
     index: 0,
     reveal: 0,
@@ -166,7 +183,7 @@ function StringDiffView<TRef>({
       expanded: defaultExpanded,
     });
   }
-  const { unified, expanded } = view;
+  const { expanded } = view;
   const tables = useMemo(
     () => (expanded ? [model.rows] : model.hunks.map((hunk) => hunk.rows)).map(diffPresentation),
     [model, expanded],
@@ -214,7 +231,6 @@ function StringDiffView<TRef>({
     },
     [blockLookup, oldPath, newPath, sideBySide],
   );
-  const setUnified = (value: boolean) => setView((current) => ({ ...current, unified: value }));
   const setExpanded = (value: boolean) => setView((current) => ({ ...current, expanded: value }));
   const columnLayout = useRef<Record<string, number> | undefined>(undefined);
   const initialLocation = useRef<DiffModel | null>(null);
@@ -229,7 +245,6 @@ function StringDiffView<TRef>({
         pendingReveal.current = { location, resolve };
         setView((current) => ({
           ...current,
-          unified: false,
           expanded: location.kind === 'text',
           reveal: current.reveal + 1,
         }));
@@ -304,26 +319,25 @@ function StringDiffView<TRef>({
     const register = () => {
       removers.forEach((remove) => remove());
       removers = [];
+      // When both sides are annotated, selection on shared unified context uses the new side.
       for (const side of ['old', 'new'] as const) {
         const target = targets[side];
         const source = side === 'old' ? model.oldText : model.newText;
         if (target === undefined || !source) continue;
         const segments: { node: Text; sourceOffsets: number[] }[] = [];
-        elementRoot
-          .querySelectorAll<HTMLElement>(`[data-code-side="${side}"]`)
-          .forEach((element) => {
-            let offset = Number(element.dataset.sourceStart);
-            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-            let node: Node | null;
-            while ((node = walker.nextNode())) {
-              const value = node as Text;
-              segments.push({
-                node: value,
-                sourceOffsets: Array.from({ length: value.data.length + 1 }, (_, i) => offset + i),
-              });
-              offset += value.data.length;
-            }
-          });
+        for (const { element, start } of diffSourceRows(elementRoot, side)) {
+          let offset = start;
+          const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const value = node as Text;
+            segments.push({
+              node: value,
+              sourceOffsets: Array.from({ length: value.data.length + 1 }, (_, i) => offset + i),
+            });
+            offset += value.data.length;
+          }
+        }
         removers.push(
           registerText({
             ref: target,
@@ -353,7 +367,12 @@ function StringDiffView<TRef>({
       removers.forEach((remove) => remove());
     };
   }, [targets, model, unified, expanded, registerText, presentation, reveal, highlightingReady]);
-  function code(side: 'old' | 'new', cell: DiffCell, endingNote: boolean) {
+  function code(
+    side: 'old' | 'new',
+    cell: DiffCell,
+    endingNote: boolean,
+    oldContextStart?: number,
+  ) {
     const { line, kind, spans } = cell;
     const changed = kind !== 'context';
     const background = changed ? `var(--diff-${kind})` : undefined;
@@ -393,6 +412,7 @@ function StringDiffView<TRef>({
           <span
             data-code-side={side}
             data-source-start={line.start}
+            data-old-context-start={oldContextStart}
             data-line={line.number}
             className={`flex-1 px-3 ${wrap ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : 'min-w-max whitespace-pre'}`}
           >
@@ -432,8 +452,10 @@ function StringDiffView<TRef>({
           }
         >
           <tbody>
-            {lines.map(({ side, cell }, index) => (
-              <tr key={index}>{code(side, cell, !cell.line.text.endsWith('\n'))}</tr>
+            {lines.map(({ side, cell, oldContextStart }, index) => (
+              <tr key={index}>
+                {code(side, cell, !cell.line.text.endsWith('\n'), oldContextStart)}
+              </tr>
             ))}
           </tbody>
         </table>
@@ -507,6 +529,7 @@ function StringDiffView<TRef>({
       >
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 px-1 py-1">
           <DiffToolbar
+            mode={mode}
             unified={unified}
             expanded={expanded}
             wrap={wrap}
@@ -515,12 +538,14 @@ function StringDiffView<TRef>({
             total={changes.length}
             onNavigate={navigate}
             onMode={(value) => {
-              if (value === unified) {
+              if (value === mode) {
                 revealChange(currentChange);
                 return;
               }
-              pendingLocation.current = true;
-              setUnified(value);
+              pendingLocation.current =
+                ((value === 'auto' ? automaticMode : value) === 'unified') !== unified;
+              setMode(value);
+              onModeChange?.(value);
             }}
             onExpanded={() => {
               pendingLocation.current = true;

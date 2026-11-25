@@ -10,7 +10,7 @@ import {
 
 type Ref = { documentId: string; version: string } | boolean | null;
 const before = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
-const after = before.replace('line 80', 'changed 80');
+const after = before.replace('line 4 ', 'changed 4 ');
 const quote = '重复';
 const start = after.indexOf(quote, after.indexOf('line 12'));
 const location = {

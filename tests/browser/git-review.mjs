@@ -136,6 +136,13 @@ try {
   await finish();
   await selectDiffLayout(frame, '单列对比');
   assert.equal(await button('隐藏未改动行').getAttribute('aria-expanded'), 'true');
+  await selectFile('未暂存 · M tracked.log');
+  await frame
+    .locator('[data-code-side="new"]')
+    .filter({ hasText: 'tracked remains visible' })
+    .waitFor();
+  assert.equal((await button('对比方式').innerText()).trim(), '单列对比');
+  await selectFile('未暂存 · M a.ts');
   await selectDiffLayout(frame, '左右对比');
   // Refresh never retargets an old annotation.
   await writeFile(join(f.repo, 'a.ts'), 'fresh changed\r\nsecond line\r\n');

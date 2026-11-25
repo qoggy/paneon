@@ -173,7 +173,11 @@ export function diffPresentation(rows: readonly DiffRow[]) {
   }
   const unified = rows.map((row) => {
     const side: 'old' | 'new' = row.kind === 'delete' ? 'old' : 'new';
-    return { side, cell: cells.get(row[side] as DiffLine) as DiffCell };
+    return {
+      side,
+      cell: cells.get(row[side] as DiffLine) as DiffCell,
+      oldContextStart: row.kind === 'context' ? row.old?.start : undefined,
+    };
   });
   return { split, unified };
 }

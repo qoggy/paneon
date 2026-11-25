@@ -29,7 +29,7 @@ try {
       const [same, setSame] = useState(false);
       return <><Button onClick={() => setSame(true)}>Same source</Button>
         <div data-layout-host className="flex flex-col border" style={{height:'80rem'}}>
-          <DiffView layout="bounded" oldPath="source.ts" newPath="source.ts"
+          <DiffView layout="bounded" defaultMode="side-by-side" oldPath="source.ts" newPath="source.ts"
             oldText={${JSON.stringify(original)}} newText={same ? ${JSON.stringify(original)} : ${JSON.stringify(modified)}} />
         </div></>;
     }

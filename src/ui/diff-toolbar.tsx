@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronDown, FoldVertical, WrapText } from 'lucide-react';
 import { useUI } from './use-ui';
+import type { DiffViewMode } from './diff';
 import { Button } from './button';
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 
 export function DiffToolbar({
+  mode,
   unified,
   expanded,
   wrap,
@@ -21,17 +23,19 @@ export function DiffToolbar({
   onExpanded,
   onWrap,
 }: {
+  mode: DiffViewMode;
   unified: boolean;
   expanded: boolean;
   wrap: boolean;
   current: number;
   total: number;
   onNavigate: (index: number) => void;
-  onMode: (unified: boolean) => void;
+  onMode: (mode: DiffViewMode) => void;
   onExpanded: () => void;
   onWrap: () => void;
 }) {
   const { t } = useUI();
+  const layout = t(unified ? '单列对比' : '左右对比');
   return (
     <div
       className="flex min-w-0 flex-wrap items-center gap-1"
@@ -99,15 +103,18 @@ export function DiffToolbar({
           <DropdownMenuTrigger
             render={<Button size="sm" variant="ghost" aria-label={t('对比方式')} />}
           >
-            {t(unified ? '单列对比' : '左右对比')}
+            {mode === 'auto' ? t('Auto · {layout}', { layout }) : layout}
             <ChevronDown strokeWidth={1.5} aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuRadioGroup value={unified ? 'unified' : 'split'}>
-              <DropdownMenuRadioItem value="split" onClick={() => onMode(false)}>
+            <DropdownMenuRadioGroup value={mode}>
+              <DropdownMenuRadioItem value="auto" onClick={() => onMode('auto')}>
+                {t('Auto')}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="side-by-side" onClick={() => onMode('side-by-side')}>
                 {t('左右对比')}
               </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="unified" onClick={() => onMode(true)}>
+              <DropdownMenuRadioItem value="unified" onClick={() => onMode('unified')}>
                 {t('单列对比')}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>

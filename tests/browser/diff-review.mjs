@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startServer } from '../runtime-fixture.ts';
 import { assertFileIcons } from './file-icon-tools.mjs';
+import { selectDiffLayout } from './diff-toolbar-tools.mjs';
 import { annotationTools, selectAnnotationText, submitAnnotations } from './annotation-tools.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'paneon-built-in-diff-review-'));
@@ -109,8 +110,14 @@ try {
   assert.equal(await annotations.count(), 1);
   assert.equal(requests, 0, 'Resizing does not read files or submit feedback.');
   page.off('request', observe);
+  await selectDiffLayout(frame, '左右对比');
   await button('added.ts').dblclick();
   await newLine.filter({ hasText: 'added = true' }).waitFor();
+  assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
+  assert.equal(await frame.locator('[data-diff-column-layout]').count(), 0);
+  await selectDiffLayout(frame, '自动');
+  await frame.locator('[data-diff-scroll="unified"]').waitFor();
+  assert.equal((await button('对比方式').innerText()).trim(), '自动 · 单列对比');
   await selectAnnotationText(frame, '[data-code-side="new"][data-line="1"]', 13, 18);
   await annotations.write('新增文件也可以批注');
   await annotations.save();

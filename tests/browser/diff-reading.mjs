@@ -325,7 +325,10 @@ try {
     const single = ['added', 'deleted', 'filled', 'cleared'].includes(kind);
     assert.equal(await divider.count(), single ? 0 : 1);
     assert.equal(await frame.locator('[data-diff-source-header]').count(), single ? 1 : 2);
-    assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
+    assert.equal(
+      (await button('对比方式').innerText()).trim(),
+      single ? '自动 · 单列对比' : '自动 · 左右对比',
+    );
     if (kind === 'empty') {
       assert.equal(await frame.locator('[data-code-side]').count(), 0);
     } else {
@@ -333,7 +336,7 @@ try {
       assert.equal(await frame.locator(`[data-code-side="${fullSide}"]`).count(), 340);
     }
     if (single) {
-      const pane = frame.locator(`[data-diff-scroll="${side}"]`);
+      const pane = frame.locator('[data-diff-scroll="unified"]');
       const width = await source.evaluate((element) => element.clientWidth);
       assert.ok(
         Math.abs((await pane.boundingBox()).width - width) <= 1,

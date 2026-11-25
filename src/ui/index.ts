@@ -58,7 +58,7 @@ export { useUI } from './use-ui';
 export type { UIPreferences, UITheme, UILanguage, UIMessage } from './use-ui';
 
 export { DiffView } from './diff';
-export type { DiffViewProps, DiffViewHandle } from './diff';
+export type { DiffViewProps, DiffViewHandle, DiffViewMode } from './diff';
 export type { DiffLocation } from './diff-annotation';
 
 export { Tree } from './tree';

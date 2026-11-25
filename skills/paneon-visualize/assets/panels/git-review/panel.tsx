@@ -33,6 +33,7 @@ import {
 } from '@qoggy/paneon/ui';
 import { DiffView } from '../../shared/diff.tsx';
 import type { DiffViewHandle } from '../../shared/diff.tsx';
+import type { DiffViewMode } from '@qoggy/paneon/ui';
 import { diffAnnotationTargets, diffTargetLocation } from '../../shared/diff-schema.ts';
 import { useSubmission, SubmissionError } from '../../shared/submission.ts';
 import {
@@ -140,6 +141,7 @@ function Review() {
   const [oldSnapshot, setOldSnapshot] = useState<GitSnapshot>();
   const [oldFileSelected, setOldFileSelected] = useState(false);
   const diffView = useRef<DiffViewHandle>(null);
+  const [diffMode, setDiffMode] = useState<DiffViewMode>('auto');
   const mountedDiff = useRef<string | undefined>(undefined);
   const locating = useRef(0);
   const [fileReveal, setFileReveal] = useState(0);
@@ -853,6 +855,8 @@ function Review() {
               }}
               annotationTargets={diffAnnotationTargets(selected.model, selected.id)}
               model={selected.model}
+              defaultMode={diffMode}
+              onModeChange={setDiffMode}
               defaultExpanded
               layout="bounded"
               onCollapse={collapseDiff}

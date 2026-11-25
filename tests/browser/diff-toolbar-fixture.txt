@@ -20,7 +20,12 @@ function Panel() {
   const diff = useRef<DiffViewHandle>(null);
   const [kind, setKind] = useState('changed');
   const model = useMemo(
-    () => createDiffModel(original, kind === 'same' ? original : modified),
+    () => {
+      if (kind === 'separate') return createDiffModel('start\nremoved\nkeep\nend\n', 'start\nkeep\nadded\nend\n');
+      if (kind === 'add') return createDiffModel('start\n', 'start\nadded\n');
+      if (kind === 'delete') return createDiffModel('start\nremoved\n', 'start\n');
+      return createDiffModel(original, kind === 'same' ? original : modified);
+    },
     [kind],
   );
   usePageAnnotations<GitRef>({
@@ -34,6 +39,9 @@ function Panel() {
       <div className="flex flex-wrap items-center gap-2 p-2">
         <Button onClick={() => setKind('changed')}>Changed source</Button>
         <Button onClick={() => setKind('same')}>Same source</Button>
+        <Button onClick={() => setKind('separate')}>Separated edits</Button>
+        <Button onClick={() => setKind('add')}>Added lines</Button>
+        <Button onClick={() => setKind('delete')}>Removed lines</Button>
         <Button onClick={() => setKind('binary')}>Binary source</Button>
       </div>
       <div data-toolbar-viewport className="h-[32rem] min-w-0 overflow-y-auto border">

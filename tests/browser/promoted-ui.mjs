@@ -53,7 +53,7 @@ try {
   for (const theme of ['light', 'dark'])
     for (const language of ['en', 'zh-CN']) {
       await prefs(theme, language);
-      const mode = language === 'en' ? 'Side by side' : '左右对比';
+      const mode = language === 'en' ? 'Auto · Side by side' : '自动 · 左右对比';
       const layout = diff.getByRole('button', {
         name: language === 'en' ? 'Comparison layout' : '对比方式',
         exact: true,

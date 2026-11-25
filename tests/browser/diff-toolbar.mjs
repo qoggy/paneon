@@ -54,7 +54,7 @@ try {
   assert.equal(await counter.textContent(), '1 / 3');
   assert.equal(await previous.isDisabled(), true);
   assert.equal(await next.isEnabled(), true);
-  assert.equal((await button('对比方式').innerText()).trim(), '左右对比');
+  assert.equal((await button('对比方式').innerText()).trim(), '自动 · 左右对比');
   const toolbar = frame.getByRole('group', { name: '差异操作', exact: true });
   assert.equal(await toolbar.getByRole('group', { name: '差异导航', exact: true }).count(), 1);
   assert.equal(await toolbar.getByRole('group', { name: '差异显示选项', exact: true }).count(), 1);
@@ -67,7 +67,7 @@ try {
   await layout.press('Enter');
   assert.equal(
     await frame
-      .getByRole('menuitemradio', { name: '左右对比', exact: true })
+      .getByRole('menuitemradio', { name: '自动', exact: true })
       .getAttribute('aria-checked'),
     'true',
   );
@@ -97,7 +97,7 @@ try {
   await viewport.evaluate((e) => {
     e.scrollTop = 0;
   });
-  await selectDiffLayout(frame, '左右对比');
+  await selectDiffLayout(frame, '自动');
   assert.ok(
     (await viewport.evaluate((e) => e.scrollTop)) > 0,
     'Choosing the current layout still reveals the current difference.',
@@ -155,7 +155,19 @@ try {
   }
   await button('Same source').click();
   assert.equal(await counter.textContent(), '无差异');
+  assert.equal((await layout.innerText()).trim(), '自动 · 左右对比');
   for (const control of [counter, previous, next]) assert.equal(await control.isDisabled(), true);
+  for (const [sample, count] of [
+    ['Separated edits', '1 / 2'],
+    ['Added lines', '1 / 1'],
+    ['Removed lines', '1 / 1'],
+  ]) {
+    await button(sample).click();
+    await frame.locator('[data-diff-scroll="unified"]').waitFor();
+    assert.equal(await frame.locator('[data-diff-hunk]').count(), 1);
+    assert.equal((await layout.innerText()).trim(), '自动 · 单列对比');
+    assert.equal(await counter.textContent(), count);
+  }
   await button('Binary source').click();
   assert.equal(await frame.getByRole('group', { name: '差异操作', exact: true }).count(), 0);
   await button('Changed source').click();

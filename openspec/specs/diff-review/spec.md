@@ -65,7 +65,7 @@ Diff Review and Git Review's changes/compare views SHALL compose the public shad
 
 ### Requirement: Offer word wrapping with CodeBlock interaction
 
-Public DiffView SHALL accept `defaultWrap?: boolean`, defaulting to false, and own the user's wrap state internally. Its toolbar SHALL group difference navigation separately from display options, use a side-by-side/unified radio menu showing the current layout, and keep fixed wrap and hide-unchanged-lines icons in icon-sm buttons. Both toggles SHALL use secondary styling when on and ghost when off, with localized tooltips and aria-pressed semantics. The wrap tooltip SHALL state the current state and next action. Split, unified and whole-file single-sided views SHALL share the same state. Diff Review and Git Review SHALL inherit this behavior without panel-specific wrap parameters or state.
+Public DiffView SHALL accept `defaultWrap?: boolean`, defaulting to false, and own the user's wrap state internally. Its toolbar SHALL group difference navigation separately from display options and keep fixed wrap and hide-unchanged-lines icons in icon-sm buttons. Both toggles SHALL use secondary styling when on and ghost when off, with localized tooltips and aria-pressed semantics. The wrap tooltip SHALL state the current state and next action. Split, unified and whole-file single-sided views SHALL share the same state. Diff Review and Git Review SHALL inherit this behavior without panel-specific wrap parameters or state.
 
 #### Scenario: Retain the default long-line presentation
 
@@ -87,11 +87,6 @@ Public DiffView SHALL accept `defaultWrap?: boolean`, defaulting to false, and o
 - **WHEN** the wrap state changes
 - **THEN** the wrap icon stays fixed while selected styling and aria-pressed reflect the resulting state
 
-#### Scenario: Choose a comparison layout
-
-- **WHEN** the user opens the layout menu and chooses side-by-side or unified by pointer or keyboard
-- **THEN** the selected radio item and trigger text show that layout while preserving navigation, wrapping and annotations
-
 #### Scenario: Toggle context presentation
 
 - **WHEN** the user activates the hide-unchanged-lines icon
@@ -101,6 +96,30 @@ Public DiffView SHALL accept `defaultWrap?: boolean`, defaulting to false, and o
 
 - **WHEN** a mounted DiffView receives a changed defaultWrap or source after the user chooses a wrap state
 - **THEN** that choice remains until unmount; a new instance initializes from its own defaultWrap
+
+### Requirement: Choose the comparison layout from contiguous edits
+
+Public DiffView SHALL accept `defaultMode?: 'auto' | 'unified' | 'side-by-side'`, defaulting to `auto` and read when the view mounts. Its layout menu SHALL allow choosing Auto, Unified and Side by side, indicate the selected option, and display the resolved layout in Auto. In Auto it SHALL use side by side when any contiguous edit includes both removed and added lines, and unified when each edit has only one side. Identical texts SHALL use side by side, and whole-file additions and deletions SHALL remain full-width. DiffView SHALL report a changed menu choice through `onModeChange`. Diff Review and Git Review SHALL apply that choice to other files in the current panel session.
+
+#### Scenario: Add and remove lines in separate edits
+
+- **WHEN** the new version adds lines in one location and removes lines in another, with unchanged context in between
+- **THEN** Auto shows Unified even when the edits are grouped into the same hunk
+
+#### Scenario: Compare a replacement
+
+- **WHEN** a contiguous edit contains both removed and added lines
+- **THEN** Auto shows Side by side for the comparison
+
+#### Scenario: Switch files after choosing a manual layout
+
+- **WHEN** the user chooses Unified or Side by side in Diff Review or Git Review and switches files
+- **THEN** the same choice applies to the next file until the user changes it or returns to Auto
+
+#### Scenario: Locate an annotation without switching layouts
+
+- **WHEN** the user locates an annotation in Auto or a manually selected layout
+- **THEN** the view reveals the target without changing the selected mode, including old-side annotations on shared unified context
 
 ### Requirement: Preserve source identity and diff geometry during wrapping
 

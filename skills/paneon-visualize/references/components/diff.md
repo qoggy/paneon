@@ -11,6 +11,7 @@ import {
   DiffView,
   type DiffViewProps,
   type DiffViewHandle,
+  type DiffViewMode,
   type DiffLocation,
 } from '@qoggy/paneon/ui';
 ```
@@ -28,12 +29,16 @@ interface DiffViewProps<TRef> {
   oldRevision?: string;
   newRevision?: string;
   defaultWrap?: boolean; // default false: initial word wrapping; users can toggle it
+  defaultMode?: DiffViewMode; // default 'auto'; read when the view mounts
+  onModeChange?: (mode: DiffViewMode) => void; // user selects a different layout menu option
   defaultExpanded?: boolean; // default true: full file; false starts with changed hunks only
   onCollapse?: () => void; // when set, the toolbar shows a collapse button that calls it
   layout?: 'document' | 'bounded'; // default 'document' (natural flow); 'bounded' scrolls inside its container
   annotationTargets?: { old?: TRef; new?: TRef }; // an omitted side cannot be annotated; see authoring.md#markdown-codeblock-and-diffview
   ref?: Ref<DiffViewHandle>;
 }
+
+type DiffViewMode = 'auto' | 'unified' | 'side-by-side';
 
 interface DiffViewHandle {
   reveal(location: DiffLocation): Promise<void>; // expands the needed context, then scrolls to and highlights the location
@@ -48,4 +53,6 @@ type DiffLocation =
 
 Word wrapping defaults to off; its initial-value lifecycle follows CodeBlock: `defaultWrap` is read only on mount, and later prop or source changes do not overwrite the user's current choice. The toolbar toggles both sides together, including unified and single-sided views. Wrapped visual lines retain their original logical line numbers and annotation coordinates. Set `defaultWrap={true}` to start with wrapping; otherwise source lines scroll horizontally; scrolling affects the source content rather than the toolbar. Diff Review and Git Review inherit the same default without extra panel parameters.
 
-The toolbar lets the user change wrapping, comparison layout and context presentation locally. The wrap tooltip describes the current state and next action.
+In Auto, a contiguous edit containing both removed and added lines opens side by side. If every edit only adds or only removes lines, the view opens unified, even when the file has both kinds in separate edits. Identical texts open side by side. Whole-file additions and deletions display at full width.
+
+The layout menu reports the current choice and shows the resolved layout when Auto is selected. Diff Review and Git Review keep a manual choice across file switches within the panel session. A custom page can do the same by storing `onModeChange` and passing that choice as `defaultMode` when mounting another DiffView.

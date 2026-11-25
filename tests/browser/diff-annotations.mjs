@@ -93,7 +93,7 @@ try {
   await diff.locator('[data-code-side="new"][data-line="12"]').waitFor();
 
   const original = Array.from({ length: 120 }, (_, i) => `line ${i + 1} 重复 é🙂\r\n`).join('');
-  const modified = original.replace('line 80', 'changed 80');
+  const modified = original.replace('line 4 ', 'changed 4 ');
   async function save(selector, comment) {
     await selectAnnotationText(frame, selector, 0, 8);
     await annotations.write(comment);
@@ -155,7 +155,18 @@ try {
   await button('Reveal hidden text').click();
   assert.equal(
     (await diff.getByRole('button', { name: '对比方式', exact: true }).innerText()).trim(),
-    '左右对比',
+    '单列对比',
+  );
+  await annotations.locate(1);
+  await waitForAnnotationScrollIdle(frame);
+  assert.equal(await diff.locator('[data-code-side="old"][data-line="12"]').count(), 0);
+  assert.equal(
+    await diff.evaluate(() =>
+      Array.from(CSS.highlights.get('paneon-diff-location') ?? [])
+        .map(String)
+        .join(''),
+    ),
+    beforeMode.annotations[0].targets[0].text.quote,
   );
   const beforeSubmit = await draft();
   await submitAnnotations(frame);
@@ -198,6 +209,7 @@ try {
   assert.deepEqual(await draft(), edited, 'Changed source cannot block or rewrite saved feedback');
   assert.equal(await frame.locator('[data-submit-error]').textContent(), '');
   await button('Restore source').click();
+  await selectDiffLayout(frame, '左右对比', diff);
   await button('Reveal hidden text').click();
   await button('Only new').click();
   await diff.locator('[data-code-side="old"][data-line="12"]').evaluate((element) => {

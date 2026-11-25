@@ -12,7 +12,7 @@ import {
 } from '@qoggy/paneon/sdk';
 import { readFile } from 'node:fs/promises';
 import type { AnnotationValue, ElementAnnotationRef } from '@qoggy/paneon/sdk';
-import type { DiffViewHandle } from '@qoggy/paneon/ui';
+import type { DiffViewHandle, DiffViewMode, DiffViewProps } from '@qoggy/paneon/ui';
 import { useSubmission } from '../../shared/submission';
 import { FileReviewSplit } from '../../shared/file-review-split';
 import { testFilePresentation } from '../../shared/test-file-presentation';
@@ -114,16 +114,20 @@ export const readComparison = serverAction({
   },
 });
 
+type DiffModeProps = Pick<DiffViewProps, 'defaultMode' | 'onModeChange'>;
+
 function ComparisonView({
   comparison,
   onStatus,
   onRead,
   fileIndex,
   diff,
+  diffMode,
 }: {
   comparison: Comparison;
   fileIndex: number;
   diff: React.RefObject<DiffViewHandle | null>;
+  diffMode: DiffModeProps;
   onRead: (index: number, snapshot: Snapshot) => void;
   onStatus: (comparison: Comparison, status: ComparisonStatus) => void;
 }) {
@@ -157,7 +161,13 @@ function ComparisonView({
     );
   if (!query.data) return null;
   return (
-    <SnapshotView comparison={comparison} snapshot={query.data} fileIndex={fileIndex} diff={diff} />
+    <SnapshotView
+      comparison={comparison}
+      snapshot={query.data}
+      fileIndex={fileIndex}
+      diff={diff}
+      diffMode={diffMode}
+    />
   );
 }
 
@@ -166,14 +176,17 @@ function SnapshotView({
   snapshot,
   fileIndex,
   diff,
+  diffMode,
 }: {
   comparison: Comparison;
   snapshot: Snapshot;
   fileIndex: number;
   diff: React.RefObject<DiffViewHandle | null>;
+  diffMode: DiffModeProps;
 }) {
   return (
     <DiffView
+      {...diffMode}
       ref={diff}
       oldText={snapshot.oldText}
       newText={snapshot.newText}
@@ -300,6 +313,8 @@ function DiffReviewPanel() {
   const [expanded, setExpanded] = useState<readonly string[]>(initial.expanded);
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<Comparison | null>(value.files[0] ?? null);
+  const [mode, setMode] = useState<DiffViewMode>('auto');
+  const diffMode = { defaultMode: mode, onModeChange: setMode };
   const [statuses, setStatuses] = useState<Record<string, ComparisonStatus>>({});
   const statusQuery = useQuery(readComparisonStatuses, value.files);
   const comparisonStates: Record<string, { status: ComparisonStatus; error?: string }> =
@@ -557,6 +572,7 @@ function DiffReviewPanel() {
               snapshot={preserved.snapshot}
               fileIndex={preserved.fileIndex}
               diff={diff}
+              diffMode={diffMode}
             />
           ) : opened ? (
             // A fresh query/view per manifest entry keeps late responses off another file.
@@ -567,6 +583,7 @@ function DiffReviewPanel() {
               onRead={recordSnapshot}
               fileIndex={value.files.indexOf(opened)}
               diff={diff}
+              diffMode={diffMode}
             />
           ) : (
             <p className="p-4 text-sm text-muted-foreground">{copy.open}</p>

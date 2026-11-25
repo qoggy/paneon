@@ -8,6 +8,20 @@ export type DiffLocation =
   | { kind: 'hunk'; index: number }
   | ({ kind: 'text'; side: 'old' | 'new' } & AnnotationTextRange);
 
+/** Unified context is rendered once, with coordinates for both original sources. */
+export function diffSourceRows(root: HTMLElement, side: 'old' | 'new') {
+  const selector =
+    side === 'old' ? '[data-code-side="old"], [data-old-context-start]' : '[data-code-side="new"]';
+  return Array.from(root.querySelectorAll<HTMLElement>(selector), (element) => ({
+    element,
+    start: Number(
+      side === 'old'
+        ? (element.dataset.oldContextStart ?? element.dataset.sourceStart)
+        : element.dataset.sourceStart,
+    ),
+  }));
+}
+
 /** Exact DOM geometry for full-source text coordinates.
  * The same mapping powers location and contextual markers, without registering
  * overlapping text sources or searching repeated quotes. */
@@ -21,8 +35,8 @@ export function diffLocationRanges(
   if (text === undefined || !validTextRange(text, { ref: null, text: location })) return [];
   const { start, end } = location;
   const ranges: Range[] = [];
-  root.querySelectorAll<HTMLElement>(`[data-code-side="${location.side}"]`).forEach((element) => {
-    let offset = Number(element.dataset.sourceStart);
+  for (const { element, start: sourceStart } of diffSourceRows(root, location.side)) {
+    let offset = sourceStart;
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     let node: Node | null;
     while ((node = walker.nextNode())) {
@@ -36,7 +50,7 @@ export function diffLocationRanges(
       }
       offset = next;
     }
-  });
+  }
   return ranges;
 }
 
